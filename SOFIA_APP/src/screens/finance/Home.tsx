@@ -143,7 +143,7 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
   // 0.3.252 (computador): Resumo em duas colunas - saldo, guardado, controle e avisos a esquerda; lancamentos a direita
   const summary = (
     <>
-      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
+      <Presence>{breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}</Presence>
       <Presence>{forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Previsto até {forecastEnd}</Text>

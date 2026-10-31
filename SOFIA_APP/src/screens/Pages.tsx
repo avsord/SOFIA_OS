@@ -1,3 +1,4 @@
+import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
 import {useRenderCost} from '../lib/render-cost';
@@ -299,7 +300,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
     </View>
 </ScrollView></View></KeyboardToolbar>
-  {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}
+  <Presence>{appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}</Presence>
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <KeyboardViewport>{editor}</KeyboardViewport>

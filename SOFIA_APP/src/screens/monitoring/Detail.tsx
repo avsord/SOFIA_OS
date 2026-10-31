@@ -375,7 +375,7 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
         if (saved) void runCollection(api, {only: saved.id, scope: api.owner});
       }} /> : null}</Presence>
 
-      {viewer ? <PageViewer api={api} monitor={monitor} store={viewer} onClose={() => setViewer(null)} onSaved={async () => { setViewer(null); clearIssue(issueKey(monitor.id, viewer.url)); await onChanged(); }} /> : null}
+      <Presence>{viewer ? <PageViewer api={api} monitor={monitor} store={viewer} onClose={() => setViewer(null)} onSaved={async () => { setViewer(null); clearIssue(issueKey(monitor.id, viewer.url)); await onChanged(); }} /> : null}</Presence>
 
       <Sheet visible={productMenu} onClose={() => setProductMenu(false)} label="Fechar opções do produto">
         <View style={{gap: 2}}>

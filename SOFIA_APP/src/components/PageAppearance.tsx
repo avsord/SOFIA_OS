@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {PALETTE} from '../lib/palette';
 import {tap} from '../lib/desktop';
-import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder,Platform} from 'react-native';
+import {View,Text,Pressable,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder,Platform} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +13,7 @@ import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
 import {cachedPageCover} from '../lib/page-cover-cache';
+import {MotionModal} from './MotionModal';
 export const PAGE_COVERS=[
  ['Lavanda','linear-gradient(135deg,#d9d2ff,#b8aaff)'],['Areia','linear-gradient(135deg,#efe9df,#d8cfc2)'],
  ['Azul','linear-gradient(135deg,#b9d7ff,#7da8ea)'],['Verde','linear-gradient(135deg,#cde8d8,#8fc9aa)'],
@@ -118,7 +119,8 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
   if(!alive.current)return;
   await finishPick(result);
  }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
- return <Modal visible transparent animationType="fade" onRequestClose={()=>{if(!busy)onClose();}}>
+ // 0.3.268: entra e sai animada (antes sumia de uma vez ao fechar)
+ return <MotionModal visible transparent onRequestClose={()=>{if(!busy)onClose();}}>
   <Pressable onPress={()=>{if(!busy)onClose();}} style={{flex:1,backgroundColor:PALETTE.black+'55',justifyContent:'flex-end'}}>
    <Pressable onPress={()=>{}} style={{maxHeight:'82%',borderTopLeftRadius:24,borderTopRightRadius:24,backgroundColor:c.surface,padding:20,paddingBottom:30}}>
     <View style={{flexDirection:'row',alignItems:'center',marginBottom:14}}><Text style={{flex:1,fontSize:24,fontWeight:'600',color:c.text}}>{kind==='icon'?'Ícone da página':'Capa da página'}</Text><IconButton name="close" label="Fechar" disabled={busy} onPress={onClose}/></View>
@@ -134,5 +136,5 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
     </>}
    </Pressable>
   </Pressable>
- </Modal>;
+ </MotionModal>;
 }

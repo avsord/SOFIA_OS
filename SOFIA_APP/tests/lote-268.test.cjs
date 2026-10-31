@@ -20,6 +20,12 @@ test('janelas montadas so quando abertas agora saem animadas (Presence)',()=>{
   const files=['src/screens/Finance.tsx','src/screens/finance/Home.tsx','src/screens/finance/Plan.tsx','src/screens/finance/Transactions.tsx','src/screens/finance/Manage.tsx','src/screens/Mail.tsx','src/screens/Monitoring.tsx','src/screens/monitoring/Detail.tsx','src/screens/Chat.tsx','src/screens/workspace/Tasks.tsx','src/screens/Agenda.tsx','src/screens/Home.tsx','src/screens/Workspace.tsx'];
   let n=0;for(const f of files){const s=read(f);const k=(s.match(/<Presence>/g)||[]).length;assert.ok(k>0,f);n+=k;}
   assert.ok(n>=30,'janelas cobertas: '+n);
+  // as quatro que tinham ficado de fora: detalhe do mes (Financas), pagina da loja (Price Tracker), Aparencia (Paginas), Diagnostico (Perfil)
+  assert.ok(read('src/screens/finance/Home.tsx').includes('<Presence>{breakdown ? <MonthBreakdown'));
+  assert.ok(read('src/screens/monitoring/Detail.tsx').includes('<Presence>{viewer ? <PageViewer'));
+  assert.ok(read('src/screens/Pages.tsx').includes('<Presence>{appearance?<PageAppearance'));
+  assert.ok(read('src/screens/Profile.tsx').includes('<Presence>{perfOpen?<FluencyPanel'));
+  assert.ok(read('src/components/PageAppearance.tsx').includes('<MotionModal visible transparent')&&read('src/components/FluencyPanel.tsx').includes('<MotionModal visible'));
 });
 test('alerta mantem o texto durante a saida; menu do botao direito anima; seta da arvore gira suave; pagina solta sem voltar',()=>{
   assert.ok(read('src/lib/app-alert.tsx').includes('const current=open||lastShown.current'));
