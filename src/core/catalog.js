@@ -360,6 +360,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"unit","label":"Unidade","type":"text"},{"key":"price","label":"Preço total (R$)","type":"number"},{"key":"in_cart","label":"No carrinho","type":"checkbox"},
       {
         "key": "variant",
         "label": "Variante exata (tamanho, capacidade...)",
@@ -438,6 +439,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"unit","label":"Unidade","type":"text"},{"key":"price","label":"Preço total (R$)","type":"number"},{"key":"section","label":"Seção","type":"text"},{"key":"in_cart","label":"No carrinho","type":"checkbox"},
       {
         "key": "list",
         "label": "Lista",
@@ -947,6 +949,7 @@ const CATALOG={
     "group": "user",
     "states": ["active","archived"],
     "fields": [
+      {"key":"color","label":"Cor","type":"text"},{"key":"budget","label":"Orçamento (R$)","type":"number"},{"key":"keywords","label":"Palavras do grupo","type":"text"},{"key":"collection_id","label":"Lista","type":"text"},
       {"key":"description","label":"Descrição","type":"textarea"}
     ],
     "description": "Filtro definido pelo usuário dentro de Comprar. Excluir o grupo não deve apagar os itens: eles voltam para Sem grupo.",
@@ -957,6 +960,7 @@ const CATALOG={
     "group": "user",
     "states": ["active","archived"],
     "fields": [
+      {"key":"template","label":"Modelo","type":"select","options":["market","shopping","simple"]},{"key":"system","label":"Lista do app","type":"select","options":["market","shopping"]},{"key":"history_json","label":"Histórico (JSON)","type":"textarea","max":300000},{"key":"remind_at","label":"Lembrar de ir","type":"datetime"},{"key":"remind_agenda","label":"Também na Agenda","type":"checkbox"},{"key":"remind_ref","label":"Lembrete ligado (IDs)","type":"text"},{"key":"position","label":"Posição","type":"number"},
       {"key":"description","label":"Descrição","type":"textarea"},
       {"key":"icon","label":"Ícone / símbolo","type":"text"}
     ],
@@ -968,6 +972,7 @@ const CATALOG={
     "group": "user",
     "states": ["needed","done","unavailable","cancelled","archived"],
     "fields": [
+      {"key":"unit","label":"Unidade","type":"text"},{"key":"price","label":"Preço total (R$)","type":"number"},{"key":"section","label":"Seção","type":"text"},{"key":"in_cart","label":"No carrinho / feito","type":"checkbox"},{"key":"group_id","label":"Grupo","type":"text"},{"key":"url","label":"Link","type":"url"},{"key":"store","label":"Loja","type":"text"},
       {"key":"collection_id","label":"Lista (ID obrigatório)","type":"text"},
       {"key":"quantity","label":"Quantidade / unidade","type":"text"},
       {"key":"notes","label":"Observações","type":"textarea"}
@@ -1112,6 +1117,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "author",
         "label": "Origem / autor informado",
@@ -1197,6 +1203,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "artist",
         "label": "Artista",
@@ -1240,6 +1247,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "year",
         "label": "Ano",
@@ -1288,6 +1296,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "url",
         "label": "Link",
@@ -1323,6 +1332,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "author",
         "label": "Autor",
@@ -1387,6 +1397,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"cover_url","label":"Capa","type":"url"},{"key":"site","label":"Site","type":"text"},{"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000},
       {
         "key": "type",
         "label": "Tipo",
@@ -1525,6 +1536,57 @@ const CATALOG={
     ],
     "description": "Ideias são diferentes de anotações. Evoluem no mesmo registro com versões."
   },
+  "note_tag": {
+    "label": "Etiqueta de nota",
+    "group": "user",
+    "states": ["active","archived"],
+    "fields": [
+      {"key":"color","label":"Cor","type":"text"},
+      {"key":"lock_json","label":"Proteção por senha (sal e teste cifrado)","type":"textarea","max":4000}
+    ],
+    "description": "Etiqueta criada pela pessoa em Notas (nome, cor e, se quiser, senha). A senha nunca vem para o servidor.",
+    "defaultPrivacy": "private"
+  },
+  "library_item": {
+    "label": "Item da Biblioteca",
+    "group": "library",
+    "states": ["saved","archived"],
+    "fields": [
+      {"key":"type","label":"Tipo","type":"text"},
+      {"key":"status","label":"Status","type":"text"},
+      {"key":"status_on","label":"Data do status","type":"date"},
+      {"key":"rating","label":"Nota","type":"number"},
+      {"key":"year","label":"Ano","type":"number"},
+      {"key":"creator","label":"Autor / direção / canal","type":"text"},
+      {"key":"url","label":"Link","type":"url"},
+      {"key":"site","label":"Site","type":"text"},
+      {"key":"cover_url","label":"Capa","type":"url"},
+      {"key":"file_id","label":"Arquivo (anexo)","type":"text"},
+      {"key":"file_name","label":"Nome do arquivo","type":"text"},
+      {"key":"file_mime","label":"Tipo do arquivo","type":"text"},
+      {"key":"file_error","label":"Envio pendente","type":"text"},
+      {"key":"extra_json","label":"Campos do tipo","type":"textarea","max":8000},
+      {"key":"links_json","label":"Ligações com o app","type":"textarea","max":4000}
+    ],
+    "description": "Item genérico da Biblioteca (filme, série, livro, receita, produto, lugar, artigo, curso, documento ou tipo criado pela pessoa). O tipo define status e campos.",
+    "defaultPrivacy": "private"
+  },
+  "library_type": {
+    "label": "Tipo da Biblioteca",
+    "group": "user",
+    "states": ["active","archived"],
+    "fields": [
+      {"key":"builtin","label":"Tipo pronto","type":"text"},
+      {"key":"icon","label":"Ícone","type":"text"},
+      {"key":"model","label":"Modelo","type":"text"},
+      {"key":"config_json","label":"Configuração (status, nota, campos)","type":"textarea","max":8000},
+      {"key":"position","label":"Posição","type":"number"},
+      {"key":"pinned","label":"Fixo","type":"checkbox"},
+      {"key":"in_more","label":"No Mais (celular)","type":"checkbox"}
+    ],
+    "description": "Tipo da Biblioteca criado ou ajustado pela pessoa (nome, ícone, status, nota e campos).",
+    "defaultPrivacy": "private"
+  },
   "annotation": {
     "label": "Anotação",
     "group": "knowledge",
@@ -1533,6 +1595,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"pinned","label":"Fixada","type":"checkbox"},{"key":"lock_tag","label":"Etiqueta protegida","type":"text"},{"key":"enc_json","label":"Conteúdo protegido (cifrado)","type":"textarea","max":200000},
       {
         "key": "context",
         "label": "Contexto",
@@ -2130,6 +2193,7 @@ const CATALOG={
     "defaultPrivacy": "private",
     "states": ["active", "delivered", "archived"],
     "fields": [
+      {"key":"fee_amount","label":"Imposto (R$)","type":"number"},{"key":"fee_paid","label":"Imposto pago","type":"checkbox"},{"key":"fee_tx","label":"Lançamento do imposto","type":"text"},{"key":"pickup_reminder","label":"Lembrete de retirada","type":"text"},{"key":"source_mail","label":"E-mail de origem","type":"text"},
       { "key": "code", "label": "Código de rastreio", "type": "text", "max": 40 },
       { "key": "carrier", "label": "Transportadora", "type": "text", "max": 40 },
       { "key": "status", "label": "Último status", "type": "text", "max": 160 },

@@ -133,6 +133,8 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   {id:'tab:notifications',label:'Notificações',group:'Menus',icon:'bell',run:()=>onNavigate('notifications')},
   ...APP_SHORTCUTS.map(a=>({id:'app:'+a.id,label:a.title,group:'Apps',icon:a.icon,run:()=>onOpenModule(a.id)})),
   {id:'action:new-page',label:'Nova página',group:'Ações',icon:'plus',run:onCreatePage},
+  // 0.3.269: "adicionar" no Ctrl+K abre a janela de adicionar da Biblioteca
+  {id:'action:library-add',label:'Adicionar à Biblioteca',group:'Ações',icon:'book',hint:'N',run:()=>{(globalThis as any).__sofiaLibraryAdd=true;onOpenModule('library');setTimeout(()=>{try{window.dispatchEvent(new CustomEvent('sofia:library-add'));(globalThis as any).__sofiaLibraryAdd=false;}catch{/* navegador antigo */}},350);}},
   {id:'action:sidebar',label:collapsed?'Mostrar barra lateral':'Recolher barra lateral',group:'Ações',icon:'sidebar',hint:'Ctrl+\\',run:()=>setCollapsed(!collapsed)},
   ...paletteTasks.filter(t=>!['done','cancelled'].includes(t.state)).slice(0,300).map(t=>({id:'task:'+t.id,label:t.title,group:'Tarefas',icon:(t.state==='scheduled'?'calendar':'checklist') as IconName,hint:t.state==='scheduled'?'na agenda':undefined,run:()=>{(window as any).__sofiaOpenTask=t.id;onOpenModule('tasks');try{window.dispatchEvent(new CustomEvent('sofia:open-task',{detail:t.id}));}catch{/* navegador antigo */}}})),
   ...(pages||[]).map(p=>({id:'page:'+p.id,label:p.title||'Sem título',group:'Páginas',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined,icon:(isEmoji(p.data?.icon)?undefined:'book') as IconName|undefined,run:()=>onOpenPage(p.id)})),

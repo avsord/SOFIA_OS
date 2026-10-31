@@ -487,6 +487,12 @@ function makeMobileApi(runtime, deps) {
       return send({ item: workspace.save({ kind: 'commitment', title: cleanText(b.title, 'Título', 200), area: 'Pessoal', privacy: 'private', data: { start_at: new Date(b.start_at).toISOString(), end_at: '', location: '' } }) });
     }
     // Encomendas: atualizar agora (consulta a transportadora e devolve o registro atualizado).
+    // 0.3.269: cota da Ship24 no rodape de Encomendas - rastreios NOVOS cadastrados no mes (atualizar nao gasta)
+    if (p === '/api/mobile/packages/quota' && m === 'GET') {
+      const month = new Date().toISOString().slice(0, 7);
+      const used = workspace.list({kind: 'package', limit: 500}).filter(x => String(x.created_at || '').startsWith(month) && (x.data && (x.data.ship24_tracker_id || x.data.ok_at || x.data.checked_at))).length;
+      return send({used, limit: 10, month, configured: !!(runtime.packages && runtime.packages.ship24Configured && runtime.packages.ship24Configured())});
+    }
     if (p === '/api/mobile/packages/refresh' && m === 'POST') { const b = await bodyJson(req, 2048); const r = await runtime.packages.refreshOne(String(b.id || '')); return send({ item: r.item, changed: r.changed, error: r.error }); }
     if (p === '/api/mobile/notifications' && m === 'GET') return send({ items: workspace.notifications(), push_enabled: false });
     match = p.match(/^\/api\/mobile\/notifications\/([\w-]+)\/read$/);
@@ -532,6 +538,26 @@ function makeMobileApi(runtime, deps) {
         return send({ok: true, updated_at: at});
       }
       if (m === 'DELETE') { rate(session, 'write', 20); store.db.prepare("DELETE FROM profile_photo WHERE owner='owner'").run(); return send({ok: true}); }
+    }
+    // 0.3.269: ler um link colado (Listas, Biblioteca): titulo, imagem, site e preco
+    // 0.3.269: buscar um nome nos catalogos (filmes, series, livros) para criar o item da Biblioteca ja preenchido
+    if (p === '/api/mobile/library/search' && m === 'POST') {
+      rate(session, 'libsearch', 120); const b = await bodyJson(req, 2048);
+      return send({items: await require('../services/library-search').librarySearch(String(b.q || ''), {prefer: String(b.prefer || '')})});
+    }
+    // 0.3.269 (Financas no site): arrastar/colar a nota no campo de lancar - a Sofia le e devolve para conferir (nada e salvo aqui)
+    if (p === '/api/mobile/finance/read-receipt' && m === 'POST') {
+      rate(session, 'receipt', 30); const b = await bodyJson(req, 8 * 1024 * 1024);
+      const mime = /^image\/(png|jpe?g|webp|gif)$/.test(String(b.mime)) ? String(b.mime) : 'image/jpeg', data = String(b.base64 || '').replace(/^data:[^,]*,/, '');
+      if (data.length < 100) fail('BAD_IMAGE', 'Imagem inválida.', 400);
+      const schema = {type: 'object', additionalProperties: false, required: ['desc', 'amount', 'date', 'category', 'items'], properties: {desc: {type: 'string'}, amount: {type: 'number'}, date: {type: 'string'}, category: {type: 'string'}, items: {type: 'string'}}};
+      const instructions = 'Leia esta foto de compra (cupom, nota fiscal, comprovante, Pix ou pedido) e devolva: desc = loja e item principal (curto), amount = valor TOTAL pago em reais, date = data da compra AAAA-MM-DD (vazio se não aparecer), category = uma de: Alimentação, Mercado, Transporte, Moradia, Contas, Saúde, Educação, Lazer, Compras, Assinaturas, Viagem, Pets, Presentes, Impostos, Trabalho, Outros; items = itens comprados resumidos. Não invente: se não der para ler o valor, amount = 0.';
+      const r = await runtime.routing.respondStructured('private', {instructions, input: [{role: 'user', content: [{type: 'input_text', text: 'Foto da compra para lançar em Finanças.'}, {type: 'input_image', image_url: 'data:' + mime + ';base64,' + data}]}], schema, name: 'finance_receipt', maxOutputTokens: 500});
+      const out = r && r.data !== undefined ? r.data : r; return send({receipt: out});
+    }
+    if (p === '/api/mobile/link/preview' && m === 'POST') {
+      rate(session, 'link', 60); const b = await bodyJson(req, 4096);
+      return send(await require('../services/link-preview').linkPreview(String(b.url || '').slice(0, 2000)));
     }
     if (p === '/api/mobile/profile' && m === 'PATCH') {
       rate(session, 'write', 40); const b = await bodyJson(req, 2048);

@@ -72,7 +72,7 @@ export const modules:{id:string;title:string;caption:string;icon:IconName;kinds?
  {id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'box'},
  {id:'tasks',title:'Tarefas backlog',caption:'A fazer e prioridades',icon:'checklist'},
  {id:'lists',title:'Listas',caption:'Pessoais, mercado e compras',icon:'cart',kinds:['list_collection','list_item','shopping_item','purchase_group','purchase']},
- {id:'library',title:'Biblioteca',caption:'Leituras, referências e arquivos',icon:'book',group:'library'},
+ {id:'library',title:'Biblioteca',caption:'Filmes, livros e receitas',icon:'book',group:'library'},
  {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'tag'},
  {id:'finance',title:'Finanças',caption:'Contas, cartões e orçamentos',icon:'wallet'},
  {id:'mail',title:'E-mails',caption:'A Sofia de olho no que importa',icon:'mail'},

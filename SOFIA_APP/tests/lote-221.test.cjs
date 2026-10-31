@@ -79,7 +79,8 @@ test('voltar de Financas para Apps: grade ja montada, Financas nao desmonta, esq
   const w=read('src/screens/Workspace.tsx'),g=read('src/components/AppGrid.tsx'),s=read('src/screens/Finance.tsx');
   assert.ok(w.includes("<View style={{flex:1,display:module?'none':'flex'}}"),'grade so escondida');
   assert.ok(w.includes("financeKept||(module==='finance'&&financeReady)?<Finance"),'Financas fica montada');
-  assert.ok(w.includes("id==='finance'||id==='monitor'||id==='mail'){setKind('');return;}"),'nao carrega lista de registros por tras');
+  // 0.3.269: Listas, Notas e Biblioteca tambem viraram telas proprias (mesma protecao: nao carregam a lista generica por tras)
+  assert.ok(/id==='finance'\|\|id==='monitor'\|\|id==='mail'(\|\|id==='[a-z]+')*\)\{setKind\(''\);return;\}/.test(w),'nao carrega lista de registros por tras');
   assert.ok(g.includes('export function AppGridSkeleton(')&&g.includes('<ShimmerBlock')&&g.includes('if(width>0)setW(width);'));
   assert.ok(s.includes("if (wasActive.current && !active) { goHome(); setMonth(monthOf(todayISO()));"),'ao sair volta ao Resumo do mes, como antes');
 });

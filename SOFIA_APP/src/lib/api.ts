@@ -72,6 +72,8 @@ export type ImportItem = {import_id: string; date: string; desc: string; amount:
 let activeApi: SofiaApi | null = null;
 export function currentApi() { return activeApi; }
 export type ProfilePhoto = {mime: string; base64: string; updated_at: string};
+export type CatalogHit = {type: string; title: string; year: number | null; creator: string; cover: string; genre: string; source: string};
+export type LinkPreview = {url: string; title: string; site: string; image: string; price: number | null; description: string; type?: string; read: boolean};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
@@ -190,6 +192,7 @@ export class SofiaApi {
     } finally { clearTimeout(timer); signal?.removeEventListener('abort',cancel); }
   }
   /** Encomendas (0.3.142): consulta a transportadora agora e devolve o registro atualizado. */
+  packagesQuota() { return this.request<{used: number; limit: number; month: string; configured: boolean}>('/packages/quota'); }
   refreshPackage(id: string) { return this.request<{item: Entity; changed: boolean; error: string}>('/packages/refresh', { id }); }
   /** 0.3.258: no site, um navegador novo pede um codigo enviado ao e-mail cadastrado (segundo passo); depois de
    * acertar, o navegador guarda uma marca de confianca de 90 dias. No app do celular nada muda. */
@@ -291,6 +294,10 @@ export class SofiaApi {
   financeRecover(id: string) { return this.request<Entity>('/md/finance/recover', {id}, 'POST'); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
+  /** 0.3.269: titulo, imagem, site e preco de um link colado (Listas, Biblioteca). Nunca falha: sem leitura volta so o link. */
+  librarySearch(q: string, prefer = '') { return this.request<{items: CatalogHit[]}>('/library/search', {q, prefer}, 'POST', 15000); }
+  readReceipt(mime: string, base64: string) { return this.request<{receipt: {desc: string; amount: number; date: string; category: string; items: string}}>('/finance/read-receipt', {mime, base64}, 'POST', 60000); }
+  linkPreview(url: string) { return this.request<LinkPreview>('/link/preview', {url}, 'POST', 15000); }
   profilePhoto() { return this.request<{photo: ProfilePhoto | null}>('/profile/photo'); }
   saveProfilePhoto(mime: string, base64: string) { return this.request<{ok: boolean; updated_at: string}>('/profile/photo', {mime, base64}, 'POST', 60000); }
   deleteProfilePhoto() { return this.request<{ok: boolean}>('/profile/photo', undefined, 'DELETE'); }

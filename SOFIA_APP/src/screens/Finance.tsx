@@ -57,6 +57,7 @@ import {ReportsTab} from './finance/Reports';
 import {ManageSheet} from './finance/Manage';
 // 0.3.263: Financas dividida em partes (src/screens/finance/*). Quem importava daqui continua importando daqui.
 export {financeWindow} from './finance/core';
+import {FinanceDesk, type DeskView} from './finance/Desk';
 export {useFinanceGoal, FinanceGoalHome} from './finance/Goal';
 // ============================ TELA ============================
 export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler: (() => boolean) | null) => void; api: SofiaApi; active: boolean; onBack: () => void}) {
@@ -72,6 +73,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
   const [billScope, setBillScope] = useState<'month' | 'series'>('series'), [billFlow, setBillFlow] = useState<'expense' | 'income'>('expense');
   const [billEditor, setBillEditor] = useState<Tx | 'new' | null>(null), [notificationWarning, setNotificationWarning] = useState(''), [billCard, setBillCard] = useState('');
   const [pendingSide, setPendingSide] = useState<'pagar' | 'receber'>('pagar');
+  const [deskView, setDeskView] = useState<DeskView>('home');
   const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const navigateFinance = useCallback((next: Tab) => {
     if (next === tab) return;
@@ -173,6 +175,8 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
         {/* 0.3.253: no computador o cabecalho, a linha conta/mes e as abas se alinham a coluna de leitura */}
+        {/* 0.3.269: no SITE (computador) Finanças tem a estrutura nova (lateral, extrato no centro, mês valendo para tudo); o celular segue igual */}
+        {desktop && d && d.accounts.length ? <FinanceDesk api={api} d={scoped || d} full={d} month={month} setMonth={setMonth} accountId={accountId} isPrimary={isPrimary} account={account} onPickAccount={() => setAccountPicker(true)} reload={reload} onTx={setEditing} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow(t !== 'new' && t.kind === 'income' ? 'income' : 'expense'); setBillCard(''); setBillEditor(t); }} onNewBill={flow => { setBillScope('series'); setBillFlow(flow); setBillCard(''); setBillEditor('new'); }} onManage={() => setManage(true)} view={deskView} setView={setDeskView} pendingSide={pendingSide} setPendingSide={setPendingSide} warning={notificationWarning} /> : <>
         <View style={pad(0)}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
@@ -212,6 +216,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
           </ScrollView>
         )}
+        </>}
 
         {d && d.accounts.length ? <>
           {/* 0.3.152: um unico botao + (antes eram dois botoes grandes sobre o extrato) */}
