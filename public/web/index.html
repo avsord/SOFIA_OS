@@ -30,11 +30,14 @@
       @media (prefers-color-scheme: dark) { body { background: #121017; } }
       #root { display: flex; height: 100%; flex: 1; }
       ::selection { background: rgba(114, 88, 232, 0.28); }
+      /* 0.3.267: sem contorno de clique em nenhum elemento do site */
+      *:focus, *:focus-visible { outline: none !important; }
+      input, textarea, select, button, [tabindex] { outline: none; -webkit-tap-highlight-color: transparent; }
     </style>
   <link rel="icon" href="/favicon.ico"/></head>
   <body>
     <noscript>Para usar a Sofia OS, ative o JavaScript no seu navegador.</noscript>
     <div id="root"></div>
-  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-4d668efeeab61c75b4b016b914eeb156.js" defer></script><script src="/_expo/static/js/web/index-69445cf1035e4f270dbf595f16bc343f.js" defer></script>
+  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-e4107121a36074f25a70bf7e19a616cc.js" defer></script><script src="/_expo/static/js/web/index-7c08e14d4c45dd86975b7ab0bd372bee.js" defer></script>
 </body>
 </html>

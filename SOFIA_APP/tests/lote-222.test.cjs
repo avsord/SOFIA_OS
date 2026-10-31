@@ -64,5 +64,6 @@ test('apps: segurar seleciona quase na hora; segurar e soltar sem arrastar abre 
 
 test('e-mail: emoji por e-mail (estrela ou outro)',()=>{
   const m=read('src/screens/Mail.tsx');
-  assert.ok(m.includes("const HIT_EMOJIS = ['⭐'")&&m.includes('{hitEmoji(h, rules) ? <Text>{hitEmoji(h, rules)}</Text> : null}')&&m.includes('Emoji deste e-mail'));
+  // 0.3.268: cada e-mail continua com a sua marcacao, agora desenhada como icone de traco (pedido do Pedro)
+  assert.ok(m.includes("const HIT_EMOJIS = ['⭐'")&&m.includes('{hitEmoji(h, rules) ? <MarkIcon value={hitEmoji(h, rules)} /> : null}')&&m.includes('Marcação deste e-mail'));
 });

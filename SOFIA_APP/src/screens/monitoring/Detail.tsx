@@ -1,3 +1,4 @@
+import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
 import {rightClick} from '../../lib/web-page';
@@ -366,13 +367,13 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
         ) : null}
       </Sheet>
 
-      {storeSheet ? <AddStores api={api} monitor={monitor} onClose={() => setStoreSheet(false)} onAdded={async urls => {
+      <Presence>{storeSheet ? <AddStores api={api} monitor={monitor} onClose={() => setStoreSheet(false)} onAdded={async urls => {
         let data = monitor;
         for (const u of urls) data = {...data, data: {...data.data, source_urls: addSource(data, u)}};
         const saved = await patch({source_urls: data.data.source_urls}, {}, urls.length === 1 ? 'Loja adicionada' : urls.length + ' lojas adicionadas');
         setStoreSheet(false);
         if (saved) void runCollection(api, {only: saved.id, scope: api.owner});
-      }} /> : null}
+      }} /> : null}</Presence>
 
       {viewer ? <PageViewer api={api} monitor={monitor} store={viewer} onClose={() => setViewer(null)} onSaved={async () => { setViewer(null); clearIssue(issueKey(monitor.id, viewer.url)); await onChanged(); }} /> : null}
 

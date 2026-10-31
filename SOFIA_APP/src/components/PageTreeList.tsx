@@ -27,6 +27,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  const reducedMotion=useReducedMotion();
  const [ghost,setGhost]=useState<Visible|null>(null),[drop,setDrop]=useState<PageDrop|null>(null),[context,setContext]=useState<string|null>(null),[geometry,setGeometry]=useState(0),[limit,setLimit]=useState(INITIAL_ROWS);
  const pan=useRef(new Animated.ValueXY()).current;
+ useLayoutEffect(()=>{if(!ghost)pan.setValue({x:0,y:0});},[ghost,pan]);
  const all=useMemo(()=>[...new Map([...roots,...[...children.values()].flat()].map(p=>[p.id,p])).values()],[roots,children]);
  const visible=useMemo(()=>{const result:Visible[]=[];const walk=(items:Entity[],depth:number,path:Set<string>)=>{for(const page of items){if(path.has(page.id)||depth>40)continue;const kids=children.get(page.id)||[],open=compact||expanded.has(page.id);result.push({page,depth,hasChildren:!!kids.length,open});if(open)walk(kids,depth+1,new Set([...path,page.id]));}};walk(roots,0,new Set());return result;},[roots,children,expanded,compact]);
  const latest=useRef({all,visible,onMove,onOpen,onDelete,onInteractionChange,onDragChange,canParent});latest.current={all,visible,onMove,onOpen,onDelete,onInteractionChange,onDragChange,canParent};
@@ -73,7 +74,9 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
   const now=Date.now();if(prev&&Math.abs(y-d.switchY)<8&&now-d.switchAt<90)return;
   d.drop=next;d.switchY=y;d.switchAt=now;setDrop(next);}
  function end(cancelled=false){const d=drag.current;if(!d)return;drag.current=null;
-  const finish=()=>{setGhost(null);setDrop(null);pan.setValue({x:0,y:0});latest.current.onDragChange?.(false);};
+  // 0.3.268: o deslocamento so volta a zero no mesmo quadro em que a ordem nova aparece (efeito abaixo). Antes a
+  // pagina solta voltava ao lugar antigo por um instante antes de pular para o novo.
+  const finish=()=>{setGhost(null);setDrop(null);latest.current.onDragChange?.(false);};
   if(cancelled){finish();return;}if(!d.moved){finish();setContext(d.page.id);return;}
   const target=d.drop&&latest.current.canParent(d.page.id,d.drop.parentId)?d.drop:null;
   if(!target){finish();return;}
@@ -90,7 +93,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  const line=rawLine!=null&&ghostRect&&drop?.kind!=='inside'&&ghostRect.y<rawLine?rawLine-ghostRect.height:rawLine;
  const renderRow=(row:Visible)=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <ShiftRow key={p.id} offset={previewShift(p.id)} dragging={!!ghost}>
    <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} {...contextMenu(()=>[{label:'Abrir',icon:'book',run:()=>onOpen(p)},...(row.hasChildren?[{label:row.open?'Recolher subpáginas':'Mostrar subpáginas',icon:'list' as const,run:()=>toggle(p.id)}]:[]),...(onDelete?[{label:'Apagar',icon:'trash' as const,danger:true,run:()=>onDelete(p)}]:[])])} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?0:1}}>
-    {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
+    {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{...({transitionProperty:'transform',transitionDuration:'160ms',transitionTimingFunction:'ease-out'} as any),transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
     <PageRow page={p} compact={compact} onTouchStart={()=>latest.current.onInteractionChange?.(true)} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>
    </View>
    {context===p.id&&onDelete?<View style={{flexDirection:'row',justifyContent:'flex-end',gap:8,padding:6}}><Pressable accessibilityLabel={'Excluir página '+p.title} onPress={()=>{setContext(null);onDelete(p);}} style={{padding:12,borderRadius:9,backgroundColor:c.input}}><Text style={{color:c.danger}}>Excluir “{p.title}”</Text></Pressable><Pressable accessibilityLabel="Fechar ações da página" onPress={()=>setContext(null)} style={{padding:12}}><Text style={{color:c.muted}}>Cancelar</Text></Pressable></View>:null}

@@ -1,3 +1,4 @@
+import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../lib/palette';
 import {contextMenu} from '../components/ContextMenu';
@@ -232,15 +233,15 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
           </Sheet>
         </> : null}
 
-        {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} onOptimistic={patchTx} onOptimisticRemove={removeTx} /> : null}
-        {billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} hasReserve={!!reserveOf(d.goals)} finance={d} initialCard={billCard} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => { setBillEditor(null); setBillCard(''); }} onSaved={saved => {setBillEditor(null); setBillCard('');
+        <Presence>{editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} onOptimistic={patchTx} onOptimisticRemove={removeTx} /> : null}</Presence>
+        <Presence>{billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} hasReserve={!!reserveOf(d.goals)} finance={d} initialCard={billCard} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => { setBillEditor(null); setBillCard(''); }} onSaved={saved => {setBillEditor(null); setBillCard('');
           // 0.3.207: depois de salvar, vai para o mes e para o lado (A pagar / A receber) da conta e confirma onde ficou
           if(saved){setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');
             }
           void reload();}}
           onOptimistic={(t, replaceId) => { setData(prev => prev ? {...prev, txs: replaceId ? prev.txs.map(x => x.id === replaceId ? t : x) : [...prev.txs, t]} : prev);
-            setBillEditor(null); setBillCard(''); setMonth(monthOf(t.date)); setPendingSide(t.kind === 'income' ? 'receber' : 'pagar'); navigateFinance('bills'); }} /> : null}
-        {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
+            setBillEditor(null); setBillCard(''); setMonth(monthOf(t.date)); setPendingSide(t.kind === 'income' ? 'receber' : 'pagar'); navigateFinance('bills'); }} /> : null}</Presence>
+        <Presence>{manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}</Presence>
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
             <Text style={{fontSize:20,fontWeight:'700',color:c.text}}>Qual conta quer acompanhar?</Text>

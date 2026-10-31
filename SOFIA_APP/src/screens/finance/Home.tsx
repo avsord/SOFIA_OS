@@ -1,3 +1,4 @@
+import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
 import {contextMenu} from '../../components/ContextMenu';
@@ -143,7 +144,7 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
   const summary = (
     <>
       {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
-      {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
+      <Presence>{forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Previsto até {forecastEnd}</Text>
           <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{paydayKnown ? 'Quanto sobra do ciclo, do dia do salário até a véspera do próximo' : 'Quanto sobra do mês'}, depois de tudo pago: salário e outras receitas do ciclo − todas as despesas do ciclo (pagas ou não) − faturas do cartão − aporte. Não usa o Saldo: pagar uma conta não muda o previsto.{paydayKnown ? ' Nos 5 dias antes do pagamento, já mostra o ciclo seguinte.' : ''}</Text>
@@ -166,9 +167,9 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
           </View>
           {forecastP.left < 0 ? <Text style={{color: c.danger, fontSize: 12, lineHeight: 18}}>O que ainda falta pagar passa {show(-forecastP.left)} do que você tem e do que vai entrar até lá.</Text> : null}
         </ScrollView>
-      </Sheet> : null}
-      {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} startEdit={aporteEdit} onClose={() => { setReserveHistoryOpen(false); setAporteEdit(null); }} /> : null}
-      {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
+      </Sheet> : null}</Presence>
+      <Presence>{reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} startEdit={aporteEdit} onClose={() => { setReserveHistoryOpen(false); setAporteEdit(null); }} /> : null}</Presence>
+      <Presence>{reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}</Presence>
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
       <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>
       {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
@@ -281,7 +282,7 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
         </View>
       </Pressable>)}
       <FixedDupCard d={d} api={api} reload={reload} />
-      {dupGroup ? <Sheet visible onClose={() => setDupOpen(null)} label="Fechar revisão de repetidos">
+      <Presence>{dupGroup ? <Sheet visible onClose={() => setDupOpen(null)} label="Fechar revisão de repetidos">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Lançamentos repetidos</Text>
           <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>“{dupGroup.title}”, {show(dupGroup.amount)}, aparece {dupGroup.items.length} vezes em {monthLabel(month).split(' ')[0].toLowerCase()}. Apague os que foram lançados a mais: cada um que sai devolve o valor ao Saldo.</Text>
@@ -293,7 +294,7 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
           <Pressable accessibilityRole="button" onPress={() => { const next = [...dupOk, dupCode(dupGroup.key)].slice(-150); setDupOk(next); void SecureStore.setItemAsync('sofia_fin_dupok_v1', JSON.stringify(next)).catch(() => {}); setDupOpen(null); }} style={{paddingVertical: 12}}>
             <Text style={{color: c.accent, fontWeight: '600'}}>São compras diferentes, pode manter</Text></Pressable>
         </ScrollView>
-      </Sheet> : null}
+      </Sheet> : null}</Presence>
       {/* 0.3.199: categoria que ja passou do que voce costuma gastar no mes */}
       {month === monthOf(today) ? catAlerts.slice(0, 2).map(a => <Pressable key={a.category} accessibilityRole="button" onPress={() => setBreakdown('expense')}
         style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.warn + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.warn}}>
@@ -549,7 +550,7 @@ export function FixedDupCard({d, api, reload}: {d: Data; api: SofiaApi; reload: 
         <Text style={{color: c.muted, fontSize: 12}}>{x.kind === 'income' ? 'Receita' : 'Conta'} do dia {x.day}. Toque para apagar as cópias.</Text>
       </View>
     </Pressable>)}
-    {g ? <Sheet visible onClose={() => setOpen(null)} label="Fechar cadastros repetidos">
+    <Presence>{g ? <Sheet visible onClose={() => setOpen(null)} label="Fechar cadastros repetidos">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
         <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Cadastros repetidos</Text>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>“{g.title}” aparece {g.items.length} vezes, todas no dia {g.day}. Apague as que sobram e deixe só a certa.</Text>
@@ -561,7 +562,7 @@ export function FixedDupCard({d, api, reload}: {d: Data; api: SofiaApi; reload: 
         <Pressable accessibilityRole="button" onPress={() => { const next = [...ok, code(g.key)].slice(-150); setOk(next); void SecureStore.setItemAsync('sofia_fin_dupok_v1', JSON.stringify(next)).catch(() => {}); setOpen(null); }} style={{paddingVertical: 12}}>
           <Text style={{color: c.accent, fontWeight: '600'}}>São diferentes, pode manter</Text></Pressable>
       </ScrollView>
-    </Sheet> : null}
+    </Sheet> : null}</Presence>
   </>;
 }
 export function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; reload: () => Promise<void>; onImport: () => void}) {

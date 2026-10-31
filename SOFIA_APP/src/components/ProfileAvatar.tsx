@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {Image,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {initials} from '../lib/chat-model';
-import {readProfilePhoto} from '../lib/profile-photo';
+import {readProfilePhoto} from '../lib/profile-photo-cloud';
 import {primeProfilePhoto,photoPreview,subscribeProfilePhoto} from '../lib/profile-photo-events';
 import {Brand} from './UI';
 /** Account-owned photo in the title bar, synced with the Profile editor. */

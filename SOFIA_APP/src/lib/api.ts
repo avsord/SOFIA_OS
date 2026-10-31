@@ -68,6 +68,10 @@ function noteApiFailure(path:string,method:string,e:ApiError,ms:number){apiFailu
 export function apiDiagnostics(){return {recentFailures:apiFailures.slice(-25)};}
 export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
 export type ImportItem = {import_id: string; date: string; desc: string; amount: number; kind: string; category: string; duplicate: boolean; skip: string; checked?: boolean; before?: boolean; match?: {id: string; title: string; amount?: number} | null; original?: string};
+/** 0.3.268: a ultima API com sessao (para partes que nao recebem a API por props, como a foto do perfil). */
+let activeApi: SofiaApi | null = null;
+export function currentApi() { return activeApi; }
+export type ProfilePhoto = {mime: string; base64: string; updated_at: string};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
@@ -116,7 +120,7 @@ export class SofiaApi {
     if(refresh.length)systemChanged(this);
   }
   readonly owner: string;
-  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.owner=scope;this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
+  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {if(token)activeApi=this;this.owner=scope;this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
   get mdLocalOnly(){return this.md.localOnly;}
   /** 0.3.256: ordem das Paginas guardada no aparelho - pronta? carregar; aplicar sem rede */
   get pageOrderReady(){return this.md.orderLoaded;}
@@ -287,6 +291,9 @@ export class SofiaApi {
   financeRecover(id: string) { return this.request<Entity>('/md/finance/recover', {id}, 'POST'); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
+  profilePhoto() { return this.request<{photo: ProfilePhoto | null}>('/profile/photo'); }
+  saveProfilePhoto(mime: string, base64: string) { return this.request<{ok: boolean; updated_at: string}>('/profile/photo', {mime, base64}, 'POST', 60000); }
+  deleteProfilePhoto() { return this.request<{ok: boolean}>('/profile/photo', undefined, 'DELETE'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
   async entities(kind: string, q = '', offset = 0) { const path='/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset,generation=this.cacheGeneration;const result=await this.request<{items:Entity[]}>(path);if(kind!=='user_page')return result;const decorated={...result,items:await this.md.decorate(result.items)};
     // 0.3.255: a copia guardada para abrir rapido ja vai na ordem que a pessoa escolheu neste aparelho. Antes ela ficava

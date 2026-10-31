@@ -38,6 +38,14 @@ export const loadBackgroundServices=()=>once('background-services',()=>require('
 
 // Prepare lazy module definitions, without mounting hidden screens or fetching data.
 export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadProfile] as const;
+/** 0.3.268 (site): depois de entrar, baixa em segundo plano os arquivos de todas as telas, para a troca de menu
+ * nao esperar download (era o que fazia o esqueleto piscar no canto). So baixa: nao monta nada escondido. */
+let prefetched=false;
+export function prefetchWebScreens(){
+ if(prefetched)return;prefetched=true;
+ const idle=(fn:()=>void)=>{const w=globalThis as any;if(typeof w.requestIdleCallback==='function')w.requestIdleCallback(fn,{timeout:2500});else setTimeout(fn,600);};
+ idle(()=>{void Promise.all([import('../screens/Chat'),import('../screens/Agenda'),import('../screens/Pages'),import('../screens/Workspace'),import('../screens/Profile'),import('../screens/Notifications')]).catch(()=>{prefetched=false;});});
+}
 
 /** Skip unchanged hidden screens when the active tab changes.
  * Creating new JSX/props objects must not rerender chat history, workspaces,

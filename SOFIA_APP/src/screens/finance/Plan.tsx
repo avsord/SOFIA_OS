@@ -1,3 +1,4 @@
+import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
 import {contextMenu} from '../../components/ContextMenu';
@@ -98,7 +99,7 @@ export function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {mo
       {(() => { const candidates = d.txs.filter(t => !t.virtual && t.manualDue && t.kind === 'expense' && !t.cardId && ((t.recurrence === 'monthly' && !t.seriesId) || (t.recurrence === 'none' && !t.paid)));
         const link = async (t: Tx) => { if (linking.current) return; linking.current = true; setBusy(true); try { if (t.recurrence === 'monthly' && t.paid && t.entity) await startSeriesNextMonth(api, t, {card_id: card.id, invoice_month: ''}, t.desc); else if (t.entity) await saveEntity(api, 'fin_tx', t.desc, {card_id: card.id, invoice_month: '', paid: false}, t.entity); setLinkOpen(false); await reload(); } catch (e) { appAlert('Finanças', errorText(e)); } finally { linking.current = false; setBusy(false); } };
         return <>
-          {linkOpen ? <Sheet visible onClose={() => setLinkOpen(false)} label="Fechar escolher conta">
+          <Presence>{linkOpen ? <Sheet visible onClose={() => setLinkOpen(false)} label="Fechar escolher conta">
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 10, paddingBottom: 18}}>
               <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Pagar no {card.name}</Text>
               <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Escolha a conta que passa a ser paga neste cartão. Conta fixa já paga este mês continua paga pela conta; o cartão vale a partir do mês que vem.</Text>
@@ -107,7 +108,7 @@ export function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {mo
                 <Text style={{color: c.text, fontWeight: '600'}}>{money(t.amount)}</Text>
               </SurePressable>) : <Text style={{color: c.muted}}>Nenhuma conta a pagar em Contas para trazer para o cartão.</Text>}
             </ScrollView>
-          </Sheet> : null}
+          </Sheet> : null}</Presence>
         </>; })()}
     </>
   );
@@ -146,9 +147,9 @@ export function PlanTab({d, month, api, reload}: {d: Data; month: string; api: S
           );
         }) : <Text style={{color: c.muted}}>Viagem, reserva de emergência, um equipamento novo… A Sofia calcula quanto guardar por mês até o prazo.</Text>}
       </Card_>
-      {budgetSheet ? <BudgetSheet api={api} budget={budgetSheet === 'new' ? null : budgetSheet} used={d.budgets.map(b => b.category)} onClose={() => setBudgetSheet(null)} onSaved={() => { setBudgetSheet(null); void reload(); }} /> : null}
-      {goalSheet ? <GoalSheet api={api} goal={goalSheet === 'new' ? null : goalSheet} onClose={() => setGoalSheet(null)} onSaved={() => { setGoalSheet(null); void reload(); }} /> : null}
-      {deposit ? <AmountSheet title={'Guardar em ' + deposit.name} onClose={() => setDeposit(null)} onSave={async v => { const saved = Math.round((deposit.saved + v) * 100) / 100; await saveEntity(api, 'fin_goal', deposit.name, {saved}, deposit.entity, saved >= deposit.target ? 'completed' : undefined); setDeposit(null); await reload(); }} /> : null}
+      <Presence>{budgetSheet ? <BudgetSheet api={api} budget={budgetSheet === 'new' ? null : budgetSheet} used={d.budgets.map(b => b.category)} onClose={() => setBudgetSheet(null)} onSaved={() => { setBudgetSheet(null); void reload(); }} /> : null}</Presence>
+      <Presence>{goalSheet ? <GoalSheet api={api} goal={goalSheet === 'new' ? null : goalSheet} onClose={() => setGoalSheet(null)} onSaved={() => { setGoalSheet(null); void reload(); }} /> : null}</Presence>
+      <Presence>{deposit ? <AmountSheet title={'Guardar em ' + deposit.name} onClose={() => setDeposit(null)} onSave={async v => { const saved = Math.round((deposit.saved + v) * 100) / 100; await saveEntity(api, 'fin_goal', deposit.name, {saved}, deposit.entity, saved >= deposit.target ? 'completed' : undefined); setDeposit(null); await reload(); }} /> : null}</Presence>
     </>
   );
 }

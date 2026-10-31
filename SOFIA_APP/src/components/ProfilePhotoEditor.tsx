@@ -6,7 +6,7 @@ import {Brand} from './UI';
 import {Icon} from './Icon';
 import {useTheme} from '../lib/theme';
 import {errorText,initials} from '../lib/chat-model';
-import {readProfilePhoto,removeProfilePhoto,saveProfilePhoto} from '../lib/profile-photo';
+import {readProfilePhoto,removeProfilePhoto,saveProfilePhoto} from '../lib/profile-photo-cloud';
 import {photoChanged,photoPreview,primeProfilePhoto,subscribeProfilePhoto} from '../lib/profile-photo-events';
 import {appAlert} from '../lib/app-alert';
 

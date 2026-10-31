@@ -23,7 +23,10 @@ function checkMobileOrigin(req, config) {
 }
 function makeMobileApi(runtime, deps) {
   const { store, config, core, routing, workspace, audioService } = runtime;
-  const board = require('../services/conversation-board').createConversationBoard({store, provider: runtime.provider});
+  // 0.3.268: o Quadro da conversa ficava sempre vazio porque runtime.provider so existe nos testes; em producao a IA
+  // e chamada pelo roteamento (mesma chave/rota da interpretacao da Sofia).
+  const boardProvider = runtime.provider || {structured: req => runtime.routing.respondStructured('private', req).then(r => r && r.data !== undefined ? r.data : r)};
+  const board = require('../services/conversation-board').createConversationBoard({store, provider: boardProvider});
   const { bodyJson, json, ownerAuth, mobileSessions, tooManyFailures, registerFailure, clearFailures } = deps;
   // 0.3.258: segundo passo no login do SITE. O navegador (pedido com Origin) que nao tem a marca de confianca recebe
   // um codigo de 6 digitos no e-mail cadastrado; depois de acertar, ganha uma marca de 90 dias e nao pede mais.
@@ -379,7 +382,7 @@ function makeMobileApi(runtime, deps) {
     }
     if (p === '/api/mobile/chat-history' && m === 'DELETE') { rate(session, 'delete', 10); return send(store.clearChatHistory()); }
     const boardMatch = p.match(/^\/api\/mobile\/conversations\/([\w-]+)\/board$/);
-    if (boardMatch && m === 'GET') { const id = validId(boardMatch[1]); conversation(id); return send(board.read(id)); }
+    if (boardMatch && m === 'GET') { const id = validId(boardMatch[1]); conversation(id); board.schedule(id); return send(board.read(id)); } // 0.3.268: abrir uma conversa antiga tambem organiza o quadro (so chama a IA se houver mensagem nova)
     if (boardMatch && m === 'POST') { const id = validId(boardMatch[1]); conversation(id); rate(session, 'board', 20); return send(await board.update(id)); }
     let match = p.match(/^\/api\/mobile\/conversations\/([\w-]+)$/);
     if (match && m === 'GET') {
@@ -517,6 +520,19 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/md/notifications/read-all' && m === 'POST') { await bodyJson(req, 256).catch(() => ({})); return send(workspace.markAllRead()); }
     match = p.match(/^\/api\/mobile\/md\/notifications\/([\w-]+)$/);
     if (match && m === 'DELETE') return send(workspace.clearNotification(match[1] === 'all' ? 'all' : validId(match[1])));
+    // 0.3.268: foto do perfil guardada no servidor, para aparecer igual no app e no site (antes ficava so no aparelho)
+    if (p === '/api/mobile/profile/photo') {
+      try { store.db.exec('CREATE TABLE IF NOT EXISTS profile_photo(owner TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL)'); } catch { /* banco de teste */ }
+      if (m === 'GET') { const r = store.db.prepare("SELECT mime,data,updated_at FROM profile_photo WHERE owner='owner'").get(); return send(r ? {photo: {mime: r.mime, base64: r.data, updated_at: r.updated_at}} : {photo: null}); }
+      if (m === 'POST') {
+        rate(session, 'write', 20); const b = await bodyJson(req, 4 * 1024 * 1024);
+        const mime = ['image/jpeg', 'image/png', 'image/webp'].includes(String(b.mime)) ? String(b.mime) : 'image/jpeg', data = String(b.base64 || '').replace(/^data:[^,]*,/, '');
+        if (!/^[A-Za-z0-9+/=]{100,}$/.test(data)) fail('BAD_PHOTO', 'Foto inválida.', 400);
+        const at = new Date().toISOString(); store.db.prepare("INSERT INTO profile_photo VALUES('owner',?,?,?) ON CONFLICT(owner) DO UPDATE SET mime=excluded.mime,data=excluded.data,updated_at=excluded.updated_at").run(mime, data, at);
+        return send({ok: true, updated_at: at});
+      }
+      if (m === 'DELETE') { rate(session, 'write', 20); store.db.prepare("DELETE FROM profile_photo WHERE owner='owner'").run(); return send({ok: true}); }
+    }
     if (p === '/api/mobile/profile' && m === 'PATCH') {
       rate(session, 'write', 40); const b = await bodyJson(req, 2048);
       store.updateSettings({ profileName: cleanText(b.name, 'Nome', 80) }); return send({ profile: profile() });

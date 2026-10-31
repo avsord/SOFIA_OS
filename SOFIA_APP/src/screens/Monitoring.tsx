@@ -1,3 +1,4 @@
+import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
 import {PALETTE} from '../lib/palette';
@@ -51,6 +52,8 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
     try { setProducts(await loadProducts(api)); setError(''); } catch (e) { setError(errorText(e)); setProducts(p => p || []); }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
+  // 0.3.268: sair do Price Tracker (seta, Esc, voltar) fecha o painel do produto; ao voltar ele nao esta mais aberto
+  useEffect(() => { if (!active) setOpenId(null); }, [active]);
   useEffect(() => { if (!col.running && col.lastRun && active) void load(); }, [col.running, col.lastRun, active, load]);
   useEffect(() => {
     if (!active) return;
@@ -155,8 +158,8 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           )}
         </ScrollView>
 
-        {adding ? <AddProduct api={api} used={(products || []).map(p => p.color)} existing={products || []} onClose={() => setAdding(false)}
-          onCreated={id => { setAdding(false); void load().then(() => setOpenId(id)); }} /> : null}
+        <Presence>{adding ? <AddProduct api={api} used={(products || []).map(p => p.color)} existing={products || []} onClose={() => setAdding(false)}
+          onCreated={id => { setAdding(false); void load().then(() => setOpenId(id)); }} /> : null}</Presence>
         {shown ? <ProductDetail visible={!!open} others={(products || []).filter(p => p.monitor.id !== shown.monitor.id).map(p => p.monitor)} api={api} product={shown} issues={col.issues} running={col.running} onClose={() => setOpenId(null)} onChanged={load} onDeleted={() => { setOpenId(null); void load(); }} /> : null}
       </View>
     </InternalBackGesture>

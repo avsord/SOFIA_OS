@@ -1,3 +1,4 @@
+import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
 import {contextMenu} from '../../components/ContextMenu';
@@ -97,7 +98,7 @@ export function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, rel
             {items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => appAlert('Mês fechado', CLOSED_MSG)} api={api} reload={reload} />)}
           </View>)}</View> : null}
         </Card_>; }) : <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>Nenhum mês fechado ainda. Quando o mês virar, ele aparece aqui para consulta.</Text>) : null}
-      {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
+      <Presence>{importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}</Presence>
       {source === 'months' ? null : hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
       {catPresets.length ? <Chips scroll value={activeCat} onChange={setCat} options={[{value: '', label: 'Todas as categorias'}, ...catPresets.map(name => ({value: name, label: name}))]} /> : null}
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
@@ -192,7 +193,7 @@ export function RefundsTab({d, api, reload, accountId}: {d: Data; api: SofiaApi;
     </Pressable>) : <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', paddingVertical: 12}}>Nenhuma devolução esperando.</Text>}
     {received.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>RECEBIDAS</Text>{received.map(r => <View key={r.id} style={{flexDirection: 'row', gap: 10, paddingVertical: 6}}>
       <Text style={{flex: 1, color: c.text}} numberOfLines={1}>✓ {r.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{money(r.amount)}{r.receivedAt ? ' · ' + r.receivedAt.split('-').reverse().join('/') : ''}</Text></View>)}</View> : null}
-    {editing ? <RefundSheet api={api} refund={editing === 'new' ? null : editing} accounts={accounts} defaultAccount={accountId || accounts[0]?.id || ''} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
+    <Presence>{editing ? <RefundSheet api={api} refund={editing === 'new' ? null : editing} accounts={accounts} defaultAccount={accountId || accounts[0]?.id || ''} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}</Presence>
   </View>;
 }
 export function RefundSheet({api, refund, accounts, defaultAccount, expense, onClose, onSaved}: {api: SofiaApi; refund: Refund | null; accounts: Account[]; defaultAccount: string; expense?: {id: string; desc: string; amount: number}; onClose: () => void; onSaved: () => void}) {
@@ -437,7 +438,7 @@ export function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOpti
           <Button title={editing ? 'Salvar alterações' : 'Salvar'} loading={busy} onPress={() => void save()} />
         </ScrollView>
       </KeyboardAvoidingView>
-      {refundOpen && tx.id ? <RefundSheet api={api} refund={null} accounts={d.accounts.filter(a => !a.archived)} defaultAccount={tx.accountId || defaultAccountId || ''} expense={{id: tx.id, desc: desc || tx.desc || '', amount: parseMoney(amount) || tx.amount || 0}} onClose={() => setRefundOpen(false)} onSaved={() => { setRefundOpen(false); onSaved(); }} /> : null}
+      <Presence>{refundOpen && tx.id ? <RefundSheet api={api} refund={null} accounts={d.accounts.filter(a => !a.archived)} defaultAccount={tx.accountId || defaultAccountId || ''} expense={{id: tx.id, desc: desc || tx.desc || '', amount: parseMoney(amount) || tx.amount || 0}} onClose={() => setRefundOpen(false)} onSaved={() => { setRefundOpen(false); onSaved(); }} /> : null}</Presence>
     </MotionModal>
   );
 }

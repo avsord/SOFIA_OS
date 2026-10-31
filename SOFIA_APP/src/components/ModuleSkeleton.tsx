@@ -1,4 +1,5 @@
 import React, {useEffect} from 'react';
+import {Platform} from 'react-native';
 import {PageLoading} from './Loading';
 
 /** Esqueleto que aparece no MESMO toque em que o app é aberto (estilo Notion/
@@ -11,6 +12,9 @@ export function ModuleSkeleton({title, eyebrow, blocks = [150, 92, 92, 92]}: {ti
 /** Monta o conteúdo pesado um quadro depois do toque, com o esqueleto já na tela. */
 export function useAfterFrame(key: string): boolean {
   const [ready, setReady] = React.useState('');
+  // 0.3.268 (site): no computador o app abre no mesmo clique (sem os dois quadros de esqueleto que piscavam)
+  if (Platform.OS === 'web') return true;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!key) { setReady(''); return; }
     let second = 0;

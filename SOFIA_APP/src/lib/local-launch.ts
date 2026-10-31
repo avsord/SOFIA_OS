@@ -22,7 +22,7 @@ export async function prepareLocalLaunch(
   // Restore the already-saved profile photo alongside Home and Agenda.
   // The first real Home frame must not briefly fall back to initials.
   // Offline startup still uses only local storage: no HTTP dependency.
-  const photoReady=import('./profile-photo')
+  const photoReady=import('./profile-photo-cloud')
    .then(({readProfilePhoto})=>import('./profile-photo-events')
     .then(({primeProfilePhoto})=>primeProfilePhoto(auth.profile.email,readProfilePhoto)))
    .catch(()=>{});

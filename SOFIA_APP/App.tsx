@@ -35,7 +35,7 @@ import {Spinner,FadeSwap} from './src/components/Loading';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices,loadSofiaFiles} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices,loadSofiaFiles,prefetchWebScreens} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
@@ -122,6 +122,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  },[visible,auth,initialDataReady,api,fluency]);
  // Warm code/screens after the native fade, concurrently with archive I/O;
  // Pages owns its loading/empty-state gate and never fabricates a page list.
+ useEffect(()=>{if(auth)prefetchWebScreens();},[auth]); // 0.3.268: site baixa as telas em segundo plano
  const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs);
  useEffect(()=>{if(!visible||fluency==='pending')return;if(fluency==='old'){setBackgroundReady(true);return;}return queueOptional('background-services:mount',()=>setBackgroundReady(true),7,5000);},[visible,fluency]);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);

@@ -3,6 +3,7 @@
 // tudo aqui so liga com Platform.OS==='web' e largura >= DESKTOP_MIN.
 import {createContext,useContext,useEffect,useState,useSyncExternalStore} from 'react';
 import {ContentWidth,columnPadding} from './content-width';
+import {scaleSpace} from '../web/desktop-scale';
 import {Dimensions,Platform,useWindowDimensions} from 'react-native';
 import type {Entity,Tab} from './types';
 import type {IconName} from '../components/Icon';
@@ -83,16 +84,17 @@ export function useDesktopCss(on:boolean,colors:{line:string;muted:string;accent
   const el=document.createElement('style');el.id='sofia-desktop-css';
   el.textContent=[
    '[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="switch"],[role="tab"],[role="menuitem"]{cursor:pointer}',
-   '[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="checkbox"],[role="radio"]{transition:box-shadow .12s ease,background-color .12s ease,opacity .12s ease,transform .12s ease}',
+   // 0.3.268: todo hover com transicao curta (~100 ms), inclusive nos elementos clicaveis sem papel declarado
+   '[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="checkbox"],[role="radio"],div[tabindex]{transition:box-shadow .1s ease,background-color .1s ease,border-color .1s ease,color .1s ease,opacity .1s ease}',
    // 0.3.263: hover que aparece de verdade (o brilho antigo sumia em fundo branco): um veu na cor da marca por cima
    '[role="button"]:hover:not([aria-disabled="true"]),[role="menuitem"]:hover,[role="tab"]:hover,[role="checkbox"]:hover,[role="radio"]:hover{box-shadow:inset 0 0 0 999px '+colors.accent+'14}',
    '[role="button"]:active:not([aria-disabled="true"]){box-shadow:inset 0 0 0 999px '+colors.accent+'26}',
    '[role="link"]:hover{opacity:.78;text-decoration:underline;text-underline-offset:3px}',
    'div[tabindex="0"]{cursor:pointer}',
-   '[role="button"]:focus-visible,[role="menuitem"]:focus-visible,[role="link"]:focus-visible{outline:2px solid '+colors.accent+'88;outline-offset:-2px}',
+   '*:focus,*:focus-visible{outline:none!important}',
    'div[tabindex="0"]:not([role]):focus-visible{outline:none}',
-   // 0.3.263: campo em foco com o anel da marca (antes nao mostrava onde o teclado estava)
-   'input:focus,textarea:focus{box-shadow:0 0 0 3px '+colors.accent+'40!important;border-radius:12px}',
+   // 0.3.268: nenhum contorno ao clicar em nada do site (pedido do Pedro), nem o anel do campo de texto
+   'input:focus,textarea:focus,select:focus{box-shadow:none!important;outline:none!important}',
    '*{scrollbar-width:thin;scrollbar-color:'+colors.line+' transparent}',
    '::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:'+colors.line+';border-radius:8px;border:2px solid '+colors.bg+'}::-webkit-scrollbar-track{background:transparent}',
    'input,textarea{outline:none}',
@@ -145,6 +147,9 @@ export const DialogContext=createContext(false);
 /** 0.3.253: barras proprias das telas (cabecalhos, abas) que ficam fora da rolagem: ocupam a largura toda e
  * alinham o conteudo a coluna de leitura da regiao. No celular devolve {} (nada muda). */
 export function useColumnPad():(base:number)=>Record<string,any>{
- const desktop=useDesktop(),max=useContext(ContentWidth);
- return (base:number)=>desktop&&max?{paddingLeft:columnPadding(max,base),paddingRight:columnPadding(max,base)}:{};
+ const desktop=useDesktop(),max=useContext(ContentWidth),{width}=useWindowDimensions();
+ // 0.3.268: o conteudo das listas passa pela escala de computador (22 -> 16 a partir de 1024 px); a barra de cima
+ // usa a mesma escala, senao busca/filtros ficavam 6 px fora da margem dos cards (Tarefas backlog e outras telas)
+ const s=(base:number)=>width>=1024?scaleSpace(base):base;
+ return (base:number)=>desktop&&max?{paddingLeft:columnPadding(max,s(base)),paddingRight:columnPadding(max,s(base))}:{};
 }

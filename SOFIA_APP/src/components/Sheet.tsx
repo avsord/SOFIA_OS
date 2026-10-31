@@ -1,6 +1,8 @@
 import {useMotionPresence} from '../lib/motion';
 import {PALETTE} from '../lib/palette';
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useContext,useEffect,useRef,useState} from 'react';
+import {PresenceClosing} from './Presence';
+import {useWebBackClose} from '../lib/web-panels';
 import {Animated,Keyboard,KeyboardAvoidingView,LayoutAnimation,Modal,Platform,Pressable,StyleSheet,useWindowDimensions,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
@@ -12,7 +14,9 @@ import {DialogContext,isDesktopWidth} from '../lib/desktop';
 let handoffUntil=0;const holders=new Set<()=>void>();
 export function markSheetHandoff(ms=800){handoffUntil=Date.now()+ms;}
 function releaseHolders(){const fns=[...holders];holders.clear();fns.forEach(f=>f());}
-export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:boolean;onClose:()=>void;children:React.ReactNode;label?:string}){
+export function Sheet({visible:visibleProp,onClose,children,label='Fechar painel'}:{visible:boolean;onClose:()=>void;children:React.ReactNode;label?:string}){
+ const visible=visibleProp&&!useContext(PresenceClosing);
+ useWebBackClose(visible&&Platform.OS==='web'&&typeof window!=='undefined'&&window.innerWidth>=900,onClose);
  const c=useTheme(),insets=useSafeAreaInsets(),{height:windowHeight,width:windowWidth}=useWindowDimensions(),desktop=isDesktopWidth(windowWidth),[shown,setShown]=useState(false),[height,setHeight]=useState(0);
  // 0.3.167: no Android o teclado cobria os campos das folhas (o Modal translucido nao redimensiona
  // a janela, entao o KeyboardAvoidingView nao tinha efeito). Medimos o teclado e afastamos o painel.

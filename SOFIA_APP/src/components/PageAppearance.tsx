@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {PALETTE} from '../lib/palette';
 import {tap} from '../lib/desktop';
-import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder} from 'react-native';
+import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder,Platform} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +23,9 @@ const EMOJIS='😀 😊 😎 🤔 🤖 ❤️ 💜 💙 💚 💡 🔥 ✨ ⭐ �
 const SYMBOLS='♡ ♥ ☆ ★ ○ ● ◉ ◇ ◆ □ ■ △ ▲ ✓ ✔ ✕ × + − ≡ ∞ ⌂ ⌘ ⏱ ⚑ ⚙ ⚡ ☀ ☾ ☁ ☰ ▦ ⊞ ⊕ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ✎ ✦ ✧ ❖ ☑ ☐ ♫ ♪ ✉ ☎ ⌚ ⚖ ◐ ◑'.split(' ');
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 /** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */
+// 0.3.268: a previa local da capa so vale no aparelho que enviou (caminho file:// do celular nao abre no site e vice-versa);
+// fora dele a capa vem do servidor, a mesma em todos.
+const localPreview=(uri:string)=>Platform.OS==='web'?(/^(data:|blob:|https?:)/.test(uri)?uri:''):(/^(file:|content:)/.test(uri)?uri:'');
 export function coverPosition(data:Record<string,any>):number{const raw=data?.cover_position,n=Number(raw);return raw!==''&&raw!=null&&Number.isFinite(n)?Math.max(0,Math.min(100,n)):50;}
 /** Desenha a imagem cobrindo a capa e deslocada pela posicao. No modo reposicionar, arrastar move a imagem. */
 function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
@@ -47,7 +50,7 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
  </View>;
 }
 export function PageCover({data,api,repositioning=false,onPosition}:{data:Record<string,any>;api:SofiaApi;repositioning?:boolean;onPosition?:(n:number)=>void}){
- const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=String(data.cover_local_uri||'');
+ const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=localPreview(String(data.cover_local_uri||''));
  const [uri,setUri]=useState(preview),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  const retry=useRef<()=>void>(()=>{});
  useEffect(()=>{
@@ -80,10 +83,18 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
   if(result.canceled){await clearPending();return false;}
   const asset=result.assets?.[0];
   if(!asset?.uri)throw new Error('Não foi possível preparar a imagem. Escolha outra foto.');
+  let base64='';
+  if(Platform.OS==='web'){ // 0.3.268: no site a imagem escolhida vem do navegador (sem a pasta de arquivos do celular)
+   const blob=await (await fetch(asset.uri)).blob();
+   if(blob.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
+   const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(blob);});
+   base64=data.slice(data.indexOf(',')+1);
+  }else{
   const file=new File(asset.uri);
   if(!file.exists||file.size<1)throw new Error('A foto selecionada não está mais disponível no aparelho.');
   if(file.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
-  const base64=await file.base64();
+  base64=await file.base64();
+  }
   const mime=coverMime(base64,asset.mimeType);
   const attachment=await api.uploadAttachment(pageId,{name:coverName(mime),mime,base64});
   await clearPending();

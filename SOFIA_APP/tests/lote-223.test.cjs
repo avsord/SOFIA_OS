@@ -79,5 +79,5 @@ test('capsulas: dose nao tomada fica acumulando ate marcar (ontem continua la)',
 test('Inicio na barra leva ao topo; e-mail: emoji da regra no lugar da estrela',()=>{
   const h=read('src/screens/Home.tsx'),m=read('src/screens/Mail.tsx');
   assert.ok(h.includes('homeScroll.current?.scrollTo({y:0,animated:homeTopSmooth})'));
-  assert.ok(m.includes("emoji: important ? emoji : ''")&&m.includes('Emoji dos e-mails desta regra (no lugar da estrela)'));
+  assert.ok(m.includes("emoji: important ? emoji : ''")&&m.includes('Marcação dos e-mails desta regra')); // 0.3.268: icone de traco no lugar do emoji
 });

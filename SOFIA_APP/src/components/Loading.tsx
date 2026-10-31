@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
+import {Animated, Easing, Platform, StyleSheet, Text, View} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import {useTheme, dark} from '../lib/theme';
 
@@ -25,19 +25,32 @@ export function Spinner({size = 22, color, stroke = 2}: {size?: number; color?: 
   );
 }
 
+/** 0.3.268 (site): no computador as telas ja estao carregadas; o esqueleto so aparece se a espera passar de ~300 ms.
+ * Antes ele piscava por alguns milissegundos (e no canto, com o desenho do celular) a cada troca de menu. No celular
+ * nada muda: o esqueleto continua aparecendo no mesmo toque. */
+export const WEB_SKELETON_DELAY = 300;
+export function useSkeletonDelay(): boolean {
+  const web = Platform.OS === 'web';
+  const [show, setShow] = useState(!web);
+  useEffect(() => { if (!web) return; const t = setTimeout(() => setShow(true), WEB_SKELETON_DELAY); return () => clearTimeout(t); }, [web]);
+  return show;
+}
+
 /** Linhas finas no lugar do conteúdo (como as linhas da tabela do Notion),
  * respirando de leve. Separadores entre elas, larguras variadas. */
 export function LoadingLines({rows = 3, separated = true}: {rows?: number; separated?: boolean}) {
-  const c = useTheme(), pulse = useRef(new Animated.Value(0.5)).current;
+  const c = useTheme(), pulse = useRef(new Animated.Value(0.5)).current, show = useSkeletonDelay();
   useEffect(() => {
+    if (!show) return;
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(pulse, {toValue: 1, duration: 700, useNativeDriver: true}),
       Animated.timing(pulse, {toValue: 0.5, duration: 700, useNativeDriver: true}),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, show]);
   const widths = ['78%', '64%', '72%', '56%', '68%', '60%'];
+  if (!show) return <View style={{minHeight: rows * 47}} />;
   return (
     <Animated.View style={{opacity: pulse}}>
       {Array.from({length: rows}, (_, i) => (
@@ -73,7 +86,8 @@ export function FadeSwap({ready, fallback, children}: {ready: boolean; fallback:
  * o anel fino mostra que algo está vindo e as linhas marcam onde o conteúdo
  * vai entrar. Sem título, fica só o anel no centro. */
 export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: string; eyebrow?: string; label?: string; rows?: number; testID?: string}) {
-  const c = useTheme();
+  const c = useTheme(), show = useSkeletonDelay();
+  if (!show) return <View testID={testID ? testID + '-wait' : undefined} style={{flex: 1, backgroundColor: c.bg}} />;
   if (!title) return <View testID={testID} style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg}}><Spinner size={26} /></View>;
   return (
     <View testID={testID} style={{flex: 1, backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 22, gap: 18}}>

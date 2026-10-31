@@ -1,12 +1,14 @@
-import React,{useRef} from 'react';
+import React,{useContext,useRef} from 'react';
+import {PresenceClosing} from './Presence';
+import {useWebBackClose} from '../lib/web-panels';
 import {PALETTE} from '../lib/palette';
 import {Animated,Modal,Pressable,View} from 'react-native';
 import {DialogContext,useDesktop} from '../lib/desktop';
 import type {ModalProps} from 'react-native';
 import {useMotionPresence} from '../lib/motion';
 import {useTheme} from '../lib/theme';
-export function MotionModal({visible=true,children,transparent=false,...props}:ModalProps){
- const desktop=useDesktop();
+export function MotionModal({visible:visibleProp=true,children,transparent=false,...props}:ModalProps){
+ const desktop=useDesktop(),visible=visibleProp&&!useContext(PresenceClosing);
  // 0.3.251 (computador): tela cheia do celular vira painel lateral (side peek, como no Notion): a tela de
  // tras continua visivel; clicar fora ou Esc fecha pelo mesmo caminho do voltar do Android.
  if(!transparent&&desktop)return <SidePeek {...props} visible={visible}>{children}</SidePeek>;
@@ -20,6 +22,7 @@ function AnimatedTransparentModal({visible=true,children,animationType:_animatio
 }
 
 function SidePeek({visible=true,children,onRequestClose}:ModalProps){
+ useWebBackClose(!!visible,onRequestClose?()=>onRequestClose({} as any):undefined);
  const c=useTheme(),{mounted,progress}=useMotionPresence(!!visible),last=useRef(children);
  if(visible)last.current=children;
  return <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>

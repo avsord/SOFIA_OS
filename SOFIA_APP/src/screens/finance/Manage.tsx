@@ -1,3 +1,4 @@
+import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
 import {contextMenu} from '../../components/ContextMenu';
@@ -90,7 +91,7 @@ export function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaAp
           </Card_>
         </ScrollView>}
       </View>
-      {edit ? <AccountCardSheet api={api} d={d} edit={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void reload(); }} /> : null}
+      <Presence>{edit ? <AccountCardSheet api={api} d={d} edit={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void reload(); }} /> : null}</Presence>
     </MotionModal>
   );
 }

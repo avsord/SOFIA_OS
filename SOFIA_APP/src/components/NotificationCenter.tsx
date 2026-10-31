@@ -6,7 +6,7 @@ import {useBellInbox} from '../lib/use-bell-inbox';
 import {mergeBellNotices} from '../lib/bell-inbox';
 import {MOTION_EASE,useReducedMotion} from '../lib/motion';
 import React,{createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
-import {AppState,Modal,Pressable,ScrollView,Text,View,Alert,Animated,PanResponder,useWindowDimensions} from 'react-native';
+import {AppState,LayoutAnimation,Modal,Platform,Pressable,ScrollView,Text,View,Alert,Animated,PanResponder,useWindowDimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {markNoticesSeen} from '../lib/background-notify';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -60,6 +60,10 @@ function Swipeable({children,onDismiss,onRead,readLabel='✓ Lida',readAction='M
  // Sai pela esquerda e DEPOIS a altura fecha suave: os avisos de baixo sobem
  // acompanhando, como no iPhone, em vez de pularem de uma vez (corte seco).
  const dismiss=useCallback(()=>{setClosing(true);Animated.timing(x,{toValue:-width.current,duration:180,easing:MOTION_EASE,useNativeDriver:true}).start(()=>{
+  // 0.3.268: no celular a altura nao e mais animada quadro a quadro em JavaScript (useNativeDriver:false travava a lista);
+  // o aviso some e os de baixo sobem por animacao de posicao do proprio sistema (LayoutAnimation). No site, onde essa
+  // animacao nao existe, a altura fecha suave como antes.
+  if(Platform.OS!=='web'){try{LayoutAnimation.configureNext(LayoutAnimation.create(220,LayoutAnimation.Types.easeInEaseOut,LayoutAnimation.Properties.opacity));}catch{/* sem animacao */}setGone(true);onDismiss();return;}
   Animated.timing(collapse,{toValue:0,duration:220,easing:MOTION_EASE,useNativeDriver:false}).start(()=>{setGone(true);onDismiss();});});},[x,collapse,onDismiss]);
  const pan=useMemo(()=>PanResponder.create({
   // Reconhece o arrasto para o lado cedo e, uma vez reconhecido, não solta para a rolagem

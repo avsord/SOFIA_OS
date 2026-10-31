@@ -137,6 +137,7 @@ INTENÇÃO E EXECUÇÃO
 6. Uma frase descritiva NÃO é automaticamente uma ordem. “Hoje eu tenho um aniversário de um colega para ir às 19h no Capão.” descreve um possível compromisso, mas a ação está indefinida. Use clarify e pergunte de modo neutro o que a pessoa quer. Tarefa, lembrete e compromisso são coisas diferentes.
 7. Use clarify quando a AÇÃO estiver ambígua, houver mais de uma ação plausível, faltar algum dado essencial ou ainda for necessária confirmação. A pergunta e as opções DEVEM nascer de você. O backend não formula perguntas conversacionais. Preserve em actions as ações já entendidas, mesmo enquanto pergunta por um campo que falta. Quando tudo estiver claro, devolva a intenção executável e ready_for_backend=true.
 8. Quando a mensagem trouxer DUAS OU MAIS ordens explícitas e todas estiverem claras, use intent=compound e liste cada ação em actions. Não descarte a segunda solicitação.
+8b. UM ITEM SÓ, COM O TÍTULO INTEIRO (regra do dono). Quando a mensagem começa com UMA ordem de criar tarefa/lembrete/compromisso/evento ("cria uma tarefa na agenda pra amanhã comprar bag, inalador e criar uma página para meditações com senha"), tudo o que vem depois da data/hora é o TÍTULO desse único item, palavra por palavra — inclusive verbos no infinitivo como "criar", "fazer", "comprar". NÃO corte, NÃO resuma e NÃO crie páginas, espaços, listas ou outros registros que só aparecem DENTRO do título: são coisas que a pessoa quer lembrar de fazer depois. Só é compound quando há uma SEGUNDA ordem no imperativo ("... e cria uma página X"). Nunca crie nada além do que foi pedido. Na assistant_message, confirme o título e o dia/horário em que ficou (ex.: "Coloquei na agenda de amanhã, 1/11: Comprar bag, inalador e criar uma página para meditações com senha.").
 9. Exemplo de continuidade: após conversar sobre “Redmi Pad 2”, se o usuário disser “quero monitorar ele e criar um lembrete para Black Friday”, preserve “Redmi Pad 2”. Se faltar data/horário do lembrete, pergunte apenas o que falta e deixe claro que você entendeu o produto e as duas ações.
 10. Botões são sugestões/atalhos, não conclusões. Não induza Diário Pessoal, Safe Chat ou qualquer categoria não mencionada.
 11. Diário Pessoal é destino explícito. Safe Chat é modo explícito. A conversa normal NÃO sugere diário automaticamente e NÃO sugere Diário Pessoal automaticamente.
@@ -191,6 +192,33 @@ ${pending?'25. Este turno responde dentro de um estado conversacional pendente. 
 
 function emptyAction(){return {entity_kind:'',memory_kind:'',title:'',content:'',area:'',state:'',scope:'',date:'',time:'',location:'',list_name:'',quantity:'',parent_title:'',scope_id:'',target_id:'',target_ids:[],page_id:'',block_id:'',block_type:'',position:'',changes:[],priority:false,token_limit:0,page_blocks:[],query_target:'none',privacy_route:'auto',tags:[]};}
 function normalizeAction(raw={}){const a={...emptyAction(),...raw};a.title=String(a.title||'').slice(0,240);a.content=String(a.content||'').slice(0,16000);a.area=String(a.area||'').slice(0,80);a.state=String(a.state||'').slice(0,80);a.scope=['all','active','single','selected'].includes(String(a.scope||''))?String(a.scope):'';a.date=String(a.date||'').slice(0,20);a.time=String(a.time||'').slice(0,8);a.location=String(a.location||'').slice(0,1000);a.list_name=String(a.list_name||'').slice(0,100);a.quantity=String(a.quantity||'').slice(0,200);a.parent_title=String(a.parent_title||'').slice(0,240);a.scope_id=String(a.scope_id||'').slice(0,180);a.target_id=String(a.target_id||'').slice(0,180);a.target_ids=Array.isArray(a.target_ids)?[...new Set(a.target_ids.slice(0,500).map(x=>String(x).slice(0,180)).filter(Boolean))]:[];a.page_id=String(a.page_id||'').slice(0,180);a.block_id=String(a.block_id||'').slice(0,180);a.block_type=String(a.block_type||'').slice(0,40);a.position=['','start','end','before','after'].includes(String(a.position||''))?String(a.position||''):'';a.changes=Array.isArray(a.changes)?a.changes.slice(0,40).map(x=>({field:String(x?.field||'').slice(0,120),value:x?.value??null})).filter(x=>x.field):[];a.tags=Array.isArray(a.tags)?a.tags.slice(0,20).map(x=>String(x).slice(0,60)):[];a.priority=Boolean(a.priority);a.token_limit=Number.isSafeInteger(a.token_limit)?Math.max(0,Math.min(100000000,a.token_limit)):0;a.page_blocks=Array.isArray(a.page_blocks)?a.page_blocks.slice(0,40).map(x=>({type:String(x?.type||'text').slice(0,40),text:String(x?.text||'').slice(0,12000)})).filter(x=>x.text.trim()):[];return a;}
+// 0.3.268: trava deterministica da regra 8b. Se a mensagem e UMA ordem de criar tarefa/lembrete/compromisso (sem segunda
+// ordem no imperativo), o plano fica com um item so e com o titulo inteiro, mesmo que o modelo tenha dividido o pedido.
+const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const SINGLE_CMD=/^\s*(?:sofia[,:!]?\s*)?(?:por favor[,]?\s*)?(?:me\s+)?(?:cria|crie|criar|coloca|coloque|poe|bota|adiciona|adicione|anota|anote|marca|marque|agenda|agende|lembra|lembre)\s+(?:me\s+)?(?:uma?\s+|o\s+|a\s+)?(tarefa|lembrete|compromisso|evento)\b/;
+const SECOND_ORDER=/\b(?:e|tambem|depois|alem disso)\s+(?:me\s+)?(?:cria|crie|coloca|coloque|adiciona|adicione|monitora|monitore|salva|salve|guarda|guarde|marca|marque|agenda|agende|lanca|lance|apaga|apague|registra|registre)\b/;
+const AGENDA_INTENTS=new Set(['create_task','create_reminder','create_commitment']);
+const CREATE_INTENTS=new Set(['create_task','create_reminder','create_commitment','create_monitor','add_list_item','create_entity','create_user_page','save_memory']);
+function cleanTitle(tail){
+  let t=String(tail||'');
+  const cut=[/^\s*(?:na|pra|para a|no)\s+(?:agenda|backlog)(?=[\s,.:;!?]|$)[,:]?/i,/^\s*(?:pra|para|de)\s+(?:amanh[ãa]|hoje|depois de amanh[ãa])(?=[\s,.:;!?]|$)[,:]?/i,/^\s*(?:amanh[ãa]|hoje|depois de amanh[ãa])(?=[\s,.:;!?]|$)[,:]?/i,/^\s*(?:pra|para|no|na)\s+(?:o\s+)?(?:dia\s+\d{1,2}(?:\/\d{1,2})?|(?:segunda|ter[çc]a|quarta|quinta|sexta)(?:-feira)?|s[áa]bado|domingo)(?=[\s,.:;!?]|$)[,:]?/i,/^\s*(?:[àa]s|as)\s+\d{1,2}(?::\d{2}|h\d{0,2}|\s*horas?)?(?=[\s,.:;!?]|$)[,:]?/i,/^\s*(?:que|de|pra|para)\s+/i];
+  for(let k=0;k<8;k++){let changed=false;for(const re of cut){const n=t.replace(re,'');if(n!==t){t=n;changed=true;}}if(!changed)break;}
+  t=t.trim().replace(/[.!]+$/,'').trim();
+  return t?t.charAt(0).toUpperCase()+t.slice(1):'';
+}
+function singleItemGuard(plan,message){
+  const msg=String(message||''),f=fold(msg);
+  if(!plan||!msg||!SINGLE_CMD.test(f)||SECOND_ORDER.test(f))return plan;
+  const list=plan.intent==='compound'?plan.actions:(AGENDA_INTENTS.has(plan.intent)?[{intent:plan.intent,action:plan.action}]:[]);
+  const main=list.find(x=>AGENDA_INTENTS.has(x.intent));if(!main)return plan;
+  const m=SINGLE_CMD.exec(f);const tail=cleanTitle(msg.slice(m[0].length));
+  const action={...main.action};
+  // o titulo inteiro vence o titulo cortado/resumido (so troca quando o do modelo e um pedaco do que a pessoa escreveu)
+  if(tail&&tail.length>String(action.title||'').length&&fold(tail).includes(fold(action.title||'').replace(/[.!]+$/,'').trim().slice(0,12)))action.title=tail.slice(0,240);
+  const extras=list.filter(x=>x!==main&&CREATE_INTENTS.has(x.intent));
+  if(!extras.length&&action.title===main.action.title)return plan;
+  return {...plan,intent:main.intent,action,actions:[],decision_basis:(String(plan.decision_basis||'')+' [um item só: título inteiro, nada além do pedido]').slice(0,500)};
+}
 function normalizePlan(raw){
   if(!raw||typeof raw!=='object')throw new AppError('INTENT_INVALID','A interpretação da intenção não veio em formato válido.',502);
   const p={...raw,privacy:{sensitivity:String(raw.privacy?.sensitivity||'sensitive'),recommended_route:String(raw.privacy?.recommended_route||'private'),reason:String(raw.privacy?.reason||'Interpretação sem classificação explícita; rota conservadora.')},action:normalizeAction(raw.action||{}),actions:Array.isArray(raw.actions)?raw.actions.slice(0,4).map(x=>({intent:String(x?.intent||''),action:normalizeAction(x?.action||{})})).filter(x=>COMPOUND_INTENTS.has(x.intent)):[],clarification:{question:String(raw.clarification?.question||''),options:Array.isArray(raw.clarification?.options)?raw.clarification.options.slice(0,4):[]}};
@@ -216,7 +244,7 @@ class IntentEngine{
   async plan({message,input,attemptId,pending=false,signal,maxOutputTokens=1800,privacyRules=[]}){
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const result=await this.routing.respondStructured('private',{instructions:plannerInstructions({today,pending,privacyRules}),input:input||[{role:'user',content:cleanText(message,'Mensagem',12000)}],schema:INTENT_SCHEMA,name:'sofia_dialogue_turn_v62',maxOutputTokens,signal},attemptId);
-    return {...result,plan:normalizePlan(result.data)};
+    return {...result,plan:singleItemGuard(normalizePlan(result.data),message)};
   }
 }
-module.exports={IntentEngine,INTENT_SCHEMA,WRITE_INTENTS,COMPOUND_INTENTS,DESTRUCTIVE_INTENTS,normalizePlan,plannerInstructions,emptyAction,nextBlackFriday};
+module.exports={singleItemGuard,cleanTitle,IntentEngine,INTENT_SCHEMA,WRITE_INTENTS,COMPOUND_INTENTS,DESTRUCTIVE_INTENTS,normalizePlan,plannerInstructions,emptyAction,nextBlackFriday};

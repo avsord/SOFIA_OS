@@ -28,6 +28,8 @@ export const loadBackgroundServices=()=>once('background-services',()=>require('
 
 // Prepare lazy module definitions, without mounting hidden screens or fetching data.
 export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadProfile] as const;
+/** So o site baixa telas em segundo plano (ver screen-loader.web.tsx); no celular tudo ja esta no aparelho. */
+export function prefetchWebScreens(){}
 
 /** Skip unchanged hidden screens when the active tab changes.
  * Creating new JSX/props objects must not rerender chat history, workspaces,
