@@ -1,4 +1,5 @@
-import {LoadingLines} from '../components/Loading';
+import {dpx} from '../lib/content-width';
+import {LoadingLines, ShimmerBlock, ShimmerGroup} from '../components/Loading';
 import React, {useState} from 'react';
 import {Pressable, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
@@ -90,4 +91,21 @@ export function DeskCapsulesCard({api, active, onOpen}: {api: SofiaApi; active: 
       </Pressable>
     </View>; })}
   </View>;
+}
+
+/** 0.3.289 (Pedro: "o melhor e ter o esqueleto com shimmer"): enquanto tarefas e agenda chegam, o Inicio do computador
+ * mostra os cartoes vazios com brilho, no mesmo lugar e tamanho dos de verdade (a primeira linha com a mesma altura
+ * minima da linha real), e troca direto pelos cartoes prontos - sem fade e sem pular. */
+export function HomeDeskSkeleton({rowHeight, lowHeight}: {rowHeight: any; lowHeight: any}) {
+  const c = useTheme();
+  const box = (flex: number, h: any, rows: number, title: number) => <View style={[card(c), {flex, height: h, gap: 14, overflow: 'hidden'}]}>
+    <ShimmerBlock width={title} height={16} radius={6} />
+    <LoadingLines rows={rows} />
+  </View>;
+  // mesmos espacos da grade real (18 na escala do celular = 13 no computador, vezes o fator da tela)
+  const g = dpx(13) as any;
+  return <ShimmerGroup><View testID="home-desk-skeleton" style={{gap: g}}>
+    <View style={{flexDirection: 'row', gap: g}}>{box(0.62, rowHeight, 4, 130)}{box(1.38, rowHeight, 6, 90)}</View>
+    <View style={{flexDirection: 'row', gap: g}}>{box(1.5, lowHeight, 5, 110)}{box(1, lowHeight, 3, 120)}</View>
+  </View></ShimmerGroup>;
 }
