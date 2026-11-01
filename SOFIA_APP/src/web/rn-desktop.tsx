@@ -41,7 +41,9 @@ function wrap<P>(Base:any,name:string,extra?:(props:any,max:number|undefined)=>a
  return W as any;
 }
 /** Rolagem vertical: conteudo centralizado na largura de leitura (a barra fica na borda da regiao). */
-const centered=(p:any,max:number|undefined)=>p.horizontal||!max?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:max,alignSelf:'center'}]};
+// 0.3.276 (padrao do site): nas telas de app o conteudo fica na largura maxima, mas encostado a esquerda (a mesma linha
+// do titulo); centralizado so no Inicio (pedido do Pedro: nao mexer) e na Conversa (coluna estreita de leitura).
+const centered=(p:any,max:number|undefined)=>p.horizontal||!max?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:max,alignSelf:p.testID==='home-scroll'||max<1000?'center':'flex-start'}]};
 
 export const View=wrap<any>(RNW.View,'View');
 export const Text=wrap<any>(RNW.Text,'Text');

@@ -85,9 +85,11 @@ export function FadeSwap({ready, fallback, children}: {ready: boolean; fallback:
 /** Carregando com o que já se sabe na tela: o título real aparece na hora,
  * o anel fino mostra que algo está vindo e as linhas marcam onde o conteúdo
  * vai entrar. Sem título, fica só o anel no centro. */
+const wideWeb = () => typeof window !== 'undefined' && window.innerWidth >= 900;
 export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: string; eyebrow?: string; label?: string; rows?: number; testID?: string}) {
   const c = useTheme(), show = useSkeletonDelay();
   if (!show) return <View testID={testID ? testID + '-wait' : undefined} style={{flex: 1, backgroundColor: c.bg}} />;
+  if (Platform.OS === 'web' && wideWeb()) return <DeskPageSkeleton title={title} testID={testID} />;
   if (!title) return <View testID={testID} style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg}}><Spinner size={26} /></View>;
   return (
     <View testID={testID} style={{flex: 1, backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 22, gap: 18}}>
@@ -154,4 +156,17 @@ export function LoadingCaption({label}: {label: string}) {
   const c = useTheme();
   if (Platform.OS === 'web') return <View accessibilityLabel={label} />;
   return <View accessibilityLabel={label} style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>{label}</Text></View>;
+}
+
+/** 0.3.276 (site): esqueleto no MESMO desenho das telas prontas - titulo na margem de 40 px, linha da frase, linha das
+ * abas e uma caixa com linhas. Nada de anel girando nem coluna lateral fantasma no canto. */
+export function DeskPageSkeleton({title, testID}: {title?: string; testID?: string}) {
+  const c = useTheme(), show = useSkeletonDelay();
+  if (!show) return <View testID={testID ? testID + '-wait' : undefined} style={{flex: 1, backgroundColor: c.bg}} />;
+  return <View testID={testID} accessibilityLabel={title ? 'Abrindo ' + title : 'Carregando'} style={{flex: 1, backgroundColor: c.bg, paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', gap: 14, maxWidth: 1160} as any}>
+    <ShimmerGroup>{title ? <Text style={{fontSize: 28, letterSpacing: -1, fontWeight: '600', color: c.text}}>{title}</Text> : <ShimmerBlock width={220} height={28} radius={8} />}
+    <ShimmerBlock width={360} height={12} radius={6} style={{marginTop: 14}} /></ShimmerGroup>
+    <View style={{height: 1, backgroundColor: c.line, marginTop: 10}} />
+    <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, padding: 14, marginTop: 8}}><LoadingLines rows={5} /></View>
+  </View>;
 }

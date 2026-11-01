@@ -75,16 +75,16 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
   return (
     <InternalBackGesture enabled={active && !adding && !open} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, ...(deskNoBack ? {paddingTop: '32px', paddingBottom: '16px'} : {paddingTop: 14, paddingBottom: 6}), ...pad(12)} as any}>
           {deskNoBack ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
-          <View style={{flex: 1, paddingHorizontal: 4}}>
+          <View style={{flex: 1, paddingHorizontal: deskNoBack ? 0 : 4}}>
             
-            <View style={{gap: 2}}><Text style={{fontSize: deskNoBack ? 28 : 24, fontWeight: deskNoBack ? '600' : '700', letterSpacing: deskNoBack ? -0.5 : 0, color: c.text}}>Price Tracker</Text>{deskNoBack && products?.length ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { const low = products.filter(p => p.atLow); return low.length ? (low.length === 1 ? low[0].monitor.title + ' está no menor preço já visto.' : low.length + ' produtos estão no menor preço já visto.') : 'Nenhum produto no menor preço agora. A Sofia avisa quando cair.'; })()}</Text> : null}</View>
+            <View style={{gap: 2}}><Text style={{fontSize: deskNoBack ? 28 : 24, fontWeight: deskNoBack ? '600' : '700', letterSpacing: deskNoBack ? -0.5 : 0, color: c.text}}>Price Tracker</Text>{deskNoBack ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{!products?.length ? 'Cole o link de um produto e a Sofia acompanha o preço para você.' : null}{(() => { if (!products?.length) return ''; const low = products.filter(p => p.atLow); return low.length ? (low.length === 1 ? low[0].monitor.title + ' está no menor preço já visto.' : low.length + ' produtos estão no menor preço já visto.') : 'Nenhum produto no menor preço agora. A Sofia avisa quando cair.'; })()}</Text> : null}</View>
           </View>
-          <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />
+          {deskNoBack ? <Button title="Acompanhar produto" onPress={() => setAdding(true)} /> : <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />}
         </View>
 
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16}}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16, ...pad(18)}}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void runCollection(api, {force: true, scope})} />}>
           <Pressable accessibilityRole="button" accessibilityLabel="Atualizar preços agora" disabled={col.running} onPress={() => void runCollection(api, {force: true, scope})}
             style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6}}>

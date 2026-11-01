@@ -199,11 +199,11 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 2}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{title}</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag && !desktop ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{title}</Text></View>
               <Text style={{color: c.muted, fontSize: 13}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text>
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}

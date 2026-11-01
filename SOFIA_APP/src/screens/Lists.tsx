@@ -365,7 +365,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const header = <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
     {!desktop ? <IconButton name="back" label={inGroup ? 'Voltar para ' + L.name : 'Voltar aos apps'} onPress={() => inGroup ? setGfilter('all') : onBack()} /> : inGroup ? <IconButton name="back" label={'Voltar para ' + L.name} onPress={() => setGfilter('all')} /> : null}
     <View style={{flex: 1, minWidth: 0, gap: 2}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{desktop ? null : inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
       {desktop ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { /* 0.3.275: a frase da Sofia no lugar dos numeros emendados */
         const open = (L.model === 'shopping' && !inGroup ? mine : todo).filter(i => !i.done), tot = open.reduce((s, i) => s + (i.price || 0), 0);
         if (!open.length) return done.length ? 'Tudo no carrinho. É só finalizar a compra.' : 'Lista vazia. Escreva no campo abaixo e aperte Enter.';
@@ -395,7 +395,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={footer}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
           {header}
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger, marginTop: 10}}>{error}</Text> : null}

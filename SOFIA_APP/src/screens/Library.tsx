@@ -285,11 +285,11 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 4}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType && !desktop ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
               {desktop ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : <Text style={{color: c.muted, fontSize: 13}}>{shown.length} {shown.length === 1 ? 'item' : 'itens'}</Text>}
             </View>
             {curType && !curType.area ? <GhostButton icon="edit" label={desktop ? 'Editar tipo' : undefined} onPress={() => setTypeDialog({edit: curType})} /> : null}
