@@ -1,3 +1,4 @@
+import {DeskPageSkeleton} from '../components/Loading';
 import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../lib/palette';
@@ -170,6 +171,9 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
     return () => {valid=false;};
   },[active,api,d]);
 
+  // 0.3.285: no computador, enquanto carrega, o esqueleto no desenho da tela pronta (antes aparecia o cabecalho do
+  // celular, em outra fonte e altura, e a tela pulava quando os dados chegavam)
+  if (desktop && !d) return <DeskPageSkeleton title="Finanças" testID="finance-loading" />;
   return (
     <FinanceLocal.Provider value={local}>
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>

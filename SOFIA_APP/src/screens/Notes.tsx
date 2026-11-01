@@ -1,3 +1,4 @@
+import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Notas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/notas.html), web e celular.
 // Sai: Estado, Área, Privacidade, Contexto e "etiquetas por vírgula". Fica: etiquetas (com cor) + fixar/arquivar.
@@ -46,6 +47,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     catch (e) { setError(errorText(e)); setNotesE(x => x || []); }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
+  useLiveReload(load, active); // 0.3.285: o que mudar no celular aparece aqui sem recarregar a pagina (e vice-versa)
   const patchLocal = (e: Entity) => { if (e.kind === 'note_tag') setTagsE(l => l.some(x => x.id === e.id) ? l.map(x => x.id === e.id ? e : x) : [...l, e]); else setNotesE(l => (l || []).some(x => x.id === e.id) ? (l || []).map(x => x.id === e.id ? e : x) : [...(l || []), e]); };
   async function save(e: Partial<Entity>, quiet = false) { try { const s = await api.saveEntity(e); patchLocal(s); return s; } catch (err) { if (!quiet) toast(errorText(err)); return null; } }
 
@@ -203,9 +205,9 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
-            <View style={{flex: 1, gap: 2}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag && !desktop ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{title}</Text></View>
-              <Text style={{color: c.muted, fontSize: 13}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text>
+            <View style={{flex: 1}}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag && !desktop ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0}}>{title}</Text></View>
+              <Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 0}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text>
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}

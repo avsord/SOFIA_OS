@@ -1,3 +1,4 @@
+import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Listas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/listas.html). Mesma tela no
 // computador e no celular. Modelos: Mercado (secoes automaticas, soma do carrinho), Compras (grupos) e Simples.
@@ -7,7 +8,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {LayoutAnimation, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {PALETTE} from '../lib/palette';
-import {useDesktop, useColumnPad} from '../lib/desktop';
+import {useDesktop} from '../lib/desktop';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
@@ -82,7 +83,7 @@ const KIND: Record<Model, string> = {market: 'shopping_item', shopping: 'purchas
 const listKindOf = (l: ListDef) => l.system === 'market' ? 'shopping_item' : l.system === 'shopping' ? 'purchase' : 'list_item';
 
 export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
-  const c = useTheme(), desktop = useDesktop(), pad = useColumnPad(), {toast, toastNode} = useToast();
+  const c = useTheme(), desktop = useDesktop(), {toast, toastNode} = useToast();
   const [data, setData] = useState<Record<string, Entity[]> | null>(null), [error, setError] = useState('');
   const [cur, setCur] = useState('market'), [gfilter, setGfilter] = useState('all'), [folded, setFolded] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null), [histOpen, setHistOpen] = useState(false), [histRow, setHistRow] = useState(-1);
@@ -97,6 +98,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     } catch (e) { setError(errorText(e)); setData(d => d || {shopping_item: [], purchase: [], purchase_group: [], list_collection: [], list_item: []}); }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
+  useLiveReload(load, active); // 0.3.285: o que mudar no celular aparece aqui sem recarregar a pagina (e vice-versa)
   useEffect(() => { if (!active) { setOpenId(null); setHistOpen(false); setDialog(null); } }, [active]);
   const patchLocal = (e: Entity) => setData(d => d ? {...d, [e.kind!]: (d[e.kind!] || []).some(x => x.id === e.id) ? d[e.kind!].map(x => x.id === e.id ? e : x) : [...(d[e.kind!] || []), e]} : d);
   const dropLocal = (e: Entity) => setData(d => d ? {...d, [e.kind!]: (d[e.kind!] || []).filter(x => x.id !== e.id)} : d);
@@ -365,9 +367,9 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const hint = p ? [p.url ? 'Link: vou buscar nome, preço e loja' : '', !p.url && L.model !== 'simple' && (p.qty !== 1 || p.unit) ? 'Qtd ' + numText(p.qty) + (p.unit ? ' ' + p.unit : '') : '', !p.url && L.model === 'market' && p.name ? sectionOf(p.name) : '', p.price != null && L.model !== 'simple' ? brl(p.price) : '', L.model === 'shopping' && (p.name || p.url) ? (() => { const g = guessGroup(p.name, p.tag, ''); return g.startsWith('new:') ? 'Novo grupo ' + g.slice(4) : g ? 'Grupo ' + gname(g) : 'Sem grupo'; })() : ''].filter(Boolean) : [];
   const header = <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
     {!desktop ? <IconButton name="back" label={inGroup ? 'Voltar para ' + L.name : 'Voltar aos apps'} onPress={() => inGroup ? setGfilter('all') : onBack()} /> : inGroup ? <IconButton name="back" label={'Voltar para ' + L.name} onPress={() => setGfilter('all')} /> : null}
-    <View style={{flex: 1, minWidth: 0, gap: 2}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{desktop ? null : inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
-      {desktop ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { /* 0.3.275: a frase da Sofia no lugar dos numeros emendados */
+    <View style={{flex: 1, minWidth: 0}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{desktop ? null : inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
+      {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { /* 0.3.275: a frase da Sofia no lugar dos numeros emendados */
         const open = (L.model === 'shopping' && !inGroup ? mine : todo).filter(i => !i.done), tot = open.reduce((s, i) => s + (i.price || 0), 0);
         if (!open.length) return done.length ? 'Tudo no carrinho. É só finalizar a compra.' : 'Lista vazia. Escreva no campo abaixo e aperte Enter.';
         if (L.model === 'simple') return open.length === 1 ? 'Falta uma coisa: ' + open[0].name + '.' : 'Faltam ' + open.length + ' coisas; a primeira é ' + open[0].name + '.';
@@ -382,7 +384,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     </View>
   </View>;
   const ticked = (inGroup ? view : L.model === 'shopping' ? mine : view).filter(i => i.done);
-  const footer = L.model === 'shopping' && !inGroup && !mine.some(i => i.done) ? null : <View testID="list-footer" style={{flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: desktop ? 40 : 16, ...(desktop ? pad(40) : null), paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
+  const footer = L.model === 'shopping' && !inGroup && !mine.some(i => i.done) ? null : <View testID="list-footer" style={desktop ? {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface} : {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
     {L.model === 'simple'
       ? <View style={{flex: 1}}><Text style={{color: c.muted, fontSize: 12}}>Feitos</Text><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>{done.length} de {view.length}</Text></View>
       : <View style={{flex: 1, flexDirection: 'row', gap: 24}}>
@@ -395,7 +397,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!data) return <AppSkeleton label="Carregando listas…" />;
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={footer}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={desktop ? undefined : footer}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
           {header}
           {desktop ? <NavTabs nav={mobileNav} /> : null}
@@ -409,6 +411,8 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
           {hint.length ? <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 8}}>{hint.map(h => <Text key={h} style={{color: c.accent, fontSize: 12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: c.accentSoft}}>{h}</Text>)}<Text style={{color: c.muted, fontSize: 12}}>{dupe ? 'Já está na lista: Enter soma na quantidade' : 'Enter para adicionar'}</Text></View> : null}
           {/* 20 px entre o campo de adicionar e a primeira secao ("deixa com espaco"); o resto compacto */}
           <View style={{marginTop: 20, gap: 14}}>{body}</View>
+          {/* 0.3.285 (site): o total e o Finalizar ficam logo abaixo da lista, num cartao na coluna (antes uma barra colada no pe da janela) */}
+          {desktop && footer ? <View style={{marginTop: 16}}>{footer}</View> : null}
         </ScrollView>
       </AppFrame>
       {toastNode}

@@ -20,8 +20,8 @@ export function nativeFamily(weight: TextStyle['fontWeight'], italic = false): s
  * (0.3.261: na 0.3.259 a regra geral perdia para a classe e o site continuava na fonte do sistema.) */
 const WEB_ALIASES = [SOFIA_FONT, '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Helvetica Neue'];
 export function webFontCss(base = '/assets/fonts/'): string {
-  const face = (w: string, file: string, style = 'normal') => WEB_ALIASES.map(name => `@font-face{font-family:'${name}';src:url('${base}SofiaSans-${file}.woff2') format('woff2');font-weight:${w};font-style:${style};font-display:swap}`).join('\n');
-  const display = `@font-face{font-family:'Sofia Display';src:url('${base}SofiaDisplay-MediumItalic.woff2') format('woff2');font-weight:100 900;font-style:italic;font-display:swap}`;
+  const face = (w: string, file: string, style = 'normal') => WEB_ALIASES.map(name => `@font-face{font-family:'${name}';src:url('${base}SofiaSans-${file}.woff2') format('woff2');font-weight:${w};font-style:${style};font-display:block}`).join('\n');
+  const display = `@font-face{font-family:'Sofia Display';src:url('${base}SofiaDisplay-MediumItalic.woff2') format('woff2');font-weight:100 900;font-style:italic;font-display:block}`;
   return [display, face('100 450', 'Regular'), face('451 550', 'Medium'), face('551 650', 'SemiBold'), face('651 750', 'Bold'), face('751 900', 'ExtraBold'), face('100 900', 'Italic', 'italic'),
     `html,body,#root,input,textarea,button,select,div,span{font-family:'${SOFIA_FONT}',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}`,
     `code,pre,kbd,samp,[data-mono]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}`,

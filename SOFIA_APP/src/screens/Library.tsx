@@ -1,3 +1,4 @@
+import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Biblioteca redesenhada (protótipo aprovado em 31/10: docs/prototipos-2026-10-31/biblioteca-criar.html).
 // Cards em uma coluna; tipos na lateral (computador, ordem arrastável) ou abas com "Mais" (celular); criar = entrada
@@ -95,6 +96,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
     try { const raw = await AsyncStorage.getItem(PENDING_KEY); const list: Partial<Entity>[] = raw ? JSON.parse(raw) : []; if (list.length) { const left: Partial<Entity>[] = []; for (const p of list) { try { const s = await api.saveEntity(p); patchLocal(s); } catch { left.push(p); } } await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(left)); setPending(left.map((p, i) => ({...(p as Entity), id: 'pending-' + i}))); if (list.length > left.length) toast('Itens salvos sem internet foram enviados.'); } } catch { /* sem fila */ }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
+  useLiveReload(load, active); // 0.3.285: o que mudar no celular aparece aqui sem recarregar a pagina (e vice-versa)
   useEffect(() => { if (!active) { setOpenId(null); setAdding(null); } }, [active]);
   const patchLocal = (e: Entity) => setEnts(d => d ? {...d, [e.kind!]: (d[e.kind!] || []).some(x => x.id === e.id) ? d[e.kind!].map(x => x.id === e.id ? e : x) : [e, ...(d[e.kind!] || [])]} : d);
   const dropLocal = (e: Entity) => setEnts(d => d ? {...d, [e.kind!]: (d[e.kind!] || []).filter(x => x.id !== e.id)} : d);
@@ -290,9 +292,9 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
-            <View style={{flex: 1, gap: 4}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType && !desktop ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
-              {desktop ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : <Text style={{color: c.muted, fontSize: 13}}>{shown.length} {shown.length === 1 ? 'item' : 'itens'}</Text>}
+            <View style={{flex: 1}}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType && !desktop ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
+              {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : <Text style={{color: c.muted, fontSize: 13}}>{shown.length} {shown.length === 1 ? 'item' : 'itens'}</Text>}
             </View>
             {curType && !curType.area ? <GhostButton icon="edit" label={desktop ? 'Editar tipo' : undefined} onPress={() => setTypeDialog({edit: curType})} /> : null}
             <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} />
