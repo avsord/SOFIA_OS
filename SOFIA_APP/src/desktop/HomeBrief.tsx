@@ -22,10 +22,12 @@ const isImportant = (t: Task) => t.priority_level === 'important';
 const isOut = (x: {step: number; needs: string; delivered: boolean}) => !x.delivered && x.step === 2 && x.needs !== 'pickup';
 /** cor do item na Agenda (tarefa usa a prioridade da tarefa; compromisso a do evento; feriado verde) */
 const colorOf = (r: DayRecord, accent: string) => {const o: any = r.original || {}; return agendaPriority({data: {priority_level: o.data?.priority_level ?? o.priority_level, calendar_id: o.data?.calendar_id}} as any).color || accent;};
+/** hora (hoje) ou dia e hora (outros dias) */
+const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(), tm = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); const t = timed(r) ? hhmm(d) : ''; if (d.toDateString() === n.toDateString()) return t || 'hoje'; if (d.toDateString() === tm.toDateString()) return 'amanhã' + (t ? ' ' + t : ''); return d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) + (t ? ' ' + t : '');};
 const timed = (r: DayRecord) => !/^\d{4}-\d{2}-\d{2}$/.test(r.date) && !(r.original as any)?.data?.calendar_all_day;
 
 export type HomeBriefProps = {
-  data: HomeBriefData; today: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null;
+  data: HomeBriefData; today: DayRecord[]; all: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null;
   onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onToggleTask: (t: Task) => void;
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
 };
@@ -37,6 +39,8 @@ export function HomeBrief(p: HomeBriefProps) {
   const items = useMemo(() => p.today.filter(r => !isHoliday((r.original || {}) as any)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)), [p.today]);
   const upcoming = items.filter(r => timed(r) && Date.parse(r.date) >= now.getTime() - 5 * 60000);
   const next = upcoming[0] || null;
+  // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
+  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); return p.all.filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 3);}, [p.all, now.getHours(), now.getMinutes()]);
   const low = (p.series || []).filter(s => s.atLow);
   const outToday = p.data.packs.filter(x => isOut(x) || x.needs === 'pickup');
 
@@ -80,7 +84,7 @@ export function HomeBrief(p: HomeBriefProps) {
       <Timeline items={items.filter(timed)} next={next} onOpen={p.onOpenItem} />
     </View>
     <View style={{flexDirection: 'row', gap: 14}}>
-      <AgendaTile style={{flex: 2}} card={card} upcoming={upcoming} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
+      <AgendaTile style={{flex: 2}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
       <RotinaTile style={{flex: 1}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
     </View>
@@ -124,14 +128,14 @@ function Timeline({items, next, onOpen}: {items: DayRecord[]; next: DayRecord | 
 
 function TileHead({icon, color, name, onOpen}: {icon: IconName; color: string; name: string; onOpen: () => void}) {
   const c = useTheme();
-  return <Pressable accessibilityRole="link" accessibilityLabel={'Abrir ' + name} onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+  return <Pressable accessibilityRole="link" accessibilityLabel={'Abrir ' + name} onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start'}}>
     <View style={{width: 22, height: 22, borderRadius: 7, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={13} color={color} /></View>
     <Text style={{fontSize: 12, color: c.muted, fontWeight: '500'}}>{name}</Text>
   </Pressable>;
 }
 function Big({value, unit}: {value: string; unit?: string}) {
   const c = useTheme();
-  return <Text style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}{unit ? <Text style={{fontSize: 13, fontWeight: '400', letterSpacing: 0, color: c.muted}}>  {unit}</Text> : null}</Text>;
+  return <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}{unit ? <Text style={{fontSize: 13, fontWeight: '400', letterSpacing: 0, color: c.muted}}>  {unit}</Text> : null}</Text>;
 }
 function Line({text}: {text: string}) {const c = useTheme(); return <Text numberOfLines={1} style={{fontSize: 12, color: c.text, opacity: 0.85}}>{text}</Text>;}
 function Act({label, onPress}: {label: string; onPress: () => void}) {
@@ -145,18 +149,18 @@ const Dot = () => {const c = useTheme(); return <View style={{position: 'absolut
 
 function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; card: any; upcoming: DayRecord[]; onOpen: (r: DayRecord) => void; onOpenAgenda: () => void}) {
   const c = useTheme(), list = upcoming.slice(0, 3);
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
     {list.length ? list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 34, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
-      <Text style={{width: 42, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}</Text>
+      <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>
       <View style={{width: 3, height: 16, borderRadius: 2, backgroundColor: colorOf(r, c.accent)}} />
       <Text numberOfLines={1} style={{flex: 1, fontSize: 13, color: c.text}}>{r.title}</Text>
-    </Pressable>) : <Quiet text="Nada mais hoje" sub="A tarde e a noite estão livres." />}
+    </Pressable>) : <Quiet text="Nada marcado" sub="Nenhum compromisso pela frente neste mês." />}
   </View>;
 }
 function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; open: Task[]; onOpen: () => void; onDone: (t: Task) => void}) {
   const imp = open.filter(isImportant), first = imp[0] || open[0];
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     {imp.length ? <Dot /> : null}
     <TileHead icon="checklist" color="#F5A0AE" name="Tarefas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -171,7 +175,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   const doses = capsuleDoses(s.plans, s.history).filter(d => d.date.toDateString() === today);
   const done = doses.filter(d => d.taken).length, next = doses.find(d => !d.taken);
   const late = !!next && next.date.getTime() < Date.now();
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     {late ? <Dot /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
     {doses.length ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -184,7 +188,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
 function FinanceTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     {first && first.date <= today ? <Dot /> : null}
     <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
     {dues === null ? <Quiet text="Abra Finanças" sub="Para ver as contas neste computador." /> : first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -194,17 +198,23 @@ function FinanceTile({style, card, data, onOpen}: {style: any; card: any; data: 
     </View> : <Quiet text="Nenhuma conta" sub="Nada vence nos próximos 7 dias." />}
   </View>;
 }
-/** O unico bloco que se mexe: passa pelos produtos a cada 5 s (pausa com o mouse em cima; bolinhas escolhem). */
+/** Price Tracker: mostra um produto por vez; as setas passam para o proximo (0.3.293: sem trocar sozinho). */
 function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: MonitorWidgetRow[] | null; onOpen: () => void}) {
   const c = useTheme(), reduced = useReducedMotion();
   const list = useMemo(() => [...(rows || [])].filter(r => r.price != null).sort((a, b) => Number(b.atLow) - Number(a.atLow) || Math.abs(b.change || 0) - Math.abs(a.change || 0)), [rows]);
   const [i, setI] = useState(0), [hover, setHover] = useState(false), fade = useRef(new Animated.Value(1)).current;
   const go = (n: number) => {Animated.timing(fade, {toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: false}).start(() => {setI(n); Animated.timing(fade, {toValue: 1, duration: 280, easing: Easing.bezier(0.22, 0.8, 0.24, 1), useNativeDriver: false}).start();});};
-  useEffect(() => {if (list.length < 2 || hover || reduced) return; const t = setInterval(() => go((i + 1) % list.length), 5200); return () => clearInterval(t);}, [list.length, hover, reduced, i]);
+  // 0.3.293 (Pedro): parado; troca so quando a pessoa escolhe
+  void hover; void reduced;
   const r = list[i % Math.max(1, list.length)];
-  return <View style={[card, style, {minHeight: 170, gap: 6}]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
-    {list.length > 1 ? <View style={{position: 'absolute', top: 20, right: 18, flexDirection: 'row', gap: 4}}>{list.map((_, k) => <Pressable key={k} accessibilityLabel={'Produto ' + (k + 1)} onPress={() => k !== i && go(k)} hitSlop={6} style={{width: k === i ? 12 : 5, height: 5, borderRadius: 3, backgroundColor: k === i ? c.accent : 'rgba(255,255,255,0.16)'}} />)}</View> : null}
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
+    
     <TileHead icon="tag" color="#88CFB8" name="Price Tracker" onOpen={onOpen} />
+    {list.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Produto anterior" onPress={() => go((i - 1 + list.length) % list.length)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
+      <Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % list.length) + 1} de {list.length}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Próximo produto" onPress={() => go((i + 1) % list.length)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
+    </View> : null}
     {r ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
       <Big value={brl(r.price || 0)} unit={r.title} />
       <Line text={r.atLow ? 'Menor preço já visto' + (r.store ? ' · ' + r.store : '') : r.change ? (r.change < 0 ? 'Caiu ' : 'Subiu ') + Math.abs(r.change).toFixed(1).replace('.', ',') + '%' + (r.store ? ' · ' + r.store : '') : 'Estável' + (r.store ? ' · ' + r.store : '')} />
@@ -214,7 +224,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
 }
 function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const list = [...data.packs].sort((a, b) => Number(isOut(b) || !!b.needs) - Number(isOut(a) || !!a.needs)), first = list[0];
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     {first && (first.needs === 'fee' || first.needs === 'pickup') ? <Dot /> : null}
     <TileHead icon="box" color="#E8B04A" name="Encomendas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -226,7 +236,7 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
 }
 function MailTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const list = data.mailNew, first = list[0];
-  return <View style={[card, style, {minHeight: 170, gap: 6}]}>
+  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
     <TileHead icon="mail" color="#8fb4ff" name="E-mails" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
       <Big value={String(list.length)} unit={list.length === 1 ? 'novo' : 'novos'} />

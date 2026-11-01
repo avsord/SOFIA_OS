@@ -6,7 +6,7 @@ import type {Entity} from './types';
 import {useCapsules} from './capsule-store';
 import {useWorkspaceRecords} from './workspace-records';
 import {manualDues, todayISO, type Due} from './finance';
-import {readCache, toData} from '../screens/finance/core';
+import {readCache, toData, loadAll, financeWindow} from '../screens/finance/core';
 import {classify, type Pack} from '../screens/PackagesApp';
 
 export type HomeBriefData = {
@@ -28,7 +28,9 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
     let alive = true;
     void (async () => {
       try {
-        const bundle = await readCache(api);
+        // 0.3.293: guardado neste aparelho se houver; senao busca no servidor (antes o bloco ficava "Abra Financas")
+        let bundle = await readCache(api);
+        if (!bundle) {const month = new Date().toISOString().slice(0, 7); bundle = await loadAll(api, financeWindow(month, 'home'));}
         if (!alive) return;
         if (!bundle) {setDues(null); return;}
         const data = toData(bundle.items || {}, bundle.carry || {});
