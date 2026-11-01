@@ -79,7 +79,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           {deskNoBack ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
           <View style={{flex: 1, paddingHorizontal: 4}}>
             
-            <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>Price Tracker</Text>
+            <View style={{gap: 2}}><Text style={{fontSize: deskNoBack ? 28 : 24, fontWeight: deskNoBack ? '600' : '700', letterSpacing: deskNoBack ? -0.5 : 0, color: c.text}}>Price Tracker</Text>{deskNoBack && products?.length ? <Text style={{color: c.muted, fontSize: 14}}>{(() => { const low = products.filter(p => p.atLow); return low.length ? (low.length === 1 ? low[0].monitor.title + ' está no menor preço já visto.' : low.length + ' produtos estão no menor preço já visto.') : 'Nenhum produto no menor preço agora. A Sofia avisa quando cair.'; })()}</Text> : null}</View>
           </View>
           <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />
         </View>

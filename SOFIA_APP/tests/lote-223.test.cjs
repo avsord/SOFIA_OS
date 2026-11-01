@@ -74,7 +74,7 @@ test('capsulas: dose nao tomada fica acumulando ate marcar (ontem continua la)',
   assert.equal(m.capsuleDayLabel('2026-10-20','2026-10-21'),'ontem');
   const c=read('src/screens/Capsules.tsx'),wd=read('src/components/CapsuleWidget.tsx');
   // 0.3.270: na Rotina a dose acumulada vale para as capsulas (habito/cuidado/treino nao acumulam)
-  assert.ok(c.includes("<CapsuleMissedList plans={state.plans.filter(p=>typeOf(p)==='capsula'")&&wd.includes('<CapsuleMissedList compact'));
+  assert.ok(c.includes("plans={state.plans.filter(p=>typeOf(p)==='capsula'")&&c.includes('<CapsuleMissedList desk={wideCaps}')&&wd.includes('<CapsuleMissedList compact'));
 });
 
 test('Inicio na barra leva ao topo; e-mail: emoji da regra no lugar da estrela',()=>{

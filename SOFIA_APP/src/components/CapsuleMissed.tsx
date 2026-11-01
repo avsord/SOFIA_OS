@@ -18,11 +18,13 @@ export function useMissedSince():string{
  return value;
 }
 type Take=(planId:string,day:string,time:string)=>Promise<void>;
-export function CapsuleMissedList({plans,history,saving,take,compact=false}:{plans:Entity[];history:Entity[];saving:string;take:Take;compact?:boolean}){
+export function CapsuleMissedList({plans,history,saving,take,compact=false,desk=false}:{plans:Entity[];history:Entity[];saving:string;take:Take;compact?:boolean;desk?:boolean}){
  const c=useTheme(),from=useMissedSince(),missed=capsuleMissed(plans,history,from),[busy,setBusy]=useState('');
  if(!missed.length)return null;
  const groups=new Map<string,CapsuleDose[]>();for(const d of missed)groups.set(d.plan.id,[...(groups.get(d.plan.id)||[]),d]);
  async function takeAll(list:CapsuleDose[]){setBusy(list[0].plan.id);try{for(const d of list)await take(d.plan.id,d.day,d.time);}catch{/* o erro aparece no app */}finally{setBusy('');}}
+ // 0.3.276 (site): atrasadas numa caixa so com divisorias, como o resto da Rotina (sem os cartoes vermelhos)
+ if(desk)return <View style={{gap:8}}><View style={{flexDirection:'row',alignItems:'baseline',gap:8}}><Text style={{color:c.danger,fontSize:14,fontWeight:'600'}}>Atrasadas</Text><Text style={{color:c.muted,fontSize:13}}>{missed.length}</Text></View><View style={{borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,overflow:'hidden'}}>{missed.map((d,i)=><View key={d.key} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:11,paddingHorizontal:14,borderTopWidth:i?1:0,borderColor:c.line}}><Text style={{width:96,color:c.danger,fontSize:13}}>{capsuleDayLabel(d.day)}, {d.time}</Text><Text style={{flex:1,color:c.text,fontSize:14}}>{d.plan.title}</Text><Pressable accessibilityRole="button" accessibilityLabel={'Tomei '+d.plan.title+' de '+capsuleDayLabel(d.day)+' às '+d.time} disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{paddingHorizontal:12,paddingVertical:6,borderRadius:8,borderWidth:1,borderColor:c.line}}><Text style={{color:c.text,fontSize:12}}>Tomei</Text></Pressable></View>)}</View></View>;
  return <View style={{gap:10}}>
   {[...groups.values()].map(list=>{const plan=list[0].plan;return <View key={plan.id} style={{padding:compact?12:14,gap:8,borderRadius:18,backgroundColor:c.danger+'12',borderWidth:1,borderColor:c.danger+'55'}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
