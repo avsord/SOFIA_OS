@@ -43,7 +43,10 @@ function wrap<P>(Base:any,name:string,extra?:(props:any,max:number|undefined)=>a
 /** Rolagem vertical: conteudo centralizado na largura de leitura (a barra fica na borda da regiao). */
 // 0.3.276 (padrao do site): nas telas de app o conteudo fica na largura maxima, mas encostado a esquerda (a mesma linha
 // do titulo); centralizado so no Inicio (pedido do Pedro: nao mexer) e na Conversa (coluna estreita de leitura).
-const centered=(p:any,max:number|undefined)=>p.horizontal||!max?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:Math.round(max*uiScale()),alignSelf:'center'}]}; // maxWidth entra pelo fator abaixo
+// 0.3.280: se a tela ja centraliza pela margem da coluna (useColumnPad -> calc(...)), nao centraliza de novo: a
+// porcentagem do calc mede a largura da rolagem e o conteudo ficava empurrado para o meio (Price Tracker, E-mails...).
+const ownsColumn=(p:any)=>{try{const f=RNW.StyleSheet.flatten(p.contentContainerStyle)||{};return typeof f.paddingLeft==='string'&&f.paddingLeft.includes('calc(');}catch{return false;}};
+const centered=(p:any,max:number|undefined)=>p.horizontal||!max||ownsColumn(p)?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:Math.round(max*uiScale()),alignSelf:'center'}]}; // maxWidth entra pelo fator abaixo
 
 export const View=wrap<any>(RNW.View,'View');
 export const Text=wrap<any>(RNW.Text,'Text');

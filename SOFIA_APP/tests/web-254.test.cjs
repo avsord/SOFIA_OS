@@ -6,7 +6,7 @@ test('larguras maximas por regiao (nada esticado de ponta a ponta em 2560)',()=>
   const d=read('src/lib/desktop.ts');for(const x of ["if(tab==='home')return 1480;","if(tab==='agenda')return 1120;","if(tab==='apps')return 1120;","if(tab==='chat')return 860;"])assert.ok(d.includes(x),x);
 });
 test('Agenda: painel do dia com largura fixa; Apps: busca e filtros alinhados a coluna',()=>{
-  assert.ok(read('src/screens/Agenda.tsx').includes('{width:440,paddingRight:22,paddingTop:0,gap:13}'));
+  assert.ok(read('src/screens/Agenda.tsx').includes('{width:440,paddingTop:0,gap:13}')); // 0.3.280: a margem da direita vem da coluna (dpx(40))
   const w=read('src/screens/Workspace.tsx');assert.ok(w.includes('paddingBottom:12,...pad(22)}}')&&w.includes('paddingBottom:10,...pad(22)}}'));
 });
 test('descricao da tarefa na lista fica abaixo do titulo na hierarquia (so no computador)',()=>{

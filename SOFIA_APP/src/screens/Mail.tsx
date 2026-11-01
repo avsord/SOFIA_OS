@@ -223,7 +223,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
         </View>
         <View style={{flex: 1, flexDirection: 'row'}}><View style={{flex: 1, minWidth: 0}}>
         {accounts === null ? <View style={{paddingHorizontal: 16, paddingTop: 8, gap: 6, ...pad(16)}}><LoadingCaption label="Carregando e-mails" /><LoadingLines rows={4} /></View> : (
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 16, gap: 12, paddingBottom: insets.bottom + 40}} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 16, gap: 12, paddingBottom: insets.bottom + 40, ...pad(16)}} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {checking ? <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><ActivityIndicator color={c.accent} /><Text style={{color: c.muted}}>Lendo as caixas de entrada…</Text></View> : info ? <Text style={{color: c.muted, fontSize: 12}}>{info}</Text> : null}
             {!accounts.length ? (

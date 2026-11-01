@@ -1,3 +1,4 @@
+import {dpx} from '../lib/content-width';
 import {useDesktop} from '../lib/desktop';
 import React,{useEffect,useMemo,useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
@@ -68,7 +69,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  return <View style={{flex:1}}>
   <ScreenTitle title="Lembretes" subtitle={!records.loaded?' ':groups.late.length?(groups.late.length===1?'“'+groups.late[0].title+'” já passou da hora.':groups.late.length+' lembretes já passaram da hora.'):groups.upcoming.length?'O próximo é “'+groups.upcoming[0].title+'”, '+new Date(Date.parse(String(groups.upcoming[0].data?.remind_at||''))).toLocaleString('pt-BR',{weekday:'long',hour:'2-digit',minute:'2-digit'})+'.':'Nenhum lembrete marcado.'} right={desk?<Button title="Novo lembrete" onPress={()=>open()}/>:<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Novo lembrete" onPress={()=>open()}/></View>}/>
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}
-  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:18}}>
+  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:18,...(desk?{paddingLeft:dpx(40),paddingRight:dpx(40)}:null)} as any}>
    {section('Atrasados',groups.late,true)}
    {section('Próximos',groups.upcoming)}
    {section('Concluídos',groups.done,false,true)}

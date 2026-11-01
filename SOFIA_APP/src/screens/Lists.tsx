@@ -7,7 +7,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {LayoutAnimation, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {PALETTE} from '../lib/palette';
-import {useDesktop} from '../lib/desktop';
+import {useDesktop, useColumnPad} from '../lib/desktop';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
@@ -82,7 +82,7 @@ const KIND: Record<Model, string> = {market: 'shopping_item', shopping: 'purchas
 const listKindOf = (l: ListDef) => l.system === 'market' ? 'shopping_item' : l.system === 'shopping' ? 'purchase' : 'list_item';
 
 export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
-  const c = useTheme(), desktop = useDesktop(), {toast, toastNode} = useToast();
+  const c = useTheme(), desktop = useDesktop(), pad = useColumnPad(), {toast, toastNode} = useToast();
   const [data, setData] = useState<Record<string, Entity[]> | null>(null), [error, setError] = useState('');
   const [cur, setCur] = useState('market'), [gfilter, setGfilter] = useState('all'), [folded, setFolded] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null), [histOpen, setHistOpen] = useState(false), [histRow, setHistRow] = useState(-1);
@@ -382,7 +382,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     </View>
   </View>;
   const ticked = (inGroup ? view : L.model === 'shopping' ? mine : view).filter(i => i.done);
-  const footer = L.model === 'shopping' && !inGroup && !mine.some(i => i.done) ? null : <View testID="list-footer" style={{flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: desktop ? 40 : 16, paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
+  const footer = L.model === 'shopping' && !inGroup && !mine.some(i => i.done) ? null : <View testID="list-footer" style={{flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: desktop ? 40 : 16, ...(desktop ? pad(40) : null), paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
     {L.model === 'simple'
       ? <View style={{flex: 1}}><Text style={{color: c.muted, fontSize: 12}}>Feitos</Text><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>{done.length} de {view.length}</Text></View>
       : <View style={{flex: 1, flexDirection: 'row', gap: 24}}>
