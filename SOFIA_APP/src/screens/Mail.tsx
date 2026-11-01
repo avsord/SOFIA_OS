@@ -3,7 +3,6 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
 import {PALETTE} from '../lib/palette';
 import {tap,useDesktop} from '../lib/desktop';
-import {useWebBackClose} from '../lib/web-panels';
 import {useColumnPad} from '../lib/desktop';
 import {ActivityIndicator, Alert, Animated, Easing, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, Switch, Text, TextInput, View} from 'react-native';
 // 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
@@ -18,6 +17,7 @@ import {useRenderCost} from '../lib/render-cost';
 import {Sheet} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Icon, type IconName} from '../components/Icon';
+import {Panel} from '../components/AppKit';
 import {Button, IconButton} from '../components/UI';
 import {relativeTime} from '../components/NotificationCenter';
 import {Spinner, LoadingLines} from '../components/Loading';
@@ -177,7 +177,6 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   }, [open, desktop, panelAnim]);
   const openMail = (h: Entity) => { setOpen(h); if (h.state === 'new') void api.saveEntity({...h, state: 'read'}).then(load).catch(() => {}); };
   const step = (dir: number) => { const cur = open || lastMail.current; if (!cur) return; const i = shown.findIndex(h => h.id === cur.id); const next = shown[i + dir]; if (next) openMail(next); };
-  useWebBackClose(desktop && !!open, () => setOpen(null));
   useEffect(() => {
     if (!desktop || !active || !open || typeof document === 'undefined') return;
     const key = (e: KeyboardEvent) => { const t = e.target as HTMLElement | null; if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
@@ -204,7 +203,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               </View>
               <Button title="Abrir no Gmail" onPress={() => { const addr = String((accounts || []).find(a => a.id === m.data.account_id)?.data?.address || ''); void openInGmail(m, addr).then(ok => { if (!ok) setInfo('Não foi possível abrir o Gmail neste celular.'); }); }} />
               <BillFromMail api={api} hit={m} onDone={() => setOpen(null)} />
-              <Pressable onPress={() => { const id = m.id; setOpen(null); void api.deleteEntity(id).then(load).catch(() => {}); }} style={{paddingVertical: 12}}><Text style={{color: c.danger}}>Tirar da lista</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => { const id = m.id; setOpen(null); void api.deleteEntity(id).then(load).catch(() => {}); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, alignSelf: 'flex-start'}}><Icon name="trash" size={16} color={c.danger} /><Text style={{color: c.danger}}>Tirar da lista</Text></Pressable>
             </View>
   );
   const pad = useColumnPad(); // 0.3.253: cabecalho alinhado a coluna de leitura no computador
@@ -276,17 +275,16 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
           </ScrollView>
         )}
         </View>
-        {desktop && panelMail ? <Animated.View testID="mail-side-panel" style={{width: '46%', minWidth: 420, maxWidth: 680, borderLeftWidth: 1, borderColor: c.line, backgroundColor: c.surface, opacity: panelAnim, transform: [{translateX: panelAnim.interpolate({inputRange: [0, 1], outputRange: [28, 0]})}]}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingTop: 12}}>
-            <Text style={{flex: 1, color: c.muted, fontSize: 12}}>{(() => { const i = shown.findIndex(h => h.id === panelMail.id); return i >= 0 ? (i + 1) + ' de ' + shown.length + ' · ↑↓ para trocar' : ''; })()}</Text>
-            <IconButton name="close" label="Fechar e-mail" onPress={() => setOpen(null)} />
-          </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 20, paddingTop: 8, paddingBottom: 40}}>{detail(panelMail)}</ScrollView>
-        </Animated.View> : null}
         </View>
         <Presence>{addAccount ? <AccountSheet groups={groups} api={api} account={addAccount === 'new' ? null : addAccount} onClose={() => setAddAccount(null)} onDone={() => { setAddAccount(null); void load(); }} /> : null}</Presence>
         <Presence>{ruleSheet ? <RuleSheet api={api} rule={ruleSheet} accounts={accounts || []} onClose={() => setRuleSheet(null)} onDone={(action) => { setRuleSheet(null); void load(); if (rescanAfterRule(action)) void check(14); }} /> : null}</Presence>
         <Presence>{picker && accounts ? <SelectionSheet api={api} accounts={accounts} selection={selection} onSelect={v => { setSelection(v); setPicker(false); }} onClose={() => setPicker(false)} onChanged={() => void load()} /> : null}</Presence>
+        {/* 0.3.270: no site o e-mail abre por cima, escurecendo o fundo, como os outros paineis (antes era uma coluna
+            presa a direita, longe da lista e desalinhada do cabecalho). Setas trocam de e-mail; X, Esc e voltar fecham. */}
+        {desktop ? <Panel visible={!!open} onClose={() => setOpen(null)} width={600} testID="mail-side-panel" title={<View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+          <Text style={{flex: 1, color: c.muted, fontSize: 12}}>{(() => { const cur = open || lastMail.current; const i = cur ? shown.findIndex(h => h.id === cur.id) : -1; return i >= 0 ? 'E-mail ' + (i + 1) + ' de ' + shown.length + ' · use ↑ e ↓ para trocar' : ''; })()}</Text>
+          {([['E-mail anterior', -1, '-90deg'], ['Próximo e-mail', 1, '90deg']] as const).map(([lb, dir, rot]) => <Pressable key={lb} accessibilityRole="button" accessibilityLabel={lb} onPress={() => step(dir)} style={({hovered}: any) => ({width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><View style={{transform: [{rotate: rot}]}}><Icon name="chevron" size={15} color={c.muted} /></View></Pressable>)}
+        </View>}>{open || lastMail.current ? detail((open || lastMail.current)!) : null}</Panel> : null}
         {desktop ? null : <Sheet visible={!!open} onClose={() => setOpen(null)} label="Fechar e-mail">
           {open ? detail(open) : null}
         </Sheet>}
