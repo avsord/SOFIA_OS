@@ -61,7 +61,8 @@ const STEP_ICON: IconName[] = ['box', 'truck', 'mapPin', 'checkCircle'];
 export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
   const c = useTheme(), desktop = useDesktop(), {toast, toastNode} = useToast();
   const [ents, setEnts] = useState<Entity[] | null>(null), [mails, setMails] = useState<Entity[]>([]), [dismissed, setDismissed] = useState<string[]>([]), [quota, setQuota] = useState<{used: number; limit: number} | null>(null);
-  const [view, setView] = useState('way'), [raw, setRaw] = useState(''), [openId, setOpenId] = useState<string | null>(null), [busy, setBusy] = useState(''), [feeDialog, setFeeDialog] = useState<Pack | null>(null), [pickDialog, setPickDialog] = useState<Pack | null>(null);
+  const [view, setView] = useState('all'), // 0.3.271: abre em Todas (pedido do Pedro)
+     [raw, setRaw] = useState(''), [openId, setOpenId] = useState<string | null>(null), [busy, setBusy] = useState(''), [feeDialog, setFeeDialog] = useState<Pack | null>(null), [pickDialog, setPickDialog] = useState<Pack | null>(null);
   const load = useCallback(async () => {
     try { const [p, m] = await Promise.all([listAll(api, 'package'), listAll(api, 'mail_hit').catch(() => [] as Entity[])]); setEnts(p); setMails(m); } catch (e) { toast(errorText(e)); setEnts(x => x || []); }
     api.packagesQuota().then(q => setQuota(q)).catch(() => {});
@@ -73,7 +74,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
   const packs = useMemo(() => (ents || []).filter(e => e.state !== 'archived').map(classify).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0)), [ents]);
   const recentDone = (p: Pack) => p.delivered && Date.now() - (Date.parse(p.at) || 0) < DONE7; // entregues saem da frente depois de 7 dias
   const lists: Record<string, Pack[]> = {
-    way: packs.filter(p => !p.delivered || recentDone(p)), needs: packs.filter(p => p.needs),
+    all: packs, way: packs.filter(p => !p.delivered || recentDone(p)), needs: packs.filter(p => p.needs),
     transit: packs.filter(p => !p.delivered && p.step <= 1 && !p.needs), out: packs.filter(p => !p.delivered && p.step === 2 && p.needs !== 'pickup'), pickup: packs.filter(p => p.needs === 'pickup'), done: packs.filter(p => p.delivered),
   };
   const open = packs.find(p => p.id === openId) || null;
@@ -116,9 +117,10 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
   }
   const openUrl = (u: string) => { if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(u, '_blank'); else void Linking.openURL(u); };
 
-  const TITLES: Record<string, string> = {way: 'A caminho', needs: 'Precisa de você', transit: 'Em trânsito', out: 'Saiu para entrega', pickup: 'Para retirar', done: 'Entregues'};
+  const TITLES: Record<string, string> = {all: 'Todas', way: 'A caminho', needs: 'Precisa de você', transit: 'Em trânsito', out: 'Saiu para entrega', pickup: 'Para retirar', done: 'Entregues'};
   const quotaNode = quota ? <View testID="packages-quota" style={{gap: 6, paddingHorizontal: 12, paddingTop: 16}}><Text style={{color: c.muted, fontSize: 12}}>{Math.max(0, quota.limit - quota.used)} de {quota.limit} rastreios grátis em {new Date().toLocaleDateString('pt-BR', {month: 'long'})}</Text><View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}><View style={{width: (Math.min(100, quota.used / quota.limit * 100) + '%') as any, height: 4, borderRadius: 2, backgroundColor: c.accent}} /></View><Text style={{color: c.muted, fontSize: 11}}>Atualizar não gasta. Renova todo mês.</Text></View> : null;
   const sidebar = <View style={{flex: 1, minHeight: 520}}>
+    <SideItem testID="pk-nav-all" icon="box" label="Todas" count={packs.length} selected={view === 'all'} onPress={() => setView('all')} />
     <SideItem testID="pk-nav-way" icon="list" label="A caminho" count={lists.way.filter(p => !p.delivered).length} selected={view === 'way'} onPress={() => setView('way')} />
     <SideItem testID="pk-nav-needs" icon="warning" label="Precisa de você" count={lists.needs.length} selected={view === 'needs'} onPress={() => setView('needs')} />
     <SideLabel>Situação</SideLabel>
@@ -150,7 +152,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
     </Pressable>;
   }
   const cur = lists[view] || [];
-  const sections: [string, Pack[]][] = view === 'way' ? [['Precisa de você', cur.filter(p => p.needs)], ['A caminho', cur.filter(p => !p.needs && !p.delivered)], ['Entregues nos últimos 7 dias', cur.filter(p => p.delivered)]] : [[TITLES[view], cur]];
+  const sections: [string, Pack[]][] = view === 'all' ? [['Precisa de você', cur.filter(p => p.needs)], ['A caminho', cur.filter(p => !p.needs && !p.delivered)], ['Entregues', cur.filter(p => p.delivered)]] : view === 'way' ? [['Precisa de você', cur.filter(p => p.needs)], ['A caminho', cur.filter(p => !p.needs && !p.delivered)], ['Entregues nos últimos 7 dias', cur.filter(p => p.delivered)]] : [[TITLES[view], cur]];
   const hint = raw.trim() ? parseCodes(raw).map(x => !x.valid ? 'Código inválido' : known.has(x.code) ? x.code + ' já está na lista' : (CARRIER_LABEL[detectCarrier(x.code)] || 'Transportadora') + ' · ' + x.code + (x.name ? ' · "' + x.name + '"' : '')) : [];
   if (!ents) return <View style={{flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted}}>Carregando encomendas…</Text></View>;
   return <InternalBackGesture enabled={active && !openId} onBack={onBack}>
@@ -159,7 +161,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 28 : 6, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
-            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700'}}>{view === 'way' ? 'Encomendas' : TITLES[view]}</Text><Text style={{color: c.muted, fontSize: 13}}>{lists.way.filter(p => !p.delivered).length} a caminho · Aviso no celular quando o status muda</Text></View>
+            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700'}}>{view === 'all' || view === 'way' ? 'Encomendas' : TITLES[view]}</Text><Text style={{color: c.muted, fontSize: 13}}>{lists.way.filter(p => !p.delivered).length} a caminho · Aviso no celular quando o status muda</Text></View>
           </View>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />
@@ -172,7 +174,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
             <PrimaryButton label="Adicionar" onPress={() => void add(suggestion.code, suggestion.mail.title.slice(0, 60), suggestion.mail.id)} /><GhostButton label="Ignorar" onPress={() => { const next = [...dismissed, suggestion.code]; setDismissed(next); void AsyncStorage.setItem(DISMISS_KEY, JSON.stringify(next)); }} />
           </View> : null}
           {sections.filter(([, l]) => l.length).map(([t, l]) => <View key={t} style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingHorizontal: 4}}>{t} <Text style={{fontWeight: '400'}}>{l.length}</Text></Text>{l.map(p => <Card key={p.id} p={p} />)}</View>)}
-          {!cur.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{view === 'way' ? 'Nada a caminho. Cole um código de rastreio no campo acima.' : 'Nenhuma encomenda aqui.'}</Text> : null}
+          {!cur.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{view === 'way' || view === 'all' ? (view === 'all' ? 'Nenhuma encomenda ainda. Cole um código de rastreio no campo acima.' : 'Nada a caminho. Cole um código de rastreio no campo acima.') : 'Nenhuma encomenda aqui.'}</Text> : null}
           {!desktop ? quotaNode : null}
         </ScrollView>
       </AppFrame>

@@ -48,3 +48,9 @@ test('Financas no site: estrutura nova so no computador, sem avisos no topo, mes
   assert.ok(D.includes('api.readReceipt(')&&D.includes('installmentPlan('));
   assert.ok(!/function render[A-Za-z]+\([^)]*\)[^{]*\{\s*const \[/.test(D),'partes sem estado proprio (campo nao perde o foco)');
 });
+test('0.3.271: Encomendas abre em Todas; notificacoes no site em janela pequena saindo do sino (aprovado por foto)',()=>{
+  const p=read('src/screens/PackagesApp.tsx');assert.ok(p.includes("useState('all')")&&p.includes('label="Todas"'));
+  const n=read('src/components/NotificationCenter.tsx');
+  assert.ok(n.includes('function DeskList')&&n.includes('function DeskRow')&&n.includes("const desk=Platform.OS==='web'&&screen.width>=900"));
+  assert.ok(n.includes('Adiar 30 min')&&n.includes('Limpar as lidas')&&n.includes("'Cápsulas':'Rotina'"));
+});
