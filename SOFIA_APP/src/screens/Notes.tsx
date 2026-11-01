@@ -1,3 +1,4 @@
+import {dpx} from '../lib/content-width';
 // 0.3.269 — Notas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/notas.html), web e celular.
 // Sai: Estado, Área, Privacidade, Contexto e "etiquetas por vírgula". Fica: etiquetas (com cor) + fixar/arquivar.
 // Etiquetas continuam nas notas como "cat:Nome" (compatível com as notas antigas); a cor e a senha ficam num note_tag.
@@ -199,7 +200,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 2}}>

@@ -7,7 +7,7 @@
 import React,{forwardRef,useContext} from 'react';
 // @ts-ignore - o react-native-web nao traz tipos; esta camada so roda no site
 import * as RNW from 'react-native-web';
-import {scaleStyle} from './desktop-scale';
+import {scaleStyle,uiScale} from './desktop-scale';
 import {ContentWidth} from '../lib/content-width';
 
 // @ts-ignore - idem
@@ -43,7 +43,7 @@ function wrap<P>(Base:any,name:string,extra?:(props:any,max:number|undefined)=>a
 /** Rolagem vertical: conteudo centralizado na largura de leitura (a barra fica na borda da regiao). */
 // 0.3.276 (padrao do site): nas telas de app o conteudo fica na largura maxima, mas encostado a esquerda (a mesma linha
 // do titulo); centralizado so no Inicio (pedido do Pedro: nao mexer) e na Conversa (coluna estreita de leitura).
-const centered=(p:any,max:number|undefined)=>p.horizontal||!max?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:max,alignSelf:'center'}]};
+const centered=(p:any,max:number|undefined)=>p.horizontal||!max?{}:{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:Math.round(max*uiScale()),alignSelf:'center'}]}; // maxWidth entra pelo fator abaixo
 
 export const View=wrap<any>(RNW.View,'View');
 export const Text=wrap<any>(RNW.Text,'Text');

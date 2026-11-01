@@ -1,3 +1,4 @@
+import {dpx} from '../lib/content-width';
 // 0.3.269 — Biblioteca redesenhada (protótipo aprovado em 31/10: docs/prototipos-2026-10-31/biblioteca-criar.html).
 // Cards em uma coluna; tipos na lateral (computador, ordem arrastável) ou abas com "Mais" (celular); criar = entrada
 // universal (nome, link de qualquer site ou arquivo) com o fluxo de 10 passos do documento de pedidos.
@@ -286,7 +287,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 4}}>

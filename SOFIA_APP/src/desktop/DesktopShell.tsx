@@ -1,3 +1,4 @@
+import {uiScale} from '../web/desktop-scale';
 import {LoadingLines} from '../components/Loading';
 // 0.3.250: moldura do app no computador (estilo Notion). So e usada no navegador com tela larga
 import {PALETTE} from '../lib/palette';
@@ -141,7 +142,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   ...(pages||[]).map(p=>({id:'page:'+p.id,label:p.title||'Sem título',group:'Páginas',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined,icon:(isEmoji(p.data?.icon)?undefined:'book') as IconName|undefined,run:()=>onOpenPage(p.id)})),
  ],[pages,paletteTasks,collapsed,onNavigate,onOpenModule,onOpenPage,onCreatePage]);
  const crumbs=[TAB_LABELS[tab]?.label||'Sofia',...(tab==='pages'?path.map(p=>p.title||'Sem título'):tab==='apps'&&moduleTitle?[moduleTitle]:[])];
- const width=collapsed?SIDEBAR_COLLAPSED:SIDEBAR_WIDTH;
+ const width=Math.round((collapsed?SIDEBAR_COLLAPSED:SIDEBAR_WIDTH)*uiScale()); // 0.3.278: lateral na escala da tela
  return <View testID="desktop-shell" style={{flex:1,flexDirection:'row',backgroundColor:c.bg}}>
   <View testID="desktop-sidebar" style={{width,flexShrink:0,backgroundColor:c.surface,borderRightWidth:1,borderColor:c.line}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10,height:56,paddingHorizontal:collapsed?0:16,justifyContent:collapsed?'center':'flex-start'}}>

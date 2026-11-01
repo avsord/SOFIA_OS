@@ -1,3 +1,4 @@
+import {dpx} from '../lib/content-width';
 // 0.3.269 — Listas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/listas.html). Mesma tela no
 // computador e no celular. Modelos: Mercado (secoes automaticas, soma do carrinho), Compras (grupos) e Simples.
 // Dados: Mercado = shopping_item; Compras = purchase + purchase_group; listas criadas = list_collection + list_item.
@@ -395,7 +396,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={footer}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
           {header}
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger, marginTop: 10}}>{error}</Text> : null}

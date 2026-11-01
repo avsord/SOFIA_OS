@@ -15,7 +15,8 @@ export function isDesktopWidth(width:number):boolean{return Platform.OS==='web'&
 export function useDesktop():boolean{const {width}=useWindowDimensions();return isDesktopWidth(width);}
 
 /** Largura maxima do conteudo por aba: so onde a leitura pede (texto de Paginas, Conversa). O resto e fluido. */
-export function contentMaxWidth(tab:Tab):number|undefined{
+export function contentMaxWidth(tab:Tab):number|undefined{return baseMaxWidth(tab); /* 0.3.278: na escala de computador; a camada do site multiplica pelo fator da tela */}
+function baseMaxWidth(tab:Tab):number|undefined{
  // 0.3.251: Paginas ocupa a tela (capa e barra na largura toda; o texto se centraliza no proprio editor).
  // Apps: formularios e listas dos apps nao se esticam por 1900 px.
  if(tab==='chat')return 860;

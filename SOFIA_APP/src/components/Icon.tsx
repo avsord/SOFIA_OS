@@ -1,3 +1,4 @@
+import {uiScale} from '../web/desktop-scale';
 import React from 'react';
 import Svg, {Path, Rect} from 'react-native-svg';
 import * as PAirplane from 'phosphor-react-native/src/icons/Airplane';
@@ -245,7 +246,8 @@ function GuardadoGlyph({size, color, fill}: {size: number; color: string; fill: 
   </Svg>;
 }
 const CUSTOM: Record<string, (p: {size: number; color: string; fill: boolean}) => React.ReactElement> = {sofia: SofiaGlyph, capsule: CapsuleGlyph, guardado: GuardadoGlyph};
-export function Icon({ name, size = 22, color = '#7258E8', active = false, weight }: { name: IconName; size?: number; color?: string; active?: boolean; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }) {
+export function Icon({ name, size: base = 22, color = '#7258E8', active = false, weight }: { name: IconName; size?: number; color?: string; active?: boolean; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }) {
+  const size = Math.round(base * uiScale()); // 0.3.278: icones crescem junto com o site em telas grandes (1 no celular)
   const Own = CUSTOM[name];
   if (Own) return <Own size={size} color={color} fill={active || weight === 'fill'} />;
   const Glyph = ICONS[name] || ICONS.circle;

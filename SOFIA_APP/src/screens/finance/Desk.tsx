@@ -1,3 +1,4 @@
+import {dpx} from '../../lib/content-width';
 // 0.3.269 — Finanças no SITE (protótipo aprovado em 31/10: docs/prototipos-2026-10-31/financas.html). Só no computador;
 // o celular continua com a Finanças de antes. Todas as regras de número são as mesmas do Resumo (copiadas do HomeTab:
 // Saldo como banco, Guardado fora do saldo, Previsto pela regra do dia do pagamento, Controle de gastos como antes,
@@ -272,7 +273,7 @@ export function FinanceDesk(p: Props) {
   }
   return <View testID="finance-desk" style={{flex: 1, flexDirection: 'row', backgroundColor: c.bg}}>
     <View style={{flex: 1, minWidth: 0}}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', paddingBottom: 40, gap: 18, maxWidth: 1240, width: '100%', alignSelf: 'flex-start'} as any}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), paddingBottom: 40, gap: 18, maxWidth: 1240, width: '100%', alignSelf: 'flex-start'} as any}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
           <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -0.5}}>Finanças</Text><Text style={{color: c.muted, fontSize: 14}}>{past ? 'Em ' + monthLabel(month).split(' ')[0] + ' entrou ' + show(inSum) + ' e saiu ' + show(outSum) + '.' : future ? 'Mês que vem: aqui só aparece o que já está programado.' : 'Sobram ' + show(forecast.left) + ' até ' + short(forecast.end) + ', depois de tudo pago.'}</Text></View>
           {month !== curMonth ? <Pressable accessibilityRole="link" onPress={() => setMonth(curMonth)}><Text style={{color: c.accent, fontSize: 13}}>Voltar para {monthLabel(curMonth).split(' ')[0]}</Text></Pressable> : null}

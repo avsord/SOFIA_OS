@@ -1,3 +1,5 @@
+import {dpx} from '../lib/content-width';
+import {contentMaxWidth} from '../lib/desktop';
 import React, {useEffect, useRef, useState} from 'react';
 import {Animated, Easing, Platform, StyleSheet, Text, View} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
@@ -163,7 +165,7 @@ export function LoadingCaption({label}: {label: string}) {
 export function DeskPageSkeleton({title, testID}: {title?: string; testID?: string}) {
   const c = useTheme(), show = useSkeletonDelay();
   if (!show) return <View testID={testID ? testID + '-wait' : undefined} style={{flex: 1, backgroundColor: c.bg}} />;
-  return <View testID={testID} accessibilityLabel={title ? 'Abrindo ' + title : 'Carregando'} style={{flex: 1, backgroundColor: c.bg, paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', gap: 14, maxWidth: 1120, width: '100%', alignSelf: 'center'} as any}>
+  return <View testID={testID} accessibilityLabel={title ? 'Abrindo ' + title : 'Carregando'} style={{flex: 1, backgroundColor: c.bg, paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), gap: 14, maxWidth: contentMaxWidth('apps'), width: '100%', alignSelf: 'center'} as any}>
     <ShimmerGroup>{title ? <Text style={{fontSize: 28, letterSpacing: -1, fontWeight: '600', color: c.text}}>{title}</Text> : <ShimmerBlock width={220} height={28} radius={8} />}
     <ShimmerBlock width={360} height={12} radius={6} style={{marginTop: 14}} /></ShimmerGroup>
     <View style={{height: 1, backgroundColor: c.line, marginTop: 10}} />

@@ -5,6 +5,20 @@
 
 const r2=(v:number)=>Math.round(v*2)/2;
 
+/** 0.3.278 (site responsivo): fator unico que acompanha o tamanho da tela. Ate 1440 px de largura vale 1 (o
+ * desenho de notebook); acima disso tudo cresce na mesma proporcao - texto, espacos, cantos, controles, icones e a
+ * largura da coluna - para o site ocupar uma TV/monitor grande como ocupa um notebook (antes ficava "pequeno no
+ * meio"). Degraus de 0,05 para nao recalcular a cada pixel; limite em 1,8 (4K continua legivel sem exagero). */
+export function fluidFactor(width?:number):number{
+ const w=typeof width==='number'?width:(typeof window!=='undefined'?window.innerWidth:1440);
+ if(!(w>1440))return 1;
+ return Math.min(1.8,Math.round((w/1440)*20)/20);
+}
+let current=1;
+export function uiScale():number{return current;}
+export function refreshUiScale(width?:number):boolean{const f=fluidFactor(width);if(f===current)return false;current=f;return true;}
+if(typeof window!=='undefined')refreshUiScale();
+
 export function scaleFont(v:number):number{
  if(v<=11)return v;
  if(v<=13)return r2(v-0.5);
@@ -37,6 +51,7 @@ const SPACE=new Set(['padding','paddingTop','paddingBottom','paddingLeft','paddi
 const RADIUS=new Set(['borderRadius','borderTopLeftRadius','borderTopRightRadius','borderBottomLeftRadius','borderBottomRightRadius']);
 const SIZE=new Set(['width','height','minWidth','minHeight','maxHeight']);
 const POS=new Set(['top','bottom','left','right']);
+const MAXW=new Set(['maxWidth','minWidth']);
 
 /** Recebe um estilo ja achatado e devolve outro com os numeros na escala de computador. */
 export function scaleStyle<T extends Record<string,any>>(style:T|null|undefined):T|null|undefined{
@@ -47,14 +62,33 @@ export function scaleStyle<T extends Record<string,any>>(style:T|null|undefined)
   if(typeof v!=='number'||!Number.isFinite(v)||v===0)continue;
   const neg=v<0,a=Math.abs(v);
   let n=a;
+  let grow=true;
   if(FONT.has(key))n=scaleFont(a);
   else if(LINE.has(key))n=scaleLine(a);
   else if(SPACE.has(key))n=scaleSpace(a);
-  else if(RADIUS.has(key))n=scaleRadius(a);
-  else if(SIZE.has(key))n=scaleSize(a);
-  else if(POS.has(key))n=a<=24?scaleSpace(a):a;
+  else if(RADIUS.has(key)){n=scaleRadius(a);grow=a<40;}
+  else if(SIZE.has(key)){n=scaleSize(a);grow=a<=96;}
+  else if(MAXW.has(key)){n=a;grow=a>=200;}            // larguras maximas (colunas, barra da Sofia, janelas) crescem junto
+  else if(POS.has(key)){n=a<=24?scaleSpace(a):a;grow=a<=24;}
   else continue;
+  if(grow&&current!==1)n=r2(n*current);
   if(n!==a){if(!out)out={...style};out[key]=neg?-n:n;}
+ }
+ return (out||style) as T;
+}
+
+/** 0.3.278: so o fator da tela, sem a conversao celular->computador (para a moldura do site, que ja foi desenhada
+ * em tamanhos de computador: lateral, barra de cima, busca). */
+export function fluidStyle<T extends Record<string,any>>(style:T|null|undefined):T|null|undefined{
+ if(current===1||!style||typeof style!=='object')return style;
+ let out:Record<string,any>|null=null;
+ for(const key in style){
+  const v=style[key];
+  if(typeof v!=='number'||!Number.isFinite(v)||v===0)continue;
+  const a=Math.abs(v);
+  const grow=FONT.has(key)||LINE.has(key)||SPACE.has(key)||(RADIUS.has(key)&&a<40)||(SIZE.has(key)&&a<=96)||(MAXW.has(key)&&a>=200)||(POS.has(key)&&a<=24);
+  if(!grow)continue;
+  if(!out)out={...style};out[key]=(v<0?-1:1)*r2(a*current);
  }
  return (out||style) as T;
 }

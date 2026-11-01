@@ -1,3 +1,4 @@
+import {uiScale} from '../web/desktop-scale';
 // 0.3.269: pecas comuns dos apps redesenhados em 31/10 (Listas, Notas, Biblioteca, Encomendas, Financas no site).
 // Mesma estrutura nos dois tamanhos: no computador lateral fixa + conteudo + painel por cima escurecendo o fundo;
 // no celular a lateral vira abas/etiquetas no topo e o painel vira tela cheia. Aviso com "Desfazer" no rodape.
@@ -133,7 +134,7 @@ export function Dialog({visible, onClose, title, children, footer}: {visible: bo
   const c = useTheme();
   return <MotionModal visible={visible} transparent onRequestClose={onClose}>
     <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{flex: 1, backgroundColor: '#0008', alignItems: 'center', justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end', padding: Platform.OS === 'web' ? 24 : 0}}>
-      <Pressable onPress={() => undefined} style={{width: '100%', maxWidth: 480, backgroundColor: c.surface, borderRadius: 18, borderBottomLeftRadius: Platform.OS === 'web' ? 18 : 0, borderBottomRightRadius: Platform.OS === 'web' ? 18 : 0, padding: 20, paddingBottom: Platform.OS === 'web' ? 18 : 34, gap: 14, borderWidth: 1, borderColor: c.line}}>
+      <Pressable onPress={() => undefined} style={{width: '100%', maxWidth: Math.round(480 * uiScale()), backgroundColor: c.surface, borderRadius: 18, borderBottomLeftRadius: Platform.OS === 'web' ? 18 : 0, borderBottomRightRadius: Platform.OS === 'web' ? 18 : 0, padding: 20, paddingBottom: Platform.OS === 'web' ? 18 : 34, gap: 14, borderWidth: 1, borderColor: c.line}}>
         <Text style={{color: c.text, fontSize: 18, fontWeight: '600'}}>{title}</Text>
         {children}
         {footer ? <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4}}>{footer}</View> : null}

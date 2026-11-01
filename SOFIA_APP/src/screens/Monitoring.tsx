@@ -1,3 +1,4 @@
+import {dpx} from '../lib/content-width';
 import {useDesktop} from '../lib/desktop';
 import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -75,7 +76,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
   return (
     <InternalBackGesture enabled={active && !adding && !open} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, ...(deskNoBack ? {paddingTop: '32px', paddingBottom: '16px'} : {paddingTop: 14, paddingBottom: 6}), ...pad(12)} as any}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, ...(deskNoBack ? {paddingTop: dpx(32), paddingBottom: dpx(16)} : {paddingTop: 14, paddingBottom: 6}), ...pad(12)} as any}>
           {deskNoBack ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
           <View style={{flex: 1, paddingHorizontal: deskNoBack ? 0 : 4}}>
             

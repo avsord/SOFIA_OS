@@ -1,3 +1,4 @@
+import {uiScale} from '../web/desktop-scale';
 import {capsuleStore} from '../lib/capsule-store';
 import {PALETTE} from '../lib/palette';
 import {capsuleDoseOfNotice,capsuleKey} from '../lib/capsule-model';
@@ -234,7 +235,7 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  // Posição do sino medida antes (ao desenhar), não no toque: o painel abre no mesmo quadro.
  function measureBell(){bell.current?.measureInWindow((x,y,width,height)=>{if(width>0){setAnchor({x,y,width,height});anchorKnown.current=true;}});}
  const desk=Platform.OS==='web'&&screen.width>=900;
- const layout=desk?(()=>{const top=anchor.y+anchor.height+8,width=470;return {left:Math.max(16,anchor.x+anchor.width-width),top,width,maxHeight:Math.max(1,Math.min(640,screen.height-top-24))} as any;})():notificationPopoverLayout(anchor,screen,insets);
+ const layout=desk?(()=>{const top=anchor.y+anchor.height+8,width=Math.round(470*uiScale());return {left:Math.max(16,anchor.x+anchor.width-width),top,width,maxHeight:Math.max(1,Math.min(640,screen.height-top-24))} as any;})():notificationPopoverLayout(anchor,screen,insets);
  // A busca de avisos novos espera a animação terminar, para não disputar com ela.
  // A lista já vem pronta (atualizada a cada minuto por trás); ao abrir só busca de novo se estiver velha.
  function reveal(){closing.current=false;motion.stopAnimation();motion.setValue(0);setSettled(false);setOpen(true);if(Date.now()-lastRefreshAt>90000)setTimeout(()=>{void n.refresh();},420);}

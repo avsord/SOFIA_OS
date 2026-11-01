@@ -1,3 +1,4 @@
+import {refreshUiScale} from './src/web/desktop-scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useRenderCost} from './src/lib/render-cost';
 import {startFluency,revealFluency,noteFluencyInput,noteFluencyMovement,queueOptional,newFluency,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
@@ -57,7 +58,11 @@ const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',ico
 function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const system=useColorScheme(),[ready]=useState(true),[auth,setAuth]=useState<Auth|null>(startup.auth),[bootstrap,setBootstrap]=useState<Bootstrap|null>(()=>startup.auth?fastBootstrap(startup.auth):null),[prefs,setPrefs]=useState<Prefs>(startup.prefs||{appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
- const desktop=isDesktopWidth(useWindowDimensions().width);
+ const winWidth=useWindowDimensions().width;
+ // 0.3.278 (site responsivo): o fator de escala acompanha a largura da janela; como o Shell redesenha ao mudar o
+ // tamanho, todas as telas pegam o fator novo no mesmo quadro
+ if(Platform.OS==='web')refreshUiScale(winWidth);
+ const desktop=isDesktopWidth(winWidth);
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  const tabTap=useRef<{tab:Tab;at:number;early:boolean}|null>(null);
  const nativeRevealAt=useRef(0);
