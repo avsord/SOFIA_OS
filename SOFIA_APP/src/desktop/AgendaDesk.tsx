@@ -179,7 +179,9 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
 export function AgendaDesk(p: AgendaDeskProps) {
   const c = useTheme(), reduced = useReducedMotion();
   const [level, setLevel] = useState<Level>('month');
-  const [anim, setAnim] = useState<null | {from: Level; fromDate: Date; dir: 'in' | 'out' | 'side'; rect: Rect | null; side: number}>(null);
+  const [anim, setAnim] = useState<null | {from: Level; fromDate: Date; dir: 'in' | 'out' | 'side'; rect: Rect | null; side: number; axis?: 'x' | 'y'}>(null);
+  const axisRef = useRef<'x' | 'y'>('x');
+  const stageRef = useRef<any>(null);
   const progress = useRef(new Animated.Value(1)).current;
   const stage = useRef<Rect>({x: 0, y: 0, w: 1, h: 1});
   const rects = useRef(new Map<string, Local>());
@@ -205,7 +207,8 @@ export function AgendaDesk(p: AgendaDeskProps) {
     if (reduced) return;
     const rect = deeper && from ? resolve(rects.current, from) : null;
     const side = !deeper && !shallower ? (+date >= +prevDate ? 1 : -1) : 0;
-    setAnim({from: prev, fromDate: prevDate, dir: deeper ? 'in' : shallower ? 'out' : 'side', rect, side});
+    setAnim({from: prev, fromDate: prevDate, dir: deeper ? 'in' : shallower ? 'out' : 'side', rect, side, axis: axisRef.current});
+    axisRef.current = 'x';
     progress.setValue(0);
     Animated.timing(progress, {toValue: 1, duration: side ? DUR * 0.8 : DUR, easing: ease, useNativeDriver: false}).start(() => setAnim(null));
   }
@@ -215,6 +218,30 @@ export function AgendaDesk(p: AgendaDeskProps) {
     else if (level === 'month') go('month', new Date(d.getFullYear(), d.getMonth() + n, 1));
     else go('day', new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
   }
+  // 0.3.284: rolar a rodinha (ou deslizar dois dedos no trackpad) no Mes e no Ano passa para o proximo/anterior.
+  // No Dia a rodinha continua rolando as horas.
+  const wheel = useRef({acc: 0, at: 0, lock: 0});
+  useEffect(() => {
+    const node = stageRef.current as HTMLElement | null;
+    if (!node || typeof node.addEventListener !== 'function' || level === 'day') return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now(), w = wheel.current;
+      const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY), d = horiz ? e.deltaX : e.deltaY;
+      // a inercia do trackpad (passos pequenos seguidos) nao passa varios meses de uma vez: enquanto ela durar, a trava
+      // se estende; cliques de rodinha (passos grandes) continuam passando um mes por clique depois da trava
+      if (now < w.lock) {if (Math.abs(d) < 50) w.lock = now + 300; w.at = now; return;}
+      if (now - w.at > 250) w.acc = 0;
+      w.at = now;
+      w.acc += d;
+      if (anim || Math.abs(w.acc) < 60) return;
+      const n = w.acc > 0 ? 1 : -1; w.acc = 0; w.lock = now + 450;
+      axisRef.current = horiz ? 'x' : 'y';
+      step(n);
+    };
+    node.addEventListener('wheel', onWheel, {passive: false});
+    return () => node.removeEventListener('wheel', onWheel);
+  });
   useEffect(() => {
     if (!p.active || typeof window === 'undefined') return;
     const onKey = (e: KeyboardEvent) => {
@@ -260,10 +287,11 @@ export function AgendaDesk(p: AgendaDeskProps) {
       </>;
     }
   } else {
-    const dx = 24 * anim.side;
+    // ‹ › e setas deslizam para o lado; a rodinha do mouse desliza para cima/baixo (como rolar o calendario)
+    const dx = (anim.axis === 'y' ? 40 : 24) * anim.side, tr = anim.axis === 'y' ? 'translateY' : 'translateX';
     layers = <>
-      <Animated.View style={[card, {opacity: lerp(1, 0), transform: [{translateX: lerp(0, -dx)}]}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
-      <Animated.View style={[card, {opacity: lerp(0, 1), transform: [{translateX: lerp(dx, 0)}]}]}>{viewFor(level, p.selected)}</Animated.View>
+      <Animated.View style={[card, {opacity: lerp(1, 0), transform: [{[tr]: lerp(0, -dx)} as any]}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
+      <Animated.View style={[card, {opacity: lerp(0, 1), transform: [{[tr]: lerp(dx, 0)} as any]}]}>{viewFor(level, p.selected)}</Animated.View>
     </>;
   }
 
@@ -293,6 +321,6 @@ export function AgendaDesk(p: AgendaDeskProps) {
           style={{height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
       </View>
     </View>
-    <View style={{flex: 1, minHeight: 520, borderRadius: 14, overflow: 'hidden'}} onLayout={e => {const l = e.nativeEvent.layout; stage.current = {x: 0, y: 0, w: l.width, h: l.height};}}>{layers}</View>
+    <View ref={stageRef} style={{flex: 1, minHeight: 520, borderRadius: 14, overflow: 'hidden'}} onLayout={e => {const l = e.nativeEvent.layout; stage.current = {x: 0, y: 0, w: l.width, h: l.height};}}>{layers}</View>
   </View>;
 }
