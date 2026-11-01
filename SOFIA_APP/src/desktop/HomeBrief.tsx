@@ -67,28 +67,28 @@ export function HomeBrief(p: HomeBriefProps) {
   if (low.length) actions.push({label: 'Ver ' + (low.length === 1 ? 'o ' + low[0].title : 'os produtos'), run: p.onOpenMonitoring});
 
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
-  return <View style={{gap: 14}}>
-    <View testID="home-brief" style={{...card, borderRadius: 24, padding: 24, paddingBottom: 20, backgroundColor: c.surface}}>
+  return <View style={{gap: 12}}>
+    <View testID="home-brief" style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
         <View style={{flex: 1}} />
         <Pressable accessibilityRole="link" onPress={p.onOpenAgenda}><Text style={{color: c.muted, fontSize: 12}}>Abrir agenda</Text></Pressable>
       </View>
-      <Text style={{marginTop: 12, fontSize: 20, lineHeight: 28, fontWeight: '500', color: c.text, maxWidth: 860, textWrap: 'balance'} as any}>{parts.map((x, i) => <React.Fragment key={i}>{x}</React.Fragment>)}{extraText ? <Text style={{color: c.muted}}>{extraText}</Text> : null}</Text>
-      {actions.length ? <View style={{flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap'}}>
+      <Text style={{marginTop: 10, fontSize: 20, lineHeight: 28, fontWeight: '500', color: c.text, maxWidth: 860, textWrap: 'balance'} as any}>{parts.map((x, i) => <React.Fragment key={i}>{x}</React.Fragment>)}{extraText ? <Text style={{color: c.muted}}>{extraText}</Text> : null}</Text>
+      {actions.length ? <View style={{flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap'}}>
         {actions.map(a => <Pressable key={a.label} accessibilityRole="button" onPress={a.run} style={({hovered, pressed}: any) => ({height: 36, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', backgroundColor: a.primary ? c.accent : hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
           <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: a.primary ? c.onAccent : c.accent, maxWidth: 260}}>{a.label}</Text>
         </Pressable>)}
       </View> : null}
       <Timeline items={items.filter(timed)} next={next} onOpen={p.onOpenItem} />
     </View>
-    <View style={{flexDirection: 'row', gap: 14}}>
+    <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
       <RotinaTile style={{flex: 1}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
     </View>
-    <View style={{flexDirection: 'row', gap: 14}}>
+    <View style={{flexDirection: 'row', gap: 12}}>
       <FinanceTile style={{flex: 1}} card={card} data={p.data} onOpen={() => p.onOpenModule('finance')} />
       <PriceTile style={{flex: 1}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
       <PackagesTile style={{flex: 1}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
@@ -108,7 +108,7 @@ function Timeline({items, next, onOpen}: {items: DayRecord[]; next: DayRecord | 
   const groups: {x: number; list: DayRecord[]}[] = [];
   for (const r of items) {const x = pos(new Date(r.date)); const g = groups[groups.length - 1]; if (g && w && (x - g.x) * w < 22) g.list.push(r); else groups.push({x, list: [r]});}
   const color = (r: DayRecord) => colorOf(r, c.accent);
-  return <View style={{marginTop: 26, height: 60}} onLayout={e => setW(e.nativeEvent.layout.width)}>
+  return <View style={{marginTop: 18, height: 56}} onLayout={e => setW(e.nativeEvent.layout.width)}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     <View style={{position: 'absolute', left: 0, width: (nowX * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {groups.map((g, i) => {
@@ -140,7 +140,7 @@ function Big({value, unit}: {value: string; unit?: string}) {
 function Line({text}: {text: string}) {const c = useTheme(); return <Text numberOfLines={1} style={{fontSize: 12, color: c.text, opacity: 0.85}}>{text}</Text>;}
 function Act({label, onPress}: {label: string; onPress: () => void}) {
   const c = useTheme();
-  return <Pressable accessibilityRole="button" onPress={onPress} hitSlop={6} style={({hovered, pressed}: any) => ({alignSelf: 'flex-start', marginTop: 10, height: 30, paddingHorizontal: 11, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
+  return <Pressable accessibilityRole="button" onPress={onPress} hitSlop={6} style={({hovered, pressed}: any) => ({alignSelf: 'flex-start', marginTop: 8, height: 28, paddingHorizontal: 11, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
     <Text style={{fontSize: 12, fontWeight: '600', color: c.accent}}>{label}</Text>
   </Pressable>;
 }
@@ -149,9 +149,9 @@ const Dot = () => {const c = useTheme(); return <View style={{position: 'absolut
 
 function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; card: any; upcoming: DayRecord[]; onOpen: (r: DayRecord) => void; onOpenAgenda: () => void}) {
   const c = useTheme(), list = upcoming.slice(0, 3);
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
-    {list.length ? list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 34, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
+    {list.length ? list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
       <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>
       <View style={{width: 3, height: 16, borderRadius: 2, backgroundColor: colorOf(r, c.accent)}} />
       <Text numberOfLines={1} style={{flex: 1, fontSize: 13, color: c.text}}>{r.title}</Text>
@@ -160,7 +160,7 @@ function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; 
 }
 function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; open: Task[]; onOpen: () => void; onDone: (t: Task) => void}) {
   const imp = open.filter(isImportant), first = imp[0] || open[0];
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     {imp.length ? <Dot /> : null}
     <TileHead icon="checklist" color="#F5A0AE" name="Tarefas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -175,7 +175,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   const doses = capsuleDoses(s.plans, s.history).filter(d => d.date.toDateString() === today);
   const done = doses.filter(d => d.taken).length, next = doses.find(d => !d.taken);
   const late = !!next && next.date.getTime() < Date.now();
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     {late ? <Dot /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
     {doses.length ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -188,7 +188,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
 function FinanceTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     {first && first.date <= today ? <Dot /> : null}
     <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
     {dues === null ? <Quiet text="Abra Finanças" sub="Para ver as contas neste computador." /> : first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -207,7 +207,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
   // 0.3.293 (Pedro): parado; troca so quando a pessoa escolhe
   void hover; void reduced;
   const r = list[i % Math.max(1, list.length)];
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
     
     <TileHead icon="tag" color="#88CFB8" name="Price Tracker" onOpen={onOpen} />
     {list.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
@@ -224,7 +224,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
 }
 function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const list = [...data.packs].sort((a, b) => Number(isOut(b) || !!b.needs) - Number(isOut(a) || !!a.needs)), first = list[0];
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     {first && (first.needs === 'fee' || first.needs === 'pickup') ? <Dot /> : null}
     <TileHead icon="box" color="#E8B04A" name="Encomendas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
@@ -236,7 +236,7 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
 }
 function MailTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
   const list = data.mailNew, first = list[0];
-  return <View style={[card, style, {height: 176, gap: 6, overflow: 'hidden'}]}>
+  return <View style={[card, style, {height: 152, gap: 6, overflow: 'hidden', paddingVertical: 16}]}>
     <TileHead icon="mail" color="#8fb4ff" name="E-mails" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
       <Big value={String(list.length)} unit={list.length === 1 ? 'novo' : 'novos'} />

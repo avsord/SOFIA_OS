@@ -10,7 +10,7 @@ import {Icon} from './Icon';
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
 export function greetingFor(now = new Date()) { const h = now.getHours(); return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 const CHIPS = ['O que tenho hoje?', 'Lançar uma despesa', 'Criar lembrete', 'Quanto já guardei?', 'Resumo da semana'];
-export function HomeHero({api, first, subtitle, wide, onContinue}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void}) {
+export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean}) {
   const c = useTheme(), [text, setText] = useState(''), [busy, setBusy] = useState(false), [answer, setAnswer] = useState<{q: string; a: string; error?: boolean} | null>(null), input = useRef<TextInput>(null);
   async function ask(raw: string) {
     const q = raw.trim(); if (!q || busy) return;
@@ -22,6 +22,11 @@ export function HomeHero({api, first, subtitle, wide, onContinue}: {api: SofiaAp
     } catch (e) { setAnswer({q, a: errorText(e), error: true}); } finally { setBusy(false); }
   }
   const date = new Date().toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}).toUpperCase();
+  // 0.3.294 (Pedro): no computador o Inicio fica so com a data e a saudacao (sem a conversa rapida), para o resumo caber numa tela
+  if (minimal) return <View testID="home-hero" style={{alignItems: 'center', paddingTop: 30, paddingBottom: 22, gap: 6}}>
+    <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}}>{date}</Text>
+    <Text accessibilityRole="header" style={{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
+  </View>;
   return <View testID="home-hero" style={{alignItems: wide ? 'center' : 'stretch', paddingTop: wide ? 46 : 6, paddingBottom: wide ? 30 : 18, paddingHorizontal: wide ? 0 : 20, gap: wide ? 6 : 4}}>
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: wide ? 'center' : 'left'}}>{date}</Text>
     <Text accessibilityRole="header" style={{color: c.text, fontSize: wide ? 40 : 28, fontWeight: '600', letterSpacing: -0.5, textAlign: wide ? 'center' : 'left'}}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
