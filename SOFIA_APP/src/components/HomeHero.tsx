@@ -23,9 +23,11 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   }
   const date = new Date().toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}).toUpperCase();
   // 0.3.294 (Pedro): no computador o Inicio fica so com a data e a saudacao (sem a conversa rapida), para o resumo caber numa tela
-  if (minimal) return <View testID="home-hero" style={{alignItems: 'center', paddingTop: 30, paddingBottom: 22, gap: 6}}>
+  if (minimal) return <View testID="home-hero" style={{alignItems: 'center', paddingTop: 44, paddingBottom: 26, paddingHorizontal: 40, gap: 6}}>
+    {/* 0.3.295: respiro em cima (o texto nao encosta no teto) e a frase da Sofia logo abaixo da saudacao */}
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}}>{date}</Text>
     <Text accessibilityRole="header" style={{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
+    <Text numberOfLines={2} style={{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any}>{subtitle || '\u00a0'}</Text>
   </View>;
   return <View testID="home-hero" style={{alignItems: wide ? 'center' : 'stretch', paddingTop: wide ? 46 : 6, paddingBottom: wide ? 30 : 18, paddingHorizontal: wide ? 0 : 20, gap: wide ? 6 : 4}}>
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: wide ? 'center' : 'left'}}>{date}</Text>
