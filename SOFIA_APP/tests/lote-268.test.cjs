@@ -48,7 +48,7 @@ test('foto do perfil e capas iguais no app e no site',()=>{
 });
 test('Capsulas: tique neutro tambem no app, cor so na barrinha',()=>{
   const w=read('src/components/CapsuleWidget.tsx');assert.ok(w.includes("borderColor:c.muted+'77'")&&w.includes('DOSE_COLORS[Math.max(0,state.plans.findIndex'));
-  assert.ok(read('src/screens/Capsules.tsx').includes('<Icon name="check" color={c.muted}/>'));
+  const caps=read('src/screens/Capsules.tsx');assert.ok(caps.includes('borderColor:done?c.line:c.muted')&&caps.includes('backgroundColor:t.color'),'tique neutro; cor so na barrinha (0.3.270: cor do tipo na Rotina)');
 });
 test('Conversa: no site Enter envia e Shift+Enter quebra linha; no celular o Enter quebra linha',()=>{
   const c=read('src/components/Composer.tsx');assert.ok(c.includes("n.key==='Enter'&&!n.shiftKey&&!n.isComposing")&&c.includes("submitBehavior={enterToSend&&!WEB_KEYS?'submit':'newline'}"));

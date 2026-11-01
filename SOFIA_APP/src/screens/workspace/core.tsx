@@ -66,8 +66,7 @@ import {appAlert} from '../../lib/app-alert';
 export const states:Record<string,string>={active:'Ativo',archived:'Arquivado',idea:'Ideia',paused:'Pausado',completed:'Concluído',planned:'Planejado',confirmed:'Confirmado',pending:'Pendente',done:'Concluído',todo:'A fazer',cancelled:'Cancelado',draft:'Rascunho',interest:'Interesse',purchased:'Comprado',needed:'Necessário',unavailable:'Indisponível',learning:'Estudando',acquired:'Adquirido',saved:'Salvo',to_watch:'Para assistir',watched:'Assistido',reading:'Lendo',ready:'Pronto',collecting:'Reunindo',questions:'Dúvidas',new:'Novo',waiting:'Aguardando',local:'Somente local',private:'Privado',shared:'Compartilhado',public:'Público',list:'Lista',board:'Quadro',gallery:'Galeria',notes:'Notas',manual:'Manual',json:'Feed autorizado',product:'Link do produto'};
 export const translated=(v:string)=>states[v]||v;
 export const modules:{id:string;title:string;caption:string;icon:IconName;kinds?:string[];group?:string}[]=[
- {id:'capsules',title:'Cápsulas',caption:'Doses diárias e lembretes',icon:'capsule'},
- {id:'routines',title:'Rotinas',caption:'Hábitos e cuidados recorrentes',icon:'cycle'},
+ {id:'capsules',title:'Rotina',caption:'Cápsulas, cuidados, hábitos e treino',icon:'cycle'},
  {id:'reminders',title:'Lembretes',caption:'Avisos na hora certa',icon:'bell'},
  {id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'box'},
  {id:'tasks',title:'Tarefas backlog',caption:'A fazer e prioridades',icon:'checklist'},

@@ -73,7 +73,8 @@ test('Editar etiquetas: juntar "Horror" em "Terror" e apagar mudam TODOS os iten
 
 test('Capsulas: aba "Todas", apagar de verdade (sai da lista e os lembretes seguem a lista), sem "rotina" nos textos',()=>{
   const s=read('src/screens/Capsules.tsx'),st=read('src/lib/capsule-store.ts');
-  assert.ok(s.includes("{value:'routines',label:'Todas'}"));assert.ok(!/[Rr]otina/.test(s),'nenhum "rotina" sobrando em Capsulas');
+  // 0.3.270: o app virou "Rotina" (pedido do Pedro) e a aba "Todas" virou "Tudo" (capsulas, cuidados, habitos e treino)
+  assert.ok(s.includes("{value:'routines',label:'Tudo'}"));assert.ok(s.includes('title="Rotina"'));
   assert.ok(s.includes('title="Apagar cápsula"')&&s.includes('capsuleStore(api).remove(id)'));assert.ok(!s.includes('Arquivar rotina'));
   assert.ok(s.includes('As doses já marcadas continuam no Histórico.'));
   assert.ok(st.includes('async remove(id:string){await this.api.deleteEntity(id);')&&st.includes('plans:this.snapshot.plans.filter(p=>p.id!==id)'),'sai da lista -> a reconciliacao cancela os lembretes');

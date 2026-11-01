@@ -217,6 +217,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {"key":"rotina_type","label":"Tipo na Rotina","type":"select","options":["capsula","cuidado","habito","treino"]},{"key":"count_target","label":"Vezes por dia","type":"number"},
       {
         "key": "capsule_type",
         "label": "Tipo",

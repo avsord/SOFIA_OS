@@ -31,7 +31,7 @@ export function useCapsuleNotifications(api:SofiaApi,scope:string,enabled:boolea
    if(!store.snapshot.loaded)return;
    await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Cápsulas da Sofia',importance:Notifications.AndroidImportance.HIGH,sound:'default',vibrationPattern:[0,250,120,250]});
    const exact=await capsuleExactPermission(),all=capsuleNotificationPlan(store.snapshot.plans,store.snapshot.history),plan=capsuleNotificationLimit(all,NOTIFICATION_CHANNEL_LIMIT);
-   if(all.length&&!(await ensureSystemNotificationPermission())){capsuleNotificationWarning='Notificações desativadas neste celular. Ative-as para receber os lembretes de Cápsulas.';return;}
+   if(all.length&&!(await ensureSystemNotificationPermission())){capsuleNotificationWarning='Notificações desativadas neste celular. Ative-as para receber os lembretes da Rotina.';return;}
    const desired:Notifications.NotificationRequestInput[]=[];
    for(const notice of plan){
     if(stopped||epoch!==generation)return;

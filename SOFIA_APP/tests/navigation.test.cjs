@@ -148,15 +148,13 @@ test('chat responses trigger immediate refreshes across synchronized app caches'
  assert.ok(api.includes("systemChanged(this);return result"));
  for(const code of [home,pages,agenda,capsules,records,notices])assert.ok(code.includes('subscribeSystemChanged'));
 });
-test('Apps exposes Rotinas separately from Cápsulas and generic flow records',()=>{
- const workspace=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
- const routines=fs.readFileSync(path.join(root,'src/screens/Routines.tsx'),'utf8');
- assert.ok(workspace.includes("id:'routines',title:'Rotinas'"));
- assert.ok(workspace.includes("module==='routines'"));
- assert.ok(workspace.includes("k!=='routine'"));
- assert.ok(routines.includes("kind:'routine'"));
- assert.ok(routines.includes("d.delivery='task'"));
- assert.ok(routines.includes('borderRadius:34'));
+test('0.3.270: Capsulas virou Rotina (capsulas, cuidados, habitos e treino) e as Rotinas antigas entram nela sem perder nada',()=>{
+ // pedido do Pedro (31/10): "Capsula pode virar Rotina, e dentro de rotina tenha capsulas e outras coisas"
+ const core=fs.readFileSync(path.join(root,'src/screens/workspace/core.tsx'),'utf8');
+ const caps=fs.readFileSync(path.join(root,'src/screens/Capsules.tsx'),'utf8');
+ assert.ok(core.includes("{id:'capsules',title:'Rotina'")&&!core.includes("id:'routines',title:'Rotinas'"),'um app so');
+ assert.ok(caps.includes("api.entities('routine')")&&caps.includes("rotina_type:'cuidado'")&&caps.includes("await api.saveEntity({...r,state:'archived'})"),'rotinas antigas migradas e arquivadas');
+ assert.ok(caps.includes("['Manhã','Tarde','Noite']")&&caps.includes('ROTINA_TYPES'));
 });
 test('returning to Conversa explicitly resumes following the newest message',()=>{
  const chat=fs.readFileSync(path.join(root,'src/screens/Chat.tsx'),'utf8');

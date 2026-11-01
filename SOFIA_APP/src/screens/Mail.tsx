@@ -184,8 +184,8 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
     document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
   });
   const detail = (m: Entity) => (
-            <View style={{gap: 10}}>
-              <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{m.title}</Text>
+            <View style={{gap: desktop ? 14 : 10}}>
+              <Text style={{fontSize: desktop ? 20 : 18, fontWeight: '700', color: c.text, lineHeight: desktop ? 26 : undefined}}>{m.title}</Text>
               <Text style={{color: c.text}}>{m.data.from_name} <Text style={{color: c.muted}}>&lt;{m.data.from_addr}&gt;</Text></Text>
               <Text style={{color: c.muted, fontSize: 12}}>{new Date(String(m.data.received_at)).toLocaleString('pt-BR')} · {accountName(m.data.account_id)}</Text>
               <Text style={{color: c.text, lineHeight: 21}}>{m.data.snippet}</Text>
@@ -281,7 +281,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
         <Presence>{picker && accounts ? <SelectionSheet api={api} accounts={accounts} selection={selection} onSelect={v => { setSelection(v); setPicker(false); }} onClose={() => setPicker(false)} onChanged={() => void load()} /> : null}</Presence>
         {/* 0.3.270: no site o e-mail abre por cima, escurecendo o fundo, como os outros paineis (antes era uma coluna
             presa a direita, longe da lista e desalinhada do cabecalho). Setas trocam de e-mail; X, Esc e voltar fecham. */}
-        {desktop ? <Panel visible={!!open} onClose={() => setOpen(null)} width={600} testID="mail-side-panel" title={<View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+        {desktop ? <Panel visible={!!open} onClose={() => setOpen(null)} width={520} roomy dim="8c" testID="mail-side-panel" title={<View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
           <Text style={{flex: 1, color: c.muted, fontSize: 12}}>{(() => { const cur = open || lastMail.current; const i = cur ? shown.findIndex(h => h.id === cur.id) : -1; return i >= 0 ? 'E-mail ' + (i + 1) + ' de ' + shown.length + ' · use ↑ e ↓ para trocar' : ''; })()}</Text>
           {([['E-mail anterior', -1, '-90deg'], ['Próximo e-mail', 1, '90deg']] as const).map(([lb, dir, rot]) => <Pressable key={lb} accessibilityRole="button" accessibilityLabel={lb} onPress={() => step(dir)} style={({hovered}: any) => ({width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><View style={{transform: [{rotate: rot}]}}><Icon name="chevron" size={15} color={c.muted} /></View></Pressable>)}
         </View>}>{open || lastMail.current ? detail((open || lastMail.current)!) : null}</Panel> : null}

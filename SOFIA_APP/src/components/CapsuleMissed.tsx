@@ -33,7 +33,7 @@ export function CapsuleMissedList({plans,history,saving,take,compact=false}:{pla
     {list.length>1?<Pressable accessibilityRole="button" accessibilityLabel={'Tomei todas as doses atrasadas de '+plan.title} disabled={!!saving||!!busy} onPress={()=>void takeAll(list)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'600',fontSize:12}}>{busy===plan.id?'Marcando…':'Tomei todas'}</Text></Pressable>:null}
    </View>
    {list.map(d=><View key={d.key} style={{flexDirection:'row',alignItems:'center',gap:10}}>
-    <Pressable accessibilityRole="checkbox" accessibilityLabel={'Tomei '+plan.title+' de '+capsuleDayLabel(d.day)+' às '+d.time} accessibilityState={{checked:false}} disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{padding:6}}><Icon name="check" color={c.danger}/></Pressable>
+    <Pressable accessibilityRole="checkbox" accessibilityLabel={'Tomei '+plan.title+' de '+capsuleDayLabel(d.day)+' às '+d.time} accessibilityState={{checked:false}} disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{padding:6}}><Icon name="check" color={c.muted}/></Pressable>
     <Text style={{flex:1,color:c.muted,fontSize:13}}>{capsuleDayLabel(d.day)}, {d.time} · atrasada</Text>
     <Pressable accessibilityRole="button" disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.accent+'22'}}><Text style={{color:c.accent,fontWeight:'600',fontSize:12}}>Tomei</Text></Pressable>
    </View>)}

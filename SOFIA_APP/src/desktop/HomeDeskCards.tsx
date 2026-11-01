@@ -79,7 +79,7 @@ export function DeskCapsulesCard({api, active, onOpen}: {api: SofiaApi; active: 
   const colorOf = (planId: string) => DOSE_COLORS[Math.max(0, state.plans.findIndex(p => p.id === planId)) % DOSE_COLORS.length];
   return <View testID="home-desk-capsules" style={[card(c), {gap: 8}]}>
     <View style={{flexDirection: 'row', alignItems: 'center'}}>
-      <Pressable accessibilityRole="link" accessibilityLabel="Abrir app Cápsulas" onPress={onOpen} style={{flex: 1}}><Text style={{color: c.text, fontSize: 16, fontWeight: '600'}}>Cápsulas</Text></Pressable>
+      <Pressable accessibilityRole="link" accessibilityLabel="Abrir app Cápsulas" onPress={onOpen} style={{flex: 1}}><Text style={{color: c.text, fontSize: 16, fontWeight: '600'}}>Rotina</Text></Pressable>
       <Text style={{color: c.muted, fontSize: 12}}>hoje · {taken} de {doses.length}</Text>
     </View>
     {!state.loaded ? <Text style={{color: c.muted, fontSize: 13}}>Carregando suas doses…</Text> : !doses.length ? <Text style={{color: c.muted, fontSize: 13}}>Nenhuma dose para hoje.</Text> : doses.map(d => { const color = colorOf(d.plan.id), on = !!d.taken; return <View key={d.key} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 10, paddingVertical: 6, borderLeftWidth: 3, borderColor: color}}>

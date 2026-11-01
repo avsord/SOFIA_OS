@@ -99,15 +99,15 @@ export function openMore(e: any, title: string, items: MenuItem[]) {
 }
 
 /* ---------- painel por cima (lateral no computador, tela cheia no celular) ---------- */
-export function Panel({visible, onClose, title, children, width = 460, testID, footer}: {visible: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; width?: number; testID?: string; footer?: React.ReactNode}) {
+export function Panel({visible, onClose, title, children, width = 460, testID, footer, roomy, dim}: {visible: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; width?: number; testID?: string; footer?: React.ReactNode; roomy?: boolean; dim?: string}) {
   const c = useTheme();
-  return <MotionModal visible={visible} animationType="slide" onRequestClose={onClose} peekWidth={width}>
+  return <MotionModal visible={visible} animationType="slide" onRequestClose={onClose} peekWidth={width} peekDim={dim}>
     <View testID={testID} style={{flex: 1, backgroundColor: c.bg}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: Platform.OS === 'web' ? 16 : 44, paddingBottom: 8}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: roomy ? 28 : 18, paddingTop: Platform.OS === 'web' ? (roomy ? 30 : 16) : 44, paddingBottom: roomy ? 18 : 8, ...(roomy ? {borderBottomWidth: 1, borderColor: c.line, marginBottom: 20} : {})}}>
         <View style={{flex: 1, minWidth: 0}}>{typeof title === 'string' ? <Text numberOfLines={1} style={{color: c.text, fontSize: 18, fontWeight: '600'}}>{title}</Text> : title}</View>
         <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} style={({hovered}: any) => ({width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={18} color={c.muted} /></Pressable>
       </View>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 18, paddingBottom: 40, gap: 14}}>{children}</ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: roomy ? 28 : 18, paddingBottom: 40, gap: roomy ? 16 : 14}}>{children}</ScrollView>
       {footer}
     </View>
   </MotionModal>;
