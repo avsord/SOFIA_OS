@@ -123,7 +123,7 @@ export function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; mon
       </Fold> : null}
       <Fold id="seis" title="Receitas × despesas · 6 meses">
         
-        <View onLayout={e => setW(e.nativeEvent.layout.width)} style={{height: 150}}>
+        <View onLayout={e => {const w = e.nativeEvent.layout.width; if (w > 0) setW(w);}} style={{height: 150}}>
           {w ? <Svg width={w} height={150}>
             <Line x1={0} x2={w} y1={130} y2={130} stroke={c.line} />
             {t6.map((m, i) => { const bw = w / t6.length, x = i * bw + bw * 0.18, h1 = m.income / max * 120, h2 = m.expense / max * 120; return <React.Fragment key={m.month}><Rect x={x} y={130 - h1} width={bw * 0.3} height={h1} rx={3} fill={c.good} /><Rect x={x + bw * 0.33} y={130 - h2} width={bw * 0.3} height={h2} rx={3} fill={c.danger} /></React.Fragment>; })}

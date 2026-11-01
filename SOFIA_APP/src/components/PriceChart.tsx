@@ -16,7 +16,7 @@ export function PriceChart({lines, height = 200, window = '30d', mode = 'price',
   const g = width ? chartGeometry(lines, {width: width - labelW, height, window, mode, pad: {l: 6, r: 10, t: 10, b: axes ? 8 : 6}, refs: refs.map(r => r.value)}) : null;
   const fmt = (v: number) => mode === 'change' ? (v > 0 ? '+' : '') + Math.round(v) + '%' : money(v, currency).replace(/,00$/, '');
   return (
-    <View onLayout={e => setWidth(Math.round(e.nativeEvent.layout.width))} style={{minHeight: height + (axes ? 18 : 0)}}>
+    <View onLayout={e => {const w = Math.round(e.nativeEvent.layout.width); if (w > 0) setWidth(w);}} style={{minHeight: height + (axes ? 18 : 0)}}>
       {!width ? null : !g ? (
         <View style={{height, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 12}}>{empty}</Text></View>
       ) : (
