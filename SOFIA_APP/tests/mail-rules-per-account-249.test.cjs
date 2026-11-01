@@ -4,7 +4,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const m=fs.readFileSync(path.join(__dirname,'..','src/screens/Mail.tsx'),'utf8');
 test('lista e contador so com as regras da conta (ou grupo) escolhida no topo',()=>{
   assert.ok(m.includes('const scopedRules = rules.filter(r => inSel.has(ruleOwner(r)));'));
-  assert.ok(m.includes("label: 'Regras ' + scopedRules.length")&&m.includes('{scopedRules.map(r => ('));
+  // 0.3.272: enquanto carrega o contador nao mostra 0 (some o numero); carregado, conta so as regras da conta escolhida
+  assert.ok(m.includes("label: 'Regras' + (accounts === null ? '' : ' ' + scopedRules.length)")&&m.includes('{scopedRules.map(r => ('));
   assert.ok(!m.includes("'Todas as contas'} · "),'card nao diz mais "Todas as contas"');
 });
 test('nova regra (e modelo) nasce na conta aberta; o editor nao tem mais "Todas"; salvar sempre grava uma conta',()=>{

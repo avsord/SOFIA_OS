@@ -17,7 +17,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, Stepper, brl, fold, moneyInput, numText, openMore, parseMoney, shareText, useToast} from '../components/AppKit';
+import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, Stepper, brl, fold, moneyInput, numText, openMore, parseMoney, shareText, useToast, AppSkeleton} from '../components/AppKit';
 
 export type Model = 'market' | 'shopping' | 'simple';
 type ListDef = {id: string; name: string; icon: IconName; model: Model; meta: Entity | null; system?: 'market' | 'shopping'};
@@ -386,7 +386,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     {L.model === 'shopping' && !inGroup ? null : <PrimaryButton testID="list-finish" icon={L.model === 'simple' ? 'check' : 'wallet'} label={L.model === 'simple' ? 'Concluir lista' : inGroup ? 'Finalizar compra de ' + gname(gfilter) : 'Finalizar compra'} disabled={!ticked.length} onPress={() => setDialog({type: 'finish', gid: inGroup ? gfilter : undefined})} />}
   </View>;
 
-  if (!data) return <View style={{flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted}}>Carregando listas…</Text></View>;
+  if (!data) return <AppSkeleton label="Carregando listas…" />;
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
       <AppFrame sidebar={sidebar} mobileNav={mobileNav} footer={footer}>

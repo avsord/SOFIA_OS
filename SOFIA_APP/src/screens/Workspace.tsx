@@ -65,7 +65,7 @@ import {tagOptions} from '../lib/library-tags';
 import {errorText} from '../lib/chat-model';
 import {Icon,IconName} from '../components/Icon';
 import {Button,Empty,ErrorBanner,IconButton,ModuleHeader,ScreenTitle,forms} from '../components/UI';
-import {Spinner,LoadingLines} from '../components/Loading';
+import {Spinner,LoadingLines,LoadingCaption} from '../components/Loading';
 import {appAlert} from '../lib/app-alert';
 // 0.3.263: tela dividida em partes (src/screens/workspace/*), sem mudar o que ela faz. Quem importava daqui continua importando daqui.
 import {translated, modules} from './workspace/core';
@@ -160,7 +160,7 @@ export function Workspace({onModuleChange,api,navigate,onDepthChange,active,onGe
  contentContainerStyle={{padding:22,paddingTop:8}}
  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(false,true)}/>}
  ItemSeparatorComponent={()=><View style={{height:12}}/>}
- ListHeaderComponent={<> {!loaded&&!recordsError?<View testID="records-loading-placeholder" accessibilityLabel="Carregando registros" style={{paddingTop:6,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando registros</Text></View><LoadingLines rows={4}/></View>:null}</>}
+ ListHeaderComponent={<> {!loaded&&!recordsError?<View testID="records-loading-placeholder" accessibilityLabel="Carregando registros" style={{paddingTop:6,gap:4}}><LoadingCaption label="Carregando registros" /><LoadingLines rows={4}/></View>:null}</>}
  renderItem={({item:e})=><Pressable key={e.id} onPress={()=>openRecord(e)} {...contextMenu(()=>[
  {label:'Abrir',icon:'edit',run:()=>openRecord(e)},
  {label:'Duplicar',icon:'copy',run:()=>{void api.saveEntity({kind:e.kind,title:(e.title||'Sem título')+' (cópia)',content:e.content||'',area:e.area,state:e.state,privacy:e.privacy,tags:e.tags||[],data:{...e.data}} as any).then(()=>load()).catch(err=>setError(errorText(err)));}},

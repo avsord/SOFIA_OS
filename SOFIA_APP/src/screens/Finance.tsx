@@ -30,7 +30,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {Icon, type IconName} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
-import {Spinner, LoadingLines, ShimmerBlock, ShimmerGroup} from '../components/Loading';
+import {Spinner, LoadingLines, ShimmerBlock, ShimmerGroup,LoadingCaption} from '../components/Loading';
 import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
@@ -204,7 +204,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         </View>
         </View>
 
-        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
+        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><LoadingCaption label="Carregando suas finanças" /><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
           <ScrollView ref={mainScroll} onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={64} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>

@@ -1,3 +1,4 @@
+import {LoadingLines} from '../components/Loading';
 // 0.3.250: moldura do app no computador (estilo Notion). So e usada no navegador com tela larga
 import {PALETTE} from '../lib/palette';
 import type {Task} from '../lib/types';
@@ -156,7 +157,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)}/>)}</Section>
      <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={onCreatePage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
-      {pages===null?<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Carregando páginas…</Text>:pages.length?<PageTree pages={pages} openId={openPageId} onOpen={onOpenPage}/>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
+      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View>:pages.length?<PageTree pages={pages} openId={openPageId} onOpen={onOpenPage}/>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}
    </ScrollView>

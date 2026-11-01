@@ -18,7 +18,7 @@ import {IconButton} from '../components/UI';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast} from '../components/AppKit';
+import {AppFrame, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 const COLORS = ['#b49ae6', '#7f9ad8', '#7fcf9f', '#e8b04a', '#e08ad0', '#7fc0c9', '#f0997b', '#a3a0ad'];
 const LOCKED_TITLE = 'Nota protegida';
@@ -195,7 +195,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     </Pressable>;
   }
   const pinned = visible.filter(n => n.pinned && view !== 'pinned'), rest = visible.filter(n => !(n.pinned && view !== 'pinned'));
-  if (!notesE) return <View style={{flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted}}>Carregando notas…</Text></View>;
+  if (!notesE) return <AppSkeleton label="Carregando notas…" />;
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
       <AppFrame sidebar={sidebar} mobileNav={mobileNav}>

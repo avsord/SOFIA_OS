@@ -22,7 +22,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast} from '../components/AppKit';
+import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 /* ---------- tipos (modelos com blocos liga/desliga) ---------- */
 export type TypeDef = {id: string; name: string; one: string; icon: IconName; statuses: string[]; rating: boolean; fields: string[]; kind: string; e: Entity | null; area?: LibraryArea; builtin?: string; position: number; pinned: boolean; inMore: boolean};
@@ -280,7 +280,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
       {t.statuses.length > 1 ? <Pressable testID={'lib-status-' + it.id} accessibilityRole="button" accessibilityLabel={isDone ? 'Marcado como ' + t.statuses[last] : 'Marcar ' + t.statuses[Math.min(last, it.status + 1)]} onPress={next} style={({hovered}: any) => ({paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: isDone ? PALETTE.green + '88' : c.line, backgroundColor: isDone ? PALETTE.green + '18' : hovered ? c.input : 'transparent'})}><Text style={{color: isDone ? c.success : c.muted, fontSize: 12, fontWeight: '500'}}>{t.statuses[it.status] || t.statuses[0]}</Text></Pressable> : null}
     </Pressable>;
   }
-  if (!ents) return <View style={{flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted}}>Carregando a Biblioteca…</Text></View>;
+  if (!ents) return <AppSkeleton label="Carregando a Biblioteca…" />;
   const kbd = (k: string) => <Text style={{color: c.muted, fontSize: 11, borderWidth: 1, borderColor: c.line, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1}}>{k}</Text>;
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>

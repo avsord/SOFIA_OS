@@ -58,6 +58,6 @@ test('E-mails: painel lateral, setas, icones de traco, contador e regra apagada'
   // 0.3.270: o painel do e-mail no site e o Panel padrao (por cima, escurecendo o fundo; voltar/Esc pelo proprio painel)
   assert.ok(m.includes('testID="mail-side-panel"')&&m.includes("e.key === 'ArrowDown'")&&m.includes('<Panel visible={!!open}'));
   assert.ok(m.includes("'🧾': {icon: 'receipt'")&&!/<Text>\{hitEmoji/.test(m));
-  assert.ok(m.includes("label: 'Encontrados ' + scoped.length")&&m.includes("'Regra apagada'"));
+  assert.ok(m.includes("label: 'Encontrados' + (accounts === null ? '' : ' ' + scoped.length)")&&m.includes("'Regra apagada'"));
   assert.ok(m.includes("flexDirection: 'row', alignItems: 'center', gap: 8}}><Icon name=\"receipt\""),'icone ao lado de Lancar como conta a pagar');
 });

@@ -18,7 +18,7 @@ import {InternalBackGesture} from '../components/InternalBackGesture';
 import {EmojiIcon, Icon} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
-import {Spinner, LoadingLines} from '../components/Loading';
+import {Spinner, LoadingLines,LoadingCaption} from '../components/Loading';
 import {readPrice, readLinks, USER_AGENT, DESKTOP_AGENT} from '../lib/price-reader';
 import {readStorePrice, identityOf, storedMLIdentity, isMercadoLivreUrl} from '../lib/price-direct';
 import type {MercadoLivreReading} from '../lib/mercado-livre-types';
@@ -94,7 +94,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           </Pressable>
 
           {error ? <Text style={{color: c.danger, fontSize: 13}}>{error}</Text> : null}
-          {products === null ? <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando produtos</Text></View><LoadingLines rows={4} /></View> : !products.length ? (
+          {products === null ? <View style={{gap: 6}}><LoadingCaption label="Carregando produtos" /><LoadingLines rows={4} /></View> : !products.length ? (
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 40, paddingHorizontal: 10}}>
               <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="monitor" size={38} color={c.accent} /></View>
               <Text style={{fontSize: 20, fontWeight: '600', color: c.text, textAlign: 'center'}}>Acompanhe o preço do que você quer comprar</Text>

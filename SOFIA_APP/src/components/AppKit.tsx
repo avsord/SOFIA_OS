@@ -8,6 +8,7 @@ import {useTheme} from '../lib/theme';
 import {useDesktop} from '../lib/desktop';
 import {Icon, type IconName} from './Icon';
 import {MotionModal} from './MotionModal';
+import {LoadingLines, useSkeletonDelay} from './Loading';
 import {openContextMenu, type MenuItem} from './ContextMenu';
 import {appAlert} from '../lib/app-alert';
 
@@ -164,4 +165,14 @@ export const ICON_CHOICES: IconName[] = ['cart', 'list', 'checklist', 'box', 'gi
 export function IconPicker({value, onChange}: {value: string; onChange: (v: IconName) => void}) {
   const c = useTheme();
   return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{ICON_CHOICES.map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={'Ícone ' + n} accessibilityState={{selected: value === n}} onPress={() => onChange(n)} style={{width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: value === n ? c.accent : c.line, backgroundColor: value === n ? c.accentSoft : c.surface}}><Icon name={n} size={18} color={value === n ? c.accent : c.text} /></Pressable>)}</View>;
+}
+
+/** 0.3.272: carregamento dos apps novos = esqueleto com brilho no lugar do conteudo (lateral + coluna), nunca texto
+ * "Carregando..." no meio da tela. No site so aparece se a espera passar de 300 ms. */
+export function AppSkeleton({label, side = true}: {label: string; side?: boolean}) {
+  const c = useTheme(), desktop = useDesktop(), show = useSkeletonDelay();
+  return <View accessibilityLabel={label} testID="app-skeleton" style={{flex: 1, flexDirection: 'row', backgroundColor: c.bg}}>
+    {desktop && side ? <View style={{width: 248, borderRightWidth: 1, borderColor: c.line, backgroundColor: c.surface, padding: 14}}>{show ? <LoadingLines rows={6} /> : null}</View> : null}
+    <View style={{flex: 1, paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 34 : 18, gap: 14}}>{show ? <><View style={{width: 180, height: 22, borderRadius: 8, backgroundColor: c.input}} /><LoadingLines rows={6} /></> : null}</View>
+  </View>;
 }

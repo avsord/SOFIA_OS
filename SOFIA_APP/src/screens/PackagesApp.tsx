@@ -19,7 +19,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, FieldRow, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, brl, moneyInput, openMore, parseMoney, useToast} from '../components/AppKit';
+import {AppFrame, Chip, Dialog, FieldRow, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, brl, moneyInput, openMore, parseMoney, useToast, AppSkeleton} from '../components/AppKit';
 import {CARRIER_LABEL, detectCarrier, normalizeCode, officialUrl, parseEvents, type PackageEvent} from './Packages';
 
 const STEPS = ['Postado', 'Em trânsito', 'Saiu para entrega', 'Entregue'];
@@ -154,7 +154,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
   const cur = lists[view] || [];
   const sections: [string, Pack[]][] = view === 'all' ? [['Precisa de você', cur.filter(p => p.needs)], ['A caminho', cur.filter(p => !p.needs && !p.delivered)], ['Entregues', cur.filter(p => p.delivered)]] : view === 'way' ? [['Precisa de você', cur.filter(p => p.needs)], ['A caminho', cur.filter(p => !p.needs && !p.delivered)], ['Entregues nos últimos 7 dias', cur.filter(p => p.delivered)]] : [[TITLES[view], cur]];
   const hint = raw.trim() ? parseCodes(raw).map(x => !x.valid ? 'Código inválido' : known.has(x.code) ? x.code + ' já está na lista' : (CARRIER_LABEL[detectCarrier(x.code)] || 'Transportadora') + ' · ' + x.code + (x.name ? ' · "' + x.name + '"' : '')) : [];
-  if (!ents) return <View style={{flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.muted}}>Carregando encomendas…</Text></View>;
+  if (!ents) return <AppSkeleton label="Carregando encomendas…" />;
   return <InternalBackGesture enabled={active && !openId} onBack={onBack}>
     <View testID="packages-screen" style={{flex: 1}}>
       <AppFrame sidebar={sidebar} mobileNav={mobileNav}>

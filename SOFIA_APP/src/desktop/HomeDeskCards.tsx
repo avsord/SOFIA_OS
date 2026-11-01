@@ -1,3 +1,4 @@
+import {LoadingLines} from '../components/Loading';
 import React, {useState} from 'react';
 import {Pressable, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
@@ -82,7 +83,7 @@ export function DeskCapsulesCard({api, active, onOpen}: {api: SofiaApi; active: 
       <Pressable accessibilityRole="link" accessibilityLabel="Abrir app Cápsulas" onPress={onOpen} style={{flex: 1}}><Text style={{color: c.text, fontSize: 16, fontWeight: '600'}}>Rotina</Text></Pressable>
       <Text style={{color: c.muted, fontSize: 12}}>hoje · {taken} de {doses.length}</Text>
     </View>
-    {!state.loaded ? <Text style={{color: c.muted, fontSize: 13}}>Carregando suas doses…</Text> : !doses.length ? <Text style={{color: c.muted, fontSize: 13}}>Nenhuma dose para hoje.</Text> : doses.map(d => { const color = colorOf(d.plan.id), on = !!d.taken; return <View key={d.key} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 10, paddingVertical: 6, borderLeftWidth: 3, borderColor: color}}>
+    {!state.loaded ? <LoadingLines rows={2} /> : !doses.length ? <Text style={{color: c.muted, fontSize: 13}}>Nenhuma dose para hoje.</Text> : doses.map(d => { const color = colorOf(d.plan.id), on = !!d.taken; return <View key={d.key} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 10, paddingVertical: 6, borderLeftWidth: 3, borderColor: color}}>
       <View style={{flex: 1, gap: 2}}><Text numberOfLines={1} style={{color: on ? c.muted : c.text, fontSize: 14, textDecorationLine: on ? 'line-through' : 'none'}}>{d.plan.title}</Text><Text style={{color: d.due && !on && !d.missed ? c.danger : c.muted, fontSize: 12}}>{[d.plan.data?.dose_text, d.time].filter(Boolean).join(' · ')}{d.missed && !on ? ' · Não tomada' : ''}</Text></View>
       <Pressable testID={'home-capsule-check-' + d.key} accessibilityRole="checkbox" accessibilityLabel={(on ? 'Tomada: ' : 'Marcar como tomada: ') + d.plan.title + ' às ' + d.time} accessibilityState={{checked: on, disabled: on || !!state.saving}} disabled={on || !!state.saving} onPress={() => void state.take(d.plan.id, d.day, d.time).catch(() => {})} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center'}}>
         <View style={{width: 20, height: 20, borderRadius: 6, borderWidth: 1.6, borderColor: on ? c.line : c.muted + '77', backgroundColor: on ? c.line : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{on ? <Icon name="check" size={13} color={c.text} weight="bold" /> : null}</View>

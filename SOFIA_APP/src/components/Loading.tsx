@@ -147,3 +147,11 @@ export function ShimmerBlock({width, height, radius = 6, style}: {width: number 
     </View>
   );
 }
+
+/** 0.3.272: no site o carregamento e so o esqueleto com brilho (sem anel girando e sem "Carregando..." no canto, que
+ * aparecia desalinhado em varias paginas); no celular continua o anel fino + texto + linhas. */
+export function LoadingCaption({label}: {label: string}) {
+  const c = useTheme();
+  if (Platform.OS === 'web') return <View accessibilityLabel={label} />;
+  return <View accessibilityLabel={label} style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>{label}</Text></View>;
+}
