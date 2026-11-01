@@ -11,8 +11,11 @@ const r2=(v:number)=>Math.round(v*2)/2;
  * meio"). Degraus de 0,05 para nao recalcular a cada pixel; limite em 1,8 (4K continua legivel sem exagero). */
 export function fluidFactor(width?:number):number{
  const w=typeof width==='number'?width:(typeof window!=='undefined'?window.innerWidth:1440);
- if(!(w>1440))return 1;
- return Math.min(1.8,Math.round((w/1440)*20)/20);
+ // 0.3.279: curva mais suave (Pedro: no zoom 100% ficava grande demais). Ate 1600 px vale 1; cresce devagar:
+ // 1920 -> ~1,07 ; 2560 -> 1,2 ; 3840 (4K) -> 1,4 no maximo.
+ if(!(w>1600))return 1;
+ const f=w<=2560?1+(w-1600)/960*0.2:1.2+(Math.min(w,3840)-2560)/1280*0.2;
+ return Math.round(f*40)/40;
 }
 let current=1;
 export function uiScale():number{return current;}
