@@ -23,7 +23,7 @@ export function contentMaxWidth(tab:Tab):number|undefined{
  if(tab==='apps')return 1120;
  // 0.3.254: Inicio e Agenda tambem tem largura maxima - em monitores grandes (2560) o painel esticava de ponta a ponta
  if(tab==='home')return 1480;
- if(tab==='agenda')return 1280;
+ if(tab==='agenda')return 1120; // 0.3.277: mesma coluna das outras telas (antes 1280)
  return undefined;
 }
 /** Colunas do painel do Inicio pela largura disponivel do conteudo. */

@@ -22,7 +22,7 @@ test('so no site: o metro troca os componentes das telas pela camada; celular e 
 test('rolagem na largura toda, conteudo centralizado; Agenda lado a lado; cabecalhos alinhados',()=>{
   assert.ok(read('src/desktop/DesktopPages.tsx').includes('<ContentWidth.Provider value={max}>'));
   // 0.3.276: largura maxima igual; nas telas de app o conteudo encosta a esquerda (Inicio e Conversa seguem centralizados)
-  assert.ok(read('src/web/rn-desktop.tsx').includes("alignSelf:p.testID==='home-scroll'||max<1000?'center':'flex-start'"));
+  assert.ok(read('src/web/rn-desktop.tsx').includes("{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:max,alignSelf:'center'}]}"));
   assert.ok(read('src/screens/Agenda.tsx').includes('testID="agenda-split"'));
   assert.ok(read('src/screens/Finance.tsx').includes('<View style={pad(0)}>'));
   assert.ok(read('src/screens/Chat.tsx').includes('paddingLeft:columnPadding(column,12)'));
