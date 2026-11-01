@@ -58,7 +58,7 @@ test('0.3.255: Inicio abre o compromisso direto; + na agenda; capa reposiciona; 
   assert.ok(read('src/lib/api.ts').includes('this.snapshots.remember(path,decorated)'),'lista de paginas guardada ja na ordem do aparelho');
   assert.ok(read('src/lib/startup-snapshot.ts').includes('GOAL_WIDGET_PATH,VALUES_MASK_PATH].includes(path)'));
   assert.ok(read('src/screens/Finance.tsx').includes('useValuesHidden(api)'));
-  assert.ok(read('src/screens/Workspace.tsx').includes('<ScreenTitle title="Tarefas backlog"')&&read('src/screens/Workspace.tsx').includes('<TaskToAgendaSheet api={api} task={toAgenda}'));
+  assert.ok(read('src/screens/Workspace.tsx').includes('<ScreenTitle title="Tarefas"')&&read('src/screens/Workspace.tsx').includes('<TaskToAgendaSheet api={api} task={toAgenda}'));
 });
 
 test('0.3.255: build do APK nao cai mais no teste de E-mails (empate de contas criadas no mesmo milissegundo)',()=>{

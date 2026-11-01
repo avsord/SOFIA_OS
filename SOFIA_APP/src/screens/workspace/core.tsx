@@ -69,7 +69,7 @@ export const modules:{id:string;title:string;caption:string;icon:IconName;kinds?
  {id:'capsules',title:'Rotina',caption:'Cápsulas, cuidados, hábitos e treino',icon:'cycle'},
  {id:'reminders',title:'Lembretes',caption:'Avisos na hora certa',icon:'bell'},
  {id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'box'},
- {id:'tasks',title:'Tarefas backlog',caption:'A fazer e prioridades',icon:'checklist'},
+ {id:'tasks',title:'Tarefas',caption:'A fazer e prioridades',icon:'checklist'},
  {id:'lists',title:'Listas',caption:'Pessoais, mercado e compras',icon:'cart',kinds:['list_collection','list_item','shopping_item','purchase_group','purchase']},
  {id:'library',title:'Biblioteca',caption:'Filmes, livros e receitas',icon:'book',group:'library'},
  {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'tag'},

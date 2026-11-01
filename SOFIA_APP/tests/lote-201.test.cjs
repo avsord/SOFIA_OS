@@ -322,7 +322,7 @@ test('0.3.222: Previsto no fim do proximo mes; agenda fixa; meta sem espaco extr
   assert.ok(h.includes("...(goal?[{id:'goal'"),'sem meta, sem espaco vazio');
   const box=h.indexOf("todo.length||(tasks.length>2||taskQuery)?<View style={{backgroundColor:c.surface,borderRadius:18"),inp=h.indexOf('accessibilityLabel="Buscar tarefa no Início"');
   assert.ok(box>0&&inp>box,'busca dentro da caixa');assert.ok(h.includes('marginTop:14,marginBottom:6}}'),'com respiro');
-  assert.ok(h.includes("marginTop:0,marginBottom:12}}><Text style={{fontSize:20,fontWeight:'500',color:c.text}}>Tarefas backlog</Text>"),'titulo e filtro logo acima da caixa (0.3.257: Tarefas backlog)');
+  assert.ok(h.includes("marginTop:0,marginBottom:12}}><Text style={{fontSize:20,fontWeight:'500',color:c.text}}>Tarefas</Text>"),'titulo e filtro logo acima da caixa (0.3.257: Tarefas backlog)');
 });
 
 test('0.3.223: Redefinir Financas; Relatorios na ordem pedida e todas as secoes abrem/fecham; contas no cartao',()=>{

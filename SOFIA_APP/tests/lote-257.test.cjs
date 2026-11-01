@@ -22,7 +22,7 @@ test('0.3.257: editar item - Vai ser reembolsada entre as opcoes de baixo; cabec
 test('0.3.257: Inicio - + menor na altura do titulo; criar ao segurar sem piscar; Tarefas backlog',()=>{
   assert.ok(read('src/components/DashboardWidgets.tsx').includes("style={{width:22,height:22,borderRadius:11,"));
   assert.ok(read('src/components/HomeCommitmentEditor.tsx').includes('<MotionModal visible transparent animationType="fade"'));
-  assert.ok(read('src/screens/Home.tsx').includes("{id:'tasks',title:'Tarefas backlog',")&&read('src/lib/desktop.ts').includes("title:'Tarefas backlog'"));
+  assert.ok(read('src/screens/Home.tsx').includes("{id:'tasks',title:'Tarefas',")&&read('src/lib/desktop.ts').includes("title:'Tarefas'"));
 });
 
 test('0.3.257: E-mails - Entrar com Google por conta e seletor salvo',()=>{

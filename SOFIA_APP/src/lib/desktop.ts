@@ -35,7 +35,7 @@ export function gridColumns(width:number):number{if(Platform.OS!=='web')return 2
 // Atalhos de apps na barra lateral e na busca (Ctrl+K). Lista propria: importar a tela Apps aqui
 // carregaria a tela inteira na abertura do celular.
 export const APP_SHORTCUTS:{id:string;title:string;icon:IconName}[]=[
- {id:'tasks',title:'Tarefas backlog',icon:'checklist'},
+ {id:'tasks',title:'Tarefas',icon:'checklist'},
  {id:'finance',title:'Finanças',icon:'wallet'},
  {id:'monitor',title:'Price Tracker',icon:'tag'},
  {id:'mail',title:'E-mails',icon:'mail'},

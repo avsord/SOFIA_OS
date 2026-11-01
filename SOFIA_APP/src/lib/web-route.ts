@@ -4,7 +4,7 @@ import type {Tab} from './types';
 export const TAB_PATH: Record<Tab, string> = {home: '/inicio', chat: '/conversa', pages: '/paginas', agenda: '/agenda', apps: '/apps', notifications: '/avisos', profile: '/perfil'};
 export const MODULE_SLUG: Record<string, string> = {capsules: 'rotina', routines: 'rotinas', reminders: 'lembretes', packages: 'encomendas', tasks: 'tarefas', lists: 'listas', library: 'biblioteca', monitor: 'price-tracker', finance: 'financas', mail: 'emails', knowledge: 'notas', all: 'registros'};
 export const TAB_TITLE: Record<Tab, string> = {home: 'Início', chat: 'Conversa', pages: 'Páginas', agenda: 'Agenda', apps: 'Apps', notifications: 'Avisos', profile: 'Perfil'};
-export const MODULE_TITLE: Record<string, string> = {capsules: 'Rotina', routines: 'Rotinas', reminders: 'Lembretes', packages: 'Encomendas', tasks: 'Tarefas backlog', lists: 'Listas', library: 'Biblioteca', monitor: 'Price Tracker', finance: 'Finanças', mail: 'E-mails', knowledge: 'Notas', all: 'Todos os registros'};
+export const MODULE_TITLE: Record<string, string> = {capsules: 'Rotina', routines: 'Rotinas', reminders: 'Lembretes', packages: 'Encomendas', tasks: 'Tarefas', lists: 'Listas', library: 'Biblioteca', monitor: 'Price Tracker', finance: 'Finanças', mail: 'E-mails', knowledge: 'Notas', all: 'Todos os registros'};
 export type Route = {tab: Tab; module: string};
 export const isWeb = () => typeof window !== 'undefined' && typeof document !== 'undefined' && !!window.history;
 export function routeToPath(r: Route): string { const base = TAB_PATH[r.tab] || '/inicio'; return r.tab === 'apps' && r.module && MODULE_SLUG[r.module] ? base + '/' + MODULE_SLUG[r.module] : base; }

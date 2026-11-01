@@ -55,7 +55,7 @@ export function DeskTasksCard({todo, ready, areaLabel, priorityLabel, onArea, on
   const c = useTheme(), [listH, setListH] = useState(0), ROW = 48, fit = Math.max(3, Math.floor(listH / ROW));
   return <View testID="home-desk-tasks" style={[card(c), {flex: 1, gap: 10}]}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-      <Text style={{flex: 1, color: c.text, fontSize: 16, fontWeight: '600'}}>Tarefas backlog</Text>
+      <Text style={{flex: 1, color: c.text, fontSize: 16, fontWeight: '600'}}>Tarefas</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Filtrar áreas das tarefas do Início" onPress={onArea} style={{paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: c.accentSoft}}><Text numberOfLines={1} style={{fontSize: 11, color: c.accent, maxWidth: 110}}>{areaLabel} ▾</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Filtrar níveis das tarefas do Início" onPress={onPriority} style={{paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: c.accentSoft}}><Text style={{fontSize: 11, color: c.accent}}>{priorityLabel} ▾</Text></Pressable>
       <Text style={{color: c.muted, fontSize: 12, marginLeft: 2}}>{todo.length}</Text>

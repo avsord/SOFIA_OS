@@ -17,12 +17,13 @@ import {uiScale} from '../web/desktop-scale';
 
 type Level = 'year' | 'month' | 'day';
 type Rect = {x: number; y: number; w: number; h: number};
+type Local = Rect & {parent?: string};
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const DEPTH: Record<Level, number> = {year: 0, month: 1, day: 2};
 const HOUR = 56;
-const DUR = 340;
-const ease = Easing.bezier(0.22, 0.8, 0.24, 1);
+const DUR = 460; // 0.3.283: um pouco mais longo para o zoom ser percebido sem pressa
+const ease = Easing.bezier(0.32, 0.72, 0, 1); // curva dos calendarios da Apple: arranca firme e pousa macio
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const tint = (hex: string, a: number) => {const h = hex.replace('#', ''); if (h.length !== 6) return hex; const n = parseInt(h, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;};
 
@@ -65,16 +66,16 @@ function useYearMarks(api: SofiaApi, year: number, on: boolean) {
   return marks;
 }
 
-type Ctx = {c: ReturnType<typeof useTheme>; p: AgendaDeskProps; byDay: Map<string, AgendaItem[]>; marks: {ev: Set<string>; hol: Map<string, string>}; today: Date; go: (l: Level, d: Date, from?: string) => void; rects: Map<string, Rect>};
-const keeper = (rects: Map<string, Rect>) => (k: string, base?: () => Rect) => (e: any) => {const l = e.nativeEvent.layout; const o = base ? base() : {x: 0, y: 0, w: 0, h: 0}; rects.set(k, {x: o.x + l.x, y: o.y + l.y, w: l.width, h: l.height});};
+type Ctx = {c: ReturnType<typeof useTheme>; p: AgendaDeskProps; byDay: Map<string, AgendaItem[]>; marks: {ev: Set<string>; hol: Map<string, string>}; today: Date; go: (l: Level, d: Date, from?: string) => void; rects: Map<string, Local>};
+const keeper = (rects: Map<string, Local>) => (k: string, parent?: string) => (e: any) => {const l = e.nativeEvent.layout; rects.set(k, {x: l.x, y: l.y, w: l.width, h: l.height, parent});};
+function resolve(rects: Map<string, Local>, k: string): Rect | null {let r = rects.get(k); if (!r) return null; let x = r.x, y = r.y; const w = r.w, h = r.h; let guard = 0; while (r && r.parent && guard++ < 6) {const p = rects.get(r.parent); if (!p) return null; x += p.x; y += p.y; r = p;} return {x, y, w, h};}
 function YearView({x, y}: {x: Ctx; y: number}) {
   const {c, marks, today, go} = x, keep = keeper(x.rects);
-  const grid = useRef<Rect>({x: 0, y: 0, w: 0, h: 0});
-  return <View style={{flex: 1, padding: 14}} onLayout={e => {const l = e.nativeEvent.layout; grid.current = {x: l.x + 14, y: l.y + 14, w: l.width, h: l.height};}}>
-    <View style={{flex: 1, flexDirection: 'row', flexWrap: 'wrap'}}>
+  return <View style={{flex: 1, padding: 14}} onLayout={keep('yearpad')}>
+    <View style={{flex: 1, flexDirection: 'row', flexWrap: 'wrap'}} onLayout={keep('yeargrid', 'yearpad')}>
       {Array.from({length: 12}, (_, m) => {
         const first = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate(), cur = m === today.getMonth() && y === today.getFullYear();
-        return <Pressable key={m} accessibilityRole="button" accessibilityLabel={'Abrir ' + MONTHS[m] + ' de ' + y} onLayout={keep('m' + m, () => grid.current)} onPress={() => go('month', new Date(y, m, 1), 'm' + m)}
+        return <Pressable key={m} accessibilityRole="button" accessibilityLabel={'Abrir ' + MONTHS[m] + ' de ' + y} onLayout={keep('m' + m, 'yeargrid')} onPress={() => go('month', new Date(y, m, 1), 'm' + m)}
           style={({hovered}: any) => ({width: '25%', height: '33.33%', padding: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
           <Text style={{fontSize: 14, fontWeight: '600', color: cur ? c.accent : c.text, marginBottom: 6}}>{MONTHS[m]}</Text>
           <View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
@@ -102,19 +103,19 @@ function Chip({x, i}: {x: Ctx; i: AgendaItem}) {
   </View>;
 }
 function MonthView({x, m}: {x: Ctx; m: Date}) {
-  const {c, p, byDay, today, go} = x, keep = keeper(x.rects), rects = {current: x.rects};
+  const {c, p, byDay, today, go} = x, keep = keeper(x.rects);
   const y = m.getFullYear(), mo = m.getMonth(), first = new Date(y, mo, 1).getDay(), rows = Math.ceil((first + new Date(y, mo + 1, 0).getDate()) / 7);
-  const begin = new Date(y, mo, 1 - first), grid = useRef<Rect>({x: 0, y: 0, w: 0, h: 0});
+  const begin = new Date(y, mo, 1 - first);
   const cur = y === p.month.getFullYear() && mo === p.month.getMonth();
   return <View style={{flex: 1}}>
     <View style={{flexDirection: 'row', borderBottomWidth: 1, borderColor: c.line}}>{WD.map((w, i) => <Text key={w} style={{flex: 1, paddingVertical: 10, paddingHorizontal: 12, fontSize: 12, color: c.muted, borderLeftWidth: i ? 1 : 0, borderColor: c.line}}>{w}</Text>)}</View>
-    <View style={{flex: 1}} onLayout={e => {const l = e.nativeEvent.layout; grid.current = {x: l.x, y: l.y, w: l.width, h: l.height};}}>
-      {Array.from({length: rows}, (_, r) => <View key={r} style={{flex: 1, flexDirection: 'row'}} onLayout={keep('row' + r, () => grid.current)}>
+    <View style={{flex: 1}} onLayout={keep('monthgrid')}>
+      {Array.from({length: rows}, (_, r) => <View key={r} style={{flex: 1, flexDirection: 'row'}} onLayout={keep('row' + r, 'monthgrid')}>
         {Array.from({length: 7}, (_, d) => {
           const day = new Date(begin.getFullYear(), begin.getMonth(), begin.getDate() + r * 7 + d), k = localDateKey(day), out = day.getMonth() !== mo, t = localDateKey(today) === k;
           const list = !out && cur ? byDay.get(k) || [] : [];
           return <Pressable key={k} accessibilityRole="button" accessibilityLabel={day.toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}) + (list.length ? ', ' + list.length + ' itens' : '')}
-            onLayout={e => {const l = e.nativeEvent.layout, row = rects.current.get('row' + r); if (row) rects.current.set('d' + k, {x: row.x + l.x, y: row.y + l.y, w: l.width, h: l.height});}}
+            onLayout={keep('d' + k, 'row' + r)}
             onPress={() => go('day', day, 'd' + k)}
             style={({hovered}: any) => ({flex: 1, minWidth: 0, borderLeftWidth: d ? 1 : 0, borderTopWidth: r ? 1 : 0, borderColor: c.line, paddingVertical: 8, paddingHorizontal: 6, gap: 3, overflow: 'hidden', backgroundColor: hovered ? c.input : 'transparent'})}>
             <View style={{height: 20, justifyContent: 'center', paddingLeft: 6, marginBottom: 2}}>
@@ -181,7 +182,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
   const [anim, setAnim] = useState<null | {from: Level; fromDate: Date; dir: 'in' | 'out' | 'side'; rect: Rect | null; side: number}>(null);
   const progress = useRef(new Animated.Value(1)).current;
   const stage = useRef<Rect>({x: 0, y: 0, w: 1, h: 1});
-  const rects = useRef(new Map<string, Rect>());
+  const rects = useRef(new Map<string, Local>());
   const today = new Date();
   const year = p.selected.getFullYear();
   const marks = useYearMarks(p.api, level === 'year' || anim?.from === 'year' ? year : -1, p.active && (level === 'year' || anim?.from === 'year'));
@@ -202,7 +203,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
     if (date.getFullYear() !== p.month.getFullYear() || date.getMonth() !== p.month.getMonth()) p.setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     setLevel(next);
     if (reduced) return;
-    const rect = deeper && from ? rects.current.get(from) || null : null;
+    const rect = deeper && from ? resolve(rects.current, from) : null;
     const side = !deeper && !shallower ? (+date >= +prevDate ? 1 : -1) : 0;
     setAnim({from: prev, fromDate: prevDate, dir: deeper ? 'in' : shallower ? 'out' : 'side', rect, side});
     progress.setValue(0);
@@ -228,41 +229,41 @@ export function AgendaDesk(p: AgendaDeskProps) {
   const viewFor = (l: Level, d: Date) => l === 'year' ? <YearView x={x} y={d.getFullYear()} /> : l === 'month' ? <MonthView x={x} m={new Date(d.getFullYear(), d.getMonth(), 1)} /> : <DayView x={x} d={d} />;
 
   // ---------- animacao ----------
+  // 0.3.283 (Pedro: "mais pra zoom"): zoom de verdade, como a camera chegando perto - a visao de cima AMPLIA em
+  // direcao ao quadradinho clicado (ate ele ocupar a tela) enquanto a visao nova cresce de dentro dele, sempre na
+  // mesma proporcao (sem achatar). Voltar faz o caminho inverso: a visao atual encolhe para dentro do quadradinho e
+  // a de cima "se afasta" ate o tamanho normal.
   const S = stage.current;
-  const toRect = (r: Rect) => [
-    {translateX: progress.interpolate({inputRange: [0, 1], outputRange: [r.x + r.w / 2 - S.w / 2, 0]})},
-    {translateY: progress.interpolate({inputRange: [0, 1], outputRange: [r.y + r.h / 2 - S.h / 2, 0]})},
-    {scaleX: progress.interpolate({inputRange: [0, 1], outputRange: [Math.max(0.05, r.w / S.w), 1]})},
-    {scaleY: progress.interpolate({inputRange: [0, 1], outputRange: [Math.max(0.05, r.h / S.h), 1]})},
-  ];
+  const lerp = (from: number, to: number) => progress.interpolate({inputRange: [0, 1], outputRange: [from, to]});
   const card = {position: 'absolute' as const, left: 0, top: 0, right: 0, bottom: 0, borderWidth: 1, borderColor: c.line, borderRadius: 14, backgroundColor: c.surface, overflow: 'hidden' as const};
+  const zoomOf = (r: Rect) => {const k = Math.min(S.w / Math.max(1, r.w), S.h / Math.max(1, r.h)); return {k, dx: r.x + r.w / 2 - S.w / 2, dy: r.y + r.h / 2 - S.h / 2};};
   let layers: React.ReactNode;
   if (!anim) layers = <View style={card}>{viewFor(level, p.selected)}</View>;
-  else if (anim.dir === 'in') {
-    layers = <>
-      <Animated.View style={[card, {opacity: progress.interpolate({inputRange: [0, 1], outputRange: [1, 0]}), transform: [{scale: progress.interpolate({inputRange: [0, 1], outputRange: [1, 1.04]})}]}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
-      <Animated.View style={[card, {opacity: progress.interpolate({inputRange: [0, 0.12, 1], outputRange: [0, 1, 1]}), transform: anim.rect ? toRect(anim.rect) : [{scale: progress.interpolate({inputRange: [0, 1], outputRange: [0.96, 1]})}]}]}>{viewFor(level, p.selected)}</Animated.View>
-    </>;
-  } else if (anim.dir === 'out') {
-    const key = level === 'year' ? 'm' + anim.fromDate.getMonth() : 'd' + localDateKey(anim.fromDate);
-    const r = rects.current.get(key);
-    // saindo: a mesma interpolacao do zoom, de tras para frente
-    const inv = Animated.subtract(1, progress);
-    const outT = r ? [
-      {translateX: inv.interpolate({inputRange: [0, 1], outputRange: [r.x + r.w / 2 - S.w / 2, 0]})},
-      {translateY: inv.interpolate({inputRange: [0, 1], outputRange: [r.y + r.h / 2 - S.h / 2, 0]})},
-      {scaleX: inv.interpolate({inputRange: [0, 1], outputRange: [Math.max(0.05, r.w / S.w), 1]})},
-      {scaleY: inv.interpolate({inputRange: [0, 1], outputRange: [Math.max(0.05, r.h / S.h), 1]})},
-    ] : [{scale: inv.interpolate({inputRange: [0, 1], outputRange: [0.96, 1]})}];
-    layers = <>
-      <Animated.View style={[card, {opacity: progress, transform: [{scale: progress.interpolate({inputRange: [0, 1], outputRange: [1.04, 1]})}]}]}>{viewFor(level, p.selected)}</Animated.View>
-      <Animated.View style={[card, {opacity: progress.interpolate({inputRange: [0, 0.85, 1], outputRange: [1, 1, 0]}), transform: outT}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
-    </>;
+  else if (anim.dir === 'in' || anim.dir === 'out') {
+    const inward = anim.dir === 'in';
+    const outer = inward ? anim.from : level, outerDate = inward ? anim.fromDate : p.selected;
+    const inner = inward ? level : anim.from, innerDate = inward ? p.selected : anim.fromDate;
+    const r = inward ? anim.rect : resolve(rects.current, level === 'year' ? 'm' + anim.fromDate.getMonth() : 'd' + localDateKey(anim.fromDate));
+    if (r) {
+      const {k, dx, dy} = zoomOf(r);
+      // t: 0 = afastado (visao de cima normal), 1 = dentro (visao de dentro na tela toda)
+      const t = (a0: number, a1: number) => inward ? lerp(a0, a1) : lerp(a1, a0);
+      const fade = (pts: number[], vals: number[]) => progress.interpolate({inputRange: pts, outputRange: inward ? vals : [...vals].reverse()});
+      layers = <>
+        <Animated.View style={[card, {opacity: fade([0, 0.45, 1], [1, 1, 0]), transform: [{translateX: t(0, -k * dx)}, {translateY: t(0, -k * dy)}, {scale: t(1, k)}]}]}>{viewFor(outer, outerDate)}</Animated.View>
+        <Animated.View style={[card, {opacity: fade([0, 0.35, 1], [0, 1, 1]), transform: [{translateX: t(dx, 0)}, {translateY: t(dy, 0)}, {scale: t(1 / k, 1)}]}]}>{viewFor(inner, innerDate)}</Animated.View>
+      </>;
+    } else {
+      layers = <>
+        <Animated.View style={[card, {opacity: lerp(1, 0)}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
+        <Animated.View style={[card, {opacity: lerp(0, 1), transform: [{scale: lerp(inward ? 0.94 : 1.06, 1)}]}]}>{viewFor(level, p.selected)}</Animated.View>
+      </>;
+    }
   } else {
     const dx = 24 * anim.side;
     layers = <>
-      <Animated.View style={[card, {opacity: progress.interpolate({inputRange: [0, 1], outputRange: [1, 0]}), transform: [{translateX: progress.interpolate({inputRange: [0, 1], outputRange: [0, -dx]})}]}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
-      <Animated.View style={[card, {opacity: progress, transform: [{translateX: progress.interpolate({inputRange: [0, 1], outputRange: [dx, 0]})}]}]}>{viewFor(level, p.selected)}</Animated.View>
+      <Animated.View style={[card, {opacity: lerp(1, 0), transform: [{translateX: lerp(0, -dx)}]}]}>{viewFor(anim.from, anim.fromDate)}</Animated.View>
+      <Animated.View style={[card, {opacity: lerp(0, 1), transform: [{translateX: lerp(dx, 0)}]}]}>{viewFor(level, p.selected)}</Animated.View>
     </>;
   }
 
@@ -292,6 +293,6 @@ export function AgendaDesk(p: AgendaDeskProps) {
           style={{height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
       </View>
     </View>
-    <View style={{flex: 1, minHeight: 520}} onLayout={e => {const l = e.nativeEvent.layout; stage.current = {x: 0, y: 0, w: l.width, h: l.height};}}>{layers}</View>
+    <View style={{flex: 1, minHeight: 520, borderRadius: 14, overflow: 'hidden'}} onLayout={e => {const l = e.nativeEvent.layout; stage.current = {x: 0, y: 0, w: l.width, h: l.height};}}>{layers}</View>
   </View>;
 }
