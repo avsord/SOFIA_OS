@@ -14,8 +14,8 @@ const original=config.resolver.resolveRequest;
 // 0.3.253: no site, as telas do app usam a camada de computador do react-native (escala e rolagem de
 // computador com a tela larga). Ficam de fora: node_modules, a propria camada e a moldura do computador.
 const SRC=path.join(__dirname,'src')+path.sep,APP=path.join(__dirname,'App.tsx');
-const RAW=new Set(['rn-desktop.tsx','desktop-scale.ts','DesktopShell.tsx','DesktopPages.tsx','rn-fluid.tsx','AgendaDesk.tsx']);
-const FLUID=new Set(['DesktopShell.tsx','DesktopPages.tsx','AgendaDesk.tsx']);
+const RAW=new Set(['rn-desktop.tsx','desktop-scale.ts','DesktopShell.tsx','DesktopPages.tsx','rn-fluid.tsx','AgendaDesk.tsx','HomeBrief.tsx']);
+const FLUID=new Set(['DesktopShell.tsx','DesktopPages.tsx','AgendaDesk.tsx','HomeBrief.tsx']);
 // O babel do site troca `import {View} from 'react-native'` por `react-native-web/dist/exports/View`;
 // os componentes com escala sao entregues por src/web/rnd/<Nome>.ts.
 const WRAPPED=['View','Text','TextInput','Image','Pressable','TouchableOpacity','KeyboardAvoidingView','SafeAreaView','ScrollView','FlatList','SectionList','Animated'];
