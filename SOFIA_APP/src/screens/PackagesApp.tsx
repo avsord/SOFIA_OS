@@ -14,7 +14,7 @@ import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
 import {appAlert} from '../lib/app-alert';
 import {Icon, type IconName} from '../components/Icon';
-import {IconButton} from '../components/UI';
+import {IconButton, DeskTabs} from '../components/UI';
 import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
@@ -157,12 +157,14 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
   if (!ents) return <AppSkeleton label="Carregando encomendas…" />;
   return <InternalBackGesture enabled={active && !openId} onBack={onBack}>
     <View testID="packages-screen" style={{flex: 1}}>
-      <AppFrame sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 28 : 6, paddingBottom: 40, gap: 12}}>
+      <AppFrame sidebar={sidebar} mobileNav={mobileNav} tabsOnTop>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
-            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700'}}>{view === 'all' || view === 'way' ? 'Encomendas' : TITLES[view]}</Text><Text style={{color: c.muted, fontSize: 13}}>{lists.way.filter(p => !p.delivered).length} a caminho · Aviso no celular quando o status muda</Text></View>
+            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{desktop || view === 'all' || view === 'way' ? 'Encomendas' : TITLES[view]}</Text><Text style={{color: c.muted, fontSize: desktop ? 14 : 13}}>{lists.way.filter(p => !p.delivered).length} a caminho · aviso no celular quando o status muda</Text></View>
+            {desktop && quota ? <Text style={{color: c.muted, fontSize: 12, borderWidth: 1, borderColor: c.line, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6}}>{Math.max(0, quota.limit - quota.used)} de {quota.limit} rastreios grátis em {new Date().toLocaleDateString('pt-BR', {month: 'long'})}</Text> : null}
           </View>
+          {desktop ? <DeskTabs value={view} onChange={setView} options={(['all', 'needs', 'way', 'transit', 'out', 'pickup', 'done'] as const).map(k => ({value: k, label: TITLES[k], count: (k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length}))} /> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />
             <TextInput testID="pk-add" accessibilityLabel="Código de rastreio" value={raw} onChangeText={setRaw} placeholder="Cole o código de rastreio e, se quiser, um nome. Ex.: AA123456789BR Fone" placeholderTextColor={c.muted} autoCapitalize="characters" submitBehavior="submit"

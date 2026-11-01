@@ -37,7 +37,7 @@ test('0.3.264: Inicio no desenho aprovado (saudacao com nome em italico, barra d
 });
 test('0.3.265: Conversa no desenho aprovado - Quadro da conversa (computador na lateral, celular no botao), separador de assunto, foto visivel; barra do Inicio manda message',()=>{
   const ch=read('src/screens/Chat.tsx');assert.ok(ch.includes('testID="chat-board-side"')&&ch.includes('testID="chat-board-chip"')&&ch.includes('Novo assunto · {topic}')&&ch.includes('refreshBoardSoon(result.conversation_id)'));
-  const b=read('src/components/ConversationBoard.tsx');assert.ok(b.includes('ASSUNTOS ANTERIORES')&&b.includes("'Guardar em Páginas'")&&b.includes("'Copiar resumo'"));
+  const b=read('src/components/ConversationBoard.tsx');assert.ok(b.includes('Assuntos anteriores')&&b.includes("'Guardar em Páginas'")&&b.includes("'Copiar resumo'"));
   const w=load('src/components/ConversationBoard.tsx',{react:{useState:v=>[v,()=>{}]},'react-native':{Platform:{OS:'web'}},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null,Fragment:'F'},'../lib/theme':{useTheme:()=>({})},'../lib/app-alert':{appAlert(){}},'./Icon':{Icon:()=>null},'./ContextMenu':{contextMenu:()=>({})}}).when;
   const now=new Date('2026-10-30T19:00:00');assert.match(w(new Date('2026-10-30T16:17:00').toISOString(),now),/^Hoje, 30\/10 · 16:17$/);assert.match(w(new Date('2026-10-29T23:04:00').toISOString(),now),/^Ontem, 29\/10 · 23:04$/);
   assert.ok(read('src/components/HomeHero.tsx').includes('api.chat({conversation_id: id, message: q,'),'a barra do Inicio manda o campo message (na 0.3.264 mandava content e o servidor recusava)');

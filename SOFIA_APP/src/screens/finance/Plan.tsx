@@ -79,7 +79,7 @@ export function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {mo
         <Card_>
           <View style={{alignItems: 'center'}}>
               <Text style={{color: c.text, fontWeight: '600'}}>Fatura de {monthLabel(i.month).toLowerCase()}</Text>
-              <View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor[i.status] + '22', marginTop: 4}}><Text style={{color: statusColor[i.status], fontWeight: '600', fontSize: 11}}>{i.status.toUpperCase()}</Text></View>
+              <View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor[i.status] + '22', marginTop: 4}}><Text style={{color: statusColor[i.status], fontWeight: '600', fontSize: 11}}>{i.status.charAt(0).toUpperCase()+i.status.slice(1)}</Text></View>
           </View>
           <View style={{alignItems: 'center'}}><BigMoney text={money(i.total)} color={c.text} size={32} /></View>
           <Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{i.status === 'fechada' || i.status === 'paga' ? 'Fechou' : 'Fecha'} {dateBR(i.close)} · {i.status !== 'paga' && todayISO() > i.due ? <Text style={{color: c.danger, fontWeight: '600'}}>venceu {dateBR(i.due)}</Text> : 'vence ' + dateBR(i.due)}{i.paid ? ' · pago ' + money(i.paid) : ''}</Text>

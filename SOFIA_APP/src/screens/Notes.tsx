@@ -18,7 +18,7 @@ import {IconButton} from '../components/UI';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
+import {AppFrame, NavTabs, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 const COLORS = ['#b49ae6', '#7f9ad8', '#7fcf9f', '#e8b04a', '#e08ad0', '#7fc0c9', '#f0997b', '#a3a0ad'];
 const LOCKED_TITLE = 'Nota protegida';
@@ -198,17 +198,18 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!notesE) return <AppSkeleton label="Carregando notas…" />;
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
-      <AppFrame sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 28 : 6, paddingBottom: 40, gap: 12}}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 2}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700'}}>{title}</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{title}</Text></View>
               <Text style={{color: c.muted, fontSize: 13}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : visible.length + (visible.length === 1 ? ' nota' : ' notas')}</Text>
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}
           </View>
+          {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {lockedView ? <LockScreen tag={curTag!} count={notes.filter(n => tagKey(n.lockTag) === curTag!.key).length} onUnlock={async pw => { const k = await unlock(pw, curTag!.lock!); if (!k) return false; keys.current.set(curTag!.key, k); await decryptAll(curTag!.key, k); bump(x => x + 1); touch(); return true; }} /> : <>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>

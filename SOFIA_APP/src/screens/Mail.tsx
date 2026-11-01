@@ -18,7 +18,7 @@ import {Sheet} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Icon, type IconName} from '../components/Icon';
 import {Panel} from '../components/AppKit';
-import {Button, IconButton} from '../components/UI';
+import {Button, IconButton, DeskTabs} from '../components/UI';
 import {relativeTime} from '../components/NotificationCenter';
 import {Spinner, LoadingLines,LoadingCaption} from '../components/Loading';
 import {parseBill, parseMoney, todayISO, toAccount} from '../lib/finance';
@@ -210,13 +210,15 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   return (
     <InternalBackGesture enabled={active && !open && !addAccount && !ruleSheet} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
-          <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
-          <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '500'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts || []) + '. Trocar'} onPress={() => setPicker(true)} disabled={!accounts?.length}><Text numberOfLines={1} style={{fontSize: 24, fontWeight: '700', color: c.text}}>{accounts?.length ? selectionLabel(selection, accounts) + ' ▾' : 'E-mails'}</Text></Pressable></View>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: desktop ? 32 : 14, paddingBottom: desktop ? 18 : 6, ...pad(12)}}>
+          {desktop ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
+          {desktop ? <View style={{flex: 1, gap: 2}}><Text style={{fontSize: 28, fontWeight: '600', letterSpacing: -0.5, color: c.text}}>E-mails</Text><Text style={{color: c.muted, fontSize: 14}}>{accounts === null ? ' ' : scoped.length + ' encontrados pelas suas regras' + (scoped.some(h => h.state === 'new') ? ' · ' + scoped.filter(h => h.state === 'new').length + ' novos' : '')}</Text></View> : null}
+          <View style={{flex: desktop ? undefined : 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap'}}>{desktop ? null : <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>E-mails</Text>}{accounts?.length ? <Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts) + '. Trocar'} onPress={() => setPicker(true)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, borderWidth: 1, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent'})}><Text numberOfLines={1} style={{fontSize: 13, color: c.text}}>{selectionLabel(selection, accounts)}</Text><View style={{transform: [{rotate: '90deg'}]}}><Icon name="chevron" size={12} color={c.muted} /></View></Pressable> : null}</View>
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
-        <View style={{paddingHorizontal: 16, paddingBottom: 8, ...pad(16)}}>
-          <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (accounts === null ? '' : ' ' + scoped.length)}, {value: 'rules' as Tab, label: 'Regras' + (accounts === null ? '' : ' ' + scopedRules.length)}, {value: 'accounts' as Tab, label: 'Contas' + (accounts === null ? '' : ' ' + accounts.length)}]} />
+        <View style={{paddingHorizontal: 16, paddingBottom: desktop ? 18 : 8, ...pad(16)}}>
+          {desktop ? <DeskTabs value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados', count: accounts === null ? '' : scoped.length}, {value: 'rules' as Tab, label: 'Regras', count: accounts === null ? '' : scopedRules.length}, {value: 'accounts' as Tab, label: 'Contas', count: accounts === null ? '' : accounts.length}]} />
+          : <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (accounts === null ? '' : ' ' + scoped.length)}, {value: 'rules' as Tab, label: 'Regras' + (accounts === null ? '' : ' ' + scopedRules.length)}, {value: 'accounts' as Tab, label: 'Contas' + (accounts === null ? '' : ' ' + accounts.length)}]} />}
         </View>
         <View style={{flex: 1, flexDirection: 'row'}}><View style={{flex: 1, minWidth: 0}}>
         {accounts === null ? <View style={{paddingHorizontal: 16, paddingTop: 8, gap: 6, ...pad(16)}}><LoadingCaption label="Carregando e-mails" /><LoadingLines rows={4} /></View> : (
@@ -234,19 +236,20 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             ) : tab === 'hits' ? (
               <>
                 <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>{onlyImportant ? shown.length + ' importantes de ' + scoped.length + ' encontrados' : scoped.length + (scoped.length === 1 ? ' e-mail encontrado' : ' e-mails encontrados')}{unread ? ' · ' + unread + (unread === 1 ? ' novo' : ' novos') : ''}</Text><Text style={{color: c.text, fontSize: 13, marginRight: 6}}>Só importantes</Text><Switch value={onlyImportant} onValueChange={setOnlyImportant} /></View>
-                {!rules.length ? <Pressable onPress={() => setTab('rules')} style={{padding: 14, borderRadius: 16, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600'}}>Crie sua primeira regra →</Text><Text style={{color: c.text, fontSize: 12}}>Sem regras, a Sofia não sabe o que procurar.</Text></Pressable> : null}
-                {shown.length ? shown.map(h => (
+                {!rules.length ? <Pressable onPress={() => setTab('rules')} style={{padding: 14, borderRadius: 16, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600'}}>Crie sua primeira regra</Text><Text style={{color: c.text, fontSize: 12}}>Sem regras, a Sofia não sabe o que procurar.</Text></Pressable> : null}
+                {shown.length ? <View style={desktop ? {borderWidth: 1, borderColor: c.line, borderRadius: 14, overflow: 'hidden', backgroundColor: c.surface} : {gap: 8}}>{shown.map((h, hi) => (
                   <Pressable key={h.id} testID={'mail-hit-'+h.id} onPress={() => openMail(h)} {...contextMenu(() => [{label: 'Abrir', icon: 'mail', run: () => setOpen(h)}, ...(h.state === 'new' ? [{label: 'Marcar como lido', icon: 'check' as const, run: () => { void api.saveEntity({...h, state: 'read'}).then(load).catch(() => {}); }}] : []), {label: 'Tirar da lista', icon: 'trash', danger: true, run: () => { void api.deleteEntity(h.id).then(load).catch(() => {}); }}])}
-                    style={{flexDirection: 'row', gap: 12, padding: 12, borderRadius: 16, backgroundColor: desktop && open?.id === h.id ? c.accentSoft : h.state === 'new' ? PALETTE.sky+'14' : c.surface, borderWidth: 1, borderColor: desktop && open?.id === h.id ? c.accent : c.line}}>
+                    style={desktop ? ({hovered}: any) => ({flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: hi ? 1 : 0, borderColor: c.line, backgroundColor: open?.id === h.id ? c.accentSoft : hovered ? c.input : 'transparent'}) : {flexDirection: 'row', gap: 12, padding: 12, borderRadius: 16, backgroundColor: h.state === 'new' ? PALETTE.sky+'14' : c.surface, borderWidth: 1, borderColor: c.line}}>
+                    {desktop ? <View style={{width: 6, alignItems: 'center', paddingTop: 15, marginLeft: -6}}>{h.state === 'new' ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent}} /> : null}</View> : null}
                     <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: PALETTE.sky+'26', alignItems: 'center', justifyContent: 'center'}}><Text style={{fontWeight: '700', color: PALETTE.sky}}>{String(h.data.from_name || h.data.from_addr || '?').charAt(0).toUpperCase()}</Text></View>
                     <View style={{flex: 1, gap: 2}}>
                       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{hitEmoji(h, rules) ? <MarkIcon value={hitEmoji(h, rules)} /> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontWeight: h.state === 'new' ? '700' : '500'}}>{h.data.from_name || h.data.from_addr}</Text><Text style={{color: c.muted, fontSize: 10}}>{relativeTime(String(h.data.received_at))}</Text></View>
                       <Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{h.title}</Text>
-                      <Text numberOfLines={2} style={{color: c.muted, fontSize: 12}}>{h.data.snippet}</Text>
+                      <Text numberOfLines={desktop ? 1 : 2} style={{color: c.muted, fontSize: 12}}>{h.data.snippet}</Text>
                       <Text style={{color: c.muted, fontSize: 10}}>{String(h.data.rule_names || '').trim() ? 'Regra: ' + h.data.rule_names : 'Regra apagada'}</Text>
                     </View>
                   </Pressable>
-                )) : <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 24}}>Nada encontrado ainda. A Sofia confere a cada 5 minutos.</Text>}
+                ))}</View> : <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 24}}>Nada encontrado ainda. A Sofia confere a cada 5 minutos.</Text>}
               </>
             ) : tab === 'rules' ? (
               <>
@@ -360,7 +363,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
           {viaGoogle ? null : provider === 'imap' ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 3}}><Field label="Servidor IMAP" value={host} onChange={setHost} placeholder="imap.seudominio.com" /></View><View style={{flex: 1}}><Field label="Porta" value={port} onChange={setPort} /></View></View> : null}
           <View style={{padding: 12, borderRadius: 14, backgroundColor: c.accentSoft, gap: 6}}>
             <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>{p.help}</Text>
-            {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '600'}}>Abrir página da senha de app →</Text></Pressable> : null}
+            {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '600'}}>Abrir página da senha de app</Text></Pressable> : null}
           </View>
           {/* 0.3.248: este modo le SO a caixa da Conta Google conectada no Perfil - avisa se o e-mail digitado for outro */}
           {viaGoogle && ownGoogle?.linked ? (

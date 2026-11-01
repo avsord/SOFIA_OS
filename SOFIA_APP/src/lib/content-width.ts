@@ -4,4 +4,7 @@
 import {createContext} from 'react';
 export const ContentWidth=createContext<number|undefined>(undefined);
 /** Barra que ocupa a largura toda (fundo e borda de ponta a ponta) com o conteudo alinhado a coluna de leitura. */
-export function columnPadding(max:number,base:number):any{return `max(${base}px, calc((100% - ${max}px) / 2 + ${base}px))`;}
+/** 0.3.273 (padrao aprovado): no computador todo conteudo comeca na mesma linha a esquerda (DESK_LEFT), com a mesma
+ * largura maxima; antes cada tela centralizava a coluna e as margens mudavam de tela para tela. */
+export const DESK_LEFT=40;
+export function columnPadding(max:number,base:number):any{return {left:`${Math.max(base,DESK_LEFT)}px`,right:`max(${base}px, calc(100% - ${max}px - ${Math.max(base,DESK_LEFT)}px))`};}

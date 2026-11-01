@@ -49,15 +49,17 @@ function ToastView({toast, onClose}: {toast: {id: number; text: string; actions:
 }
 
 /* ---------- moldura: lateral + conteudo ---------- */
-export function AppFrame({sidebar, mobileNav, children, footer}: {sidebar: React.ReactNode; mobileNav?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode}) {
+export function AppFrame({sidebar, mobileNav, children, footer, tabsOnTop}: {sidebar: React.ReactNode; mobileNav?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; tabsOnTop?: boolean}) {
   const c = useTheme(), desktop = useDesktop();
+  // 0.3.273 (padrao aprovado): no computador a navegacao interna vira abas no topo (a tela desenha as abas no cabecalho)
+  if (desktop && tabsOnTop) return <View style={{flex: 1, backgroundColor: c.bg}}><View style={{flex: 1, minWidth: 0}}>{children}{footer}</View></View>;
   if (!desktop) return <View style={{flex: 1, backgroundColor: c.bg}}>{mobileNav}<View style={{flex: 1}}>{children}</View>{footer}</View>;
   return <View style={{flex: 1, flexDirection: 'row', backgroundColor: c.bg}}>
     <View testID="app-sidebar" style={{width: 248, borderRightWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingVertical: 14, paddingHorizontal: 10, gap: 2}}>{sidebar}</ScrollView></View>
     <View style={{flex: 1, minWidth: 0}}>{children}{footer}</View>
   </View>;
 }
-export function SideLabel({children}: {children: string}) { const c = useTheme(); return <Text style={{color: c.muted, fontSize: 11, fontWeight: '600', letterSpacing: 0.6, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6}}>{children.toUpperCase()}</Text>; }
+export function SideLabel({children}: {children: string}) { const c = useTheme(); return <Text style={{color: c.muted, fontSize: 12, fontWeight: '600', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 6}}>{children}</Text>; }
 export function SideItem({icon, label, count, selected, onPress, sub, dot, leading, trailing, faded, testID, onContextMenu}: {icon?: IconName; label: string; count?: number | string; selected?: boolean; onPress: () => void; sub?: boolean; dot?: string; leading?: React.ReactNode; trailing?: React.ReactNode; faded?: boolean; testID?: string; onContextMenu?: any}) {
   const c = useTheme();
   return <Pressable testID={testID} accessibilityRole="button" accessibilityState={{selected: !!selected}} accessibilityLabel={label} onPress={onPress} {...(onContextMenu || {})}
@@ -69,8 +71,21 @@ export function SideItem({icon, label, count, selected, onPress, sub, dot, leadi
 }
 
 /* ---------- etiquetas e botoes ---------- */
-export function Chip({label, selected, onPress, icon, count, dot, dashed, testID}: {label: string; selected?: boolean; onPress?: () => void; icon?: IconName; count?: number; dot?: string; dashed?: boolean; testID?: string}) {
+const ChipTabs = React.createContext(false);
+/** 0.3.273 (padrao aprovado): no computador a navegacao interna (as mesmas etiquetas do celular) vira abas sublinhadas no topo */
+export function NavTabs({nav}: {nav?: React.ReactNode}) {
   const c = useTheme();
+  if (!nav || !React.isValidElement(nav)) return null;
+  return <ChipTabs.Provider value={true}><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flexGrow: 0, marginTop: 14, borderBottomWidth: 1, borderColor: c.line}} contentContainerStyle={{gap: 24, alignItems: 'flex-end'}}>{(nav.props as any).children}</ScrollView></ChipTabs.Provider>;
+}
+export function Chip({label, selected, onPress, icon, count, dot, dashed, testID}: {label: string; selected?: boolean; onPress?: () => void; icon?: IconName; count?: number; dot?: string; dashed?: boolean; testID?: string}) {
+  const c = useTheme(), asTab = React.useContext(ChipTabs);
+  if (asTab) return <Pressable testID={testID} accessibilityRole="tab" accessibilityState={{selected: !!selected}} accessibilityLabel={label} disabled={!onPress} onPress={onPress}
+    style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 10, marginBottom: -1, borderBottomWidth: 2, borderColor: selected ? c.accent : hovered ? c.line : 'transparent'})}>
+    {dot ? <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: dot}} /> : null}{dashed && icon ? <Icon name={icon} size={13} color={c.accent} /> : icon === 'lock' ? <Icon name="lock" size={12} color={c.muted} /> : null}
+    <Text style={{color: dashed ? c.accent : selected ? c.text : c.muted, fontSize: 14, fontWeight: selected ? '600' : '400'}}>{label}</Text>
+    {count != null ? <Text style={{color: c.muted, fontSize: 13}}>{count}</Text> : null}
+  </Pressable>;
   return <Pressable testID={testID} accessibilityRole="button" accessibilityState={{selected: !!selected}} accessibilityLabel={label} disabled={!onPress} onPress={onPress}
     style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderStyle: dashed ? 'dashed' : 'solid', borderColor: selected ? c.accent : c.line, backgroundColor: selected ? c.accentSoft : c.surface}}>
     {dot ? <View style={{width: 7, height: 7, borderRadius: 3, backgroundColor: dot}} /> : null}{icon ? <Icon name={icon} size={14} color={selected ? c.accent : c.muted} /> : null}
@@ -176,3 +191,4 @@ export function AppSkeleton({label, side = true}: {label: string; side?: boolean
     <View style={{flex: 1, paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 34 : 18, gap: 14}}>{show ? <><View style={{width: 180, height: 22, borderRadius: 8, backgroundColor: c.input}} /><LoadingLines rows={6} /></> : null}</View>
   </View>;
 }
+

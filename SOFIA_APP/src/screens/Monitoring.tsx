@@ -1,3 +1,4 @@
+import {useDesktop} from '../lib/desktop';
 import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
@@ -38,7 +39,7 @@ import {GOOD, useCollector, Delta, Chips, Spark, issuesFor} from './monitoring/c
 import {Tag, AddProduct} from './monitoring/Add';
 import {ProductDetail} from './monitoring/Detail';
 // ======================= TELA PRINCIPAL =======================
-export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; active: boolean; onBack: () => void; focusId?: string}) {
+export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; active: boolean; onBack: () => void; focusId?: string}) {const deskNoBack=useDesktop();
   useRenderCost('apps:monitoring');
   const c = useTheme(), insets = useSafeAreaInsets(), col = useCollector();
   const [products, setProducts] = useState<ProductSeries[] | null>(null), [error, setError] = useState('');
@@ -75,9 +76,9 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
     <InternalBackGesture enabled={active && !adding && !open} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
-          <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
+          {deskNoBack ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
           <View style={{flex: 1, paddingHorizontal: 4}}>
-            <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '500'}}>PREÇOS QUE VOCÊ ACOMPANHA</Text>
+            
             <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>Price Tracker</Text>
           </View>
           <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />

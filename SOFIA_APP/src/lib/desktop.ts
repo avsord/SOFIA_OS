@@ -151,5 +151,5 @@ export function useColumnPad():(base:number)=>Record<string,any>{
  // 0.3.268: o conteudo das listas passa pela escala de computador (22 -> 16 a partir de 1024 px); a barra de cima
  // usa a mesma escala, senao busca/filtros ficavam 6 px fora da margem dos cards (Tarefas backlog e outras telas)
  const s=(base:number)=>width>=1024?scaleSpace(base):base;
- return (base:number)=>desktop&&max?{paddingLeft:columnPadding(max,s(base)),paddingRight:columnPadding(max,s(base))}:{};
+ return (base:number)=>{if(!(desktop&&max))return {};const p=columnPadding(max,s(base));return {paddingLeft:p.left,paddingRight:p.right};};
 }

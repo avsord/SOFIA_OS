@@ -23,7 +23,7 @@ export function topicSummary(t: BoardTopic): string {
 }
 function counts(t: BoardTopic) { const parts: string[] = []; if (t.decided.length) parts.push(t.decided.length + (t.decided.length === 1 ? ' decidido' : ' decididos')); if (t.todo.length) parts.push(t.todo.length + ' a fazer'); if (t.open.length) parts.push(t.open.length + ' em aberto'); return parts.join(' · '); }
 function Section({color, title, children}: {color: string; title: string; children: React.ReactNode}) {
-  return <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: color}} /><Text style={{color, fontSize: 11, fontWeight: '600', letterSpacing: 1}}>{title}</Text></View>{children}</View>;
+  return <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: color}} /><Text style={{color, fontSize: 12, fontWeight: '600'}}>{title.charAt(0)+title.slice(1).toLowerCase()}</Text></View>{children}</View>;
 }
 function Item({children, warn}: {children: React.ReactNode; warn?: string}) { const c = useTheme(); return <View style={{padding: 10, borderRadius: 10, backgroundColor: c.surface, borderWidth: 1, borderColor: warn ? warn + '66' : c.line, gap: 2}}>{children}</View>; }
 function TopicBody({t}: {t: BoardTopic}) {
@@ -44,7 +44,7 @@ export function ConversationBoard({board, loading, onSave, onCopy, compact}: {bo
   return <ScrollView testID="conversation-board" keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{padding: compact ? 4 : 20, gap: 12}} showsVerticalScrollIndicator={false}>
     {compact ? null : <View style={{gap: 3}}><Text style={{color: c.text, fontSize: 18, fontWeight: '600'}}>Quadro da conversa</Text><View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}><View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: c.good}} /><Text style={{color: c.muted, fontSize: 12}}>{loading ? 'A Sofia está organizando…' : 'A Sofia vai organizando enquanto vocês falam'}</Text></View></View>}
     {!topics.length ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 20, marginTop: 6}}>Converse com a Sofia e ela vai separando aqui o que ficou decidido, o que falta fazer e o que ficou em aberto.</Text> : null}
-    {previous.length ? <Text style={{color: c.muted, fontSize: 11, fontWeight: '600', letterSpacing: 1, marginTop: 4}}>ASSUNTOS ANTERIORES</Text> : null}
+    {previous.length ? <Text style={{color: c.muted, fontSize: 12, fontWeight: '600', marginTop: 4}}>Assuntos anteriores</Text> : null}
     {previous.map(t => { const key = (t.message_id || t.title), on = openKey === key, dot = t.open.length ? c.warn : c.good; return <View key={key} style={{borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>
       <Pressable accessibilityRole="button" accessibilityState={{expanded: on}} accessibilityLabel={(on ? 'Fechar ' : 'Abrir ') + t.title} onPress={() => setOpenKey(on ? '' : key)} {...menu(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12}}>
         <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: dot}} />
@@ -55,7 +55,7 @@ export function ConversationBoard({board, loading, onSave, onCopy, compact}: {bo
       {on ? <View style={{padding: 12, paddingTop: 0, gap: 10}}><View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>{more(t)}</View><TopicBody t={t} /></View> : null}
     </View>; })}
     {current ? <>
-      <Text style={{color: c.muted, fontSize: 11, fontWeight: '600', letterSpacing: 1, marginTop: 6}}>AGORA</Text>
+      <Text style={{color: c.muted, fontSize: 12, fontWeight: '600', marginTop: 6}}>Agora</Text>
       <View testID="board-current" style={{borderRadius: 14, borderWidth: 1, borderColor: c.accent + '55', backgroundColor: c.bg, padding: 14, gap: 12}}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: c.accent}} /><View style={{flex: 1}}><Text style={{color: c.text, fontSize: 16, fontWeight: '600'}}>{current.title}</Text><Text style={{color: c.muted, fontSize: 11, marginTop: 2}}>{current.started_at ? when(current.started_at).replace(' · ', ' · desde ') : ''}</Text></View>{more(current)}</View>
         <TopicBody t={current} />

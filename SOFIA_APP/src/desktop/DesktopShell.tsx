@@ -61,7 +61,7 @@ function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onTog
 function Section({title,children,action}:{title:string;children:React.ReactNode;action?:React.ReactNode}){
  const c=useTheme();
  return <View style={{marginTop:18}}>
-  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}><Text style={{flex:1,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.6}}>{title.toUpperCase()}</Text>{action}</View>
+  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}><Text style={{flex:1,color:c.muted,fontSize:12,fontWeight:'600'}}>{title.charAt(0)+title.slice(1).toLowerCase()}</Text>{action}</View>
   {children}
  </View>;
 }
@@ -103,7 +103,7 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
     </View>
     <ScrollView keyboardShouldPersistTaps="always" style={{maxHeight:480}} contentContainerStyle={{paddingVertical:6}}>
      {results.length?results.map((cmd,i)=>{const head=cmd.group!==lastGroup;lastGroup=cmd.group;return <React.Fragment key={cmd.id}>
-      {head?<Text style={{color:c.muted,fontSize:11,fontWeight:'600',paddingHorizontal:16,paddingTop:10,paddingBottom:4}}>{cmd.group.toUpperCase()}</Text>:null}
+      {head?<Text style={{color:c.muted,fontSize:11,fontWeight:'600',paddingHorizontal:16,paddingTop:10,paddingBottom:4}}>{cmd.group}</Text>:null}
       <Pressable accessibilityRole="menuitem" onHoverIn={()=>setIndex(i)} onPress={()=>run(cmd)} style={{flexDirection:'row',alignItems:'center',gap:10,marginHorizontal:6,paddingHorizontal:10,paddingVertical:9,borderRadius:8,backgroundColor:i===index?c.accentSoft:'transparent'}}>
        {cmd.emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{cmd.emoji}</Text>:cmd.icon?<Icon name={cmd.icon} size={18} color={i===index?c.accent:c.muted}/>:null}
        <Text numberOfLines={1} style={{flex:1,color:i===index?c.accent:c.text,fontSize:14}}>{cmd.label}</Text>

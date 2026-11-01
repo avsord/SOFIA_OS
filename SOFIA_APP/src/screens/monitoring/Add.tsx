@@ -125,7 +125,7 @@ export function AddProduct({api, used, existing, onClose, onCreated}: {api: Sofi
           ) : (
             <>
               <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 2, borderColor: color, padding: 18, gap: 10}}>
-                <Text style={{fontSize: 11, letterSpacing: 1, fontWeight: '600', color}}>{storeName(url).toUpperCase()}</Text>
+                <Text style={{fontSize: 13, fontWeight: '600', color}}>{storeName(url)}</Text>
                 <TextInput accessibilityLabel="Nome do produto" value={title} onChangeText={setTitle} placeholder="Nome do produto" placeholderTextColor={c.muted} multiline
                   style={{fontSize: 18, fontWeight: '600', color: c.text, padding: 0}} />
                 <Text style={{fontSize: 32, fontWeight: '700', color: c.text}}>{picked ? money(picked.amount) : '—'}</Text>

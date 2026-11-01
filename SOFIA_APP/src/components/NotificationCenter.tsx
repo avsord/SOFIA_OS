@@ -215,7 +215,7 @@ function DeskList(){const n=useNotifications(),c=useTheme(),digest=useDigest(),[
   </Pressable>)}
   {n.error?<View style={{padding:14}}><ErrorBanner text={n.error} onRetry={()=>void n.refresh()}/></View>:null}
   {!shown.length?<Text style={{color:c.muted,textAlign:'center',paddingVertical:28}}>{n.loading?'Carregando…':tab==='unread'?'Nada sem ler.':'Tudo em dia. Sem notificações.'}</Text>:null}
-  {[...groups].map(([g,items])=><View key={g}><Text style={{color:c.muted,fontSize:11,fontWeight:'700',letterSpacing:0.5,paddingHorizontal:18,paddingTop:12,paddingBottom:4}}>{g.toUpperCase()}</Text>{items.slice(0,30).map(i=><DeskRow key={i.id} item={i}/>)}</View>)}
+  {[...groups].map(([g,items])=><View key={g}><Text style={{color:c.muted,fontSize:12,fontWeight:'600',paddingHorizontal:18,paddingTop:12,paddingBottom:4}}>{g}</Text>{items.slice(0,30).map(i=><DeskRow key={i.id} item={i}/>)}</View>)}
  </View>;}
 /** O número aparece crescendo de 0 a 1 em vez de surgir seco. Depois disso, quando a contagem muda, só o número troca (sem pulo). */
 function BellBadge({count}:{count:number}){const c=useTheme(),reduced=useReducedMotion(),scale=useRef(new Animated.Value(count>0?1:0)).current,last=useRef(count),[shown,setShown]=useState(count);

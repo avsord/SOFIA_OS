@@ -17,7 +17,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, Stepper, brl, fold, moneyInput, numText, openMore, parseMoney, shareText, useToast, AppSkeleton} from '../components/AppKit';
+import {AppFrame, NavTabs, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, Stepper, brl, fold, moneyInput, numText, openMore, parseMoney, shareText, useToast, AppSkeleton} from '../components/AppKit';
 
 export type Model = 'market' | 'shopping' | 'simple';
 type ListDef = {id: string; name: string; icon: IconName; model: Model; meta: Entity | null; system?: 'market' | 'shopping'};
@@ -298,10 +298,10 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     <Chip icon="plus" label="Nova lista" dashed onPress={() => setDialog({type: 'newList'})} />
   </ScrollView>;
 
-  function Row({it}: {it: Item}) {
+  function Row({it, first}: {it: Item; first?: boolean}) {
     const meta: string[] = []; if (L.model === 'shopping' || L.model !== 'market' && it.store) { if (it.store) meta.push(it.store); if (it.url) meta.push('link'); }
     if (it.note) meta.push(it.note.length > 40 ? it.note.slice(0, 40) + '…' : it.note);
-    return <View testID={'list-row-' + it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: flash === it.id ? c.accentSoft : c.surface, ...({transitionProperty: 'background-color', transitionDuration: '400ms'} as any)}}
+    return <View testID={'list-row-' + it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 12, borderTopWidth: first ? 0 : 1, borderColor: c.line, backgroundColor: flash === it.id ? c.accentSoft : 'transparent', ...({transitionProperty: 'background-color', transitionDuration: '400ms'} as any)}}
       {...contextMenu(() => [{label: 'Abrir', icon: 'edit', run: () => setOpenId(it.id)}, {label: it.done ? 'Desmarcar' : 'Marcar', icon: 'check', run: () => void toggle(it)}, {label: 'Apagar', icon: 'trash', danger: true, run: () => void removeItem(it)}])}>
       <Pressable testID={'list-check-' + it.id} accessibilityRole="checkbox" accessibilityState={{checked: it.done}} accessibilityLabel={(it.done ? 'Desmarcar ' : 'Marcar ') + it.name} onPress={() => void toggle(it)} hitSlop={8}
         style={{width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: it.done ? c.muted : c.muted + '99', backgroundColor: it.done ? c.line : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{it.done ? <Icon name="check" size={12} color={c.text} weight="bold" /> : null}</Pressable>
@@ -315,7 +315,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   }
   const Section = ({title, items, icon}: {title: string; items: Item[]; icon?: IconName}) => <View style={{gap: 6}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4}}>{icon ? <Icon name={icon} size={13} color={c.muted} /> : null}<Text style={{color: c.muted, fontSize: 12, fontWeight: '700'}}>{title}</Text><Text style={{color: c.muted, fontSize: 12}}>{items.length}</Text></View>
-    <View style={{gap: 6}}>{items.map(i => <Row key={i.id} it={i} />)}</View>
+    <View style={{borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{items.map((i, k) => <Row key={i.id} it={i} first={!k} />)}</View>
   </View>;
   function GroupSummary({gid}: {gid: string}) {
     const arr = mine.filter(i => (i.group || 'none') === gid), grp = myGroups.find(g => g.id === gid), a = sum(arr.filter(i => !i.done)), b = sum(arr.filter(i => i.done)), tot = a + b;
@@ -354,7 +354,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     const parts: React.ReactNode[] = [];
     if (inGroup) parts.push(<GroupSummary key="sum" gid={gfilter} />);
     if (L.model === 'market' && todo.length) { const g: Record<string, Item[]> = {}; todo.forEach(i => { (g[i.section || 'Outros'] = g[i.section || 'Outros'] || []).push(i); }); Object.keys(g).sort((a, b) => (SECTION_ORDER.indexOf(a) + 99) % 99 - (SECTION_ORDER.indexOf(b) + 99) % 99).forEach(k => parts.push(<Section key={k} title={k} items={g[k]} />)); }
-    else if (todo.length) parts.push(<View key="todo" style={{gap: 6}}>{todo.map(i => <Row key={i.id} it={i} />)}</View>);
+    else if (todo.length) parts.push(<View key="todo" style={{borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{todo.map((i, k) => <Row key={i.id} it={i} first={!k} />)}</View>);
     else parts.push(<Text key="all" style={{color: c.muted, fontSize: 13, textAlign: 'center', paddingVertical: 8}}>{L.model === 'simple' ? 'Tudo feito. Conclua a lista para guardar no histórico.' : 'Tudo no carrinho. Finalize para guardar no histórico.'}</Text>);
     // "No carrinho" / "Feitos" sempre aberta, sem botao de abrir/fechar (pedido do Pedro)
     if (done.length) parts.push(<Section key="done" title={L.model === 'simple' ? 'Feitos' : 'No carrinho'} items={done} />);
@@ -365,7 +365,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const header = <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
     {!desktop ? <IconButton name="back" label={inGroup ? 'Voltar para ' + L.name : 'Voltar aos apps'} onPress={() => inGroup ? setGfilter('all') : onBack()} /> : inGroup ? <IconButton name="back" label={'Voltar para ' + L.name} onPress={() => setGfilter('all')} /> : null}
     <View style={{flex: 1, minWidth: 0, gap: 2}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700', flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
       <Text style={{color: c.muted, fontSize: 13}}>{L.model === 'shopping' && !inGroup ? myGroups.length + (myGroups.length === 1 ? ' grupo' : ' grupos') + ' · ' + mine.filter(i => !i.done).length + ' para comprar' : todo.length + (todo.length === 1 ? ' item ' : ' itens ') + (L.model === 'simple' ? 'a fazer' : 'para comprar') + (done.length ? ' · ' + done.length + (done.length === 1 ? ' ticado' : ' ticados') : '')}</Text>
     </View>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
@@ -389,9 +389,10 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!data) return <AppSkeleton label="Carregando listas…" />;
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
-      <AppFrame sidebar={sidebar} mobileNav={mobileNav} footer={footer}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 28 : 6, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={footer}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
           {header}
+          {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger, marginTop: 10}}>{error}</Text> : null}
           <View style={{marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />

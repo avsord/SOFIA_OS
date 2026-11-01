@@ -116,7 +116,7 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
               {s.primary ? <Text style={{fontSize: 10, color: c.muted, borderWidth: 1, borderColor: c.line, borderRadius: 6, paddingHorizontal: 4}}>PRINCIPAL</Text> : null}
             </View>
             {iss?.kind === 'confirm' ? <Pressable onPress={() => setConfirm({store: s, issue: iss})}><Text style={{fontSize: 12, color: PALETTE.amberDeep, fontWeight: '500'}}>{tap('Toque para confirmar o preço')}</Text></Pressable>
-              : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '600'}}>{isMercadoLivreUrl(s.url) ? 'Consultar no servidor →' : 'Ver a página e ler daqui →'}</Text></Pressable>
+              : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '600'}}>{isMercadoLivreUrl(s.url) ? 'Consultar no servidor' : 'Ver a página e ler daqui'}</Text></Pressable>
               : <Text style={{fontSize: 12, color: c.muted}}>{s.last ? 'lido ' + since(s.last.at) : 'ainda não lido'}{st && st.cheapestShare !== null && stores.length > 1 ? ' · mais barata ' + Math.round(st.cheapestShare * 100) + '% do tempo' : ''}</Text>}
           </View>
           <View style={{alignItems: 'flex-end', gap: 3}}>

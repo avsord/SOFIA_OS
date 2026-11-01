@@ -22,7 +22,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
+import {AppFrame, NavTabs, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 /* ---------- tipos (modelos com blocos liga/desliga) ---------- */
 export type TypeDef = {id: string; name: string; one: string; icon: IconName; statuses: string[]; rating: boolean; fields: string[]; kind: string; e: Entity | null; area?: LibraryArea; builtin?: string; position: number; pinned: boolean; inMore: boolean};
@@ -284,17 +284,18 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const kbd = (k: string) => <Text style={{color: c.muted, fontSize: 11, borderWidth: 1, borderColor: c.line, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1}}>{k}</Text>;
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
-      <AppFrame sidebar={sidebar} mobileNav={mobileNav}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: desktop ? 40 : 16, paddingTop: desktop ? 28 : 6, paddingBottom: 60, gap: 12}}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', maxWidth: 1160} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1, gap: 4}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 24 : 20, fontWeight: '700'}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -0.5 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
               {desktop ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap'}}>{kbd('N')}<Text style={{color: c.muted, fontSize: 12}}>adicionar</Text><Text> </Text>{kbd('Ctrl')}<Text style={{color: c.muted, fontSize: 12}}>+</Text>{kbd('V')}<Text style={{color: c.muted, fontSize: 12}}>colar link ou print</Text><Text style={{color: c.muted, fontSize: 12, marginLeft: 8}}>Arraste arquivos em qualquer lugar</Text></View> : <Text style={{color: c.muted, fontSize: 13}}>{shown.length} {shown.length === 1 ? 'item' : 'itens'}</Text>}
             </View>
             {curType && !curType.area ? <GhostButton icon="edit" label={desktop ? 'Editar tipo' : undefined} onPress={() => setTypeDialog({edit: curType})} /> : null}
             <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} />
           </View>
+          {desktop ? <NavTabs nav={mobileNav} /> : null}
           <View style={{flexDirection: 'row', gap: 10}}>
             <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View>
             {/* botao de filtro neutro quando nao ha filtro ativo */}

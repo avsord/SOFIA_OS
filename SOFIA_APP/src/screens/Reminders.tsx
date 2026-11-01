@@ -1,3 +1,4 @@
+import {useDesktop} from '../lib/desktop';
 import React,{useEffect,useMemo,useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
 import {PALETTE} from '../lib/palette';
@@ -40,7 +41,7 @@ function field(c:any,label:string,value:string,onChange:(v:string)=>void,multili
  return <View style={{gap:6}}><Text style={{color:c.muted,fontSize:12}}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} multiline={multiline} placeholder={placeholder} placeholderTextColor={c.muted} style={[forms.input,{color:c.text,backgroundColor:c.input,borderColor:c.line,minHeight:multiline?88:48,textAlignVertical:multiline?'top':'center'}]}/></View>;
 }
 
-export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBack:()=>void}){
+export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBack:()=>void}){const desk=useDesktop();
  const c=useTheme(),records=useWorkspaceRecords(api,'reminder','',true),[editing,setEditing]=useState<Partial<Entity>|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{if(active)void records.load();else setEditing(null);},[active,api]);
  const groups=useMemo(()=>splitReminders(records.items),[records.items]);
@@ -65,7 +66,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  </Pressable>;
  const section=(title:string,list:Entity[],late=false,done=false)=>list.length?<View style={{gap:10}}><Text style={{color:c.muted,fontSize:12,fontWeight:'600',paddingHorizontal:6}}>{title}</Text>{list.map(i=>row(i,late,done))}</View>:null;
  return <View style={{flex:1}}>
-  <ScreenTitle title="Lembretes" eyebrow="AVISOS · NA HORA CERTA" right={<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Novo lembrete" onPress={()=>open()}/></View>}/>
+  <ScreenTitle title="Lembretes" right={<View style={{flexDirection:'row'}}>{desk?null:<IconButton name="back" label="Voltar aos apps" onPress={onBack}/>}<IconButton name="plus" label="Novo lembrete" onPress={()=>open()}/></View>}/>
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}
   <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:18}}>
    {section('Atrasados',groups.late,true)}

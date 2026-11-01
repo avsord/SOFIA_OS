@@ -14,7 +14,8 @@ import {useValuesHidden} from '../../lib/values-mask';
 import {Icon, type IconName} from '../../components/Icon';
 import {Presence} from '../../components/Presence';
 import {contextMenu} from '../../components/ContextMenu';
-import {Chip, Dialog, GhostButton, PrimaryButton, SideItem, fold, useToast} from '../../components/AppKit';
+import {Chip, Dialog, GhostButton, PrimaryButton, fold, useToast} from '../../components/AppKit';
+import {DeskTabs} from '../../components/UI';
 import {EXPENSE_CATEGORIES, INCOME_CATEGORIES, addDays, addMonths, balanceAsOf, budgetProgress, categoryOf, cycleRange, dayIn, daysIn, effectiveCycleDay, expandRecurring, installmentPlan, invoiceForMonth, invoiceMonth, manualDues, monthControl, monthLabel, monthOf, moneySplit, reserveFor, reserveHistory, simpleForecast, todayISO, totalBalance, type Account, type Card, type Tx} from '../../lib/finance';
 import {money} from '../../lib/monitoring';
 import {saveEntity, uid, type Data, type Refund} from './core';
@@ -270,16 +271,10 @@ export function FinanceDesk(p: Props) {
     </View>;
   }
   return <View testID="finance-desk" style={{flex: 1, flexDirection: 'row', backgroundColor: c.bg}}>
-    <View style={{width: 236, borderRightWidth: 1, borderColor: c.line, backgroundColor: c.surface, paddingVertical: 14, paddingHorizontal: 10, gap: 2}}>
-      <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + (p.account?.name || '') + '. Trocar'} onPress={p.onPickAccount} style={{flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: 10, borderRadius: 11, borderWidth: 1, borderColor: c.line}}><View style={{width: 9, height: 9, borderRadius: 5, backgroundColor: p.account?.color || c.accent}} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{p.account?.name || 'Conta'}</Text><Icon name="chevron" size={12} color={c.muted} /></Pressable>
-      {NAV.map(([k, l, ic]) => <SideItem key={k} testID={'fin-nav-' + k} icon={ic} label={l} selected={view === k} onPress={() => setView(k)} count={k === 'bills' ? manualDues(d.txs, accountId, today, 3).filter(x => !x.paid).length || undefined : k === 'refunds' ? refunds.length || undefined : undefined} />)}
-      <View style={{height: 1, backgroundColor: c.line, marginVertical: 8, marginHorizontal: 6}} />
-      {NAV2.map(([k, l, ic]) => <SideItem key={k} testID={'fin-nav-' + k} icon={ic} label={l} selected={view === k} onPress={() => setView(k)} />)}
-    </View>
     <View style={{flex: 1, minWidth: 0}}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 28, gap: 18, maxWidth: 1240}}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingLeft: '40px', paddingRight: '40px', paddingTop: '32px', paddingBottom: 40, gap: 18, maxWidth: 1240} as any}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-          <Text style={{flex: 1, color: c.text, fontSize: 24, fontWeight: '700'}}>{view === 'home' ? 'Finanças' : [...NAV, ...NAV2].find(x => x[0] === view)?.[1]}</Text>
+          <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -0.5}}>Finanças</Text><Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + (p.account?.name || '') + '. Trocar'} onPress={p.onPickAccount} style={{flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start'}}><View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: p.account?.color || c.accent}} /><Text style={{color: c.muted, fontSize: 14}}>{p.account?.name || 'Conta'} · {monthLabel(month)}</Text><View style={{transform: [{rotate: '90deg'}]}}><Icon name="chevron" size={11} color={c.muted} /></View></Pressable></View>
           {month !== curMonth ? <Pressable accessibilityRole="link" onPress={() => setMonth(curMonth)}><Text style={{color: c.accent, fontSize: 13}}>Voltar para {monthLabel(curMonth).split(' ')[0]}</Text></Pressable> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Pressable testID="fin-month-prev" accessibilityRole="button" accessibilityLabel="Mês anterior" onPress={() => setMonth(addMonths(month, -1))} style={{padding: 9, transform: [{rotate: '180deg'}]}}><Icon name="chevron" size={15} color={c.text} /></Pressable>
@@ -289,6 +284,7 @@ export function FinanceDesk(p: Props) {
           <Pressable accessibilityRole="button" accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(!hide)} style={{padding: 9, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name={hide ? 'eyeOff' : 'eye'} size={16} color={c.text} /></Pressable>
           <PrimaryButton icon="plus" label="Conta a pagar" onPress={() => p.onNewBill('expense')} />
         </View>
+        <DeskTabs value={view} onChange={setView} options={[...NAV, ...NAV2].map(([k, l]) => ({value: k, label: l, count: k === 'bills' ? manualDues(d.txs, accountId, today, 3).filter(x => !x.paid).length || '' : k === 'refunds' ? refunds.length || '' : ''}))} />
         {body}
       </ScrollView>
     </View>
