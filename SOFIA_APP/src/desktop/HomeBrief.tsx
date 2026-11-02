@@ -523,16 +523,26 @@ function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; 
     </Pressable>)}</ScrollView> : <Quiet text="Nada marcado" sub="Nenhum compromisso pela frente neste mês." />}
   </View>;
 }
+/** 0.3.322 (Pedro): troca suave do item mostrado - sai descendo um pouco e apagando (160 ms), entra subindo (260 ms). */
+function useSwap(): [Animated.Value, (change: () => void) => void, any] {
+  const v = useRef(new Animated.Value(1)).current;
+  const swap = (change: () => void) => Animated.timing(v, {toValue: 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: false}).start(() => {change(); Animated.timing(v, {toValue: 1, duration: 260, easing: Easing.bezier(0.22, 0.8, 0.24, 1), useNativeDriver: false}).start();});
+  return [v, swap, {opacity: v, transform: [{translateY: v.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]}];
+}
 function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; open: Task[]; onOpen: () => void; onDone: (t: Task) => Promise<boolean | void> | void}) {
-  const imp = open.filter(isImportant), first = imp[0] || open[0], [conf, setConf, busy, setBusy] = useConfirm();
-  const finish = async (t: Task) => {if (busy) return; setBusy(true); setConf(null); let ok: boolean | void = undefined; try {ok = await onDone(t);} catch {ok = false;} setBusy(false);
+  const imp0 = open.filter(isImportant), [, swap, swapStyle] = useSwap(), [held, setHeld] = useState<Task[] | null>(null);
+  // segura a lista na tela enquanto grava; quando termina, troca para a nova com a animacao (sem pulo seco)
+  const shown = held || open, imp = held ? held.filter(isImportant) : imp0, first = imp[0] || shown[0], [conf, setConf, busy, setBusy] = useConfirm();
+  const finish = async (t: Task) => {if (busy) return; setBusy(true); setConf(null); setHeld(open); let ok: boolean | void = undefined; try {ok = await onDone(t);} catch {ok = false;} setBusy(false); swap(() => setHeld(null));
     if (ok === false) setConf({ok: false, text: 'Não deu para concluir.', retry: () => void finish(t)}); else setConf({ok: true, text: t.title + ' concluída', undo: () => onDone({...t, state: 'done'})});};
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     {imp.length ? <Dot reason={imp.length === 1 ? '1 tarefa importante em aberto' : imp.length + ' tarefas importantes em aberto'} /> : null}
     <TileHead icon="checklist" color="#F5A0AE" name="Tarefas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      <Big value={String(imp.length || open.length)} unit={imp.length ? (imp.length === 1 ? 'importante' : 'importantes') : 'em aberto'} />
-      <Line text={(imp.length ? 'Comece por ' : '') + first.title} />
+      <Animated.View style={[{gap: 4}, swapStyle]}>
+        <Big value={String(imp.length || shown.length)} unit={imp.length ? (imp.length === 1 ? 'importante' : 'importantes') : 'em aberto'} />
+        <Line text={(imp.length ? 'Comece por ' : '') + first.title} />
+      </Animated.View>
       {conf ? <ConfirmRow conf={conf} onClear={() => setConf(null)} /> : <Act label={busy ? 'Concluindo…' : 'Concluir'} busy={busy} onPress={() => void finish(first)} />}
     </View> : <Quiet text="Tudo feito" sub="Nenhuma tarefa em aberto." />}
   </View>;
@@ -552,11 +562,14 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   const gi = gid ? Math.max(0, groups.findIndex(x => x.id === gid)) : auto, g = groups[gi];
   const list = g?.doses || [], firstOpen = Math.max(0, list.findIndex(d => !d.taken)), cur = list[k >= 0 && k < list.length ? k : firstOpen];
   const pickGroup = (n: number) => {const ng = groups[(n + groups.length) % groups.length]; if (ng) {setGid(ng.id); setK(-1);} setMenu(false);};
-  const wheel = useWheelStep(d => list.length > 1 && setK(o => ((o >= 0 ? o : firstOpen) + d + list.length) % list.length), list.length > 1);
+  const [, swap, swapStyle] = useSwap(), curIdx = cur ? list.indexOf(cur) : -1;
+  const wheel = useWheelStep(d => list.length > 1 && swap(() => setK(((curIdx >= 0 ? curIdx : firstOpen) + d + list.length) % list.length)), list.length > 1);
   const done = list.filter(d => d.taken).length, late = doses.some(d => !d.taken && d.date.getTime() < Date.now());
   const curLate = !!cur && !cur.taken && cur.date.getTime() < Date.now(), [conf, setConf, busy, setBusy] = useConfirm();
-  const takeIt = async (d: NonNullable<typeof cur>) => {if (busy) return; setBusy(true); setConf(null);
-    try {await s.take(d.plan.id, d.day, d.time); setConf({ok: true, text: d.plan.title + ' feito às ' + hhmm(new Date()), undo: () => s.take(d.plan.id, d.day, d.time, false).catch(() => undefined)});}
+  // 0.3.322 (Pedro): depois do Tomei o Inicio ja passa para o proximo que falta (na ordem do dia), com a troca suave
+  const takeIt = async (d: NonNullable<typeof cur>) => {if (busy) return; setBusy(true); setConf(null); const at = list.indexOf(d); setK(at);
+    const nextOpen = [...list.slice(at + 1), ...list.slice(0, at)].find(x => !x.taken && x !== d), ni = nextOpen ? list.indexOf(nextOpen) : -1;
+    try {await s.take(d.plan.id, d.day, d.time); if (ni >= 0) swap(() => setK(ni)); setConf({ok: true, text: d.plan.title + ' feito às ' + hhmm(new Date()), undo: () => s.take(d.plan.id, d.day, d.time, false).catch(() => undefined)});}
     catch {setConf({ok: false, text: 'Não deu para marcar.', retry: () => void takeIt(d)});} finally {setBusy(false);}};
   return <View ref={wheel} style={[card, {gap: 6, overflow: 'visible', paddingVertical: 16, zIndex: menu ? 30 : 0}, style]}>
     {late && groups.length < 2 ? <Dot reason={(() => {const d = doses.find(x => !x.taken && x.date.getTime() < Date.now()); return d ? d.plan.title + ' passou da hora (' + hhmm(d.date) + ')' : 'Algo da rotina passou da hora';})()} /> : null}
@@ -577,8 +590,10 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
       </View> : null}
     </View> : null}
     {cur ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      <Big value={String(done)} unit={'de ' + list.length + ' hoje'} />
-      <Line text={cur.taken ? cur.plan.title + ' · feito às ' + hhmm(cur.date) : curLate ? cur.plan.title + ' passou da hora (' + hhmm(cur.date) + ')' : (k < 0 ? 'Próximo: ' : '') + cur.plan.title + ' às ' + hhmm(cur.date)} />
+      <Animated.View style={[{gap: 4}, swapStyle]}>
+        <Big value={String(done)} unit={'de ' + list.length + ' hoje'} />
+        <Line text={cur.taken ? cur.plan.title + ' · feito às ' + hhmm(cur.date) : curLate ? cur.plan.title + ' passou da hora (' + hhmm(cur.date) + ')' : (curIdx === firstOpen ? 'Próximo: ' : '') + cur.plan.title + ' às ' + hhmm(cur.date)} />
+      </Animated.View>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         {conf ? <ConfirmRow conf={conf} onClear={() => setConf(null)} /> : !cur.taken ? <Act label={busy ? 'Marcando…' : 'Tomei'} busy={busy} onPress={() => void takeIt(cur)} /> : <View style={{height: 28, marginTop: 8, justifyContent: 'center'}}><Text style={{fontSize: 12, color: g.color, fontWeight: '600'}}>✓ Feito</Text></View>}
         {list.length > 1 ? <View style={{marginTop: 8, flexDirection: 'row', gap: 4}}>{list.map((d, n) => <View key={d.key} style={{width: d === cur ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: d === cur ? g.color : d.taken ? tint(g.color, 0.5) : c.line}} />)}</View> : null}
