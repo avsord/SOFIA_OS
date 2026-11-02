@@ -32,7 +32,7 @@ const timed = (r: DayRecord) => {if (/^\d{4}-\d{2}-\d{2}$/.test(r.date) || (r.or
 
 export type HomeBriefProps = {
   data: HomeBriefData; today: DayRecord[]; all: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null; goal: GoalNumbers | null; masked: boolean; onToggleMask?: () => void;
-  onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onOpenTask?: (id: string) => void; onToggleTask: (t: Task) => void;
+  onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onOpenTask?: (id: string) => void; onToggleTask: (t: Task) => Promise<boolean | void> | void;
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
   onMarkAction?: (m: TimeMark) => void;
@@ -316,8 +316,9 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   for (const p of points) {const r = fits(p.x * (w || 1)); if (r >= 0) place[p.key] = r;}
   for (const p of mpoints) if (p.marks[0].kind !== 'routine') {const r = fits(p.x * (w || 1)); if (r >= 0) place[p.key] = r;}
   const shown = all.find(p => p.key === (pin || hover));
-  const tagOf = (p: Point) => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
-    return {text: hhmm(new Date(r.date)) + ' ' + (p.recs.length > 1 ? p.recs.length + ' itens' : r.title), color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
+  const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
+    // 0.3.321 (revisao - Reconhecer): bolinha com varios itens mostra o primeiro e quantos mais ("09:00 Cafe +3"), nao so "4 itens"
+    return {text: hhmm(new Date(r.date)) + ' ' + r.title, more: p.recs.length - 1, color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
   // 0.3.318 (Pedro): o "agora" fica na altura da linha, colado na borda para onde ele leva ("‹ agora" na esquerda,
   // "agora ›" na direita); a linha encolhe daquele lado (deslizando) para o botao nao cobrir a marca da ponta
   // 0.3.319: o espaco do botao abre e fecha JUNTO com o movimento da linha (sai da distancia ate 07:00), sem transicao
@@ -365,7 +366,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
         </Pressable>;
       })}
       {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] ?? p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
-        <Text numberOfLines={1} style={{fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>
+        <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}><Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text style={{fontSize: 12, fontWeight: '700', color: t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}</View>
       </View>;})())}
     </View>
     {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
@@ -471,14 +472,43 @@ function Big({value, unit}: {value: string; unit?: string}) {
   return <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}{unit ? <Text style={{fontSize: 13, fontWeight: '400', letterSpacing: 0, color: c.muted}}>  {unit}</Text> : null}</Text>;
 }
 function Line({text}: {text: string}) {const c = useTheme(); return <Text numberOfLines={1} style={{fontSize: 12, color: c.text, opacity: 0.85}}>{text}</Text>;}
-function Act({label, onPress}: {label: string; onPress: () => void}) {
+/** 0.3.321 (revisao com as skills - Confirmar/Recuperar): Concluir e Tomei mostram que estao gravando, confirmam o que
+ * mudou ("Devolver oficial farma concluida") com Desfazer por alguns segundos e, se falhar, dizem e oferecem tentar de novo.
+ * Antes o item so sumia e dava lugar ao proximo - sem confirmacao e sem volta pelo Inicio. */
+type Confirm = {ok: boolean; text: string; undo?: () => Promise<unknown> | void; retry?: () => void} | null;
+function useConfirm(): [Confirm, (v: Confirm) => void, boolean, (v: boolean) => void] {
+  const [conf, setConf] = useState<Confirm>(null), [busy, setBusy] = useState(false), t = useRef<any>(null);
+  useEffect(() => () => clearTimeout(t.current), []);
+  return [conf, (v: Confirm) => {clearTimeout(t.current); setConf(v); if (v) t.current = setTimeout(() => setConf(null), v.ok ? 6000 : 9000);}, busy, setBusy];
+}
+function ConfirmRow({conf, onClear}: {conf: NonNullable<Confirm>; onClear: () => void}) {
+  const c = useTheme(), [undoing, setUndoing] = useState(false);
+  const link = (label: string, f: () => void) => <Pressable accessibilityRole="button" disabled={undoing} onPress={f} hitSlop={8} style={({hovered, pressed}: any) => ({height: 26, paddingHorizontal: 9, borderRadius: 8, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{scale: pressed ? 0.97 : 1}], opacity: undoing ? 0.5 : 1})}><Text style={{fontSize: 12, fontWeight: '600', color: conf.ok ? c.accent : c.danger}}>{label}</Text></Pressable>;
+  return <View accessibilityLiveRegion="polite" style={{marginTop: 8, height: 28, flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0}}>
+    <Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: conf.ok ? c.muted : c.danger}}>{conf.ok ? '✓ ' : ''}{conf.text}</Text>
+    {conf.ok && conf.undo ? link(undoing ? 'Desfazendo…' : 'Desfazer', () => {setUndoing(true); void Promise.resolve(conf.undo!()).finally(() => {setUndoing(false); onClear();});}) : null}
+    {!conf.ok && conf.retry ? link('Tentar de novo', () => {onClear(); conf.retry!();}) : null}
+  </View>;
+}
+function Act({label, onPress, busy}: {label: string; onPress: () => void; busy?: boolean}) {
   const c = useTheme();
-  return <Pressable accessibilityRole="button" onPress={onPress} hitSlop={6} style={({hovered, pressed}: any) => ({alignSelf: 'flex-start', marginTop: 8, height: 28, paddingHorizontal: 11, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
+  return <Pressable accessibilityRole="button" accessibilityState={{busy: !!busy, disabled: !!busy}} disabled={busy} onPress={onPress} hitSlop={6} style={({hovered, pressed}: any) => ({opacity: busy ? 0.6 : 1, alignSelf: 'flex-start', marginTop: 8, height: 28, paddingHorizontal: 11, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
     <Text style={{fontSize: 12, fontWeight: '600', color: c.accent}}>{label}</Text>
   </Pressable>;
 }
 function Quiet({text, sub}: {text: string; sub: string}) {const c = useTheme(); return <View style={{marginTop: 'auto', gap: 4} as any}><Text style={{fontSize: 14, color: c.muted, fontWeight: '500'}}>{text}</Text><Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{sub}</Text></View>;}
-const Dot = () => {const c = useTheme(); return <View style={{position: 'absolute', top: 18, right: 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} />;};
+/** 0.3.321 (Pedro): a bolinha vermelha diz o motivo ao passar o mouse (antes aparecia sem explicacao). */
+function Dot({reason}: {reason: string}) {
+  const c = useTheme(), [on, setOn] = useState(false);
+  return <View style={{position: 'absolute', top: 8, right: 8, zIndex: 6}}>
+    <Pressable accessibilityRole="text" accessibilityLabel={reason} onHoverIn={() => setOn(true)} onHoverOut={() => setOn(false)} onPress={() => setOn(v => !v)} style={{width: 28, height: 28, alignItems: 'center', justifyContent: 'center', cursor: 'help'} as any}>
+      <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', on ? 0.3 : 0.15)} as any} />
+    </Pressable>
+    {on ? <View pointerEvents="none" style={{position: 'absolute', top: 2, right: 30, maxWidth: 240, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 10px 24px rgba(0,0,0,0.45)'} as any}>
+      <Text style={{fontSize: 12, color: c.text, whiteSpace: 'nowrap'} as any}>{reason}</Text>
+    </View> : null}
+  </View>;
+}
 
 /** 0.3.310: a ultima linha da Agenda some aos poucos em vez de aparecer cortada no meio (mostra que tem mais rolando). */
 const FADE_END = {maskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)'};
@@ -493,15 +523,17 @@ function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; 
     </Pressable>)}</ScrollView> : <Quiet text="Nada marcado" sub="Nenhum compromisso pela frente neste mês." />}
   </View>;
 }
-function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; open: Task[]; onOpen: () => void; onDone: (t: Task) => void}) {
-  const imp = open.filter(isImportant), first = imp[0] || open[0];
+function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; open: Task[]; onOpen: () => void; onDone: (t: Task) => Promise<boolean | void> | void}) {
+  const imp = open.filter(isImportant), first = imp[0] || open[0], [conf, setConf, busy, setBusy] = useConfirm();
+  const finish = async (t: Task) => {if (busy) return; setBusy(true); setConf(null); let ok: boolean | void = undefined; try {ok = await onDone(t);} catch {ok = false;} setBusy(false);
+    if (ok === false) setConf({ok: false, text: 'Não deu para concluir.', retry: () => void finish(t)}); else setConf({ok: true, text: t.title + ' concluída', undo: () => onDone({...t, state: 'done'})});};
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {imp.length ? <Dot /> : null}
+    {imp.length ? <Dot reason={imp.length === 1 ? '1 tarefa importante em aberto' : imp.length + ' tarefas importantes em aberto'} /> : null}
     <TileHead icon="checklist" color="#F5A0AE" name="Tarefas" onOpen={onOpen} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
       <Big value={String(imp.length || open.length)} unit={imp.length ? (imp.length === 1 ? 'importante' : 'importantes') : 'em aberto'} />
       <Line text={(imp.length ? 'Comece por ' : '') + first.title} />
-      <Act label="Concluir" onPress={() => onDone(first)} />
+      {conf ? <ConfirmRow conf={conf} onClear={() => setConf(null)} /> : <Act label={busy ? 'Concluindo…' : 'Concluir'} busy={busy} onPress={() => void finish(first)} />}
     </View> : <Quiet text="Tudo feito" sub="Nenhuma tarefa em aberto." />}
   </View>;
 }
@@ -522,14 +554,18 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   const pickGroup = (n: number) => {const ng = groups[(n + groups.length) % groups.length]; if (ng) {setGid(ng.id); setK(-1);} setMenu(false);};
   const wheel = useWheelStep(d => list.length > 1 && setK(o => ((o >= 0 ? o : firstOpen) + d + list.length) % list.length), list.length > 1);
   const done = list.filter(d => d.taken).length, late = doses.some(d => !d.taken && d.date.getTime() < Date.now());
-  const curLate = !!cur && !cur.taken && cur.date.getTime() < Date.now();
+  const curLate = !!cur && !cur.taken && cur.date.getTime() < Date.now(), [conf, setConf, busy, setBusy] = useConfirm();
+  const takeIt = async (d: NonNullable<typeof cur>) => {if (busy) return; setBusy(true); setConf(null);
+    try {await s.take(d.plan.id, d.day, d.time); setConf({ok: true, text: d.plan.title + ' feito às ' + hhmm(new Date()), undo: () => s.take(d.plan.id, d.day, d.time, false).catch(() => undefined)});}
+    catch {setConf({ok: false, text: 'Não deu para marcar.', retry: () => void takeIt(d)});} finally {setBusy(false);}};
   return <View ref={wheel} style={[card, {gap: 6, overflow: 'visible', paddingVertical: 16, zIndex: menu ? 30 : 0}, style]}>
-    {late && groups.length < 2 ? <Dot /> : null}
+    {late && groups.length < 2 ? <Dot reason={(() => {const d = doses.find(x => !x.taken && x.date.getTime() < Date.now()); return d ? d.plan.title + ' passou da hora (' + hhmm(d.date) + ')' : 'Algo da rotina passou da hora';})()} /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
     {g && groups.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 5}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Grupo anterior" hitSlop={7} onPress={() => pickGroup(gi - 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
       <Pressable testID="rotina-group" accessibilityRole="button" accessibilityLabel={'Grupo da Rotina: ' + g.name + '. Escolher outro'} onPress={() => setMenu(v => !v)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint(g.color, hovered || menu ? 0.22 : 0.12)})}>
         <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: g.color}} /><Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: g.color, maxWidth: 110}}>{g.name}</Text><Text style={{fontSize: 10, color: g.color}}>▾</Text>
+        {late ? <View accessibilityLabel="Tem item da rotina que passou da hora (veja na lista)" style={{width: 6, height: 6, borderRadius: 3, backgroundColor: c.danger, marginLeft: 1}} /> : null}
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Próximo grupo" hitSlop={7} onPress={() => pickGroup(gi + 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
       {menu ? <View style={{position: 'absolute', top: 32, right: 24, minWidth: 180, paddingVertical: 6, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
@@ -544,7 +580,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
       <Big value={String(done)} unit={'de ' + list.length + ' hoje'} />
       <Line text={cur.taken ? cur.plan.title + ' · feito às ' + hhmm(cur.date) : curLate ? cur.plan.title + ' passou da hora (' + hhmm(cur.date) + ')' : (k < 0 ? 'Próximo: ' : '') + cur.plan.title + ' às ' + hhmm(cur.date)} />
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-        {!cur.taken ? <Act label="Tomei" onPress={() => void s.take(cur.plan.id, cur.day, cur.time).catch(() => undefined)} /> : <View style={{height: 28, marginTop: 8, justifyContent: 'center'}}><Text style={{fontSize: 12, color: g.color, fontWeight: '600'}}>✓ Feito</Text></View>}
+        {conf ? <ConfirmRow conf={conf} onClear={() => setConf(null)} /> : !cur.taken ? <Act label={busy ? 'Marcando…' : 'Tomei'} busy={busy} onPress={() => void takeIt(cur)} /> : <View style={{height: 28, marginTop: 8, justifyContent: 'center'}}><Text style={{fontSize: 12, color: g.color, fontWeight: '600'}}>✓ Feito</Text></View>}
         {list.length > 1 ? <View style={{marginTop: 8, flexDirection: 'row', gap: 4}}>{list.map((d, n) => <View key={d.key} style={{width: d === cur ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: d === cur ? g.color : d.taken ? tint(g.color, 0.5) : c.line}} />)}</View> : null}
       </View>
     </View> : <Quiet text="Nada hoje" sub="Nenhum item da rotina para hoje." />}
@@ -635,7 +671,7 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
   const wheel = useWheelStep(d => list.length > 1 && go((i + d + list.length) % list.length), list.length > 1);
   const cur = list[i % Math.max(1, list.length)], today = list.filter(isOut).length;
   return <View ref={wheel} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {list.some(p => p.needs === 'fee' || p.needs === 'pickup') && list.length < 2 ? <Dot /> : null}
+    {list.some(p => p.needs === 'fee' || p.needs === 'pickup') && list.length < 2 ? <Dot reason={list.find(p => p.needs === 'fee') ? 'Encomenda com taxa para pagar' : 'Encomenda esperando retirada'} /> : null}
     <TileHead icon="box" color="#E8B04A" name="Encomendas" onOpen={onOpen} />
     <Pager i={i} n={list.length} onGo={go} what="Encomenda" />
     {cur ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
