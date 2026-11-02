@@ -2,7 +2,7 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Animated, Easing, Pressable, ScrollView, Text, View, useWindowDimensions} from 'react-native';
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
@@ -36,7 +36,7 @@ export type HomeBriefProps = {
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
   onMarkAction?: (m: TimeMark) => void;
-  onMove?: (t: MoveTarget, to: Date) => void;
+  onMove?: (moves: Move[]) => void;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -80,10 +80,11 @@ function useRowHeight(_root: React.RefObject<View | null>, _briefH: number) {
 
 /** 0.3.313 (Pedro): engrenagem do Seu dia - o que aparece na linha do tempo (por area e item por item na Rotina e em
  * Financas) e a opacidade das marcas. Guardado neste navegador. */
-type TimelineSettings = {cats: Record<string, boolean>; items: Record<string, boolean>; opacity: number};
+/** 0.3.318 (Pedro): opacidade por item (e por grupo, para quem nao tem item proprio), nao uma so para tudo. */
+type TimelineSettings = {cats: Record<string, boolean>; items: Record<string, boolean>; opacity: number; op: Record<string, number>};
 const TL_KEY = 'sofia.timeline.v1';
 function useTimelineSettings(): [TimelineSettings, (s: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void] {
-  const [s, set] = useState<TimelineSettings>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(TL_KEY) || 'null'); if (v && v.cats) return {cats: v.cats || {}, items: v.items || {}, opacity: Number(v.opacity) || 1};} catch {} return {cats: {}, items: {}, opacity: 1};});
+  const [s, set] = useState<TimelineSettings>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(TL_KEY) || 'null'); if (v && v.cats) return {cats: v.cats || {}, items: v.items || {}, opacity: 1, op: v.op || {}};} catch {} return {cats: {}, items: {}, opacity: 1, op: {}};});
   return [s, (f: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => set(old => {const v = typeof f === 'function' ? f(old) : f; try {globalThis.localStorage?.setItem(TL_KEY, JSON.stringify(v));} catch {} return v;})];
 }
 const TL_CATS: {id: string; label: string; color: string}[] = [{id: 'events', label: 'Compromissos', color: '#8fb4ff'}, {id: 'tasks', label: 'Tarefas', color: '#F5A0AE'}, {id: 'reminders', label: 'Lembretes', color: '#7FD1E8'}, {id: 'bill', label: 'Contas a pagar', color: '#E8B04A'}, {id: 'income', label: 'Receitas', color: '#7ED6A5'}, {id: 'invoice', label: 'Faturas do cartão', color: '#B49AE6'}, {id: 'package', label: 'Encomendas', color: '#F0956A'}, {id: 'routine', label: 'Rotina', color: '#5FD3C6'}];
@@ -93,9 +94,18 @@ function Switch({on, onChange, label}: {on: boolean; onChange: (v: boolean) => v
     <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', transform: [{translateX: on ? 14 : 0}]}} />
   </Pressable>;
 }
+function OpChip({label, v, on, onPress}: {label: string; v: number; on: boolean; onPress: () => void}) {
+  const c = useTheme();
+  return <Pressable accessibilityRole="button" accessibilityLabel={'Opacidade de ' + label + ': ' + Math.round(v * 100) + '%. Tocar para mudar'} onPress={onPress} disabled={!on}
+    style={({hovered}: any) => ({width: 46, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center', opacity: on ? 1 : 0.4, backgroundColor: hovered && on ? c.input : 'transparent', borderWidth: 1, borderColor: c.line})}>
+    <Text style={{fontSize: 11, color: v < 1 ? c.accent : c.muted, fontVariant: ['tabular-nums'], fontWeight: v < 1 ? '600' : '400'}}>{Math.round(v * 100)}%</Text>
+  </Pressable>;
+}
 function TimelineSettingsPanel({s, set, plans, bills, incomes, onClose}: {s: TimelineSettings; set: (v: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void; plans: {id: string; title: string; type: string; color?: string}[]; bills: string[]; incomes: string[]; onClose: () => void}) {
   const c = useTheme(), [open, setOpen] = useState('');
   const cat = (id: string) => s.cats[id] !== false, item = (k: string) => s.items[k] !== false;
+  // opacidade: cada toque passa 100 -> 80 -> 60 -> 40 -> 100
+  const setOp = (k: string, base = 1) => set(o => {const cur = o.op[k] ?? base, nx = cur > 0.9 ? 0.8 : cur > 0.7 ? 0.6 : cur > 0.5 ? 0.4 : 1; return {...o, op: {...o.op, [k]: nx}};});
   const setCat = (id: string, v: boolean) => set(o => ({...o, cats: {...o.cats, [id]: v}})), setItem = (k: string, v: boolean) => set(o => ({...o, items: {...o.items, [k]: v}}));
   const sub = (id: string) => id === 'routine' ? plans.map(p => ({k: 'routine:' + p.id, label: p.title, color: p.color || routineColor(p.type)})) : id === 'bill' ? bills.map(t => ({k: 'fin:' + t, label: t, color: '#E8B04A'})) : id === 'income' ? incomes.map(t => ({k: 'fin:' + t, label: t, color: '#7ED6A5'})) : [];
   return <View style={{position: 'absolute', top: 52, right: 16, width: 340, maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
@@ -104,7 +114,7 @@ function TimelineSettingsPanel({s, set, plans, bills, incomes, onClose}: {s: Tim
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={15} color={c.muted} /></Pressable>
     </View>
     <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight: 400}} contentContainerStyle={{paddingHorizontal: 16, paddingBottom: 16, gap: 2}}>
-      <Text style={{fontSize: 12, color: c.muted, marginBottom: 6}}>O que aparece na linha do tempo do Início. Não muda avisos nem os apps.</Text>
+      <Text style={{fontSize: 12, color: c.muted, marginBottom: 6}}>O que aparece na linha do tempo do Início e com que força (toque na porcentagem). Não muda avisos nem os apps.</Text>
       {TL_CATS.map(k => {const items = sub(k.id); return <View key={k.id}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, height: 38}}>
           <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: k.color}} />
@@ -112,20 +122,18 @@ function TimelineSettingsPanel({s, set, plans, bills, incomes, onClose}: {s: Tim
             <Text style={{fontSize: 13, color: c.text}}>{k.label}</Text>
             {items.length ? <Text style={{fontSize: 12, color: c.muted}}>{open === k.id ? '▴' : '▾'} {items.filter(i => item(i.k)).length}/{items.length}</Text> : null}
           </Pressable>
+          <OpChip label={k.label} v={s.op[k.id] ?? 1} on={cat(k.id)} onPress={() => setOp(k.id)} />
           <Switch label={k.label} on={cat(k.id)} onChange={v => setCat(k.id, v)} />
         </View>
         {open === k.id && items.length ? <View style={{marginLeft: 18, paddingLeft: 10, borderLeftWidth: 1, borderColor: c.line, opacity: cat(k.id) ? 1 : 0.45}}>
           {items.map(i => <View key={i.k} style={{flexDirection: 'row', alignItems: 'center', gap: 8, height: 32}}>
             <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: i.color}} />
             <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{i.label}</Text>
+            <OpChip label={i.label} v={s.op[i.k] ?? s.op[k.id] ?? 1} on={item(i.k) && cat(k.id)} onPress={() => setOp(i.k, s.op[k.id] ?? 1)} />
             <Switch label={i.label} on={item(i.k)} onChange={v => setItem(i.k, v)} />
           </View>)}
         </View> : null}
       </View>;})}
-      <View style={{height: 1, backgroundColor: c.line, marginVertical: 10}} />
-      <Text style={{fontSize: 13, color: c.text, marginBottom: 8}}>Opacidade das marcas</Text>
-      <View style={{flexDirection: 'row', gap: 6}}>{[0.4, 0.6, 0.8, 1].map(o => <Pressable key={o} accessibilityRole="button" accessibilityState={{selected: s.opacity === o}} onPress={() => set(old => ({...old, opacity: o}))} style={({hovered}: any) => ({flex: 1, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: s.opacity === o ? c.accentSoft : hovered ? c.input : 'transparent', borderWidth: 1, borderColor: s.opacity === o ? c.accent : c.line})}>
-        <Text style={{fontSize: 12, color: s.opacity === o ? c.accent : c.text, fontWeight: s.opacity === o ? '600' : '400'}}>{Math.round(o * 100)}%</Text></Pressable>)}</View>
     </ScrollView>
   </View>;
 }
@@ -139,6 +147,14 @@ export function HomeBrief(p: HomeBriefProps) {
   const upcoming = items.filter(r => timed(r) && Date.parse(r.date) >= now.getTime() - 5 * 60000);
   const next = upcoming[0] || null;
   // 0.3.311: o que mais aparece na linha do tempo, cada area com a sua marca (Financas, Encomendas e Rotina)
+  // 0.3.318 (Pedro): conta, receita, fatura e encomenda tambem arrastam - so mudam de lugar aqui na linha do tempo do Inicio
+  // (a data delas vem do banco e do rastreio); fica guardado neste computador e some 2 dias depois
+  const MK = 'sofia.timeline.marks.v1';
+  const [markMoves, setMarkMoves] = useState<Record<string, string>>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(MK) || '{}'), old = Date.now() - 2 * 864e5; return Object.fromEntries(Object.entries(v || {}).filter(([, iso]) => Date.parse(String(iso)) > old)) as Record<string, string>;} catch {return {};}});
+  const moveMarks = (list: {id: string; to: Date}[]) => setMarkMoves(o => {const n = {...o}; for (const x of list) n[x.id] = x.to.toISOString(); try {globalThis.localStorage?.setItem(MK, JSON.stringify(n));} catch {} return n;});
+  const onMove = (moves: Move[]) => {const marks = moves.filter(x => 'mark' in x.t), rest = moves.filter(x => !('mark' in x.t));
+    if (marks.length) moveMarks(marks.map(x => ({id: (x.t as {mark: TimeMark}).mark.id, to: x.to}))); if (rest.length) p.onMove?.(rest);};
+  useEffect(() => {if (!gear || typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
   const timeMarks = useMemo(() => {
     const out: TimeMark[] = [], todayKey = new Date().toISOString().slice(0, 10), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
     for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
@@ -151,8 +167,9 @@ export function HomeBrief(p: HomeBriefProps) {
       const day = new Date(); day.setDate(day.getDate() + k);
       try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : ds.time, done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
     }
+    for (const m of out) {const iso = m.kind !== 'routine' ? markMoves[m.id] : ''; if (iso) {m.at = new Date(iso); m.late = false;}}
     return out.sort((x, y) => x.at.getTime() - y.at.getTime());
-  }, [p.data, p.masked]);
+  }, [p.data, p.masked, markMoves]);
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
@@ -172,10 +189,12 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{flex: 1}} />
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
+      {/* 0.3.318 (Pedro): clicar fora (ou Esc) fecha os ajustes */}
+      {gear ? <Pressable testID="timeline-gear-backdrop" accessibilityLabel="Fechar ajustes da linha do tempo" onPress={() => setGear(false)} style={{position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 19, cursor: 'default'} as any} /> : null}
       {gear ? <TimelineSettingsPanel s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
-      <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} opacity={tl.opacity}
+      <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove}} />
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -209,16 +228,18 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (t: MoveTarget, to: Date) => void};
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
-export type MoveTarget = MuteTarget;
+export type MoveTarget = MuteTarget | {mark: TimeMark};
+/** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
+export type Move = {t: MoveTarget; to: Date};
 const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
 const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) || ROTINA_TYPES[0]).color;
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
-function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; opacity?: number; actions: TimelineActions}) {
-  const c = useTheme(), [w, setW] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null);
+function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions}) {
+  const c = useTheme(), [w, setW] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null), lineBox = useRef<View>(null);
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(DAY_START), target = useRef(DAY_START), raf = useRef<any>(null);
   const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - SPAN, v));
@@ -252,30 +273,33 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
   const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
   // 0.3.317 (Pedro): arrastar para frente ou para tras. A bolinha segue o mouse em tempo real (sem cortes), a hora aparece
   // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
-  type Drag = {key: string; target: MoveTarget; fx: number; live: boolean; color: string};
+  type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string};
   const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
   const [settle, setSettle] = useState<Record<string, number>>({});
   useEffect(() => {setSettle({});}, [items, marks]);
   const hourAt = (fx: number) => startRef.current + fx * SPAN;
   const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
-  const beginDrag = (e: any, key: string, t: MoveTarget, x0: number, color: string) => {
-    const el: any = box.current; if (!actions.onMove || !el?.getBoundingClientRect || typeof window === 'undefined') return;
+  const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
+    const el: any = lineBox.current; if (!actions.onMove || !items.length || !el?.getBoundingClientRect || typeof window === 'undefined') return;
     const ne = e?.nativeEvent || {}, sx = Number(ne.pageX ?? ne.clientX), rect = el.getBoundingClientRect(); if (!Number.isFinite(sx) || !rect.width) return;
     const grab = sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
     const fxOf = (x: number) => Math.max(0, Math.min(1, (x - grab - rect.left) / rect.width));
     const tickEdge = () => {if (!edge || !dragRef.current) {edgeRaf = null; return;} glide(target.current + edge * 0.08); const d = {...dragRef.current, fx: fxOf(lastX)}; dragRef.current = d; setDrag(d); edgeRaf = requestAnimationFrame(tickEdge);};
+    const stop = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('keydown', esc, true); edge = 0; if (edgeRaf) cancelAnimationFrame(edgeRaf);
+      document.body.style.userSelect = ''; document.body.style.cursor = ''; const d = dragRef.current; dragRef.current = null; setDrag(null); return d;};
     const move = (ev: PointerEvent) => {lastX = ev.pageX; const live = dragRef.current?.live || Math.abs(ev.pageX - sx) > 4; if (!live) return;
       if (!dragRef.current?.live) {setPin(''); setHover(''); document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing';}
-      const d = {key, target: t, fx: fxOf(ev.pageX), live: true, color}; dragRef.current = d; setDrag(d);
+      const d = {key, items, fx: fxOf(ev.pageX), live: true, color}; dragRef.current = d; setDrag(d);
       const px = ev.pageX - rect.left; edge = px < 28 ? -1 : px > rect.width - 28 ? 1 : 0; if (edge && !edgeRaf) edgeRaf = requestAnimationFrame(tickEdge);};
-    const up = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); edge = 0; if (edgeRaf) cancelAnimationFrame(edgeRaf);
-      document.body.style.userSelect = ''; document.body.style.cursor = '';
-      const d = dragRef.current; dragRef.current = null; setDrag(null); if (!d?.live) return;
+    // 0.3.318 (Pedro): Esc cancela o arrastar - tudo volta para onde estava, nada e gravado
+    const esc = (ev: KeyboardEvent) => {if (ev.key !== 'Escape') return; ev.preventDefault(); ev.stopPropagation(); const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);}};
+    const up = () => {const d = stop(); if (!d?.live) return;
       justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);
-      const to = snapDate(d.fx), fx = ((to.getTime() - day0) / 3600000 - startRef.current) / SPAN;
+      // o primeiro item vai para onde a bolinha foi solta; os outros andam o mesmo tanto (de 5 em 5 minutos)
+      const to = snapDate(d.fx), delta = to.getTime() - items[0].at.getTime(), fx = ((to.getTime() - day0) / 3600000 - startRef.current) / SPAN;
       setSettle(o => ({...o, [key]: fx})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
-      actions.onMove!(t, to);};
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+      actions.onMove!(items.map(x => ({t: x.t, to: new Date(x.at.getTime() + delta)})));};
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('keydown', esc, true);
   };
   const dragLabel = (fx: number) => {const d = snapDate(fx), dd = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - day0) / 864e5);
     return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : dd === -1 ? 'ontem ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hhmm(d);};
@@ -290,19 +314,30 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
   const shown = all.find(p => p.key === (pin || hover));
   const tagOf = (p: Point) => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
     return {text: hhmm(new Date(r.date)) + ' ' + (p.recs.length > 1 ? p.recs.length + ' itens' : r.title), color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
-  return <View ref={box} style={{marginTop: 12, height: 56 + OFF}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
+  // 0.3.318 (Pedro): o "agora" fica na altura da linha, colado na borda para onde ele leva ("‹ agora" na esquerda,
+  // "agora ›" na direita); a linha encolhe daquele lado (deslizando) para o botao nao cobrir a marca da ponta
+  const side = Math.abs(start - DAY_START) > 0.3 ? (start > DAY_START ? 'left' : 'right') : '', INSET = 84;
+  // 0.3.318 (Pedro): o "agora" fica no MEIO do cartao inteiro (Seu dia), nao na altura da linha
+  const [btnTop, setBtnTop] = useState<string>('');
+  useLayoutEffect(() => {const el: any = box.current, card = el?.closest?.('[data-testid="home-brief"]'); if (!el?.getBoundingClientRect || !card) return;
+    const a = el.getBoundingClientRect(), b = card.getBoundingClientRect(), z = homeZoom(), k = uiScale();
+    setBtnTop(Math.round(((b.top + b.height / 2) - a.top) / z - 12 * k) + 'px');}, [side, w]);
+  return <View ref={box} style={{marginTop: 12, height: 56 + OFF}}>
+   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? INSET : 0, right: side === 'right' ? INSET : 0, transitionProperty: 'left, right', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
-    <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, opacity}}>
+    <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
         const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, onHoverOut: leave};
         // 0.3.317: da para arrastar a bolinha de um item so (compromisso, lembrete, tarefa) e a dose da Rotina sozinha
-        const tgt: MoveTarget | null = !actions.onMove ? null : m ? (p.marks.length === 1 && m.kind === 'routine' && m.dose && !m.late ? {dose: m.dose} : null) : p.recs.length === 1 ? {rec: r} : null;
+        // 0.3.318 (Pedro): tudo o que esta na linha arrasta - bolinha de um item ou de varios (andam juntos), dose ou pilula
+        // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
+        const tgt: DragItem[] | null = !actions.onMove ? null : m ? p.marks.map(x => ({t: (x.kind === 'routine' && x.dose ? {dose: x.dose} : {mark: x}) as MoveTarget, at: x.at})) : p.recs.map(x => ({t: {rec: x} as MoveTarget, at: new Date(x.date)}));
         const xo = settle[p.key] ?? p.x, ghost = drag?.key === p.key;
-        const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
-        const extra: any = {opacity: ghost ? 0.3 : 1, cursor: tgt ? 'grab' : 'pointer', ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
+        const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt!, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
+        const itemOp = m ? op.mark(m) : op.rec(r), extra: any = {opacity: ghost ? 0.3 * itemOp : itemOp, cursor: tgt ? 'grab' : 'pointer', ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
           const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
@@ -320,7 +355,7 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
           {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{p.recs.length}</Text> : null}
         </Pressable>;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] ?? p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : 1, ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] ?? p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <Text numberOfLines={1} style={{fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>
       </View>;})())}
     </View>
@@ -329,10 +364,6 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
     {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} w={w} top={29 + OFF} /> : null}
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
-    {Math.abs(start - DAY_START) > 0.3 ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START);}}
-      style={({hovered}: any) => ({position: 'absolute', top: -38, right: 40, height: 24, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
-      {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{start > DAY_START ? '‹ agora' : 'agora ›'}</Text>}
-    </Pressable> : null}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
     {Array.from({length: 6}, (_, k) => Math.ceil((start - 3) / 4) * 4 + 3 + k * 4).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && w && Math.abs(x - nowX) * w < 46)) return null;
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
@@ -343,7 +374,12 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
         <Text style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{dragLabel(drag.fx)}</Text>
       </View>
     </View> : null}
-    {shown && !drag?.live ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : t.dose.planId + t.dose.time), t, shown.x, color) : undefined} /> : null}
+    {shown && !drag?.live ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
+   </View>
+    {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START);}}
+      style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
+      {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
+    </Pressable> : null}
   </View>;
 }
 
@@ -392,7 +428,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, done: r.isTask ? (r.original as any)?.state === 'done' : false, onEdit: () => {onClose(); actions.onEdit(r);}, grab: onGrab && point.recs.length + point.marks.length > 1 ? (e: any) => onGrab(e, {rec: r}, r.kind === 'reminder' ? REMIND : colorOf(r, c.accent)) : undefined})}</View>)}
     {marks.map((m, i) => <View key={m.id} style={{borderTopWidth: i || recs.length ? 1 : 0, borderColor: c.line}}>{Row({color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
       time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, sub: m.kind === 'routine' ? (m.done ? 'Feito' : '') : m.sub, done: m.done && m.kind === 'routine',
-      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 && m.kind === 'routine' && m.dose && !m.late ? (e: any) => onGrab(e, {dose: m.dose!}, markColor(m, c.danger)) : undefined})}</View>)}
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined})}</View>)}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingBottom: 6}}>+{extra} mais</Text> : null}
   </View>;
 }
