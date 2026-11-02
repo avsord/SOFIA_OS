@@ -1,6 +1,7 @@
 import type {AgendaItem} from './types';
 // 0.3.317: mesma leitura de lib/timeline-move.ts (copiada aqui: este arquivo nao depende de outro, os testes o rodam sozinho)
-function readMoves(tags?:string[]|null){const out=new Map<string,string>();for(const t of tags||[]){if(typeof t!=='string'||!t.startsWith('sofia-move-v1:'))continue;const [f,to]=t.slice(14).split('>');if(f&&to&&Number.isFinite(Date.parse(f))&&Number.isFinite(Date.parse(to)))out.set(f,to);}return out;}
+const minuteKey=(d:string|Date)=>new Date(d).toISOString().slice(0,16)+'Z';
+function readMoves(tags?:string[]|null){const out=new Map<string,string>();for(const t of tags||[]){if(typeof t!=='string'||!t.startsWith('sofia-move-v1:'))continue;const [f,to]=t.slice(14).split('>');if(f&&to&&Number.isFinite(Date.parse(f))&&Number.isFinite(Date.parse(to)))out.set(minuteKey(f),new Date(to).toISOString());}return out;}
 export const REPEATS=[{value:'none',label:'Não repetir'},{value:'weekly',label:'Toda semana'},{value:'monthly',label:'Todo mês'},{value:'yearly',label:'Todo ano'}] as const;
 export type Repeat=typeof REPEATS[number]['value'];
 const prefix='sofia-repeat-v1:';
@@ -45,7 +46,7 @@ export function occurrences(item:AgendaItem,from:Date,to:Date):AgendaItem[]{
  // 0.3.317: ocorrencia arrastada na linha do tempo (so aquela vez) aparece no horario novo; data.sofia_moved_from guarda
  // o inicio original. A busca olha 3 dias a mais para cada lado, para pegar o que foi levado de um dia para outro.
  const moves=item.data.calendar_all_day?new Map<string,string>():readMoves(item.tags);
- const moved=(occ:AgendaItem,date:Date):AgendaItem|null=>{const to=moves.get(date.toISOString());if(!to)return occ;const nd=new Date(to),data={...occ.data,sofia_moved_from:date.toISOString()} as any;
+ const moved=(occ:AgendaItem,date:Date):AgendaItem|null=>{const to=moves.get(minuteKey(date));if(!to)return occ;const nd=new Date(to),data={...occ.data,sofia_moved_from:date.toISOString()} as any;
   if(data.start_at)data.start_at=nd.toISOString();else if(data.remind_at)data.remind_at=nd.toISOString();else data.due_at=nd.toISOString();
   if(occ.data.end_at)data.end_at=new Date(nd.getTime()+Date.parse(occ.data.end_at)-date.getTime()).toISOString();return {...occ,data};};
  const inRange=(occ:AgendaItem)=>{const s=eventStart(occ),d=new Date(s.length===10?s+'T09:00:00':s);return d>=from&&d<to;};

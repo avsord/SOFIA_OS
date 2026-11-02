@@ -14,7 +14,7 @@ function nextRoutine(e,after=new Date()){
  }return null;
 }
 /** 0.3.317: horario em que o lembrete toca desta vez (o movido pela linha do tempo, se houver). */
-function movedAt(e){const from=new Date(e.data.remind_at).toISOString(),t=(e.tags||[]).find(x=>String(x).startsWith('sofia-move-v1:'+from+'>'));const to=t?String(t).split('>')[1]:'';return to&&Number.isFinite(Date.parse(to))?new Date(to).toISOString():e.data.remind_at;}
+function movedAt(e){const from=new Date(e.data.remind_at).toISOString().slice(0,16)+'Z',t=(e.tags||[]).find(x=>String(x).startsWith('sofia-move-v1:'+from+'>'));const to=t?String(t).split('>')[1]:'';return to&&Number.isFinite(Date.parse(to))?new Date(to).toISOString():e.data.remind_at;}
 function nextRepeat(e,stamp){
  const tag=(e.tags||[]).find(t=>String(t).startsWith('sofia-repeat-v1:'));if(!tag)return '';
  const freq=String(tag).split(':')[1];if(!['weekly','monthly','yearly'].includes(freq))return '';
@@ -41,7 +41,7 @@ class Scheduler{
     // 0.3.304: lembrete que se repete (marca sofia-repeat-v1:FREQ:FUSO, a mesma da Agenda) nao termina: vai para a
     // proxima vez (semana, mes ou ano seguinte; dia 31 vira o ultimo dia do mes curto)
     // a proxima vez conta a partir do horario original (adiantada nao repete no mesmo dia); a marca usada sai
-    const after=new Date(Math.max(Date.parse(stamp),Date.parse(e.data.remind_at))).toISOString(),next=nextRepeat(e,after),tags=(e.tags||[]).filter(t=>!String(t).startsWith('sofia-move-v1:'+new Date(e.data.remind_at).toISOString()+'>'));
+    const after=new Date(Math.max(Date.parse(stamp),Date.parse(e.data.remind_at))).toISOString(),next=nextRepeat(e,after),tags=(e.tags||[]).filter(t=>!String(t).startsWith('sofia-move-v1:'+new Date(e.data.remind_at).toISOString().slice(0,16)+'Z>'));
     if(next)this.w.save({...e,tags,revision:e.revision,data:{...e.data,remind_at:next}},e.id);
     else this.w.changeState(e.id,'done',e.revision);
   }

@@ -165,7 +165,7 @@ export function HomeBrief(p: HomeBriefProps) {
     }
     for (let k = 0; k < 3; k++) {
       const day = new Date(); day.setDate(day.getDate() + k);
-      try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : ds.time, done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
+      try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : hhmm(ds.date), done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
     }
     for (const m of out) {const iso = m.kind !== 'routine' ? markMoves[m.id] : ''; if (iso) {m.at = new Date(iso); m.late = false;}}
     return out.sort((x, y) => x.at.getTime() - y.at.getTime());
@@ -266,6 +266,8 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (w) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * w < 20)) mp.x += 22 / w;}
   const all = [...points, ...mpoints];
+  useEffect(() => {setSettle(o => {const keys = Object.keys(o); if (!keys.length) return o; let ch = false; const n = {...o};
+    for (const k of keys) {const pt = all.find(q => q.key === k); if (!pt || Math.abs(pt.x * SPAN + startRef.current - o[k]) < 0.05) {delete n[k]; ch = true;}} return ch ? n : o;});}, [items, marks]);
   useEffect(() => {
     const el: any = box.current; if (!el || !el.addEventListener) return;
     const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return; const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; setPin(''); setHover(''); glide(target.current + d / 40);};
@@ -280,7 +282,6 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string};
   const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
   const [settle, setSettle] = useState<Record<string, number>>({});
-  useEffect(() => {setSettle({});}, [items, marks]);
   const hourAt = (fx: number) => startRef.current + fx * SPAN;
   const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
   const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
@@ -300,8 +301,10 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     const up = () => {const d = stop(); if (!d?.live) return;
       justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);
       // o primeiro item vai para onde a bolinha foi solta; os outros andam o mesmo tanto (de 5 em 5 minutos)
-      const to = snapDate(d.fx), delta = to.getTime() - items[0].at.getTime(), fx = ((to.getTime() - day0) / 3600000 - startRef.current) / SPAN;
-      setSettle(o => ({...o, [key]: fx})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
+      // 0.3.323 (Pedro: "arrasto e ele vai e volta"): fica no lugar novo ate os dados chegarem com ele (guarda a HORA, nao a
+      // posicao, para continuar certo se a linha rolar); antes qualquer atualizacao da tela (a Rotina atualiza todo segundo) desfazia
+      const to = snapDate(d.fx), delta = to.getTime() - items[0].at.getTime(), hAbs = (to.getTime() - day0) / 3600000;
+      setSettle(o => ({...o, [key]: hAbs})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
       actions.onMove!(items.map(x => ({t: x.t, to: new Date(x.at.getTime() + delta)})));};
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('keydown', esc, true);
   };
@@ -345,7 +348,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
         // 0.3.318 (Pedro): tudo o que esta na linha arrasta - bolinha de um item ou de varios (andam juntos), dose ou pilula
         // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
         const tgt: DragItem[] | null = !actions.onMove ? null : m ? p.marks.map(x => ({t: (x.kind === 'routine' && x.dose ? {dose: x.dose} : {mark: x}) as MoveTarget, at: x.at})) : p.recs.map(x => ({t: {rec: x} as MoveTarget, at: new Date(x.date)}));
-        const xo = settle[p.key] ?? p.x, ghost = drag?.key === p.key;
+        const xo = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, ghost = drag?.key === p.key;
         const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt!, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
         const itemOp = m ? op.mark(m) : op.rec(r), extra: any = {opacity: ghost ? 0.3 * itemOp : itemOp, cursor: tgt ? 'grab' : 'pointer', ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
@@ -365,7 +368,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
           {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{p.recs.length}</Text> : null}
         </Pressable>;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] ?? p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}><Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text style={{fontSize: 12, fontWeight: '700', color: t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}</View>
       </View>;})())}
     </View>
