@@ -4,7 +4,6 @@ import {useEffect, useState} from 'react';
 import type {SofiaApi} from './api';
 import type {Entity} from './types';
 import {useCapsules} from './capsule-store';
-import {useWorkspaceRecords} from './workspace-records';
 import {manualDues, todayISO, type Due} from './finance';
 import {readCache, toData, loadAll, financeWindow} from '../screens/finance/core';
 import {classify, type Pack} from '../screens/PackagesApp';
@@ -19,10 +18,10 @@ export type HomeBriefData = {
 
 export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData {
   const capsules = useCapsules(api, active);
-  const pkgs = useWorkspaceRecords(api, 'package', '', true);
+  // 0.3.302: encomendas lidas direto do servidor (o gancho de registros nao carregava fora do app Encomendas)
+  const [pkgItems, setPkgItems] = useState<Entity[] | undefined>(undefined);
   const [dues, setDues] = useState<Due[] | null | undefined>(undefined);
   const [mailNew, setMailNew] = useState<Entity[] | undefined>(undefined);
-  useEffect(() => {if (active) void pkgs.load();}, [active, api]);
   useEffect(() => {
     if (!active) return;
     let alive = true;
@@ -40,13 +39,20 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
     })();
     void (async () => {
       try {
+        const all: Entity[] = [];
+        for (let o = 0; ; o += 100) {const r = await api.entities('package', '', o); all.push(...r.items); if (r.items.length < 100) break;}
+        if (alive) setPkgItems(all);
+      } catch {if (alive) setPkgItems([]);}
+    })();
+    void (async () => {
+      try {
         const r = await api.entities('mail_hit', '', 0);
         if (alive) setMailNew(r.items.filter(h => h.state === 'new'));
       } catch {if (alive) setMailNew([]);}
     })();
     return () => {alive = false;};
   }, [api, active]);
-  const packs = pkgs.items.filter(i => i.state !== 'archived' && i.state !== 'delivered').map(classify);
-  const ready = !!capsules.loaded && (pkgs.loaded || !!pkgs.error) && dues !== undefined && mailNew !== undefined;
+  const packs = (pkgItems || []).filter(i => i.state !== 'archived' && i.state !== 'delivered').map(classify).filter(x => !x.delivered);
+  const ready = !!capsules.loaded && pkgItems !== undefined && dues !== undefined && mailNew !== undefined;
   return {ready, capsules, packs, dues: dues ?? null, mailNew: mailNew || []};
 }

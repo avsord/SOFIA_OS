@@ -30,7 +30,7 @@ const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(),
 const timed = (r: DayRecord) => {if (/^\d{4}-\d{2}-\d{2}$/.test(r.date) || (r.original as any)?.data?.calendar_all_day) return false; const d = new Date(r.date); return !(d.getHours() === 0 && d.getMinutes() === 0); /* 0.3.295: 00:00 = sem hora (nao estica a linha do tempo) */};
 
 export type HomeBriefProps = {
-  data: HomeBriefData; today: DayRecord[]; all: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null; goal: GoalNumbers | null; masked: boolean;
+  data: HomeBriefData; today: DayRecord[]; all: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null; goal: GoalNumbers | null; masked: boolean; onToggleMask?: () => void;
   onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onOpenTask?: (id: string) => void; onToggleTask: (t: Task) => void;
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
 };
@@ -50,7 +50,7 @@ export function briefLine(a: {today: DayRecord[]; tasks: Task[]; series: Monitor
 }
 
 /** Os blocos crescem ate o fim da tela (com 32 px de respiro), sem passar dela: altura de cada fileira. */
-let lastTop = 0, lastBrief = Math.round(180 * uiScale()); // o esqueleto e o Inicio pronto usam a MESMA medida (a troca nao mexe nada)
+let lastTop = 0, lastBrief = Math.round(170 * uiScale()); // o esqueleto e o Inicio pronto usam a MESMA medida (a troca nao mexe nada)
 function useRowHeight(root: React.RefObject<View | null>, briefH: number) {
   const {height} = useWindowDimensions(), [top, setTop] = useState(lastTop);
   useEffect(() => {const el: any = root.current; if (el && typeof el.getBoundingClientRect === 'function') {const sc = el.closest ? el.closest('[data-testid="home-scroll"]') : null; const t = Math.round(el.getBoundingClientRect().top + (sc ? sc.scrollTop : 0)); if (t > 0 && el.getBoundingClientRect().height > 0) {lastTop = t; setTop(t);}}});
@@ -68,7 +68,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const next = upcoming[0] || null;
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
-  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); return p.all.filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.all, now.getHours(), now.getMinutes()]);
+  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
   const low = (p.series || []).filter(s => s.atLow);
 
   const actions: {label: string; primary?: boolean; run: () => void}[] = [];
@@ -85,11 +85,6 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{flex: 1}} />
         <Pressable accessibilityRole="link" onPress={p.onOpenAgenda}><Text style={{color: c.muted, fontSize: 12}}>Abrir agenda</Text></Pressable>
       </View>
-      <View style={{flexDirection: 'row', gap: 8, marginTop: 12, minHeight: 36, flexWrap: 'wrap'}}>{/* altura reservada mesmo sem atalhos: o cartao nao muda de tamanho */}
-        {actions.map(a => <Pressable key={a.label} accessibilityRole="button" onPress={a.run} style={({hovered, pressed}: any) => ({height: 36, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', backgroundColor: a.primary ? c.accent : hovered ? tint(c.accent, 0.22) : c.accentSoft, transform: [{scale: pressed ? 0.97 : 1}]})}>
-          <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: a.primary ? c.onAccent : c.accent, maxWidth: 260}}>{a.label}</Text>
-        </Pressable>)}
-      </View>
       <Timeline items={timelineItems} next={next} onEdit={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
@@ -98,7 +93,7 @@ export function HomeBrief(p: HomeBriefProps) {
       <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
-      <FinanceTile style={{flex: 1, height: rowH}} card={card} data={p.data} goal={p.goal} masked={p.masked} onOpen={() => p.onOpenModule('finance')} />
+      <FinanceTile style={{flex: 1, height: rowH}} card={card} data={p.data} goal={p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
       <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
       <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
@@ -130,21 +125,25 @@ function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | 
   const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.content || o.data?.location || '').trim();};
   const shownGroup = pin >= 0 ? pin : hover;
-  return <View ref={box} style={{marginTop: 18, height: 56}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
-    <View style={{position: 'absolute', left: 0, right: 0, top: 28, height: 2, borderRadius: 1, backgroundColor: c.line}} />
-    {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
-    {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
+  // 0.3.302 (Pedro): sem os botoes de atalho; cada bolinha tem o rotulo fixo em cima (horario e nome), em duas fileiras
+  const LW = 150, rowsAt: number[][] = [[], []], place: Record<number, number> = {};
+  groups.forEach((g, i) => {const px = g.x * (w || 1); for (const r of [0, 1]) {if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); place[i] = r; break;}}});
+  const OFF = 44; // espaco dos rotulos em cima da linha
+  return <View ref={box} style={{marginTop: 12, height: 56 + OFF}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
+    <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
+    {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
+    {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {groups.map((g, i) => {
       const isNext = !!next && g.list.includes(next), many = g.list.length > 1, size = isNext ? 16 : many ? 20 : 12;
       return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => setPin(p => p === i ? -1 : i)} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
-        style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(g.list[0], c.accent), alignItems: 'center', justifyContent: 'center'}}>
+        style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(g.list[0], c.accent), alignItems: 'center', justifyContent: 'center'}}>
         {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
       </Pressable>;
     })}
     {shownGroup >= 0 && groups[shownGroup] ? (() => {
       // previa (mouse em cima) ou cartao fixo (clique): titulo, descricao e o lapis para editar
       const g = groups[shownGroup], pinned = pin >= 0, W = pinned ? 300 : 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
-      return <View pointerEvents={pinned ? 'auto' : 'none'} style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 5, backgroundColor: c.bg, borderRadius: 12, paddingVertical: pinned ? 10 : 8, paddingHorizontal: 12, gap: pinned ? 10 : 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
+      return <View pointerEvents={pinned ? 'auto' : 'none'} style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 6, backgroundColor: c.bg, borderRadius: 12, paddingVertical: pinned ? 10 : 8, paddingHorizontal: 12, gap: pinned ? 10 : 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
         {g.list.slice(0, pinned ? 4 : 5).map((r, k) => <View key={k} style={{gap: 2}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
             <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: colorOf(r, c.accent)}} />
@@ -157,11 +156,11 @@ function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | 
         {g.list.length > (pinned ? 4 : 5) ? <Text style={{fontSize: 11, color: c.muted}}>+{g.list.length - (pinned ? 4 : 5)} mais</Text> : null}
       </View>;
     })() : null}
-    {next && shownGroup < 0 && pos(new Date(next.date)) >= 0 && pos(new Date(next.date)) <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (pos(new Date(next.date)) * 100 + '%') as any, top: 0, transform: [{translateX: -60}], width: 120, alignItems: 'center'}}>
-      <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: c.text, backgroundColor: tint(c.accent, 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden'}}>{hhmm(new Date(next.date))} {next.title}</Text>
-    </View> : null}
-    {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
-    {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
+    {groups.map((g, i) => place[i] == null ? null : <View key={'l' + i} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, g.x * (w || 1) - LW / 2)), top: place[i] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: shownGroup >= 0 && shownGroup !== i ? 0.35 : 1}}>
+      <Text numberOfLines={1} style={{fontSize: 12, color: next && g.list.includes(next) ? c.text : c.muted, fontWeight: next && g.list.includes(next) ? '600' : '400', backgroundColor: next && g.list.includes(next) ? tint(c.accent, 0.14) : 'transparent', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{hhmm(new Date(g.list[0].date))} {g.list.length > 1 ? g.list.length + ' itens' : g.list[0].title}</Text>
+    </View>)}
+    {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18 + OFF, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
+    {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
   </View>;
 }
 
@@ -187,7 +186,7 @@ function Quiet({text, sub}: {text: string; sub: string}) {const c = useTheme(); 
 const Dot = () => {const c = useTheme(); return <View style={{position: 'absolute', top: 18, right: 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} />;};
 
 function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; card: any; upcoming: DayRecord[]; onOpen: (r: DayRecord) => void; onOpenAgenda: () => void}) {
-  const c = useTheme(), list = upcoming.slice(0, 3);
+  const c = useTheme(), list = upcoming; // 0.3.302: todos (rolagem invisivel)
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
     {list.length ? <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2}} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
@@ -224,7 +223,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
     </View> : <Quiet text="Nada hoje" sub="Nenhum item da rotina para hoje." />}
   </View>;
 }
-function FinanceTile({style, card, data, goal, masked, onOpen}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void}) {
+function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void; onToggleMask?: () => void}) {
   // 0.3.296 (Pedro): guardado e quanto falta da meta sempre visiveis; a conta que vence primeiro numa linha
   const c = useTheme(), dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
@@ -233,6 +232,7 @@ function FinanceTile({style, card, data, goal, masked, onOpen}: {style: any; car
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     {first && first.date <= today ? <Dot /> : null}
     <TileHead icon="wallet" color="#b49ae6" name={'Finanças' + (goal?.name ? ' · ' + goal.name : '')} onOpen={onOpen} />
+    {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
     {g && goal ? <View style={{marginTop: 'auto', gap: 5} as any}>
       <Big value={money(goal.saved)} unit={Math.round(g.pct * 100) + '% guardado'} />
       <View style={{height: 6, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#88CFB8'}} /></View>
@@ -305,8 +305,7 @@ export function HomeBriefSkeleton() {
   return <ShimmerGroup><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     <View style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, height: briefH}}>
       <View style={{height: 24, justifyContent: 'center'}}><ShimmerBlock width={90} height={16} radius={6} /></View>
-      <View style={{flexDirection: 'row', gap: 8, marginTop: 12, minHeight: 36}}><ShimmerBlock width={150} height={36} radius={10} /><ShimmerBlock width={120} height={36} radius={10} /></View>
-      <View style={{marginTop: 18, height: 56, justifyContent: 'center'}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
+      <View style={{marginTop: 12, height: 100, justifyContent: 'center'}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(1)}{tile(1)}{tile(1)}{tile(1)}</View>
