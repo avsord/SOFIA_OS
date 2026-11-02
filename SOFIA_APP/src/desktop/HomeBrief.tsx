@@ -252,14 +252,20 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
     {first && first.date <= today ? <View style={{position: 'absolute', top: 23, right: onToggleMask ? 50 : 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} /> : null}
     <TileHead icon="wallet" color="#b49ae6" name={'Finanças' + (goal?.name ? ' · ' + goal.name : '')} onOpen={onOpen} />
     {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
-    {data.left ? <View style={{marginTop: 10, gap: 2}}>
-      {/* 0.3.303: o que sobra depois de tudo pago (a mesma conta do Previsto de Financas) */}
-      <Text style={{fontSize: 12, color: c.muted}}>Sobra até {data.left.end.slice(8, 10)}/{data.left.end.slice(5, 7)}, depois de tudo pago</Text>
-      <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: data.left.left < 0 ? c.danger : c.text, fontVariant: ['tabular-nums']}}>{money(data.left.left)}</Text>
+    {data.spend && data.spend.available > 0 ? <View style={{marginTop: 10, gap: 4}}>
+      {/* 0.3.305 (Pedro): no lugar do "Sobra ate", o Controle de gastos do mes (o mesmo card de Financas) */}
+      <Text style={{fontSize: 12, color: c.muted}}>Gastos de {new Date().toLocaleDateString('pt-BR', {month: 'long'})}</Text>
+      <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
+        <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{money(data.spend.spent)}</Text>
+        <Text style={{fontSize: 12, color: c.muted}}>de {money(data.spend.available)}</Text>
+        <View style={{flex: 1}} />
+        <Text style={{fontSize: 12, fontWeight: '600', color: data.spend.pct > 100 ? c.danger : data.spend.pct >= 80 ? '#E8B04A' : c.text}}>{data.spend.pct}%</Text>
+      </View>
+      <View style={{height: 5, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 5, borderRadius: 3, width: (Math.min(100, Math.max(1, data.spend.pct)) + '%') as any, backgroundColor: data.spend.pct > 100 ? c.danger : data.spend.pct >= 80 ? '#E8B04A' : '#88CFB8'}} /></View>
     </View> : null}
     {g && goal ? <View style={{marginTop: 'auto', gap: 5} as any}>
       <View style={{flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between'}}><Text style={{fontSize: 12, color: c.muted}}>Guardado</Text><Text style={{fontSize: 12, color: c.text, fontVariant: ['tabular-nums']}}>{money(goal.saved)} · {Math.round(g.pct * 100)}%</Text></View>
-      <View style={{height: 6, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#88CFB8'}} /></View>
+      <View style={{height: 6, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#b49ae6'}} /></View>
       <Line text={'Faltam ' + money(g.missing) + ' de ' + money(goal.target)} />
       {first ? <Text numberOfLines={1} style={{fontSize: 12, color: first.date <= today ? c.danger : c.muted}}>{first.title + ' ' + when(first.date) + ' · ' + money(first.amount)}</Text> : null}
     </View> : first ? <View style={{marginTop: 'auto', gap: 4} as any}>
