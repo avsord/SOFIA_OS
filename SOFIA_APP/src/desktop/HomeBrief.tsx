@@ -243,8 +243,12 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(DAY_START), target = useRef(DAY_START), raf = useRef<any>(null);
   const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - SPAN, v));
-  const glide = (to: number) => {target.current = clampStart(to); if (raf.current) return;
-    const step = () => {const cur = startRef.current, d = target.current - cur; const nx = Math.abs(d) < 0.004 ? target.current : cur + d * 0.2; startRef.current = nx; setStartRaw(nx); raf.current = nx === target.current ? null : requestAnimationFrame(step);};
+  // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
+  // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
+  const tween = useRef({from: DAY_START, t0: 0, ms: 380, home: false});
+  const glide = (to: number, ms = 380, home = false) => {target.current = clampStart(to); tween.current = {from: startRef.current, t0: Date.now(), ms, home}; if (raf.current) return;
+    const step = () => {const {from, t0, ms: dur} = tween.current, t = Math.min(1, (Date.now() - t0) / dur), e = 1 - Math.pow(1 - t, 3);
+      const nx = t >= 1 ? target.current : from + (target.current - from) * e; startRef.current = nx; setStartRaw(nx); raf.current = t >= 1 ? null : requestAnimationFrame(step);};
     raf.current = requestAnimationFrame(step);};
   useEffect(() => () => {if (raf.current) cancelAnimationFrame(raf.current);}, []);
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
@@ -316,14 +320,19 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     return {text: hhmm(new Date(r.date)) + ' ' + (p.recs.length > 1 ? p.recs.length + ' itens' : r.title), color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
   // 0.3.318 (Pedro): o "agora" fica na altura da linha, colado na borda para onde ele leva ("‹ agora" na esquerda,
   // "agora ›" na direita); a linha encolhe daquele lado (deslizando) para o botao nao cobrir a marca da ponta
-  const side = Math.abs(start - DAY_START) > 0.3 ? (start > DAY_START ? 'left' : 'right') : '', INSET = 84;
+  // 0.3.319: o espaco do botao abre e fecha JUNTO com o movimento da linha (sai da distancia ate 07:00), sem transicao
+  // separada - antes o botao sumia no meio do caminho, a linha alargava e os itens voltavam para tras no fim
+  // na volta pelo botao, o espaco fecha na mesma proporcao do caminho (cada item anda sempre para o mesmo lado, sem tranco)
+  const span0 = tween.current.home ? Math.max(0.75, Math.abs(tween.current.from - DAY_START)) : 0.75;
+  const dist = start - DAY_START, ease = Math.min(1, Math.abs(dist) / span0), INSET = 84;
+  const side = Math.abs(dist) > 0.02 ? (dist > 0 ? 'left' : 'right') : '', inset = Math.round(INSET * ease * 10) / 10;
   // 0.3.318 (Pedro): o "agora" fica no MEIO do cartao inteiro (Seu dia), nao na altura da linha
   const [btnTop, setBtnTop] = useState<string>('');
   useLayoutEffect(() => {const el: any = box.current, card = el?.closest?.('[data-testid="home-brief"]'); if (!el?.getBoundingClientRect || !card) return;
     const a = el.getBoundingClientRect(), b = card.getBoundingClientRect(), z = homeZoom(), k = uiScale();
     setBtnTop(Math.round(((b.top + b.height / 2) - a.top) / z - 12 * k) + 'px');}, [side, w]);
   return <View ref={box} style={{marginTop: 12, height: 56 + OFF}}>
-   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? INSET : 0, right: side === 'right' ? INSET : 0, transitionProperty: 'left, right', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} as any}>
+   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
@@ -376,8 +385,8 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     </View> : null}
     {shown && !drag?.live ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
-    {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START);}}
-      style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
+    {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START, 520, true);}}
+      style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
       {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
     </Pressable> : null}
   </View>;
