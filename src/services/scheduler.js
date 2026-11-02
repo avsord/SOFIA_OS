@@ -13,6 +13,17 @@ function nextRoutine(e,after=new Date()){
   const at=zoned(iso,d.time);if(Date.parse(at)>after.getTime())return at;
  }return null;
 }
+function nextRepeat(e,stamp){
+ const tag=(e.tags||[]).find(t=>String(t).startsWith('sofia-repeat-v1:'));if(!tag)return '';
+ const freq=String(tag).split(':')[1];if(!['weekly','monthly','yearly'].includes(freq))return '';
+ const base=new Date(e.data.remind_at);if(!Number.isFinite(base.getTime()))return '';
+ const day=base.getUTCDate();let n=new Date(base.getTime()),i=0;
+ while(n.getTime()<=Date.parse(stamp)&&i++<600){
+  if(freq==='weekly')n=new Date(n.getTime()+7*864e5);
+  else{const y=n.getUTCFullYear()+(freq==='yearly'?1:0),m=n.getUTCMonth()+(freq==='monthly'?1:0),last=new Date(Date.UTC(y,m+1,0)).getUTCDate();n=new Date(Date.UTC(y,m,Math.min(day,last),base.getUTCHours(),base.getUTCMinutes(),0,0));}
+ }
+ return n.toISOString();
+}
 class Scheduler{
  constructor(workspace,{fetcher=readFeed,clock=()=>new Date()}={}){this.w=workspace;this.fetcher=fetcher;this.clock=clock;this.busy=false;this.controller=null;this.stopped=false;}
  async tick(){if(this.busy||this.stopped)return;this.busy=true;this.controller=new AbortController();try{
@@ -24,7 +35,11 @@ class Scheduler{
   for(const e of reminders){
     const dedup='reminder:'+e.id+':'+e.data.remind_at;
     this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
-    this.w.changeState(e.id,'done',e.revision);
+    // 0.3.304: lembrete que se repete (marca sofia-repeat-v1:FREQ:FUSO, a mesma da Agenda) nao termina: vai para a
+    // proxima vez (semana, mes ou ano seguinte; dia 31 vira o ultimo dia do mes curto)
+    const next=nextRepeat(e,stamp);
+    if(next)this.w.save({...e,revision:e.revision,data:{...e.data,remind_at:next}},e.id);
+    else this.w.changeState(e.id,'done',e.revision);
   }
  }finally{this.busy=false;this.controller=null;}}
  async monitor(e,j,stamp){const d=e.data;if(d.method!=='json'||!d.consent)return;const json=await this.fetcher(d.feed_url,{signal:this.controller?.signal});this.w.observe(e.id,{price:field(json,d.price_path),shipping:d.shipping_path?field(json,d.shipping_path):0,variant:field(json,d.variant_path),currency:field(json,d.currency_path),source:d.feed_url,source_key:j.id+':'+stamp,observed_at:stamp});this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,new Date(Date.parse(stamp)+j.interval_minutes*60000).toISOString(),j.id);}
@@ -46,4 +61,4 @@ class Scheduler{
  start(){this.timer=setInterval(()=>this.tick().catch(()=>{}),60000);this.timer.unref();this.tick().catch(()=>{});}
  async stop(){this.stopped=true;clearInterval(this.timer);this.controller?.abort();const end=Date.now()+12000;while(this.busy&&Date.now()<end)await new Promise(r=>setTimeout(r,30));}
 }
-module.exports={Scheduler,nextRoutine,localISO,zoned};
+module.exports={nextRepeat,Scheduler,nextRoutine,localISO,zoned};

@@ -104,7 +104,7 @@ export function HomeBrief(p: HomeBriefProps) {
 /** Linha do tempo: 16 horas por vez, comecando nas 7h de hoje. A rodinha do mouse em cima dela anda pelas horas e
  * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
-const SPAN = 16;
+const SPAN = 16, REMIND = '#7FD1E8'; // cor dos lembretes na linha do tempo
 type BillMark = {id: string; title: string; date: string; amount: number; late: boolean};
 function Timeline({items, next, onEdit, bills = [], masked = false, onBill}: {items: DayRecord[]; next: DayRecord | null; onEdit: (r: DayRecord) => void; bills?: BillMark[]; masked?: boolean; onBill?: () => void}) {
   const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), [pin, setPin] = useState(-1), [start, setStart] = useState(7), box = useRef<View>(null);
@@ -141,6 +141,11 @@ function Timeline({items, next, onEdit, bills = [], masked = false, onBill}: {it
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {groups.map((g, i) => {
       const isNext = !!next && g.list.includes(next), many = g.list.length > 1, size = isNext ? 16 : many ? 20 : 12;
+      // 0.3.304: lembrete tem marca propria (sino num circulo contornado), diferente de compromisso e de conta
+      if (!many && g.list[0].kind === 'reminder') return <Pressable key={i} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(g.list[0].date)) + ' ' + g.list[0].title} onPress={() => setPin(p => p === i ? -1 : i)} hitSlop={12} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
+        style={({hovered}: any) => ({position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', transform: [{scale: hovered ? 1.12 : 1}], boxShadow: '0 0 0 4px ' + tint(REMIND, 0.16)} as any)}>
+        <Icon name="bell" size={11} color={REMIND} />
+      </Pressable>;
       return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => setPin(p => p === i ? -1 : i)} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
         style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(g.list[0], c.accent), alignItems: 'center', justifyContent: 'center'}}>
         {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
@@ -171,7 +176,7 @@ function Timeline({items, next, onEdit, bills = [], masked = false, onBill}: {it
       </View>;
     })() : null}
     {groups.map((g, i) => place[i] == null ? null : <View key={'l' + i} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, g.x * (w || 1) - LW / 2)), top: place[i] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: shownGroup >= 0 && shownGroup !== i ? 0.35 : 1}}>
-      <Text numberOfLines={1} style={{fontSize: 12, color: next && g.list.includes(next) ? c.text : c.muted, fontWeight: next && g.list.includes(next) ? '600' : '400', backgroundColor: next && g.list.includes(next) ? tint(c.accent, 0.14) : 'transparent', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{hhmm(new Date(g.list[0].date))} {g.list.length > 1 ? g.list.length + ' itens' : g.list[0].title}</Text>
+      <Text numberOfLines={1} style={{fontSize: 12, color: g.list.length === 1 && g.list[0].kind === 'reminder' ? REMIND : next && g.list.includes(next) ? c.text : c.muted, fontWeight: next && g.list.includes(next) ? '600' : '400', backgroundColor: next && g.list.includes(next) ? tint(c.accent, 0.14) : 'transparent', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{hhmm(new Date(g.list[0].date))} {g.list.length > 1 ? g.list.length + ' itens' : g.list[0].title}</Text>
     </View>)}
     {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18 + OFF, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
     {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
