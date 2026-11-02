@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Alert,Modal,Pressable,Text,View} from 'react-native';
 import {useTheme} from './theme';
+import {contentArea} from './desktop';
 
 // 0.3.154: confirmacoes no visual da Sofia. Com 1 ou 2 botoes curtos ficam lado a lado, do mesmo
 // tamanho; com 3 ou mais (ex.: foto do perfil) viram uma lista de acoes, uma por linha, com
@@ -25,7 +26,7 @@ export function AppAlertHost(){
  const action=(b:AppAlertButton,i:number,fill:boolean,grow:boolean)=>{const danger=b.style==='destructive';
   return <Pressable key={'a'+i} accessibilityRole="button" onPress={()=>close(b)} style={({pressed})=>({flex:grow?1:undefined,minHeight:48,paddingHorizontal:14,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:fill?(danger?c.danger:c.accent):c.accentSoft,opacity:pressed?0.8:1})}>{label(b,fill?'#fff':danger?c.danger:c.accent)}</Pressable>;};
  return <Modal visible={!!open} transparent animationType="fade" statusBarTranslucent onRequestClose={()=>close(cancel)}>
-  <Pressable accessibilityLabel="Fechar" onPress={()=>close(cancel)} style={{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:24}}>
+  {/* 0.3.328: no computador o aviso fica no meio do conteudo, sem cobrir a barra lateral */}<Pressable accessibilityLabel="Fechar" onPress={()=>close(cancel)} style={{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:24,...(open&&contentArea()?{paddingLeft:contentArea()!.left+24}:null)}}>
    <Pressable accessibilityRole="alert" onPress={()=>undefined} style={{width:'100%',maxWidth:400,backgroundColor:c.surface,borderRadius:26,paddingHorizontal:22,paddingTop:22,paddingBottom:18,gap:8,borderWidth:1,borderColor:c.line,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
     <Text style={{color:c.text,fontSize:20,fontWeight:'700'}}>{current?.title}</Text>
     {current?.message?<Text style={{color:c.muted,fontSize:14,lineHeight:21}}>{current.message}</Text>:null}

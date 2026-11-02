@@ -4,7 +4,7 @@ import {PresenceClosing} from './Presence';
 import {useWebBackClose} from '../lib/web-panels';
 import {PALETTE} from '../lib/palette';
 import {Animated,Modal,Pressable,View} from 'react-native';
-import {DialogContext,useDesktop} from '../lib/desktop';
+import {DialogContext,useDesktop,contentArea} from '../lib/desktop';
 import type {ModalProps} from 'react-native';
 import {useMotionPresence} from '../lib/motion';
 import {useTheme} from '../lib/theme';
@@ -29,7 +29,7 @@ function SidePeek({visible=true,children,onRequestClose,peekWidth,peekDim}:Modal
  return <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>
   <View testID="side-peek" style={{flex:1,flexDirection:'row'}} pointerEvents={visible?'auto':'none'}>
    <Animated.View style={{flex:1,opacity:progress}}><Pressable accessibilityLabel="Fechar painel" onPress={()=>onRequestClose?.({} as any)} style={{flex:1,backgroundColor:PALETTE.black+(peekDim||'59')}}/></Animated.View>
-   <Animated.View testID="side-peek-panel" style={{...(peekWidth?{width:Math.round(peekWidth*uiScale()),maxWidth:'92%' as any}:{width:'60%',minWidth:Math.round(560*uiScale()),maxWidth:Math.round(860*uiScale())}),height:'100%',backgroundColor:c.bg,borderLeftWidth:1,borderColor:c.line,shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:-8,height:0},opacity:progress,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[40,0]})}]}}>
+   <Animated.View testID="side-peek-panel" style={{...(peekWidth?{width:Math.round(peekWidth*uiScale()),maxWidth:'92%' as any}:{width:'60%',minWidth:Math.round(560*uiScale()),maxWidth:Math.round(860*uiScale())}),...(contentArea()?{maxWidth:Math.min(peekWidth?Infinity:Math.round(860*uiScale()),Math.round(window.innerWidth-contentArea()!.left)),minWidth:Math.min(Math.round(560*uiScale()),Math.round(window.innerWidth-contentArea()!.left))}:null),height:'100%',backgroundColor:c.bg,borderLeftWidth:1,borderColor:c.line,shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:-8,height:0},opacity:progress,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[40,0]})}]}}>
     <DialogContext.Provider value={true}>{visible?children:last.current}</DialogContext.Provider>
    </Animated.View>
   </View>

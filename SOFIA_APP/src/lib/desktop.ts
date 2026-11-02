@@ -11,6 +11,14 @@ import type {IconName} from '../components/Icon';
 // 0.3.260: 900 (antes 1024) - janela pela metade da tela (~960) e notebooks pequenos ja usam o layout de computador
 export const DESKTOP_MIN=900;
 export const SIDEBAR_WIDTH=256,SIDEBAR_COLLAPSED=60;
+/** 0.3.328 (Pedro: "a janela esta invadindo a barra"): area do conteudo no computador - a direita da barra lateral, abaixo
+ * da barra de cima - em px da janela. Janelas, avisos e paineis ficam dentro dela (a barra lateral nunca fica coberta por algo
+ * aberto numa pagina). null fora do computador. */
+export function contentArea():{left:number;right:number;top:number;bottom:number}|null{
+ if(Platform.OS!=='web'||typeof document==='undefined')return null;
+ const el=document.querySelector('[data-testid="desktop-pages"]') as HTMLElement|null;if(!el)return null;
+ const r=el.getBoundingClientRect();return r.width>0?{left:r.left,right:r.right,top:r.top,bottom:r.bottom}:null;
+}
 export function isDesktopWidth(width:number):boolean{return Platform.OS==='web'&&Number.isFinite(width)&&width>=DESKTOP_MIN;}
 export function useDesktop():boolean{const {width}=useWindowDimensions();return isDesktopWidth(width);}
 
