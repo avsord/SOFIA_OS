@@ -107,7 +107,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
             <>
               <View style={{backgroundColor: c.surface, borderRadius: 24, borderWidth: 1, borderColor: c.line, padding: 16, gap: 14, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                 <View style={{alignSelf: 'flex-start'}}><Chips value={win} onChange={setWin} options={WINDOWS.map(w => ({value: w.value, label: w.label}))} /></View>
-                <PriceChart lines={lines} height={210} window={win} mode="price" currency={visible[0]?.currency || 'BRL'} />
+                <PriceChart lines={lines} height={210} window={win} mode="price" currency={visible[0]?.currency || 'BRL'} names={Object.fromEntries(visible.map(p => [p.monitor.id, p.monitor.title]))} />
                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
                   {products.map(p => {
                     const off = hidden.includes(p.monitor.id);

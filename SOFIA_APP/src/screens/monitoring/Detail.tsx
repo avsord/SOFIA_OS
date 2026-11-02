@@ -199,7 +199,7 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
                   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Text style={{fontWeight: '600', color: c.text}}>Melhor preço ao longo do tempo</Text>
                   </View>
-                  <PriceChart lines={[{id: 'best', color: product.color, points: product.best}]} height={200} window={win} currency={product.currency}
+                  <PriceChart names={{best: product.monitor.title}} lines={[{id: 'best', color: product.color, points: product.best}]} height={200} window={win} currency={product.currency}
                     refs={[...(a.avg !== null ? [{value: a.avg, color: c.muted}] : []), ...(alerts.target ? [{value: alerts.target, color: GOOD}] : [])]} />
                   <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap'}}>
                     <Legend color={product.color} text="melhor preço entre as lojas" />
@@ -244,7 +244,7 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
               <>
                 <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 14, gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                   <Text style={{fontWeight: '600', color: c.text}}>Cada loja no tempo</Text>
-                  <PriceChart lines={product.stores.map(s => ({id: s.url, color: colorOfStore(s), points: s.points}))} height={190} window={win} currency={product.currency} />
+                  <PriceChart names={Object.fromEntries(product.stores.map(s => [s.url, s.name]))} lines={product.stores.map(s => ({id: s.url, color: colorOfStore(s), points: s.points}))} height={190} window={win} currency={product.currency} />
                   <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap'}}>{product.stores.map(s => <Legend key={s.url} color={colorOfStore(s)} text={s.name} />)}</View>
                 </View>
                 <Section title="Lojas" hint={tap("Toque numa loja para ver a análise dela. Segure para mais opções.")}>

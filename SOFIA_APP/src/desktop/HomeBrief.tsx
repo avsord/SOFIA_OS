@@ -66,6 +66,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const items = useMemo(() => p.today.filter(r => !isHoliday((r.original || {}) as any)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)), [p.today]);
   const upcoming = items.filter(r => timed(r) && Date.parse(r.date) >= now.getTime() - 5 * 60000);
   const next = upcoming[0] || null;
+  const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); return p.all.filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.all, now.getHours(), now.getMinutes()]);
   const low = (p.series || []).filter(s => s.atLow);
@@ -89,7 +90,7 @@ export function HomeBrief(p: HomeBriefProps) {
           <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: a.primary ? c.onAccent : c.accent, maxWidth: 260}}>{a.label}</Text>
         </Pressable>)}
       </View>
-      <Timeline items={items.filter(timed)} next={next} onOpen={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
+      <Timeline items={timelineItems} next={next} onEdit={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -105,44 +106,62 @@ export function HomeBrief(p: HomeBriefProps) {
   </View>;
 }
 
-/** Linha do tempo das 7h as 23h (ou mais, se houver algo fora): pontos na cor de cada item, juntando os que
- * ficam colados num numero; so o proximo aparece escrito; a marca de "agora" divide o que ja passou. */
-function Timeline({items, next, onOpen}: {items: DayRecord[]; next: DayRecord | null; onOpen: (r: DayRecord) => void}) {
-  const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), now = new Date();
-  const hours = items.map(r => new Date(r.date).getHours());
-  const start = Math.min(7, ...hours), end = Math.max(23, ...hours.map(h => h + 1));
-  const pos = (d: Date) => ((d.getHours() + d.getMinutes() / 60) - start) / (end - start);
-  const nowX = Math.max(0, Math.min(1, pos(now)));
+/** Linha do tempo: 16 horas por vez, comecando nas 7h de hoje. A rodinha do mouse em cima dela anda pelas horas e
+ * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
+ * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
+const SPAN = 16;
+function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | null; onEdit: (r: DayRecord) => void}) {
+  const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), [pin, setPin] = useState(-1), [start, setStart] = useState(7), box = useRef<View>(null);
+  const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
+  const hoursOf = (d: Date) => (d.getTime() - day0) / 3600000;
+  const pos = (d: Date) => (hoursOf(d) - start) / SPAN;
+  const nowX = pos(new Date());
+  const shown = items.filter(r => {const x = pos(new Date(r.date)); return x >= -0.01 && x <= 1.01;});
   const groups: {x: number; list: DayRecord[]}[] = [];
-  for (const r of items) {const x = pos(new Date(r.date)); const g = groups[groups.length - 1]; if (g && w && (x - g.x) * w < 22) g.list.push(r); else groups.push({x, list: [r]});}
-  const color = (r: DayRecord) => colorOf(r, c.accent);
-  return <View style={{marginTop: 18, height: 56}} onLayout={e => setW(e.nativeEvent.layout.width)}>
+  for (const r of shown) {const x = pos(new Date(r.date)); const g = groups[groups.length - 1]; if (g && w && (x - g.x) * w < 22) g.list.push(r); else groups.push({x, list: [r]});}
+  useEffect(() => {
+    const el: any = box.current; if (!el || !el.addEventListener) return;
+    let acc = 0;
+    const onWheel = (e: WheelEvent) => {e.preventDefault(); acc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; const steps = Math.trunc(acc / 40); if (!steps) return; acc -= steps * 40; setPin(-1); setStart(v => Math.max(0, Math.min(24 * 3 - SPAN, v + steps)));};
+    el.addEventListener('wheel', onWheel, {passive: false});
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+  useEffect(() => {if (typeof window === 'undefined' || pin < 0) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin(-1);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
+  const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
+  const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.content || o.data?.location || '').trim();};
+  const shownGroup = pin >= 0 ? pin : hover;
+  return <View ref={box} style={{marginTop: 18, height: 56}} onLayout={e => setW(e.nativeEvent.layout.width)}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28, height: 2, borderRadius: 1, backgroundColor: c.line}} />
-    <View style={{position: 'absolute', left: 0, width: (nowX * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
+    {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
+    {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {groups.map((g, i) => {
       const isNext = !!next && g.list.includes(next), many = g.list.length > 1, size = isNext ? 16 : many ? 20 : 12;
-      return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => onOpen(g.list[0])} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
-        style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: color(g.list[0]), alignItems: 'center', justifyContent: 'center'}}>
+      return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => setPin(p => p === i ? -1 : i)} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
+        style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(g.list[0], c.accent), alignItems: 'center', justifyContent: 'center'}}>
         {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
       </Pressable>;
     })}
-    {hover >= 0 && groups[hover] ? (() => {
-      // previa minimalista: horario e nome de cada item do ponto; fica dentro do cartao (nao vaza pelas bordas)
-      const g = groups[hover], W = 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
-      return <View pointerEvents="none" style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 5, backgroundColor: c.bg, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, gap: 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
-        {g.list.slice(0, 5).map((r, k) => <View key={k} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-          <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: colorOf(r, c.accent)}} />
-          <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}</Text>
-          <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{r.title}</Text>
+    {shownGroup >= 0 && groups[shownGroup] ? (() => {
+      // previa (mouse em cima) ou cartao fixo (clique): titulo, descricao e o lapis para editar
+      const g = groups[shownGroup], pinned = pin >= 0, W = pinned ? 300 : 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
+      return <View pointerEvents={pinned ? 'auto' : 'none'} style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 5, backgroundColor: c.bg, borderRadius: 12, paddingVertical: pinned ? 10 : 8, paddingHorizontal: 12, gap: pinned ? 10 : 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
+        {g.list.slice(0, pinned ? 4 : 5).map((r, k) => <View key={k} style={{gap: 2}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: colorOf(r, c.accent)}} />
+            <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}</Text>
+            <Text numberOfLines={pinned ? 2 : 1} style={{flex: 1, fontSize: 12, color: c.text, fontWeight: pinned ? '600' : '400'}}>{r.title}</Text>
+            {pinned ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => {setPin(-1); onEdit(r);}} hitSlop={8} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="edit" size={14} color={c.muted} /></Pressable> : null}
+          </View>
+          {pinned && desc(r) ? <Text numberOfLines={3} style={{fontSize: 12, lineHeight: 17, color: c.muted, marginLeft: 14}}>{desc(r)}</Text> : null}
         </View>)}
-        {g.list.length > 5 ? <Text style={{fontSize: 11, color: c.muted}}>+{g.list.length - 5} mais</Text> : null}
+        {g.list.length > (pinned ? 4 : 5) ? <Text style={{fontSize: 11, color: c.muted}}>+{g.list.length - (pinned ? 4 : 5)} mais</Text> : null}
       </View>;
     })() : null}
-    {next && hover < 0 ? <View pointerEvents="none" style={{position: 'absolute', left: (pos(new Date(next.date)) * 100 + '%') as any, top: 0, transform: [{translateX: -60}], width: 120, alignItems: 'center'}}>
+    {next && shownGroup < 0 && pos(new Date(next.date)) >= 0 && pos(new Date(next.date)) <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (pos(new Date(next.date)) * 100 + '%') as any, top: 0, transform: [{translateX: -60}], width: 120, alignItems: 'center'}}>
       <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: c.text, backgroundColor: tint(c.accent, 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden'}}>{hhmm(new Date(next.date))} {next.title}</Text>
     </View> : null}
-    <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} />
-    {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -36 : -18}], fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{String(Math.round(start + f * (end - start))).padStart(2, '0')}:00</Text>)}
+    {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
+    {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
   </View>;
 }
 
