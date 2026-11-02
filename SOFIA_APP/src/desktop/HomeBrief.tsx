@@ -7,7 +7,7 @@ import {Animated, Easing, Pressable, ScrollView, Text, View, useWindowDimensions
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
-import {uiScale} from '../web/desktop-scale';
+import {uiScale, fluidFactor} from '../web/desktop-scale';
 import type {Task} from '../lib/types';
 import type {DayRecord} from '../lib/dashboard';
 import type {MonitorWidgetRow} from '../lib/monitoring';
@@ -49,13 +49,29 @@ export function briefLine(a: {today: DayRecord[]; tasks: Task[]; series: Monitor
   return out + (extra.length ? ' ' + extra.join(' e ') + '.' : '');
 }
 
+/** 0.3.310 (Pedro: em monitor grande o Inicio tem que ficar IGUAL ao do notebook, so maior - texto dos blocos embaixo,
+ * mesmas proporcoes). O notebook dele e a referencia (1912 x 904 de janela). Em tela maior, o Inicio inteiro (saudacao,
+ * Seu dia e blocos) e ampliado por igual (CSS zoom) ate ocupar a tela como ocupa no notebook. Ate o tamanho do notebook
+ * devolve 1 - nada muda. So o Inicio do computador usa (Home.tsx). */
+const REF_W = 1912, REF_H = 904;
+export function homeZoom(w?: number, h?: number): number {
+  if (typeof window === 'undefined') return 1;
+  const W = w ?? window.innerWidth, H = h ?? window.innerHeight;
+  const target = fluidFactor(REF_W) * Math.min(W / REF_W, H / REF_H);
+  return Math.max(1, Math.min(2, Math.round(target / uiScale() * 40) / 40));
+}
+
 /** Os blocos crescem ate o fim da tela (com 32 px de respiro), sem passar dela: altura de cada fileira. */
-let lastTop = 0, lastBrief = Math.round(170 * uiScale()); // o esqueleto e o Inicio pronto usam a MESMA medida (a troca nao mexe nada)
-function useRowHeight(root: React.RefObject<View | null>, briefH: number) {
-  const {height} = useWindowDimensions(), [top, setTop] = useState(lastTop);
-  useEffect(() => {const el: any = root.current; if (el && typeof el.getBoundingClientRect === 'function') {const sc = el.closest ? el.closest('[data-testid="home-scroll"]') : null; const t = Math.round(el.getBoundingClientRect().top + (sc ? sc.scrollTop : 0)); if (t > 0 && el.getBoundingClientRect().height > 0) {lastTop = t; setTop(t);}}});
-  const avail = height - top - 32 - briefH - 24;
-  return Math.max(150, Math.min(300, Math.floor(avail / 2)));
+let lastBrief = Math.round(170 * uiScale()); // o esqueleto e o Inicio pronto usam a MESMA medida (a troca nao mexe nada)
+/** 0.3.310 (Pedro, com a foto do notebook): altura FIXA das fileiras, a do notebook dele, em que o numero de Financas
+ * fica na mesma linha dos numeros de Price Tracker, Encomendas e E-mails (texto dos outros blocos no pe). Antes a
+ * altura esticava ate o fim da tela e, em qualquer altura diferente, os numeros desalinhavam. Em tela maior quem
+ * aumenta tudo por igual e o homeZoom. 183 = distancia do topo do bloco ao numero de Financas + do numero dos outros
+ * ao pe (medido na tela). */
+const ROW_H = 183;
+function useRowHeight(_root: React.RefObject<View | null>, _briefH: number) {
+  useWindowDimensions(); // recalcula quando a janela muda (fator da tela)
+  return Math.round(ROW_H * uiScale());
 }
 
 export function HomeBrief(p: HomeBriefProps) {
@@ -130,7 +146,8 @@ function Timeline({items, next, onEdit, bills = [], masked = false, onBill}: {it
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.content || o.data?.location || '').trim();};
   const shownGroup = pin >= 0 ? pin : hover;
   // 0.3.302 (Pedro): sem os botoes de atalho; cada bolinha tem o rotulo fixo em cima (horario e nome), em duas fileiras
-  const LW = 150, rowsAt: number[][] = [[], []], place: Record<number, number> = {};
+  // 0.3.310 (tela grande): o rotulo cresce com o espaco de cada hora (150 a 230 px), para o nome nao cortar a toa
+  const LW = Math.round(Math.max(150, Math.min(230, (w || 0) / SPAN * 1.45))), rowsAt: number[][] = [[], []], place: Record<number, number> = {};
   const billRow: Record<number, number> = {};
   billsShown.forEach((z, i) => {const px = z.x * (w || 1); for (const r of [0, 1]) {if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); billRow[i] = r; break;}}});
   groups.forEach((g, i) => {const px = g.x * (w || 1); for (const r of [0, 1]) {if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); place[i] = r; break;}}});
@@ -204,11 +221,13 @@ function Act({label, onPress}: {label: string; onPress: () => void}) {
 function Quiet({text, sub}: {text: string; sub: string}) {const c = useTheme(); return <View style={{marginTop: 'auto', gap: 4} as any}><Text style={{fontSize: 14, color: c.muted, fontWeight: '500'}}>{text}</Text><Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{sub}</Text></View>;}
 const Dot = () => {const c = useTheme(); return <View style={{position: 'absolute', top: 18, right: 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} />;};
 
+/** 0.3.310: a ultima linha da Agenda some aos poucos em vez de aparecer cortada no meio (mostra que tem mais rolando). */
+const FADE_END = {maskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)'};
 function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; card: any; upcoming: DayRecord[]; onOpen: (r: DayRecord) => void; onOpenAgenda: () => void}) {
   const c = useTheme(), list = upcoming; // 0.3.302: todos (rolagem invisivel)
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
-    {list.length ? <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2}} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
+    {list.length ? <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2, ...FADE_END} as any} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
       <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>
       <View style={{width: 3, height: 16, borderRadius: 2, backgroundColor: colorOf(r, c.accent)}} />
       <Text numberOfLines={1} style={{flex: 1, fontSize: 13, color: c.text}}>{r.title}</Text>
