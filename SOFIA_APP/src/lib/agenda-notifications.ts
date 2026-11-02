@@ -31,6 +31,8 @@ export function notificationPlan(items:AgendaItem[],now=new Date()){
   for(const minutes of (offsets.length?offsets:[0])){
    const ahead=minutes*60000,from=new Date(now.getTime()+ahead),to=readRepeat(item).frequency==='none'?new Date(8640000000000000):new Date(end.getTime()+ahead);
    for(const event of occurrences(item,from,to)){const start=eventStart(event),date=new Date((start.length===10?new Date(start+'T09:00:00').getTime():Date.parse(start))-ahead);if(date<=now)continue;
+    // 0.3.312: aviso desligado so desta vez (marca sofia-skip-v1:<inicio da ocorrencia>)
+    if(item.tags?.includes('sofia-skip-v1:'+new Date(start.length===10?start+'T09:00:00':start).toISOString()))continue;
     planned.push({id:item.id+':'+date.getTime(),entityId:item.id,alarm:['once','ring'].includes(String((item.data as {alarm_mode?:string}).alarm_mode))?String((item.data as {alarm_mode?:string}).alarm_mode):'',title:item.title,body:minutes?'Começa em '+reminderLabel(minutes).replace(' antes','')+(event.data.location?' · '+event.data.location:''):(event.data.location||'Seu compromisso na agenda da Sofia.'),date,day:localDateKey(start)});}
   }
  }

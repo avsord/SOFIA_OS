@@ -34,7 +34,7 @@ class Scheduler{
   const reminders=this.w.list({kind:'reminder',limit:500}).filter(e=>e.state==='active'&&e.data.remind_at&&Date.parse(e.data.remind_at)<=Date.parse(stamp));
   for(const e of reminders){
     const dedup='reminder:'+e.id+':'+e.data.remind_at;
-    this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
+    if(!(e.tags||[]).includes('sofia-skip-v1:'+new Date(e.data.remind_at).toISOString())&&!(e.tags||[]).includes('sofia-notify-v1:off'))this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
     // 0.3.304: lembrete que se repete (marca sofia-repeat-v1:FREQ:FUSO, a mesma da Agenda) nao termina: vai para a
     // proxima vez (semana, mes ou ano seguinte; dia 31 vira o ultimo dia do mes curto)
     const next=nextRepeat(e,stamp);
