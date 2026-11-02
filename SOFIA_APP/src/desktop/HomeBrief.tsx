@@ -93,7 +93,7 @@ export function HomeBrief(p: HomeBriefProps) {
       <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
-      <FinanceTile style={{flex: 1, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
+      <FinanceTile style={{flex: 2, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
       <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
       <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
@@ -242,37 +242,35 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
     </View> : <Quiet text="Nada hoje" sub="Nenhum item da rotina para hoje." />}
   </View>;
 }
+/** 0.3.307 (Pedro: "o layout ficou ruim"): Financas ocupa duas colunas, com dois numeros lado a lado no mesmo peso -
+ * gastos do mes e dinheiro guardado -, cada um com a sua barra; embaixo, numa linha so, a conta que vence primeiro. */
 function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void; onToggleMask?: () => void}) {
-  // 0.3.296 (Pedro): guardado e quanto falta da meta sempre visiveis; a conta que vence primeiro numa linha
   const c = useTheme(), dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
-  const g = goal && goal.target > 0 ? goalStats(goal) : null;
+  const g = goal && goal.target > 0 ? goalStats(goal) : null, sp = data.spend && data.spend.available > 0 ? data.spend : null;
+  const spendColor = sp ? (sp.pct > 100 ? c.danger : sp.pct >= 80 ? '#E8B04A' : '#88CFB8') : '#88CFB8';
+  const Stat = ({label, value, sub, pct, color}: {label: string; value: string; sub: string; pct: number; color: string}) => <View style={{flex: 1, minWidth: 0, gap: 6}}>
+    <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{label}</Text>
+    <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
+    <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}><View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /></View>
+    <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>
+  </View>;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {first && first.date <= today ? <View style={{position: 'absolute', top: 23, right: onToggleMask ? 50 : 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} /> : null}
-    <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
-    {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
-    {data.spend && data.spend.available > 0 ? <View style={{marginTop: 10, gap: 4}}>
-      {/* 0.3.305 (Pedro): no lugar do "Sobra ate", o Controle de gastos do mes (o mesmo card de Financas) */}
-      <Text style={{fontSize: 12, color: c.muted}}>Gastos de {new Date().toLocaleDateString('pt-BR', {month: 'long'})}</Text>
-      <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-        <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{money(data.spend.spent)}</Text>
-        <Text style={{fontSize: 12, color: c.muted}}>de {money(data.spend.available)}</Text>
-        <View style={{flex: 1}} />
-        <Text style={{fontSize: 12, fontWeight: '600', color: data.spend.pct > 100 ? c.danger : data.spend.pct >= 80 ? '#E8B04A' : c.text}}>{data.spend.pct}%</Text>
-      </View>
-      <View style={{height: 5, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 5, borderRadius: 3, width: (Math.min(100, Math.max(1, data.spend.pct)) + '%') as any, backgroundColor: data.spend.pct > 100 ? c.danger : data.spend.pct >= 80 ? '#E8B04A' : '#88CFB8'}} /></View>
-    </View> : null}
-    {g && goal ? <View style={{marginTop: 'auto', gap: 5} as any}>
-      {/* meta numa linha: nome, guardado de quanto e a porcentagem (0.3.306) */}
-      <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.muted}}>{goal.name || 'Meta'}</Text><Text numberOfLines={1} style={{fontSize: 12, color: c.text, fontVariant: ['tabular-nums']}}>{money(goal.saved)} de {money(goal.target)} · {Math.round(g.pct * 100)}%</Text></View>
-      <View style={{height: 5, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 5, borderRadius: 3, width: (Math.max(1, g.pct * 100) + '%') as any, backgroundColor: '#b49ae6'}} /></View>
-      {first ? <Text numberOfLines={1} style={{fontSize: 12, color: first.date <= today ? c.danger : c.muted}}>{first.title + ' ' + when(first.date) + ' · ' + money(first.amount)}</Text> : null}
-    </View> : first ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      <Big value={String(dues!.length)} unit={dues!.length === 1 ? 'conta na semana' : 'contas na semana'} />
-      <Line text={first.title + ' ' + when(first.date) + ' · ' + money(first.amount)} />
-      <Act label="Ver a conta" onPress={onOpen} />
-    </View> : <Quiet text="Nenhuma conta" sub="Nada vence nos próximos 7 dias." />}
+    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+      <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
+      <View style={{flex: 1}} />
+      {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, marginVertical: -4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
+    </View>
+    {sp || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 'auto'} as any}>
+      {sp ? <Stat label={'Gastos de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(sp.spent)} sub={sp.pct + '% de ' + money(sp.available)} pct={sp.pct} color={spendColor} /> : null}
+      {g && goal ? <Stat label={goal.name || 'Meta'} value={money(goal.saved)} sub={Math.round(g.pct * 100) + '% de ' + money(goal.target)} pct={g.pct * 100} color="#b49ae6" /> : null}
+    </View> : <Quiet text="Abra Finanças" sub="Para ver gastos e meta aqui." />}
+    {first ? <Pressable onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: c.line}}>
+      <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: first.date <= today ? c.danger : '#E8B04A'}} />
+      <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: first.date <= today ? c.danger : c.text}}>{first.title} {when(first.date)}</Text>
+      <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{money(first.amount)}</Text>
+    </Pressable> : null}
   </View>;
 }
 /** Price Tracker: mostra um produto por vez; as setas passam para o proximo (0.3.293: sem trocar sozinho). */
@@ -338,6 +336,6 @@ export function HomeBriefSkeleton() {
       <View style={{marginTop: 12, height: 100, justifyContent: 'center'}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</View>
-    <View style={{flexDirection: 'row', gap: 12}}>{tile(1)}{tile(1)}{tile(1)}{tile(1)}</View>
+    <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</View>
   </View></ShimmerGroup>;
 }
