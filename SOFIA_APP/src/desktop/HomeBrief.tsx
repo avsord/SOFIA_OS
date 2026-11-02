@@ -425,7 +425,7 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
     <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}>{pct != null ? <View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /> : null}
       {ticks.map(t => <View key={t.f} style={{position: 'absolute', left: (t.f * 100 + '%') as any, top: -2, width: 1.5, height: 8, marginLeft: -0.75, borderRadius: 1, backgroundColor: c.muted, opacity: 0.6}} />)}
     </View>
-    {ticks.length ? <View style={{height: 12, marginTop: -2}}>{ticks.map(t => <Text key={t.f} style={{position: 'absolute', left: (t.f * 100 + '%') as any, transform: [{translateX: -14}], width: 28, textAlign: 'center', fontSize: 10, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View> : null}
+    {ticks.length ? <View style={{height: 12, marginTop: -2}}>{ticks.map(t => <Text key={t.f} numberOfLines={1} style={{position: 'absolute', left: (t.f * 100 + '%') as any, transform: [{translateX: -20}], width: 40, textAlign: 'center', fontSize: 10, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View> : null}
     <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>
   </View>;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
@@ -440,7 +440,7 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
       {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, marginVertical: -4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
     </View>
     {/* 0.3.309 (Pedro): os numeros logo abaixo do titulo (antes ficavam no pe do cartao, com vazio em cima) */}
-    {lo || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 'auto'} as any}>{/* 0.3.311: alinhado embaixo, na mesma linha do E-mails */}
+    {lo || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 14}}>{/* 0.3.312: logo abaixo do titulo (0.3.309). Com a altura fixa das fileiras (ROW_H) o numero fica na mesma linha do Price Tracker e do E-mails; ancorado embaixo, as divisoes da meta empurravam o numero para baixo e desalinhava */}
       {/* 0.3.308 (Pedro): despesas que ele lancou no mes, fora as contas a pagar e o que se repete */}
       {/* 0.3.310: com teto definido (engrenagem do Controle de gastos), barra e "X% de R$ teto" */}
       {lo ? <Stat label={'Despesas de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(lo.total)} sub={lo.cap > 0 ? Math.round(lo.total / lo.cap * 100) + '% de ' + money(lo.cap) : lo.count ? (lo.count === 1 ? '1 lançamento' : lo.count + ' lançamentos') + (lo.biggest && lo.count > 1 ? ' · maior: ' + lo.biggest.title : '') : 'Nenhuma despesa lançada'} pct={lo.cap > 0 ? lo.total / lo.cap * 100 : null} color={lo.cap > 0 ? (lo.total > lo.cap ? c.danger : lo.total >= lo.cap * 0.8 ? '#E8B04A' : '#88CFB8') : spendColor} /> : null}
