@@ -218,6 +218,8 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
   const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
+  const [, tick] = useState(0);
+  useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
   const nowX = pos(new Date());
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
@@ -278,9 +280,33 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
         <Text numberOfLines={1} style={{fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>
       </View>;})())}
     </View>
-    {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18 + OFF, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
-    {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
+    {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
+        passou fica preenchido. Se a pessoa rolar para longe, aparece um botao para voltar para agora. */}
+    {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} w={w} top={29 + OFF} /> : <Pressable accessibilityRole="button" accessibilityLabel="Voltar para agora" onPress={() => setStart(Math.max(0, Math.min(24 * 3 - SPAN, Math.floor((Date.now() - day0) / 3600000) - 3)))}
+      style={({hovered}: any) => ({position: 'absolute', top: OFF + 18, [nowX < 0 ? 'left' : 'right']: 0, height: 22, paddingHorizontal: 9, borderRadius: 11, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
+      {({hovered}: any) => <><Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{nowX < 0 ? '‹' : ''} agora {nowX > 1 ? '›' : ''}</Text></>}
+    </Pressable>}
+    {[0, 0.25, 0.5, 0.75, 1].filter(f => !(nowX >= 0 && nowX <= 1 && w && Math.abs(f - nowX) * w < 46)).map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
     {shown ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} /> : null}
+  </View>;
+}
+
+/** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
+function NowBeacon({x, w, top}: {x: number; w: number; top: number}) {
+  const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {if (reduced) return; const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false})); loop.start(); return () => loop.stop();}, [reduced]);
+  const now = new Date(), label = hhmm(now), left = x * (w || 1), red = '#F57A8C';
+  return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
+    {/* aureola */}
+    <Animated.View style={{position: 'absolute', left: left - 14, top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.35, 0]}), transform: [{scale: pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1.4]})}]}} />
+    {/* ponto */}
+    <View style={{position: 'absolute', left: left - 6, top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
+    {/* fio ate a escala */}
+    <View style={{position: 'absolute', left: left - 0.5, top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
+    {/* etiqueta com a hora, na altura da escala */}
+    <View style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - 48, left - 24)), top: top + 13, width: 48, alignItems: 'center'}}>
+      <Text style={{fontSize: 11, fontWeight: '700', color: '#fff', backgroundColor: red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
+    </View>
   </View>;
 }
 
