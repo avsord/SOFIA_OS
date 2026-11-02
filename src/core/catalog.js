@@ -217,7 +217,7 @@ const CATALOG={
       "archived"
     ],
     "fields": [
-      {"key":"rotina_type","label":"Tipo na Rotina","type":"select","options":["capsula","cuidado","habito","treino"]},{"key":"count_target","label":"Vezes por dia","type":"number"},
+      {"key":"rotina_type","label":"Tipo na Rotina","type":"select","options":["capsula","cuidado","habito","treino","outro"]},{"key":"type_label","label":"Nome do tipo","type":"text","max":40},{"key":"type_color","label":"Cor do tipo","type":"text","max":16,"developerOnly":true},{"key":"type_icon","label":"Símbolo do tipo","type":"text","max":32,"developerOnly":true},{"key":"count_target","label":"Vezes por dia","type":"number"},
       {
         "key": "capsule_type",
         "label": "Tipo",
