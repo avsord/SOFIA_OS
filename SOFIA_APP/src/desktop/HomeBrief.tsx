@@ -85,7 +85,7 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{flex: 1}} />
         <Pressable accessibilityRole="link" onPress={p.onOpenAgenda}><Text style={{color: c.muted, fontSize: 12}}>Abrir agenda</Text></Pressable>
       </View>
-      <Timeline items={timelineItems} next={next} onEdit={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
+      <Timeline bills={(p.data.dues || []).map(d => ({id: d.id || d.title, title: d.title, date: d.date, amount: d.amount, late: d.date < new Date().toISOString().slice(0, 10)}))} masked={p.masked} onBill={() => p.onOpenModule('finance')} items={timelineItems} next={next} onEdit={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -105,13 +105,17 @@ export function HomeBrief(p: HomeBriefProps) {
  * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
 const SPAN = 16;
-function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | null; onEdit: (r: DayRecord) => void}) {
+type BillMark = {id: string; title: string; date: string; amount: number; late: boolean};
+function Timeline({items, next, onEdit, bills = [], masked = false, onBill}: {items: DayRecord[]; next: DayRecord | null; onEdit: (r: DayRecord) => void; bills?: BillMark[]; masked?: boolean; onBill?: () => void}) {
   const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), [pin, setPin] = useState(-1), [start, setStart] = useState(7), box = useRef<View>(null);
   const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
   const hoursOf = (d: Date) => (d.getTime() - day0) / 3600000;
   const pos = (d: Date) => (hoursOf(d) - start) / SPAN;
   const nowX = pos(new Date());
   const shown = items.filter(r => {const x = pos(new Date(r.date)); return x >= -0.01 && x <= 1.01;});
+  // 0.3.303 (Pedro): conta a pagar aparece na linha do tempo com marca especial (conexao com Financas)
+  const billAt = (b: BillMark) => b.late ? new Date(day0 + (start + 0.4) * 3600000) : new Date(b.date + 'T09:00:00'); // vencida: no comeco da linha
+  const billsShown = bills.map(b => ({b, x: pos(billAt(b))})).filter(z => z.x >= -0.01 && z.x <= 1.01);
   const groups: {x: number; list: DayRecord[]}[] = [];
   for (const r of shown) {const x = pos(new Date(r.date)); const g = groups[groups.length - 1]; if (g && w && (x - g.x) * w < 22) g.list.push(r); else groups.push({x, list: [r]});}
   useEffect(() => {
@@ -127,6 +131,8 @@ function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | 
   const shownGroup = pin >= 0 ? pin : hover;
   // 0.3.302 (Pedro): sem os botoes de atalho; cada bolinha tem o rotulo fixo em cima (horario e nome), em duas fileiras
   const LW = 150, rowsAt: number[][] = [[], []], place: Record<number, number> = {};
+  const billRow: Record<number, number> = {};
+  billsShown.forEach((z, i) => {const px = z.x * (w || 1); for (const r of [0, 1]) {if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); billRow[i] = r; break;}}});
   groups.forEach((g, i) => {const px = g.x * (w || 1); for (const r of [0, 1]) {if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); place[i] = r; break;}}});
   const OFF = 44; // espaco dos rotulos em cima da linha
   return <View ref={box} style={{marginTop: 12, height: 56 + OFF}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
@@ -140,6 +146,14 @@ function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | 
         {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
       </Pressable>;
     })}
+    {billsShown.map((z, i) => <React.Fragment key={'b' + z.b.id + i}>
+      <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + z.b.title + (z.b.late ? ', vencida' : '')} onPress={onBill} hitSlop={12} style={({hovered}: any) => ({position: 'absolute', left: (z.x * 100 + '%') as any, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 7, transform: [{rotate: '45deg'}, {scale: hovered ? 1.12 : 1}], backgroundColor: z.b.late ? c.danger : '#E8B04A', borderWidth: 3, borderColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(z.b.late ? '#F5A0AE' : '#E8B04A', 0.18)} as any)}>
+        <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>$</Text>
+      </Pressable>
+      {billRow[i] != null ? <View pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, z.x * (w || 1) - LW / 2)), top: billRow[i] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center'}}>
+        <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: z.b.late ? c.danger : '#E8B04A', backgroundColor: tint(z.b.late ? '#F5A0AE' : '#E8B04A', 0.14), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden'}}>{z.b.title} · {masked ? 'R$ •••' : brl(z.b.amount)}</Text>
+      </View> : null}
+    </React.Fragment>)}
     {shownGroup >= 0 && groups[shownGroup] ? (() => {
       // previa (mouse em cima) ou cartao fixo (clique): titulo, descricao e o lapis para editar
       const g = groups[shownGroup], pinned = pin >= 0, W = pinned ? 300 : 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
@@ -230,11 +244,16 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
   const g = goal && goal.target > 0 ? goalStats(goal) : null;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {first && first.date <= today ? <Dot /> : null}
+    {first && first.date <= today ? <View style={{position: 'absolute', top: 23, right: onToggleMask ? 50 : 18, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, boxShadow: '0 0 0 4px ' + tint('#F5A0AE', 0.15)} as any} /> : null}
     <TileHead icon="wallet" color="#b49ae6" name={'Finanças' + (goal?.name ? ' · ' + goal.name : '')} onOpen={onOpen} />
     {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
+    {data.left ? <View style={{marginTop: 10, gap: 2}}>
+      {/* 0.3.303: o que sobra depois de tudo pago (a mesma conta do Previsto de Financas) */}
+      <Text style={{fontSize: 12, color: c.muted}}>Sobra até {data.left.end.slice(8, 10)}/{data.left.end.slice(5, 7)}, depois de tudo pago</Text>
+      <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: data.left.left < 0 ? c.danger : c.text, fontVariant: ['tabular-nums']}}>{money(data.left.left)}</Text>
+    </View> : null}
     {g && goal ? <View style={{marginTop: 'auto', gap: 5} as any}>
-      <Big value={money(goal.saved)} unit={Math.round(g.pct * 100) + '% guardado'} />
+      <View style={{flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between'}}><Text style={{fontSize: 12, color: c.muted}}>Guardado</Text><Text style={{fontSize: 12, color: c.text, fontVariant: ['tabular-nums']}}>{money(goal.saved)} · {Math.round(g.pct * 100)}%</Text></View>
       <View style={{height: 6, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#88CFB8'}} /></View>
       <Line text={'Faltam ' + money(g.missing) + ' de ' + money(goal.target)} />
       {first ? <Text numberOfLines={1} style={{fontSize: 12, color: first.date <= today ? c.danger : c.muted}}>{first.title + ' ' + when(first.date) + ' · ' + money(first.amount)}</Text> : null}

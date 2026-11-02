@@ -208,6 +208,14 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             </View>
   );
   const pad = useColumnPad(); // 0.3.253: cabecalho alinhado a coluna de leitura no computador
+  // 0.3.303 (Pedro): marcar todos os e-mails novos (da conta escolhida) como lidos de uma vez, no site e no celular
+  const [readingAll, setReadingAll] = useState(false);
+  const readAll = async () => {
+    const fresh = scoped.filter(h => h.state === 'new'); if (!fresh.length) return;
+    setReadingAll(true);
+    try { for (let i = 0; i < fresh.length; i += 6) await Promise.all(fresh.slice(i, i + 6).map(h => api.saveEntity({...h, state: 'read'}).catch(() => null))); await load(); }
+    finally { setReadingAll(false); }
+  };
   return (
     <InternalBackGesture enabled={active && !open && !addAccount && !ruleSheet} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
@@ -215,6 +223,9 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
           {desktop ? null : <IconButton name="back" label="Voltar aos apps" onPress={onBack} />}
           {desktop ? <View style={{flex: 1}}><Text style={{fontSize: 28, fontWeight: '600', letterSpacing: -1, color: c.text}}>E-mails</Text><Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{accounts === null ? ' ' : !accounts.length ? 'Conecte uma conta para a Sofia ficar de olho nos seus e-mails.' : (() => { const fresh = scoped.filter(h => h.state === 'new'); return fresh.length ? (fresh.length === 1 ? 'Um e-mail novo, de ' : fresh.length + ' e-mails novos; o mais recente é de ') + String(fresh[0].data.from_name || fresh[0].data.from_addr || 'alguém') + '.' : scoped.length ? 'Nada novo. A Sofia continua de olho nas suas regras.' : 'Nenhum e-mail bateu nas suas regras ainda.'; })()}</Text></View> : null}
           <View style={{flex: desktop ? undefined : 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap'}}>{desktop ? null : <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>E-mails</Text>}{accounts?.length ? <Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts) + '. Trocar'} onPress={() => setPicker(true)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, borderWidth: 1, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent'})}><Text numberOfLines={1} style={{fontSize: 13, color: c.text}}>{selectionLabel(selection, accounts)}</Text><View style={{transform: [{rotate: '90deg'}]}}><Icon name="chevron" size={12} color={c.muted} /></View></Pressable> : null}</View>
+          {scoped.some(h => h.state === 'new') ? <Pressable testID="mail-read-all" accessibilityRole="button" accessibilityLabel="Marcar tudo como lido" disabled={readingAll} onPress={() => void readAll()} style={({hovered, pressed}: any) => ({height: desktop ? 36 : 34, paddingHorizontal: desktop ? 14 : 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: hovered ? c.input : 'transparent', borderWidth: 1, borderColor: c.line, opacity: readingAll ? 0.6 : pressed ? 0.85 : 1, marginRight: 6})}>
+            <Icon name="check" size={15} color={c.text} /><Text style={{color: c.text, fontSize: 13, fontWeight: '500'}}>{readingAll ? 'Marcando…' : desktop ? 'Marcar tudo como lido' : 'Ler tudo'}</Text>
+          </Pressable> : null}
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: desktop ? 18 : 8, ...pad(16)}}>
