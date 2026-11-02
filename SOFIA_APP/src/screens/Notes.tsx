@@ -43,7 +43,9 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const lastAct = useRef(Date.now()); const touch = () => { lastAct.current = Date.now(); };
 
   const load = useCallback(async () => {
-    try { const [n, t] = await Promise.all([listAll(api, 'annotation'), listAll(api, 'note_tag')]); setNotesE(n); setTagsE(t); setError(''); }
+    // 0.3.300 (Pedro: "notas do app nao aparecem no site"): o app Notas mostrava so as anotacoes; as ideias e os
+    // aprendizados (que a Sofia salva pela conversa e o app antigo do celular mostrava em Notas) ficavam de fora.
+    try { const [a, i, l, t] = await Promise.all([listAll(api, 'annotation'), listAll(api, 'idea'), listAll(api, 'lesson_learned'), listAll(api, 'note_tag')]); setNotesE([...a, ...i, ...l]); setTagsE(t); setError(''); }
     catch (e) { setError(errorText(e)); setNotesE(x => x || []); }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
@@ -62,7 +64,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const notes: Note[] = useMemo(() => (notesE || []).map(e => {
     let enc: Sealed | null = null; try { enc = e.data?.enc_json ? JSON.parse(String(e.data.enc_json)) : null; } catch { enc = null; }
     const p = plain[e.id];
-    return {id: e.id, e, title: enc ? (p?.title ?? '') : e.title, body: enc ? (p?.body ?? '') : String(e.content || ''), tags: tagsOf(e), pinned: !!e.data?.pinned, archived: e.state === 'archived', updated: String(e.updated_at || e.created_at || ''), created: String(e.created_at || ''), lockTag: String(e.data?.lock_tag || ''), enc};
+    return {id: e.id, e, title: enc ? (p?.title ?? '') : e.title, body: enc ? (p?.body ?? '') : String(e.content || ''), tags: [...tagsOf(e), ...(e.kind === 'idea' && !tagsOf(e).some(x => fold(x) === 'ideia') ? ['Ideia'] : e.kind === 'lesson_learned' ? ['Aprendizado'] : [])], pinned: !!e.data?.pinned, archived: e.state === 'archived', updated: String(e.updated_at || e.created_at || ''), created: String(e.created_at || ''), lockTag: String(e.data?.lock_tag || ''), enc};
   }), [notesE, plain]);
   const curTag = view.startsWith('tag:') ? tags.find(t => t.key === view.slice(4)) || null : null;
   const unlocked = (k: string) => keys.current.has(k);
