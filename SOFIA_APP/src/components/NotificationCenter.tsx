@@ -220,14 +220,14 @@ function DeskList(){const n=useNotifications(),c=useTheme(),digest=useDigest(),[
   {[...groups].map(([g,items])=><View key={g}><Text style={{color:c.muted,fontSize:12,fontWeight:'600',paddingHorizontal:18,paddingTop:12,paddingBottom:4}}>{g}</Text>{items.slice(0,30).map(i=><DeskRow key={i.id} item={i}/>)}</View>)}
  </View>;}
 /** O número aparece crescendo de 0 a 1 em vez de surgir seco. Depois disso, quando a contagem muda, só o número troca (sem pulo). */
-function BellBadge({count}:{count:number}){const c=useTheme(),reduced=useReducedMotion(),scale=useRef(new Animated.Value(count>0?1:0)).current,last=useRef(count),[shown,setShown]=useState(count);
+function BellBadge({count,desk=false}:{count:number;desk?:boolean}){const c=useTheme(),reduced=useReducedMotion(),scale=useRef(new Animated.Value(count>0?1:0)).current,last=useRef(count),[shown,setShown]=useState(count);
  useEffect(()=>{const prev=last.current;last.current=count;if(count>0)setShown(count);
   if(reduced){scale.setValue(count>0?1:0);if(!count)setShown(0);return;}
   if(prev===0&&count>0){scale.setValue(0);Animated.spring(scale,{toValue:1,useNativeDriver:true,friction:5,tension:140}).start();}
   else if(count===0&&prev>0)Animated.timing(scale,{toValue:0,duration:160,easing:MOTION_EASE,useNativeDriver:true}).start(()=>setShown(0));
  },[count,reduced,scale]);
  if(!shown&&!count)return null;
- return <Animated.View pointerEvents="none" style={{position:'absolute',right:0,top:0,minWidth:18,height:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:3,transform:[{scale}]}}><Text style={{color:c.onAccent,fontSize:10,fontWeight:'600'}}>{shown>99?'99+':shown}</Text></Animated.View>;}
+ return <Animated.View pointerEvents="none" style={{position:'absolute',right:desk?3:0,top:desk?9:0,minWidth:18,height:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:3,...(desk?{borderWidth:2,borderColor:c.bg,minWidth:20,height:20,borderRadius:10}:null),transform:[{scale}]}}><Text style={{color:c.onAccent,fontSize:10,fontWeight:'600'}}>{shown>99?'99+':shown}</Text></Animated.View>;}
 export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  const c=useTheme(),n=useNotifications(),screen=useWindowDimensions(),insets=useSafeAreaInsets();
  const [open,setOpen]=useState(false),[anchor,setAnchor]=useState<BellAnchor>({x:screen.width-66,y:insets.top+20,width:44,height:44});
@@ -246,7 +246,8 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  useEffect(()=>()=>motion.stopAnimation(),[motion]);
  useEffect(()=>{if(open)bell.current?.measureInWindow((x,y,width,height)=>setAnchor({x,y,width,height}));},[screen.width,screen.height,open]);
  return <><View ref={bell} collapsable={false} onLayout={measureBell}>
-  <Pressable testID="notification-bell" accessibilityRole="button" accessibilityLabel={'Notificações: '+n.unread+' não lidas'} onPress={show} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="bell" color={c.text}/><BellBadge count={n.unread}/></Pressable>
+  <Pressable testID="notification-bell" accessibilityRole="button" accessibilityLabel={'Notificações: '+n.unread+' não lidas'} onPress={show} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}>{/* 0.3.325 (Pedro: "o sino nao esta na mesma linha"): no computador o numero fica no ombro do sino (antes ficava acima dele e
+   o conjunto parecia mais alto que a foto e a busca); o sino fica no centro da barra */}<Icon name="bell" color={c.text}/><BellBadge count={n.unread} desk={desk}/></Pressable>
  </View><Modal visible={open} transparent hardwareAccelerated statusBarTranslucent navigationBarTranslucent animationType="none" onShow={animateShown} onRequestClose={()=>close()}>
   <View style={{flex:1}}>
    {/* Keep one stable dim layer for the whole native window lifetime. Only the card animates. */}

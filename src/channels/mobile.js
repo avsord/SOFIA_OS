@@ -531,7 +531,7 @@ function makeMobileApi(runtime, deps) {
       try { store.db.exec('CREATE TABLE IF NOT EXISTS profile_photo(owner TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL)'); } catch { /* banco de teste */ }
       if (m === 'GET') { const r = store.db.prepare("SELECT mime,data,updated_at FROM profile_photo WHERE owner='owner'").get(); return send(r ? {photo: {mime: r.mime, base64: r.data, updated_at: r.updated_at}} : {photo: null}); }
       if (m === 'POST') {
-        rate(session, 'write', 20); const b = await bodyJson(req, 4 * 1024 * 1024);
+        rate(session, 'write', 20); const b = await bodyJson(req, 14 * 1024 * 1024); // 0.3.325: foto do celular em tamanho cheio passava de 4 MB e era recusada (o site ficava sem a foto)
         const mime = ['image/jpeg', 'image/png', 'image/webp'].includes(String(b.mime)) ? String(b.mime) : 'image/jpeg', data = String(b.base64 || '').replace(/^data:[^,]*,/, '');
         if (!/^[A-Za-z0-9+/=]{100,}$/.test(data)) fail('BAD_PHOTO', 'Foto inválida.', 400);
         const at = new Date().toISOString(); store.db.prepare("INSERT INTO profile_photo VALUES('owner',?,?,?) ON CONFLICT(owner) DO UPDATE SET mime=excluded.mime,data=excluded.data,updated_at=excluded.updated_at").run(mime, data, at);
