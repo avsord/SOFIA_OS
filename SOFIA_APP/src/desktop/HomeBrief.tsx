@@ -36,6 +36,7 @@ export type HomeBriefProps = {
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
   onMarkAction?: (m: TimeMark) => void;
+  onMove?: (t: MoveTarget, to: Date) => void;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -174,7 +175,7 @@ export function HomeBrief(p: HomeBriefProps) {
       {gear ? <TimelineSettingsPanel s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} opacity={tl.opacity}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance')}} />
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -208,13 +209,23 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void};
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (t: MoveTarget, to: Date) => void};
+/** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
+export type MoveTarget = MuteTarget;
+const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
 const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) || ROTINA_TYPES[0]).color;
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
 function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; opacity?: number; actions: TimelineActions}) {
-  const c = useTheme(), [w, setW] = useState(0), [start, setStart] = useState(7), box = useRef<View>(null);
+  const c = useTheme(), [w, setW] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null);
+  // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
+  const startRef = useRef(DAY_START), target = useRef(DAY_START), raf = useRef<any>(null);
+  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - SPAN, v));
+  const glide = (to: number) => {target.current = clampStart(to); if (raf.current) return;
+    const step = () => {const cur = startRef.current, d = target.current - cur; const nx = Math.abs(d) < 0.004 ? target.current : cur + d * 0.2; startRef.current = nx; setStartRaw(nx); raf.current = nx === target.current ? null : requestAnimationFrame(step);};
+    raf.current = requestAnimationFrame(step);};
+  useEffect(() => () => {if (raf.current) cancelAnimationFrame(raf.current);}, []);
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
   const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
@@ -232,14 +243,42 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
   const all = [...points, ...mpoints];
   useEffect(() => {
     const el: any = box.current; if (!el || !el.addEventListener) return;
-    let acc = 0;
-    const onWheel = (e: WheelEvent) => {e.preventDefault(); acc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; const steps = Math.trunc(acc / 40); if (!steps) return; acc -= steps * 40; setPin(''); setHover(''); setStart(v => Math.max(0, Math.min(24 * 3 - SPAN, v + steps)));};
+    const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return; const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; setPin(''); setHover(''); glide(target.current + d / 40);};
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
   useEffect(() => {if (typeof window === 'undefined' || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
+  // 0.3.317 (Pedro): arrastar para frente ou para tras. A bolinha segue o mouse em tempo real (sem cortes), a hora aparece
+  // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
+  type Drag = {key: string; target: MoveTarget; fx: number; live: boolean; color: string};
+  const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
+  const [settle, setSettle] = useState<Record<string, number>>({});
+  useEffect(() => {setSettle({});}, [items, marks]);
+  const hourAt = (fx: number) => startRef.current + fx * SPAN;
+  const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
+  const beginDrag = (e: any, key: string, t: MoveTarget, x0: number, color: string) => {
+    const el: any = box.current; if (!actions.onMove || !el?.getBoundingClientRect || typeof window === 'undefined') return;
+    const ne = e?.nativeEvent || {}, sx = Number(ne.pageX ?? ne.clientX), rect = el.getBoundingClientRect(); if (!Number.isFinite(sx) || !rect.width) return;
+    const grab = sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
+    const fxOf = (x: number) => Math.max(0, Math.min(1, (x - grab - rect.left) / rect.width));
+    const tickEdge = () => {if (!edge || !dragRef.current) {edgeRaf = null; return;} glide(target.current + edge * 0.08); const d = {...dragRef.current, fx: fxOf(lastX)}; dragRef.current = d; setDrag(d); edgeRaf = requestAnimationFrame(tickEdge);};
+    const move = (ev: PointerEvent) => {lastX = ev.pageX; const live = dragRef.current?.live || Math.abs(ev.pageX - sx) > 4; if (!live) return;
+      if (!dragRef.current?.live) {setPin(''); setHover(''); document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing';}
+      const d = {key, target: t, fx: fxOf(ev.pageX), live: true, color}; dragRef.current = d; setDrag(d);
+      const px = ev.pageX - rect.left; edge = px < 28 ? -1 : px > rect.width - 28 ? 1 : 0; if (edge && !edgeRaf) edgeRaf = requestAnimationFrame(tickEdge);};
+    const up = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); edge = 0; if (edgeRaf) cancelAnimationFrame(edgeRaf);
+      document.body.style.userSelect = ''; document.body.style.cursor = '';
+      const d = dragRef.current; dragRef.current = null; setDrag(null); if (!d?.live) return;
+      justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);
+      const to = snapDate(d.fx), fx = ((to.getTime() - day0) / 3600000 - startRef.current) / SPAN;
+      setSettle(o => ({...o, [key]: fx})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
+      actions.onMove!(t, to);};
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const dragLabel = (fx: number) => {const d = snapDate(fx), dd = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - day0) / 864e5);
+    return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : dd === -1 ? 'ontem ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hhmm(d);};
   const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.data?.message || o.content || o.data?.location || '').trim();};
   // rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so na previa
@@ -258,36 +297,53 @@ function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRe
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, opacity}}>
       {all.map(p => {
-        const m = p.marks[0], r = p.recs[0], open = () => setPin(k => k === p.key ? '' : p.key), hov = {onHoverIn: () => enter(p.key), onHoverOut: leave};
+        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, onHoverOut: leave};
+        // 0.3.317: da para arrastar a bolinha de um item so (compromisso, lembrete, tarefa) e a dose da Rotina sozinha
+        const tgt: MoveTarget | null = !actions.onMove ? null : m ? (p.marks.length === 1 && m.kind === 'routine' && m.dose && !m.late ? {dose: m.dose} : null) : p.recs.length === 1 ? {rec: r} : null;
+        const xo = settle[p.key] ?? p.x, ghost = drag?.key === p.key;
+        const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
+        const extra: any = {opacity: ghost ? 0.3 : 1, cursor: tgt ? 'grab' : 'pointer', ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
           const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
           const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
-          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} {...hov} style={({hovered}: any) => ({position: 'absolute', left: (p.x * 100 + '%') as any, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
+          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
             {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName)} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
           </Pressable>;
         }
         const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1;
-        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} {...hov}
-          style={({hovered}: any) => ({position: 'absolute', left: (p.x * 100 + '%') as any, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
+        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} {...hov} {...drg}
+          style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
         const size = isNext ? 16 : many ? 20 : 12;
-        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov}
-          style={{position: 'absolute', left: (p.x * 100 + '%') as any, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(r, c.accent), alignItems: 'center', justifyContent: 'center'}}>
+        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(r, c.accent), alignItems: 'center', justifyContent: 'center'}}>
           {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{p.recs.length}</Text> : null}
         </Pressable>;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p); return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, p.x * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center'}}>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] ?? p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, lx * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : 1, ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <Text numberOfLines={1} style={{fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>
       </View>;})())}
     </View>
     {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
         passou fica preenchido. Se a pessoa rolar para longe, aparece um botao para voltar para agora. */}
-    {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} w={w} top={29 + OFF} /> : <Pressable accessibilityRole="button" accessibilityLabel="Voltar para agora" onPress={() => setStart(Math.max(0, Math.min(24 * 3 - SPAN, Math.floor((Date.now() - day0) / 3600000) - 3)))}
-      style={({hovered}: any) => ({position: 'absolute', top: OFF + 18, [nowX < 0 ? 'left' : 'right']: 0, height: 22, paddingHorizontal: 9, borderRadius: 11, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
-      {({hovered}: any) => <><Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{nowX < 0 ? '‹' : ''} agora {nowX > 1 ? '›' : ''}</Text></>}
-    </Pressable>}
-    {[0, 0.25, 0.5, 0.75, 1].filter(f => !(nowX >= 0 && nowX <= 1 && w && Math.abs(f - nowX) * w < 46)).map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
-    {shown ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} /> : null}
+    {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} w={w} top={29 + OFF} /> : null}
+    {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
+        cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
+    {Math.abs(start - DAY_START) > 0.3 ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START);}}
+      style={({hovered}: any) => ({position: 'absolute', top: -38, right: 40, height: 24, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
+      {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{start > DAY_START ? '‹ agora' : 'agora ›'}</Text>}
+    </Pressable> : null}
+    {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
+    {Array.from({length: 6}, (_, k) => Math.ceil((start - 3) / 4) * 4 + 3 + k * 4).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && w && Math.abs(x - nowX) * w < 46)) return null;
+      const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
+    {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
+    {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
+      <View style={{position: 'absolute', left: drag.fx * (w || 1) - 9, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
+      <View style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - 110, drag.fx * (w || 1) - 55)), top: OFF - 4, width: 110, alignItems: 'center'}}>
+        <Text style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{dragLabel(drag.fx)}</Text>
+      </View>
+    </View> : null}
+    {shown && !drag?.live ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : t.dose.planId + t.dose.time), t, shown.x, color) : undefined} /> : null}
   </View>;
 }
 
@@ -311,15 +367,16 @@ function NowBeacon({x, w, top}: {x: number; w: number; top: number}) {
 }
 
 /** O cartao da previa: uma linha por item (simbolo na cor, horario, titulo e a acao do item a direita), descricao embaixo. */
-function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void}) {
+function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const c = useTheme(), W = 320, x = Math.max(0, Math.min((width || 1) - W, point.x * (width || 1) - W / 2));
-  const Row = ({color, icon, time, title, sub, action, onAction, onEdit, done, check}: {color: string; icon?: IconName; time: string; title: string; sub?: string; action?: string; onAction?: () => void; onEdit?: () => void; done?: boolean; check?: () => void}) =>
+  const Row = ({color, icon, time, title, sub, action, onAction, onEdit, done, check, grab}: {color: string; icon?: IconName; time: string; title: string; sub?: string; action?: string; onAction?: () => void; onEdit?: () => void; done?: boolean; check?: () => void; grab?: (e: any) => void}) =>
     <View style={{flexDirection: 'row', gap: 10, paddingVertical: 8}}>
       {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={8} style={({hovered}: any) => ({width: 18, height: 18, marginTop: 1, borderRadius: 9, borderWidth: 2, borderColor: done ? color : hovered ? color : c.muted, backgroundColor: done ? color : 'transparent', alignItems: 'center', justifyContent: 'center'})}>{done ? <Icon name="check" size={11} color={c.surface} /> : null}</Pressable>
         : <View style={{width: 18, height: 18, marginTop: 1, borderRadius: 6, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}>{icon ? <Icon name={icon} size={11} color={color} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: color}} />}</View>}
       <View style={{flex: 1, minWidth: 0, gap: 2}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-          <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>
+          {/* 0.3.317: no cartao, o horario e a alca para arrastar o item (util quando varios estao na mesma bolinha) */}
+          {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} style={({hovered}: any) => ({cursor: 'grab', borderRadius: 5, paddingHorizontal: 3, marginHorizontal: -3, backgroundColor: hovered ? tint(color, 0.18) : 'transparent'} as any)}><Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>⠿ {time}</Text></Pressable> : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
           <Text numberOfLines={2} style={{flex: 1, fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
         </View>
         {sub ? <Text numberOfLines={3} style={{fontSize: 12, lineHeight: 17, color: c.muted}}>{sub}</Text> : null}
@@ -332,14 +389,31 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
   return <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 46, width: W, zIndex: 8, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 36px rgba(0,0,0,0.45)'} as any}>
     {recs.map((r, i) => <View key={r.id + i} style={{borderTopWidth: i ? 1 : 0, borderColor: c.line}}>{Row({color: r.kind === 'reminder' ? REMIND : colorOf(r, c.accent), icon: r.kind === 'reminder' ? 'bell' : undefined, time: hhmm(new Date(r.date)), title: r.title, sub: desc(r) || undefined,
-      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, done: r.isTask ? (r.original as any)?.state === 'done' : false, onEdit: () => {onClose(); actions.onEdit(r);}})}</View>)}
+      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, done: r.isTask ? (r.original as any)?.state === 'done' : false, onEdit: () => {onClose(); actions.onEdit(r);}, grab: onGrab && point.recs.length + point.marks.length > 1 ? (e: any) => onGrab(e, {rec: r}, r.kind === 'reminder' ? REMIND : colorOf(r, c.accent)) : undefined})}</View>)}
     {marks.map((m, i) => <View key={m.id} style={{borderTopWidth: i || recs.length ? 1 : 0, borderColor: c.line}}>{Row({color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
       time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, sub: m.kind === 'routine' ? (m.done ? 'Feito' : '') : m.sub, done: m.done && m.kind === 'routine',
-      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined})}</View>)}
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 && m.kind === 'routine' && m.dose && !m.late ? (e: any) => onGrab(e, {dose: m.dose!}, markColor(m, c.danger)) : undefined})}</View>)}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingBottom: 6}}>+{extra} mais</Text> : null}
   </View>;
 }
 
+/** 0.3.317 (Pedro): rodinha do mouse em cima do bloco passa os itens (um por passo, sem disparar varios de uma vez). */
+function useWheelStep(onStep: (dir: 1 | -1) => void, enabled: boolean) {
+  const ref = useRef<View>(null), cb = useRef(onStep); cb.current = onStep;
+  useEffect(() => {const el: any = ref.current; if (!el?.addEventListener || !enabled) return; let acc = 0, last = 0;
+    const h = (e: WheelEvent) => {e.preventDefault(); const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; acc += d; const now = Date.now();
+      if (Math.abs(acc) >= 40 && now - last > 260) {cb.current(acc > 0 ? 1 : -1); acc = 0; last = now;} else if (now - last > 600) acc = Math.sign(acc) * Math.min(Math.abs(acc), 40);};
+    el.addEventListener('wheel', h, {passive: false}); return () => el.removeEventListener('wheel', h);}, [enabled]);
+  return ref;
+}
+/** Setas "‹ 1 de N ›" no canto do bloco (Price Tracker, Encomendas). */
+function Pager({i, n, onGo, what}: {i: number; n: number; onGo: (k: number) => void; what: string}) {
+  const c = useTheme(); if (n < 2) return null;
+  const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={7} onPress={() => onGo(k)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>{label}</Text></Pressable>;
+  return <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
+    {btn('‹', (i - 1 + n) % n, what + ' anterior')}<Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % n) + 1} de {n}</Text>{btn('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase())}
+  </View>;
+}
 function TileHead({icon, color, name, onOpen}: {icon: IconName; color: string; name: string; onOpen: () => void}) {
   const c = useTheme();
   return <Pressable accessibilityRole="link" accessibilityLabel={'Abrir ' + name} onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start'}}>
@@ -387,17 +461,47 @@ function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; 
   </View>;
 }
 function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
-  const s = data.capsules, today = new Date().toDateString();
-  const doses = capsuleDoses(s.plans, s.history).filter(d => d.date.toDateString() === today);
-  const done = doses.filter(d => d.taken).length, next = doses.find(d => !d.taken);
-  const late = !!next && next.date.getTime() < Date.now();
-  return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {late ? <Dot /> : null}
+  const c = useTheme(), s = data.capsules, today = new Date().toDateString();
+  const doses = capsuleDoses(s.plans, s.history).filter(d => d.date.toDateString() === today).sort((a, b) => a.date.getTime() - b.date.getTime());
+  // 0.3.317 (Pedro): igual ao Price Tracker - cada grupo da Rotina (Capsulas, Cuidados, Habitos, Treino e os tipos criados)
+  // num quadro; o seletor no canto escolhe o grupo (clicar abre a lista, as setas passam); a rodinha passa os ITENS do grupo
+  const groups = useMemo(() => {const m = new Map<string, {id: string; name: string; color: string; doses: typeof doses}>();
+    for (const d of doses) {const t = typeInfo(d.plan); if (!m.has(t.id)) m.set(t.id, {id: t.id, name: t.name, color: t.color, doses: []}); m.get(t.id)!.doses.push(d);}
+    const order = (id: string) => {const n = ROTINA_TYPES.findIndex(t => t.id === id); return n < 0 ? 99 : n;};
+    return [...m.values()].sort((a, b) => order(a.id) - order(b.id) || a.name.localeCompare(b.name));}, [doses.map(d => d.key + (d.taken ? 1 : 0)).join('|'), s.plans]);
+  const [gid, setGid] = useState(''), [k, setK] = useState(-1), [menu, setMenu] = useState(false);
+  // abre no primeiro grupo (na ordem da Rotina) que ainda tem algo para fazer hoje
+  const auto = Math.max(0, groups.findIndex(x => x.doses.some(d => !d.taken)));
+  const gi = gid ? Math.max(0, groups.findIndex(x => x.id === gid)) : auto, g = groups[gi];
+  const list = g?.doses || [], firstOpen = Math.max(0, list.findIndex(d => !d.taken)), cur = list[k >= 0 && k < list.length ? k : firstOpen];
+  const pickGroup = (n: number) => {const ng = groups[(n + groups.length) % groups.length]; if (ng) {setGid(ng.id); setK(-1);} setMenu(false);};
+  const wheel = useWheelStep(d => list.length > 1 && setK(o => ((o >= 0 ? o : firstOpen) + d + list.length) % list.length), list.length > 1);
+  const done = list.filter(d => d.taken).length, late = doses.some(d => !d.taken && d.date.getTime() < Date.now());
+  const curLate = !!cur && !cur.taken && cur.date.getTime() < Date.now();
+  return <View ref={wheel} style={[card, {gap: 6, overflow: 'visible', paddingVertical: 16, zIndex: menu ? 30 : 0}, style]}>
+    {late && groups.length < 2 ? <Dot /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
-    {doses.length ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      <Big value={String(done)} unit={'de ' + doses.length + ' hoje'} />
-      <Line text={next ? (late ? next.plan.title + ' passou da hora (' + hhmm(next.date) + ')' : 'Próximo: ' + next.plan.title + ' às ' + hhmm(next.date)) : 'Tudo feito por hoje.'} />
-      {next ? <Act label="Tomei" onPress={() => void s.take(next.plan.id, next.day, next.time).catch(() => undefined)} /> : null}
+    {g && groups.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 5}}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Grupo anterior" hitSlop={7} onPress={() => pickGroup(gi - 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
+      <Pressable testID="rotina-group" accessibilityRole="button" accessibilityLabel={'Grupo da Rotina: ' + g.name + '. Escolher outro'} onPress={() => setMenu(v => !v)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint(g.color, hovered || menu ? 0.22 : 0.12)})}>
+        <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: g.color}} /><Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: g.color, maxWidth: 110}}>{g.name}</Text><Text style={{fontSize: 10, color: g.color}}>▾</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Próximo grupo" hitSlop={7} onPress={() => pickGroup(gi + 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
+      {menu ? <View style={{position: 'absolute', top: 32, right: 24, minWidth: 180, paddingVertical: 6, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
+        {groups.map((x, n) => <Pressable key={x.id} accessibilityRole="button" accessibilityState={{selected: n === gi}} onPress={() => pickGroup(n)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 9, height: 34, paddingHorizontal: 12, backgroundColor: hovered ? c.input : 'transparent'})}>
+          <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: x.color}} /><Text style={{flex: 1, fontSize: 13, color: c.text, fontWeight: n === gi ? '600' : '400'}}>{x.name}</Text>
+          {x.doses.some(d => !d.taken && d.date.getTime() < Date.now()) ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: c.danger}} /> : null}
+          <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{x.doses.filter(d => d.taken).length}/{x.doses.length}</Text>
+        </Pressable>)}
+      </View> : null}
+    </View> : null}
+    {cur ? <View style={{marginTop: 'auto', gap: 4} as any}>
+      <Big value={String(done)} unit={'de ' + list.length + ' hoje'} />
+      <Line text={cur.taken ? cur.plan.title + ' · feito às ' + hhmm(cur.date) : curLate ? cur.plan.title + ' passou da hora (' + hhmm(cur.date) + ')' : (k < 0 ? 'Próximo: ' : '') + cur.plan.title + ' às ' + hhmm(cur.date)} />
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        {!cur.taken ? <Act label="Tomei" onPress={() => void s.take(cur.plan.id, cur.day, cur.time).catch(() => undefined)} /> : <View style={{height: 28, marginTop: 8, justifyContent: 'center'}}><Text style={{fontSize: 12, color: g.color, fontWeight: '600'}}>✓ Feito</Text></View>}
+        {list.length > 1 ? <View style={{marginTop: 8, flexDirection: 'row', gap: 4}}>{list.map((d, n) => <View key={d.key} style={{width: d === cur ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: d === cur ? g.color : d.taken ? tint(g.color, 0.5) : c.line}} />)}</View> : null}
+      </View>
     </View> : <Quiet text="Nada hoje" sub="Nenhum item da rotina para hoje." />}
   </View>;
 }
@@ -420,13 +524,18 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
   const spendColor = sp ? (sp.pct > 100 ? c.danger : sp.pct >= 80 ? '#E8B04A' : '#88CFB8') : '#88CFB8';
   const Stat = ({label, value, sub, pct, color, ticks = []}: {label: string; value: string; sub: string; pct: number | null; color: string; ticks?: {f: number; label: string}[]}) => <View style={{flex: 1, minWidth: 0, gap: 6}}>
     <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{label}</Text>
-    <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
+    {/* 0.3.317 (Pedro): na meta, o "45% de R$ 40.000" fica ao lado do valor e as divisoes (10 mil, 20 mil...) descem para
+        a linha do "2 lancamentos" do lado, no mesmo tamanho de letra */}
+    <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0}}>
+      <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
+      {ticks.length ? <Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text> : null}
+    </View>
     {/* sem barra quando nao ha limite (despesas): so a linha fina, para os dois lados ficarem alinhados */}
     <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}>{pct != null ? <View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /> : null}
       {ticks.map(t => <View key={t.f} style={{position: 'absolute', left: (t.f * 100 + '%') as any, top: -2, width: 1.5, height: 8, marginLeft: -0.75, borderRadius: 1, backgroundColor: c.muted, opacity: 0.6}} />)}
     </View>
-    {ticks.length ? <View style={{height: 12, marginTop: -2}}>{ticks.map(t => <Text key={t.f} numberOfLines={1} style={{position: 'absolute', left: (t.f * 100 + '%') as any, transform: [{translateX: -20}], width: 40, textAlign: 'center', fontSize: 10, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View> : null}
-    <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>
+    {ticks.length ? <View><Text style={{fontSize: 12, color: 'transparent'}}> </Text>{ticks.map(t => <Text key={t.f} numberOfLines={1} style={{position: 'absolute', top: 0, left: (t.f * 100 + '%') as any, transform: [{translateX: -24}], width: 48, textAlign: 'center', fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View>
+      : <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>}
   </View>;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -454,10 +563,11 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
   const list = useMemo(() => [...(rows || [])].filter(r => r.price != null).sort((a, b) => Number(b.atLow) - Number(a.atLow) || Math.abs(b.change || 0) - Math.abs(a.change || 0)), [rows]);
   const [i, setI] = useState(0), [hover, setHover] = useState(false), fade = useRef(new Animated.Value(1)).current;
   const go = (n: number) => {Animated.timing(fade, {toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: false}).start(() => {setI(n); Animated.timing(fade, {toValue: 1, duration: 280, easing: Easing.bezier(0.22, 0.8, 0.24, 1), useNativeDriver: false}).start();});};
-  // 0.3.293 (Pedro): parado; troca so quando a pessoa escolhe
+  // 0.3.293 (Pedro): parado; troca so quando a pessoa escolhe (setas ou, 0.3.317, a rodinha do mouse em cima do bloco)
   void hover; void reduced;
+  const wheel = useWheelStep(d => list.length > 1 && go((i + d + list.length) % list.length), list.length > 1);
   const r = list[i % Math.max(1, list.length)];
-  return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
+  return <View ref={wheel} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
     
     <TileHead icon="tag" color="#88CFB8" name="Price Tracker" onOpen={onOpen} />
     {list.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
@@ -473,15 +583,21 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
   </View>;
 }
 function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
-  const list = [...data.packs].sort((a, b) => Number(isOut(b) || !!b.needs) - Number(isOut(a) || !!a.needs)), first = list[0];
-  return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
-    {first && (first.needs === 'fee' || first.needs === 'pickup') ? <Dot /> : null}
+  const list = [...data.packs].sort((a, b) => Number(isOut(b) || !!b.needs) - Number(isOut(a) || !!a.needs));
+  // 0.3.317 (Pedro): igual ao Price Tracker - uma encomenda por vez, setas "1 de N" e a rodinha do mouse passando
+  const [i, setI] = useState(0), fade = useRef(new Animated.Value(1)).current;
+  const go = (n: number) => {Animated.timing(fade, {toValue: 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: false}).start(() => {setI(n); Animated.timing(fade, {toValue: 1, duration: 260, easing: Easing.bezier(0.22, 0.8, 0.24, 1), useNativeDriver: false}).start();});};
+  const wheel = useWheelStep(d => list.length > 1 && go((i + d + list.length) % list.length), list.length > 1);
+  const cur = list[i % Math.max(1, list.length)], today = list.filter(isOut).length;
+  return <View ref={wheel} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
+    {list.some(p => p.needs === 'fee' || p.needs === 'pickup') && list.length < 2 ? <Dot /> : null}
     <TileHead icon="box" color="#E8B04A" name="Encomendas" onOpen={onOpen} />
-    {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      <Big value={isOut(first) ? 'Hoje' : String(list.length)} unit={isOut(first) ? undefined : 'a caminho'} />
-      <Line text={first.title + ': ' + first.status.charAt(0).toLowerCase() + first.status.slice(1)} />
-      <Act label="Rastrear" onPress={onOpen} />
-    </View> : <Quiet text="Nada a caminho" sub="Tudo o que você pediu já chegou." />}
+    <Pager i={i} n={list.length} onGo={go} what="Encomenda" />
+    {cur ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
+      <Big value={String(list.length)} unit={'a caminho' + (today ? ' · ' + today + (today === 1 ? ' chega hoje' : ' chegam hoje') : '')} />
+      <Line text={cur.title + ': ' + cur.status.charAt(0).toLowerCase() + cur.status.slice(1)} />
+      <Act label={cur.needs === 'fee' ? 'Pagar taxa' : cur.needs === 'pickup' ? 'Ver retirada' : 'Rastrear'} onPress={onOpen} />
+    </Animated.View> : <Quiet text="Nada a caminho" sub="Tudo o que você pediu já chegou." />}
   </View>;
 }
 function MailTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {

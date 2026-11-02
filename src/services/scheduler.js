@@ -13,6 +13,8 @@ function nextRoutine(e,after=new Date()){
   const at=zoned(iso,d.time);if(Date.parse(at)>after.getTime())return at;
  }return null;
 }
+/** 0.3.317: horario em que o lembrete toca desta vez (o movido pela linha do tempo, se houver). */
+function movedAt(e){const from=new Date(e.data.remind_at).toISOString(),t=(e.tags||[]).find(x=>String(x).startsWith('sofia-move-v1:'+from+'>'));const to=t?String(t).split('>')[1]:'';return to&&Number.isFinite(Date.parse(to))?new Date(to).toISOString():e.data.remind_at;}
 function nextRepeat(e,stamp){
  const tag=(e.tags||[]).find(t=>String(t).startsWith('sofia-repeat-v1:'));if(!tag)return '';
  const freq=String(tag).split(':')[1];if(!['weekly','monthly','yearly'].includes(freq))return '';
@@ -31,14 +33,16 @@ class Scheduler{
   for(const j of due){if(this.stopped)break;const e=this.w.get(j.entity_id);if(e.state!=='active')continue;try{
     if(j.kind==='monitor')await this.monitor(e,j,stamp);else this.routine(e,j,stamp);
   }catch(err){this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=?,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,err.code||'JOB_ERROR',new Date(Date.parse(stamp)+Math.max(j.interval_minutes,15)*60000).toISOString(),j.id);this.w.notify('automation','Não foi possível consultar '+e.title,'A execução falhou: '+(err.code||'JOB_ERROR')+'. Nenhum resultado externo foi presumido.',e.id,'warning',j.id+':error:'+stamp.slice(0,10));}}
-  const reminders=this.w.list({kind:'reminder',limit:500}).filter(e=>e.state==='active'&&e.data.remind_at&&Date.parse(e.data.remind_at)<=Date.parse(stamp));
+  // 0.3.317: lembrete arrastado na linha do tempo do Inicio (so aquela vez): avisa no horario novo (marca sofia-move-v1)
+  const reminders=this.w.list({kind:'reminder',limit:500}).filter(e=>e.state==='active'&&e.data.remind_at&&Date.parse(movedAt(e))<=Date.parse(stamp));
   for(const e of reminders){
-    const dedup='reminder:'+e.id+':'+e.data.remind_at;
-    if(!(e.tags||[]).includes('sofia-skip-v1:'+new Date(e.data.remind_at).toISOString())&&!(e.tags||[]).includes('sofia-notify-v1:off'))this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
+    const at=movedAt(e),dedup='reminder:'+e.id+':'+at;
+    if(!(e.tags||[]).includes('sofia-skip-v1:'+new Date(at).toISOString())&&!(e.tags||[]).includes('sofia-notify-v1:off'))this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
     // 0.3.304: lembrete que se repete (marca sofia-repeat-v1:FREQ:FUSO, a mesma da Agenda) nao termina: vai para a
     // proxima vez (semana, mes ou ano seguinte; dia 31 vira o ultimo dia do mes curto)
-    const next=nextRepeat(e,stamp);
-    if(next)this.w.save({...e,revision:e.revision,data:{...e.data,remind_at:next}},e.id);
+    // a proxima vez conta a partir do horario original (adiantada nao repete no mesmo dia); a marca usada sai
+    const after=new Date(Math.max(Date.parse(stamp),Date.parse(e.data.remind_at))).toISOString(),next=nextRepeat(e,after),tags=(e.tags||[]).filter(t=>!String(t).startsWith('sofia-move-v1:'+new Date(e.data.remind_at).toISOString()+'>'));
+    if(next)this.w.save({...e,tags,revision:e.revision,data:{...e.data,remind_at:next}},e.id);
     else this.w.changeState(e.id,'done',e.revision);
   }
  }finally{this.busy=false;this.controller=null;}}
