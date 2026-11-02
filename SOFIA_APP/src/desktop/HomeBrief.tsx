@@ -419,21 +419,25 @@ function NowBeacon({x, w, top}: {x: number; w: number; top: number}) {
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const c = useTheme(), W = 320, x = Math.max(0, Math.min((width || 1) - W, point.x * (width || 1) - W / 2));
   const Row = ({color, icon, time, title, sub, action, onAction, onEdit, done, check, grab}: {color: string; icon?: IconName; time: string; title: string; sub?: string; action?: string; onAction?: () => void; onEdit?: () => void; done?: boolean; check?: () => void; grab?: (e: any) => void}) =>
-    <View style={{flexDirection: 'row', gap: 10, paddingVertical: 8}}>
-      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={8} style={({hovered}: any) => ({width: 18, height: 18, marginTop: 1, borderRadius: 9, borderWidth: 2, borderColor: done ? color : hovered ? color : c.muted, backgroundColor: done ? color : 'transparent', alignItems: 'center', justifyContent: 'center'})}>{done ? <Icon name="check" size={11} color={c.surface} /> : null}</Pressable>
-        : <View style={{width: 18, height: 18, marginTop: 1, borderRadius: 6, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}>{icon ? <Icon name={icon} size={11} color={color} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: color}} />}</View>}
-      <View style={{flex: 1, minWidth: 0, gap: 2}}>
-        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
+    // 0.3.324 (Pedro): o tique, a alca de arrastar e as acoes ficam centralizados na altura do NOME (uma linha ou duas
+    // quebradas); a descricao vai embaixo, alinhada com o nome
+    <View style={{paddingVertical: 8, gap: 2}}>
+     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={8} style={({hovered}: any) => ({width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: done ? color : hovered ? color : c.muted, backgroundColor: done ? color : 'transparent', alignItems: 'center', justifyContent: 'center'})}>{done ? <Icon name="check" size={11} color={c.surface} /> : null}</Pressable>
+        : <View style={{width: 18, height: 18, borderRadius: 6, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}>{icon ? <Icon name={icon} size={11} color={color} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: color}} />}</View>}
+      <View style={{flex: 1, minWidth: 0}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
           {/* 0.3.317: no cartao, o horario e a alca para arrastar o item (util quando varios estao na mesma bolinha) */}
           {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} style={({hovered}: any) => ({cursor: 'grab', borderRadius: 5, paddingHorizontal: 3, marginHorizontal: -3, backgroundColor: hovered ? tint(color, 0.18) : 'transparent'} as any)}><Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>⠿ {time}</Text></Pressable> : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
           <Text numberOfLines={2} style={{flex: 1, fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
         </View>
-        {sub ? <Text numberOfLines={3} style={{fontSize: 12, lineHeight: 17, color: c.muted}}>{sub}</Text> : null}
       </View>
-      <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 4}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
         {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered, pressed}: any) => ({height: 26, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center', backgroundColor: hovered ? tint(color, 0.28) : tint(color, 0.16), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
         {onEdit ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + title} onPress={onEdit} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="edit" size={14} color={c.muted} /></Pressable> : null}
       </View>
+     </View>
+     {sub ? <Text numberOfLines={3} style={{marginLeft: 28, fontSize: 12, lineHeight: 17, color: c.muted}}>{sub}</Text> : null}
     </View>;
   const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
   return <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 46, width: W, zIndex: 8, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 36px rgba(0,0,0,0.45)'} as any}>
