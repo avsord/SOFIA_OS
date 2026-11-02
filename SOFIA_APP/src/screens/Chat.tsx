@@ -24,6 +24,7 @@ import { View, Text, Image, FlatList, Modal, ScrollView, Pressable, TextInput, K
 import * as Crypto from 'expo-crypto';
 import * as Clipboard from 'expo-clipboard';
 import { File } from 'expo-file-system';
+import {attachmentBase64} from '../lib/attachment-read';
 import type { Bootstrap, Conversation, Message, VoiceDraft, ChatResult } from '../lib/types';
 import { SITE,SofiaApi } from '../lib/api';
 import { dayKey, errorText, mergeMessages, statusLabel } from '../lib/chat-model';
@@ -216,7 +217,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
    else {
     let content=message.content;
     if(message.localAttachments?.length){
-     for(const file of message.localAttachments){if(!file.entityId){const entity=await api.saveEntity({kind:'file',title:file.name,state:'saved',privacy:'private',area:'Pessoal',content:'Anexo da conversa '+targetId,tags:['chat-attachment'],data:{provider:'local',logical_path:'conversations/'+targetId,description:'Arquivo enviado na conversa com a Sofia'}});file.entityId=entity.id;}if(!file.attachmentId){const f=new File(file.uri);if(!f.exists)throw Error('O arquivo não está mais no celular. Selecione-o novamente.');const uploaded=await api.uploadAttachment(file.entityId,{name:file.name,mime:file.mime,base64:await f.base64()});file.attachmentId=uploaded.id;}}
+     for(const file of message.localAttachments){if(!file.entityId){const entity=await api.saveEntity({kind:'file',title:file.name,state:'saved',privacy:'private',area:'Pessoal',content:'Anexo da conversa '+targetId,tags:['chat-attachment'],data:{provider:'local',logical_path:'conversations/'+targetId,description:'Arquivo enviado na conversa com a Sofia'}});file.entityId=entity.id;}if(!file.attachmentId){const uploaded=await api.uploadAttachment(file.entityId,{name:file.name,mime:file.mime,base64:await attachmentBase64(file.uri)});file.attachmentId=uploaded.id;}}
      content=[content,attachmentText(message.localAttachments,SITE)].filter(Boolean).join('\n\n');
     }
     result=await api.chat({...data,message:content});refreshBoardSoon(result.conversation_id);
