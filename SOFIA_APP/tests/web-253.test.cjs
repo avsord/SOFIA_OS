@@ -25,5 +25,7 @@ test('rolagem na largura toda, conteudo centralizado; Agenda lado a lado; cabeca
   assert.ok(read('src/web/rn-desktop.tsx').includes("{contentContainerStyle:[p.contentContainerStyle,{width:'100%',maxWidth:Math.round(max*uiScale()),alignSelf:'center'}]}"));
   assert.ok(read('src/screens/Agenda.tsx').includes('testID="agenda-split"'));
   assert.ok(read('src/screens/Finance.tsx').includes('<View style={pad(0)}>'));
-  assert.ok(read('src/screens/Chat.tsx').includes('paddingLeft:columnPadding(column,12)'));
+  // 0.3.311: recuo de verdade (left/right), o mesmo respiro da barra de cima do site
+  assert.ok(read('src/screens/Chat.tsx').includes('colPad=column?edgePadding():null')&&read('src/screens/Chat.tsx').includes('paddingLeft:colPad.left'));
+  assert.ok(read('src/components/Composer.tsx').includes('paddingLeft:colPad.left'));
 });
