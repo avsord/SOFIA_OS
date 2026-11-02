@@ -248,12 +248,13 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
   const c = useTheme(), dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
-  const g = goal && goal.target > 0 ? goalStats(goal) : null, sp = data.spend && data.spend.available > 0 ? data.spend : null;
+  const g = goal && goal.target > 0 ? goalStats(goal) : null, sp = data.spend && data.spend.available > 0 ? data.spend : null, lo = data.loose;
   const spendColor = sp ? (sp.pct > 100 ? c.danger : sp.pct >= 80 ? '#E8B04A' : '#88CFB8') : '#88CFB8';
-  const Stat = ({label, value, sub, pct, color}: {label: string; value: string; sub: string; pct: number; color: string}) => <View style={{flex: 1, minWidth: 0, gap: 6}}>
+  const Stat = ({label, value, sub, pct, color}: {label: string; value: string; sub: string; pct: number | null; color: string}) => <View style={{flex: 1, minWidth: 0, gap: 6}}>
     <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{label}</Text>
     <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
-    <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}><View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /></View>
+    {/* sem barra quando nao ha limite (despesas): so a linha fina, para os dois lados ficarem alinhados */}
+    <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}>{pct != null ? <View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /> : null}</View>
     <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>
   </View>;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
@@ -262,8 +263,9 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
       <View style={{flex: 1}} />
       {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, marginVertical: -4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
     </View>
-    {sp || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 'auto'} as any}>
-      {sp ? <Stat label={'Gastos de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(sp.spent)} sub={sp.pct + '% de ' + money(sp.available)} pct={sp.pct} color={spendColor} /> : null}
+    {lo || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 'auto'} as any}>
+      {/* 0.3.308 (Pedro): despesas que ele lancou no mes, fora as contas a pagar e o que se repete */}
+      {lo ? <Stat label={'Despesas de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(lo.total)} sub={lo.count ? (lo.count === 1 ? '1 lançamento' : lo.count + ' lançamentos') + (lo.biggest && lo.count > 1 ? ' · maior: ' + lo.biggest.title : '') : 'Nenhuma despesa lançada'} pct={null} color={spendColor} /> : null}
       {g && goal ? <Stat label={goal.name || 'Meta'} value={money(goal.saved)} sub={Math.round(g.pct * 100) + '% de ' + money(goal.target)} pct={g.pct * 100} color="#b49ae6" /> : null}
     </View> : <Quiet text="Abra Finanças" sub="Para ver gastos e meta aqui." />}
     {first ? <Pressable onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: c.line}}>

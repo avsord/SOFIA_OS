@@ -40,3 +40,14 @@ export function spendControl(all: LeftData, today = todayISO()): {spent: number;
   const m = monthControl(d.txs, d.moves || [], reserve?.id || '', month, accountId, total, manualStart);
   return {spent: m.spent, available: m.available, pct: m.available > 0 ? Math.round(m.spent / m.available * 100) : 0};
 }
+
+/** 0.3.308 (Pedro): o que a pessoa gastou no mes FORA as contas - so as despesas que ela mesma lancou (avulsas e
+ * compras no cartao, inclusive a parcela do mes); fica de fora o que e conta a pagar e o que se repete todo mes. */
+export function looseSpending(d: LeftData, today = todayISO()): {total: number; count: number; biggest: {title: string; amount: number} | null} {
+  const month = monthOf(today);
+  const list = d.txs.filter(t => t.kind === 'expense' && monthOf(t.date) === month && !(t as any).virtual && (t as any).entity?.state !== 'archived'
+    && !t.manualDue && (t.recurrence || 'none') === 'none' && !(t.seriesId && !(t.installments > 1)));
+  const total = Math.round(list.reduce((s, t) => s + t.amount, 0) * 100) / 100;
+  const big = [...list].sort((a, b) => b.amount - a.amount)[0];
+  return {total, count: list.length, biggest: big ? {title: big.desc, amount: big.amount} : null};
+}
