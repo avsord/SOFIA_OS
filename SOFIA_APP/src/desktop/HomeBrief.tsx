@@ -261,18 +261,19 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
     <View style={{flexDirection: 'row', alignItems: 'center'}}>
       <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
       <View style={{flex: 1}} />
+      {/* 0.3.309: a conta que vence primeiro fica no cabecalho, como uma etiqueta (sem ocupar uma linha embaixo) */}
+      {first ? <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + first.title + ' ' + when(first.date)} onPress={onOpen} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, marginVertical: -3, paddingHorizontal: 9, borderRadius: 13, marginRight: 6, maxWidth: '60%', backgroundColor: tint(first.date <= today ? '#F5A0AE' : '#E8B04A', hovered ? 0.2 : 0.12)} as any)}>
+        <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: first.date <= today ? c.danger : '#E8B04A'}} />
+        <Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: first.date <= today ? c.danger : '#E8B04A', fontWeight: '500'}}>{first.title} {when(first.date)} · {money(first.amount)}</Text>
+      </Pressable> : null}
       {onToggleMask ? <Pressable accessibilityRole="button" accessibilityLabel={masked ? 'Mostrar valores' : 'Esconder valores'} onPress={onToggleMask} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, marginVertical: -4, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name={masked ? 'eyeOff' : 'eye'} size={16} color={c.muted} /></Pressable> : null}
     </View>
-    {lo || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 'auto'} as any}>
+    {/* 0.3.309 (Pedro): os numeros logo abaixo do titulo (antes ficavam no pe do cartao, com vazio em cima) */}
+    {lo || g ? <View style={{flexDirection: 'row', gap: 22, marginTop: 14}}>
       {/* 0.3.308 (Pedro): despesas que ele lancou no mes, fora as contas a pagar e o que se repete */}
       {lo ? <Stat label={'Despesas de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(lo.total)} sub={lo.count ? (lo.count === 1 ? '1 lançamento' : lo.count + ' lançamentos') + (lo.biggest && lo.count > 1 ? ' · maior: ' + lo.biggest.title : '') : 'Nenhuma despesa lançada'} pct={null} color={spendColor} /> : null}
       {g && goal ? <Stat label={goal.name || 'Meta'} value={money(goal.saved)} sub={Math.round(g.pct * 100) + '% de ' + money(goal.target)} pct={g.pct * 100} color="#b49ae6" /> : null}
     </View> : <Quiet text="Abra Finanças" sub="Para ver gastos e meta aqui." />}
-    {first ? <Pressable onPress={onOpen} style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: c.line}}>
-      <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: first.date <= today ? c.danger : '#E8B04A'}} />
-      <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: first.date <= today ? c.danger : c.text}}>{first.title} {when(first.date)}</Text>
-      <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{money(first.amount)}</Text>
-    </Pressable> : null}
   </View>;
 }
 /** Price Tracker: mostra um produto por vez; as setas passam para o proximo (0.3.293: sem trocar sozinho). */
