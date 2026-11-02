@@ -38,7 +38,7 @@ export type HomeBriefProps = {
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
   onMarkAction?: (m: TimeMark) => void;
   onMove?: (moves: Move[]) => void;
-  onQuickAdd?: (x: QuickAdd) => Promise<void>;
+  onAddAt?: (kind: AddKind, at: Date) => void;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -103,14 +103,14 @@ function OpChip({label, v, on, onPress}: {label: string; v: number; on: boolean;
     <Text style={{fontSize: 11, color: v < 1 ? c.accent : c.muted, fontVariant: ['tabular-nums'], fontWeight: v < 1 ? '600' : '400'}}>{Math.round(v * 100)}%</Text>
   </Pressable>;
 }
-function TimelineSettingsPanel({s, set, plans, bills, incomes, onClose}: {s: TimelineSettings; set: (v: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void; plans: {id: string; title: string; type: string; color?: string}[]; bills: string[]; incomes: string[]; onClose: () => void}) {
+function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}: {boxRef?: React.RefObject<View | null>; s: TimelineSettings; set: (v: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void; plans: {id: string; title: string; type: string; color?: string}[]; bills: string[]; incomes: string[]; onClose: () => void}) {
   const c = useTheme(), [open, setOpen] = useState('');
   const cat = (id: string) => s.cats[id] !== false, item = (k: string) => s.items[k] !== false;
   // opacidade: cada toque passa 100 -> 80 -> 60 -> 40 -> 100
   const setOp = (k: string, base = 1) => set(o => {const cur = o.op[k] ?? base, nx = cur > 0.9 ? 0.8 : cur > 0.7 ? 0.6 : cur > 0.5 ? 0.4 : 1; return {...o, op: {...o.op, [k]: nx}};});
   const setCat = (id: string, v: boolean) => set(o => ({...o, cats: {...o.cats, [id]: v}})), setItem = (k: string, v: boolean) => set(o => ({...o, items: {...o.items, [k]: v}}));
   const sub = (id: string) => id === 'routine' ? plans.map(p => ({k: 'routine:' + p.id, label: p.title, color: p.color || routineColor(p.type)})) : id === 'bill' ? bills.map(t => ({k: 'fin:' + t, label: t, color: '#E8B04A'})) : id === 'income' ? incomes.map(t => ({k: 'fin:' + t, label: t, color: '#7ED6A5'})) : [];
-  return <View style={{position: 'absolute', top: 52, right: 16, width: 340, maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
+  return <View ref={boxRef} style={{position: 'absolute', top: 52, right: 16, width: 340, maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
     <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8}}>
       <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Linha do tempo</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={15} color={c.muted} /></Pressable>
@@ -156,6 +156,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const moveMarks = (list: {id: string; to: Date}[]) => setMarkMoves(o => {const n = {...o}; for (const x of list) n[x.id] = x.to.toISOString(); try {globalThis.localStorage?.setItem(MK, JSON.stringify(n));} catch {} return n;});
   const onMove = (moves: Move[]) => {const marks = moves.filter(x => 'mark' in x.t), rest = moves.filter(x => !('mark' in x.t));
     if (marks.length) moveMarks(marks.map(x => ({id: (x.t as {mark: TimeMark}).mark.id, to: x.to}))); if (rest.length) p.onMove?.(rest);};
+  const gearBox = useRef<View>(null); useClickOutside(gearBox, () => setGear(false), gear, '[data-testid="timeline-gear"]');
   useEffect(() => {if (!gear || typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
   const timeMarks = useMemo(() => {
     const out: TimeMark[] = [], todayKey = new Date().toISOString().slice(0, 10), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
@@ -191,12 +192,11 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{flex: 1}} />
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
-      {/* 0.3.318 (Pedro): clicar fora (ou Esc) fecha os ajustes */}
-      {gear ? <Pressable testID="timeline-gear-backdrop" accessibilityLabel="Fechar ajustes da linha do tempo" onPress={() => setGear(false)} style={{position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 19, cursor: 'default'} as any} /> : null}
-      {gear ? <TimelineSettingsPanel s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
+      {/* 0.3.318/0.3.331 (Pedro): clicar fora - em qualquer lugar, inclusive na barra lateral - ou Esc fecha os ajustes (useClickOutside) */}
+      {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onQuickAdd: p.onQuickAdd}} />
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -230,11 +230,12 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onQuickAdd?: (x: QuickAdd) => Promise<void>};
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
-/** 0.3.330 (Pedro): clicar num lugar vazio da linha do tempo adiciona ali mesmo, sem ir para o app. */
-export type QuickAdd = {kind: 'event' | 'task' | 'reminder' | 'routine'; title: string; at: Date; minutes?: number; routineType?: string; daily?: boolean};
+/** 0.3.331 (Pedro): clicar num lugar vazio da linha do tempo abre um seletor pequeno; a escolha abre o editor da propria
+ * funcao (compromisso, tarefa, lembrete, Rotina) ja com o horario do clique. */
+export type AddKind = 'event' | 'task' | 'reminder' | 'routine';
 /** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
 export type Move = {t: MoveTarget; to: Date};
 const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
@@ -352,7 +353,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
-    {actions.onQuickAdd ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
+    {actions.onAddAt ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
       {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy'} as any} /> : null}
@@ -409,7 +410,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
         <Text style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{dragLabel(drag.fx)}</Text>
       </View>
     </View> : null}
-    {adding && actions.onQuickAdd ? <QuickAddCard fx={adding.fx} at={adding.at} label={dragLabel} onSave={actions.onQuickAdd} onClose={() => setAdding(null)} /> : null}
+    {adding && actions.onAddAt ? <AddMenu fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
     {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START, 520, true);}}
@@ -419,41 +420,28 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   </View>;
 }
 
-/** 0.3.330 (Pedro): janelinha que abre ao clicar num lugar vazio da linha do tempo - escolhe o que adicionar (compromisso,
- * tarefa, lembrete ou item da Rotina), nome e horario (ja vem o do clique), e adiciona ali mesmo. Enter adiciona, Esc fecha.
- * Mostra "Adicionando…" e nao deixa clicar duas vezes; se der erro, diz e mantem o que foi digitado. */
-function QuickAddCard({fx, at, label, onSave, onClose}: {fx: number; at: Date; label: (fx: number) => string; onSave: (x: QuickAdd) => Promise<void>; onClose: () => void}) {
-  const c = useTheme(), [kind, setKind] = useState<QuickAdd['kind']>('event'), [title, setTitle] = useState(''), [when, setWhen] = useState(at);
-  const [minutes, setMinutes] = useState(60), [rtype, setRtype] = useState('capsula'), [daily, setDaily] = useState(false), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+/** 0.3.331 (Pedro): seletor pequeno que abre ao clicar num lugar vazio da linha do tempo. A escolha abre o editor completo
+ * da funcao ja com o horario do clique (nada e gravado aqui). Esc ou clique fora fecham. */
+/** Fecha ao clicar em qualquer lugar fora do elemento (inclusive na barra lateral, fora da area que rola). */
+function useClickOutside(ref: React.RefObject<View | null>, onOut: () => void, on = true, ignore = '') {
+  const cb = useRef(onOut); cb.current = onOut;
+  useEffect(() => {if (!on || typeof document === 'undefined') return; const h = (e: PointerEvent) => {const el: any = ref.current, t: any = e.target; if (ignore && t?.closest?.(ignore)) return; if (el && el.contains && !el.contains(t)) cb.current();};
+    const t = setTimeout(() => document.addEventListener('pointerdown', h, true), 0); return () => {clearTimeout(t); document.removeEventListener('pointerdown', h, true);};}, [on]);
+}
+function AddMenu({fx, when, onPick, onClose}: {fx: number; when: string; onPick: (k: AddKind) => void; onClose: () => void}) {
+  const c = useTheme(), box = useRef<View>(null);
+  useClickOutside(box, onClose);
   useEffect(() => {if (typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
-  const KINDS: {id: QuickAdd['kind']; label: string; ph: string}[] = [{id: 'event', label: 'Compromisso', ph: 'Ex.: Reunião com a Minerva'}, {id: 'task', label: 'Tarefa', ph: 'Ex.: Emitir nota'}, {id: 'reminder', label: 'Lembrete', ph: 'Ex.: Ligar para o banco'}, {id: 'routine', label: 'Rotina', ph: 'Ex.: Vitamina D'}];
-  const save = async () => {if (busy || !title.trim()) return; setBusy(true); setErr('');
-    try {await onSave({kind, title: title.trim(), at: when, minutes: kind === 'event' ? minutes : undefined, routineType: kind === 'routine' ? rtype : undefined, daily: kind === 'routine' ? daily : undefined}); onClose();}
-    catch (e: any) {setErr(String(e?.message || 'Não deu para adicionar.') + ' Tente de novo.');} finally {setBusy(false);}};
-  const shift = (m: number) => setWhen(d => new Date(d.getTime() + m * 60000));
-  const chip = (on: boolean, text: string, press: () => void, color = c.accent) => <Pressable key={text} accessibilityRole="button" accessibilityState={{selected: on}} onPress={press} style={({hovered}: any) => ({paddingHorizontal: 10, height: 28, borderRadius: 8, justifyContent: 'center', backgroundColor: on ? tint(color, 0.22) : hovered ? c.input : 'transparent', borderWidth: 1, borderColor: on ? tint(color, 0.5) : c.line})}><Text style={{fontSize: 12, fontWeight: on ? '600' : '400', color: on ? color : c.text}}>{text}</Text></Pressable>;
-  return <View testID="quick-add-card" style={{position: 'absolute', left: `clamp(0px, calc(${fx * 100}% - 200px), calc(100% - 400px))` as any, top: 29 + 44 + 22, width: 400, zIndex: 12, backgroundColor: c.bg, borderRadius: 16, padding: 16, gap: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-      <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Adicionar</Text>
-      <Pressable accessibilityLabel="15 minutos antes" onPress={() => shift(-15)} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
-      <Text style={{fontSize: 13, fontWeight: '600', color: c.accent, fontVariant: ['tabular-nums'], minWidth: 74, textAlign: 'center'}}>{label(((when.getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 3600000 - (at.getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 3600000) / SPAN + fx)}</Text>
-      <Pressable accessibilityLabel="15 minutos depois" onPress={() => shift(15)} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
-      <Pressable accessibilityLabel="Fechar" onPress={onClose} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={14} color={c.muted} /></Pressable>
+  const ITEMS: {id: AddKind; label: string; icon: IconName; color: string}[] = [{id: 'event', label: 'Compromisso', icon: 'calendar', color: '#8fb4ff'}, {id: 'task', label: 'Tarefa', icon: 'checklist', color: '#F5A0AE'}, {id: 'reminder', label: 'Lembrete', icon: 'bell', color: REMIND}, {id: 'routine', label: 'Rotina', icon: 'capsule', color: '#5FD3C6'}];
+  return <>
+    <View ref={box} testID="add-menu" accessibilityRole="menu" style={{position: 'absolute', left: `clamp(0px, calc(${fx * 100}% - 110px), calc(100% - 220px))` as any, top: 29 + 44 + 14, width: 220, zIndex: 12, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)'} as any}>
+      <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 6}}>Adicionar · <Text style={{color: c.accent, fontWeight: '600', fontVariant: ['tabular-nums']}}>{when}</Text></Text>
+      {ITEMS.map(it => <Pressable key={it.id} testID={'add-' + it.id} accessibilityRole="menuitem" onPress={() => onPick(it.id)} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 36, marginHorizontal: 6, paddingHorizontal: 8, borderRadius: 9, backgroundColor: hovered || pressed ? c.input : 'transparent'})}>
+        <View style={{width: 24, height: 24, borderRadius: 7, backgroundColor: tint(it.color, 0.16), alignItems: 'center', justifyContent: 'center'}}><Icon name={it.icon} size={13} color={it.color} /></View>
+        <Text style={{fontSize: 13, color: c.text}}>{it.label}</Text>
+      </Pressable>)}
     </View>
-    <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{KINDS.map(k => chip(kind === k.id, k.label, () => setKind(k.id)))}</View>
-    <TextInput autoFocus value={title} onChangeText={setTitle} onSubmitEditing={() => void save()} placeholder={KINDS.find(k => k.id === kind)!.ph} placeholderTextColor={c.muted} editable={!busy}
-      style={{height: 40, borderRadius: 10, paddingHorizontal: 12, backgroundColor: c.input, color: c.text, fontSize: 14, outlineStyle: 'none'} as any} />
-    {kind === 'event' ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}><Text style={{fontSize: 12, color: c.muted, marginRight: 2}}>Duração</Text>{[30, 60, 120].map(m => chip(minutes === m, m < 60 ? m + ' min' : m / 60 + ' h', () => setMinutes(m)))}</View> : null}
-    {kind === 'routine' ? <View style={{gap: 8}}>
-      <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{ROTINA_TYPES.map(t => chip(rtype === t.id, t.one, () => setRtype(t.id), t.color))}</View>
-      <View style={{flexDirection: 'row', gap: 6}}>{chip(!daily, 'Só hoje', () => setDaily(false))}{chip(daily, 'Todo dia neste horário', () => setDaily(true))}</View>
-    </View> : null}
-    {err ? <Text style={{fontSize: 12, color: c.danger}}>{err}</Text> : null}
-    <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 8}}>
-      <Pressable accessibilityRole="button" onPress={onClose} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{fontSize: 13, color: c.muted}}>Cancelar</Text></Pressable>
-      <Pressable testID="quick-add-save" accessibilityRole="button" disabled={busy || !title.trim()} onPress={() => void save()} style={({hovered, pressed}: any) => ({height: 32, paddingHorizontal: 14, borderRadius: 9, justifyContent: 'center', backgroundColor: c.accent, opacity: busy || !title.trim() ? 0.5 : hovered ? 0.9 : 1, transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 13, fontWeight: '600', color: c.onAccent}}>{busy ? 'Adicionando…' : 'Adicionar'}</Text></Pressable>
-    </View>
-  </View>;
+  </>;
 }
 
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */

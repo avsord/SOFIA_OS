@@ -1,3 +1,4 @@
+import {useDraft} from '../lib/draft-bus';
 import {REPEATS,agendaTags,readRepeat,type Repeat} from '../lib/agenda-recurrence';
 import {dpx} from '../lib/content-width';
 import {useDesktop} from '../lib/desktop';
@@ -53,7 +54,9 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  useEffect(()=>{if(active)void records.load();else setEditing(null);},[active,api]);
  const membersOf=(e:Entity)=>{const g=groupOf(e);return g?records.items.filter(x=>groupOf(x)===g):[e];};
  const groups=useMemo(()=>splitReminders(records.items),[records.items]);
- function open(item:Partial<Entity>={}){setError('');setExtras(item.id&&groupOf(item)?records.items.filter(x=>groupOf(x)===groupOf(item)&&x.id!==item.id&&x.state===item.state).map(x=>({id:x.id,at:String(x.data?.remind_at||'')})):[]);setEditing(item.id?item:{kind:'reminder',title:'',content:'',area:'Lembretes',privacy:'private',state:'active',tags:[],data:{remind_at:defaultRemindAt(),message:'',location:''}});}
+ function open(item:Partial<Entity>={}){setError('');setExtras(item.id&&groupOf(item)?records.items.filter(x=>groupOf(x)===groupOf(item)&&x.id!==item.id&&x.state===item.state).map(x=>({id:x.id,at:String(x.data?.remind_at||'')})):[]);setEditing(item.id?item:{kind:'reminder',title:'',content:'',area:'Lembretes',privacy:'private',state:'active',tags:[],...item,data:{remind_at:defaultRemindAt(),message:'',location:'',...(item.data||{})}});}
+ // 0.3.331: rascunho vindo da linha do tempo do Inicio (horario do clique)
+ useDraft<Partial<Entity>>('reminder',active,d=>open(d));
  function patchData(patch:Record<string,any>){setEditing(old=>old?{...old,data:{...(old.data||{}),...patch}}:old);}
  async function save(){
   if(!editing?.title?.trim()||busy)return;setBusy(true);setError('');
