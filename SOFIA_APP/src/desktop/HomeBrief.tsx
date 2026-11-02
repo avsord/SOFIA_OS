@@ -53,7 +53,7 @@ export function briefLine(a: {today: DayRecord[]; tasks: Task[]; series: Monitor
 let lastTop = 0, lastBrief = Math.round(180 * uiScale()); // o esqueleto e o Inicio pronto usam a MESMA medida (a troca nao mexe nada)
 function useRowHeight(root: React.RefObject<View | null>, briefH: number) {
   const {height} = useWindowDimensions(), [top, setTop] = useState(lastTop);
-  useEffect(() => {const el: any = root.current; if (el && typeof el.getBoundingClientRect === 'function') {const sc = el.closest ? el.closest('[data-testid="home-scroll"]') : null; const t = Math.round(el.getBoundingClientRect().top + (sc ? sc.scrollTop : 0)); if (t > 0) {lastTop = t; setTop(t);}}});
+  useEffect(() => {const el: any = root.current; if (el && typeof el.getBoundingClientRect === 'function') {const sc = el.closest ? el.closest('[data-testid="home-scroll"]') : null; const t = Math.round(el.getBoundingClientRect().top + (sc ? sc.scrollTop : 0)); if (t > 0 && el.getBoundingClientRect().height > 0) {lastTop = t; setTop(t);}}});
   const avail = height - top - 32 - briefH - 24;
   return Math.max(150, Math.min(300, Math.floor(avail / 2)));
 }
@@ -78,7 +78,7 @@ export function HomeBrief(p: HomeBriefProps) {
 
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   return <View ref={root} style={{gap: 12}}>
-    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); lastBrief = h; setBriefH(h);}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface}}>
+    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
@@ -130,7 +130,7 @@ function Timeline({items, next, onEdit}: {items: DayRecord[]; next: DayRecord | 
   const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.content || o.data?.location || '').trim();};
   const shownGroup = pin >= 0 ? pin : hover;
-  return <View ref={box} style={{marginTop: 18, height: 56}} onLayout={e => setW(e.nativeEvent.layout.width)}>
+  return <View ref={box} style={{marginTop: 18, height: 56}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
