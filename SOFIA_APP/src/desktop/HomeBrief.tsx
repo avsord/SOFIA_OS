@@ -31,7 +31,7 @@ const timed = (r: DayRecord) => {if (/^\d{4}-\d{2}-\d{2}$/.test(r.date) || (r.or
 
 export type HomeBriefProps = {
   data: HomeBriefData; today: DayRecord[]; all: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null; goal: GoalNumbers | null; masked: boolean;
-  onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onToggleTask: (t: Task) => void;
+  onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onOpenTask?: (id: string) => void; onToggleTask: (t: Task) => void;
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
 };
 
@@ -67,7 +67,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const upcoming = items.filter(r => timed(r) && Date.parse(r.date) >= now.getTime() - 5 * 60000);
   const next = upcoming[0] || null;
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
-  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); return p.all.filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 15);}, [p.all, now.getHours(), now.getMinutes()]);
+  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); return p.all.filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.all, now.getHours(), now.getMinutes()]);
   const low = (p.series || []).filter(s => s.atLow);
 
   const actions: {label: string; primary?: boolean; run: () => void}[] = [];
@@ -89,7 +89,7 @@ export function HomeBrief(p: HomeBriefProps) {
           <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: a.primary ? c.onAccent : c.accent, maxWidth: 260}}>{a.label}</Text>
         </Pressable>)}
       </View>
-      <Timeline items={items.filter(timed)} next={next} onOpen={p.onOpenItem} />
+      <Timeline items={items.filter(timed)} next={next} onOpen={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -108,7 +108,7 @@ export function HomeBrief(p: HomeBriefProps) {
 /** Linha do tempo das 7h as 23h (ou mais, se houver algo fora): pontos na cor de cada item, juntando os que
  * ficam colados num numero; so o proximo aparece escrito; a marca de "agora" divide o que ja passou. */
 function Timeline({items, next, onOpen}: {items: DayRecord[]; next: DayRecord | null; onOpen: (r: DayRecord) => void}) {
-  const c = useTheme(), [w, setW] = useState(0), now = new Date();
+  const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), now = new Date();
   const hours = items.map(r => new Date(r.date).getHours());
   const start = Math.min(7, ...hours), end = Math.max(23, ...hours.map(h => h + 1));
   const pos = (d: Date) => ((d.getHours() + d.getMinutes() / 60) - start) / (end - start);
@@ -121,12 +121,24 @@ function Timeline({items, next, onOpen}: {items: DayRecord[]; next: DayRecord | 
     <View style={{position: 'absolute', left: 0, width: (nowX * 100 + '%') as any, top: 28, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {groups.map((g, i) => {
       const isNext = !!next && g.list.includes(next), many = g.list.length > 1, size = isNext ? 16 : many ? 20 : 12;
-      return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => onOpen(g.list[0])} hitSlop={14}
+      return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => onOpen(g.list[0])} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
         style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: color(g.list[0]), alignItems: 'center', justifyContent: 'center'}}>
         {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
       </Pressable>;
     })}
-    {next ? <View pointerEvents="none" style={{position: 'absolute', left: (pos(new Date(next.date)) * 100 + '%') as any, top: 0, transform: [{translateX: -60}], width: 120, alignItems: 'center'}}>
+    {hover >= 0 && groups[hover] ? (() => {
+      // previa minimalista: horario e nome de cada item do ponto; fica dentro do cartao (nao vaza pelas bordas)
+      const g = groups[hover], W = 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
+      return <View pointerEvents="none" style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 5, backgroundColor: c.bg, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, gap: 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
+        {g.list.slice(0, 5).map((r, k) => <View key={k} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: colorOf(r, c.accent)}} />
+          <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}</Text>
+          <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{r.title}</Text>
+        </View>)}
+        {g.list.length > 5 ? <Text style={{fontSize: 11, color: c.muted}}>+{g.list.length - 5} mais</Text> : null}
+      </View>;
+    })() : null}
+    {next && hover < 0 ? <View pointerEvents="none" style={{position: 'absolute', left: (pos(new Date(next.date)) * 100 + '%') as any, top: 0, transform: [{translateX: -60}], width: 120, alignItems: 'center'}}>
       <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: c.text, backgroundColor: tint(c.accent, 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden'}}>{hhmm(new Date(next.date))} {next.title}</Text>
     </View> : null}
     <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} />
@@ -194,23 +206,23 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   </View>;
 }
 function FinanceTile({style, card, data, goal, masked, onOpen}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void}) {
+  // 0.3.296 (Pedro): guardado e quanto falta da meta sempre visiveis; a conta que vence primeiro numa linha
   const c = useTheme(), dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
   const g = goal && goal.target > 0 ? goalStats(goal) : null;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     {first && first.date <= today ? <Dot /> : null}
-    <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
-    {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
+    <TileHead icon="wallet" color="#b49ae6" name={'Finanças' + (goal?.name ? ' · ' + goal.name : '')} onOpen={onOpen} />
+    {g && goal ? <View style={{marginTop: 'auto', gap: 5} as any}>
+      <Big value={money(goal.saved)} unit={Math.round(g.pct * 100) + '% guardado'} />
+      <View style={{height: 6, borderRadius: 3, backgroundColor: c.line}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#88CFB8'}} /></View>
+      <Line text={'Faltam ' + money(g.missing) + ' de ' + money(goal.target)} />
+      {first ? <Text numberOfLines={1} style={{fontSize: 12, color: first.date <= today ? c.danger : c.muted}}>{first.title + ' ' + when(first.date) + ' · ' + money(first.amount)}</Text> : null}
+    </View> : first ? <View style={{marginTop: 'auto', gap: 4} as any}>
       <Big value={String(dues!.length)} unit={dues!.length === 1 ? 'conta na semana' : 'contas na semana'} />
       <Line text={first.title + ' ' + when(first.date) + ' · ' + money(first.amount)} />
       <Act label="Ver a conta" onPress={onOpen} />
-    </View> : g && goal ? <View style={{marginTop: 'auto', gap: 4} as any}>
-      {/* sem contas na semana: a meta de guardar dinheiro (0.3.295, pedido do Pedro) */}
-      <Big value={Math.round(g.pct * 100) + '%'} unit={'da meta ' + (goal.name || '')} />
-      <View style={{height: 6, borderRadius: 3, backgroundColor: c.line, marginVertical: 4}}><View style={{height: 6, borderRadius: 3, width: (Math.max(2, g.pct * 100) + '%') as any, backgroundColor: '#88CFB8'}} /></View>
-      <Line text={'Faltam ' + money(g.missing) + (goal.deadline ? ' até ' + goal.deadline.slice(5, 7) + '/' + goal.deadline.slice(0, 4) : '')} />
-      <Act label="Ver a meta" onPress={onOpen} />
     </View> : <Quiet text="Nenhuma conta" sub="Nada vence nos próximos 7 dias." />}
   </View>;
 }
