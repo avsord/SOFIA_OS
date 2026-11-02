@@ -1,3 +1,4 @@
+import {SpendCapCard} from './SpendCap';
 import {dpx} from '../../lib/content-width';
 // 0.3.269 — Finanças no SITE (protótipo aprovado em 31/10: docs/prototipos-2026-10-31/financas.html). Só no computador;
 // o celular continua com a Finanças de antes. Todas as regras de número são as mesmas do Resumo (copiadas do HomeTab:
@@ -211,11 +212,7 @@ export function FinanceDesk(p: Props) {
       <View style={{flex: 1, minWidth: 300, gap: 14}}>
         <Box testID="fin-next-bills" title="Próximas contas" action={<Link label="Ver contas" onPress={() => setView('bills')} />}>{dues.length ? dues.map(due => <DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={onTx} />) : <Text style={{color: c.muted, fontSize: 13}}>Nada para pagar nos próximos dias.</Text>}</Box>
         <Box testID="fin-refunds" title="Devoluções a receber" action={<Link label="Ver todas" onPress={() => setView('refunds')} />}>{refunds.length ? refunds.slice(0, 4).map(r => <View key={r.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><View style={{width: 32, height: 32, borderRadius: 9, backgroundColor: c.warn + '22', alignItems: 'center', justifyContent: 'center'}}><Icon name="refund" size={15} color={c.warn} /></View><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{r.title}</Text><Text style={{color: c.text, fontWeight: '600'}}>{show(r.amount)}</Text><GhostButton label="Recebi" onPress={() => void receive(r)} /></View>) : <Text style={{color: c.muted, fontSize: 13}}>Nenhuma devolução esperando.</Text>}</Box>
-        <Box testID="fin-control" title="Controle de gastos" action={<Text style={{color: c.muted, fontSize: 12, textTransform: 'capitalize'}}>{monthLabel(month).split(' ')[0]}</Text>}>
-          <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}><Text style={{color: c.text, fontSize: 18, fontWeight: '700'}}>{show(spend.spent)}</Text><Text style={{color: c.muted, fontSize: 12}}>de {show(spend.available)}</Text><View style={{flex: 1}} /><Text style={{color: spend.pct > 100 ? c.danger : spend.pct >= 80 ? c.warn : c.text, fontWeight: '700'}}>{spend.pct}%</Text></View>
-          <View style={{height: 7, borderRadius: 4, backgroundColor: c.line}}><View style={{width: (Math.min(100, spend.pct) + '%') as any, height: 7, borderRadius: 4, backgroundColor: spend.pct > 100 ? c.danger : spend.pct >= 80 ? c.warn : PALETTE.green}} /></View>
-          <Text style={{color: c.muted, fontSize: 12}}>Você começou {monthLabel(month).split(' ')[0]} com {show(spend.start)} e {past ? 'terminou' : 'agora tem'} {show(controlSaldo)}.</Text>
-        </Box>
+        <SpendCapCard api={api} d={d} month={month} accountId={accountId} account={p.account || d.accounts.find(x => x.id === accountId)} show={show} reload={reload} />
         <Box title="Orçamentos" action={<Link label="Ajustar" onPress={() => setView('budgets')} />}>{renderBudgetBars({})}</Box>
         {renderDayChart()}
       </View>

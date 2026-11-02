@@ -41,7 +41,7 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, monthRange, accountId, total, aportePendingIn(monthRange), today)'),'cartao do ciclo');
-  assert.ok(s.includes(': spend, over = b.left < 0, pct = Math.min(1, b.pct);'),'controle de gastos e o Saldo');
+  assert.ok(s.includes('<SpendCapCard '),'controle de gastos com teto (0.3.310)');
   assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
@@ -250,7 +250,7 @@ test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada 
   assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("'Previsto até ' + forecastEnd}"),'0.3.224: ate a vespera do proximo salario');
-  assert.ok(s.includes("Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}")&&s.includes("e agora tem {show(b.left)}."),'o cartao nunca some');
+  assert.ok(s.includes('<SpendCapCard '),'o cartao nunca some (0.3.310: SpendCapCard)');
 });
 
 test('0.3.196: Controle de gastos; passo a passo pede o valor cheio do salario e cria a receita fixa no dia',()=>{

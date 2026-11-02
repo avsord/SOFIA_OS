@@ -1653,6 +1653,13 @@ const CATALOG={
         "developerOnly": true
       },
       {
+        "key": "spend_caps_json",
+        "label": "Teto de gastos de cada mês",
+        "type": "textarea",
+        "max": 4000,
+        "developerOnly": true
+      },
+      {
         "key": "balance_set_at",
         "label": "Saldo acertado com o banco em",
         "type": "date",

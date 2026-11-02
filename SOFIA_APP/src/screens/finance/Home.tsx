@@ -1,3 +1,4 @@
+import {SpendCapCard} from './SpendCap';
 import {Presence} from '../../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../../lib/palette';
@@ -255,24 +256,7 @@ export function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimar
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text><Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text></View>
         <ShimmerBlock width={'52%'} height={24} radius={8} /><ShimmerBlock width={'100%'} height={10} radius={5} /><ShimmerBlock width={'78%'} height={10} />
       </View></ShimmerGroup> :
-      (() => { const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend, over = b.left < 0, pct = Math.min(1, b.pct);
-        return <Pressable accessibilityRole="button" accessibilityLabel="Ver as despesas do mês" onPress={() => setBreakdown('expense')}
-        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? c.danger : c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
-        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
-          <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text>
-          <Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text>
-        </View>
-        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-          <Text style={{color: over ? c.danger : c.text, fontWeight: '700', fontSize: 28}}>{show(b.left)}</Text>
-          <Text style={{color: c.muted, fontSize: 12}}>de {show(b.available)}</Text>
-          <View style={{flex: 1}} />
-          <Text style={{color: over ? c.danger : pct <= 0.25 ? c.warn : c.good, fontWeight: '600', fontSize: 13}}>{Math.round(b.pct * 100)}%</Text>
-        </View>
-        <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
-          <View style={{width: `${Math.round(pct * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? c.danger : pct <= 0.25 ? c.warn : c.good}} />
-        </View>
-        {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}{b.extra > 0 ? ', somou ' + show(b.extra) + ' de receita avulsa' : ''} e agora tem {show(b.left)}.{b.manual ? '' : tap(' Para informar o saldo do início do mês, toque no Saldo → Ajustar saldo.')}</Text>}
-      </Pressable>; })()}
+      <SpendCapCard api={api} d={d} month={month} accountId={accountId} account={d.accounts.find(x => x.id === accountId) || d.accounts.find(x => !x.archived)} show={show} reload={reload} onOpen={() => setBreakdown('expense')} style={{borderRadius: 20}} />}
 
       {dups.slice(0, 2).map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => setDupOpen(g.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.danger + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.danger}}>
         <Text style={{fontSize: 18}}>⚠️</Text>

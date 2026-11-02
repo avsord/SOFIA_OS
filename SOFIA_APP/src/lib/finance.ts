@@ -5,7 +5,7 @@ import type {Entity} from './types';
 
 export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
-export type Account = {carry?: number; id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
+export type Account = {spendCaps?: Record<string, number>; carry?: number; id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
 export type Tx = {paidAt: string; reservePart: number; time: string; noBalance?: boolean; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
@@ -64,7 +64,7 @@ export function addDays(date: string, n: number): string { const d = new Date(da
 // ---------- Leitura das entidades ----------
 export function toAccount(e: Entity): Account {
   return {id: e.id, name: e.title, type: String(e.data?.account_type || 'corrente'), initial: num(e.data?.initial_balance), color: String(e.data?.color || FIN_COLORS[0]),
-    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), reportStart: /^\d{4}-\d{2}-\d{2}$/.test(String(e.data?.report_start || '')) ? String(e.data.report_start) : '', monthStarts: parseMonthStarts(e.data?.month_starts_json), entity: e};
+    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), reportStart: /^\d{4}-\d{2}-\d{2}$/.test(String(e.data?.report_start || '')) ? String(e.data.report_start) : '', monthStarts: parseMonthStarts(e.data?.month_starts_json), spendCaps: parseMonthStarts(e.data?.spend_caps_json), entity: e};
 }
 export function toCard(e: Entity): Card {
   return {id: e.id, name: e.title, limit: num(e.data?.limit), closing: num(e.data?.closing_day) || 1, due: num(e.data?.due_day) || 10, color: String(e.data?.color || FIN_COLORS[2]),
@@ -935,4 +935,18 @@ export function saldoLedger(items: LedgerItem[], base: number, carry: number, ch
   const gap = round2(total - run);
   if (gap) { run = round2(run + gap); out.push({id: 'gap', date: todayISO(), desc: 'Diferença sem lançamento', delta: gap, note: 'não identificada', tx: null, at: '', change: true, run}); }
   return {start, carry: prior, rows: out};
+}
+
+/** 0.3.310 (Pedro): teto de gastos do mes, que a pessoa define (engrenagem no Controle de gastos). Mes sem valor herda
+ * o ultimo teto definido antes dele; sem nenhum, 0 (= sem teto). */
+export function spendCapFor(acc: Account | undefined, month: string): number {
+  const caps = acc?.spendCaps || {}; if (typeof caps[month] === 'number') return caps[month];
+  const prev = Object.keys(caps).filter(m => m < month).sort().pop();
+  return prev ? caps[prev] : 0;
+}
+/** Despesas do mes FORA as contas: o que a pessoa lancou (avulsas e compras no cartao com a parcela do mes), sem contas
+ * a pagar e sem o que se repete. E o que conta contra o teto. */
+export function looseExpenses(txs: Tx[], month: string, accountId = ''): Tx[] {
+  return txs.filter(t => t.kind === 'expense' && monthOf(t.date) === month && !(t as any).virtual && (t as any).entity?.state !== 'archived'
+    && (!accountId || t.accountId === accountId || !!t.cardId) && !t.manualDue && (t.recurrence || 'none') === 'none' && !(t.seriesId && !(t.installments > 1)));
 }

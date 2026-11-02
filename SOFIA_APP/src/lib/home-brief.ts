@@ -18,7 +18,7 @@ export type HomeBriefData = {
   left: {left: number; end: string} | null; // o que sobra depois de tudo pago (0.3.303)
   spend: {spent: number; available: number; pct: number} | null; // controle de gastos do mes (0.3.305)
   goal: GoalNumbers | null; // meta de guardar dinheiro, lida junto com o resto (0.3.306)
-  loose: {total: number; count: number; biggest: {title: string; amount: number} | null} | null; // despesas do mes fora as contas (0.3.308)
+  loose: {total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} | null; // despesas do mes fora as contas (0.3.308)
   mailNew: Entity[];
 };
 
@@ -26,7 +26,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
   const capsules = useCapsules(api, active);
   // 0.3.302: encomendas lidas direto do servidor (o gancho de registros nao carregava fora do app Encomendas)
   const [pkgItems, setPkgItems] = useState<Entity[] | undefined>(undefined);
-  const [dues, setDues] = useState<Due[] | null | undefined>(undefined), [left, setLeft] = useState<{left: number; end: string} | null>(null), [spend, setSpend] = useState<{spent: number; available: number; pct: number} | null>(null), [goal, setGoal] = useState<GoalNumbers | null>(null), [loose, setLoose] = useState<{total: number; count: number; biggest: {title: string; amount: number} | null} | null>(null);
+  const [dues, setDues] = useState<Due[] | null | undefined>(undefined), [left, setLeft] = useState<{left: number; end: string} | null>(null), [spend, setSpend] = useState<{spent: number; available: number; pct: number} | null>(null), [goal, setGoal] = useState<GoalNumbers | null>(null), [loose, setLoose] = useState<{total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} | null>(null);
   const [mailNew, setMailNew] = useState<Entity[] | undefined>(undefined);
   useEffect(() => {
     if (!active) return;

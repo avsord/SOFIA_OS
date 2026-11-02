@@ -7,7 +7,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('0.3.256: Controle de gastos voltou a ser o do mes (inicio do mes x agora)',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(!s.includes('cycleControl')&&!read('src/lib/finance.ts').includes('export function cycleControl'),'sem o calculo desde o salario');
-  assert.ok(s.includes("const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend"));
+  assert.ok(s.includes('<SpendCapCard ')); // 0.3.310: o Controle virou teto do mes x despesas fora as contas
 });
 
 test('0.3.256: despesa "Vai ser reembolsada" liga com Devolucoes e mostra o estado',()=>{

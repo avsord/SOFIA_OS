@@ -1,6 +1,6 @@
 // 0.3.303: "o que sobra depois de tudo pago" (a mesma regra do card Previsto de Financas: ciclo do salario, nos 5 dias
 // antes do pagamento ja o ciclo seguinte; aporte do ciclo contado como feito), para o Inicio usar sem abrir Financas.
-import {monthControl, totalBalance, transactionsForAccount, addDays, addMonths, cycleRange, dayIn, daysIn, effectiveCycleDay, manualDues, monthOf, moneySplit, reserveFor, simpleForecast, todayISO, type Account, type Card, type Tx, type Goal, type ReserveMove} from './finance';
+import {looseExpenses, spendCapFor, monthControl, totalBalance, transactionsForAccount, addDays, addMonths, cycleRange, dayIn, daysIn, effectiveCycleDay, manualDues, monthOf, moneySplit, reserveFor, simpleForecast, todayISO, type Account, type Card, type Tx, type Goal, type ReserveMove} from './finance';
 
 export type LeftData = {accounts: Account[]; cards: Card[]; txs: Tx[]; goals: Goal[]; moves?: ReserveMove[]};
 
@@ -41,13 +41,12 @@ export function spendControl(all: LeftData, today = todayISO()): {spent: number;
   return {spent: m.spent, available: m.available, pct: m.available > 0 ? Math.round(m.spent / m.available * 100) : 0};
 }
 
-/** 0.3.308 (Pedro): o que a pessoa gastou no mes FORA as contas - so as despesas que ela mesma lancou (avulsas e
- * compras no cartao, inclusive a parcela do mes); fica de fora o que e conta a pagar e o que se repete todo mes. */
-export function looseSpending(d: LeftData, today = todayISO()): {total: number; count: number; biggest: {title: string; amount: number} | null} {
-  const month = monthOf(today);
-  const list = d.txs.filter(t => t.kind === 'expense' && monthOf(t.date) === month && !(t as any).virtual && (t as any).entity?.state !== 'archived'
-    && !t.manualDue && (t.recurrence || 'none') === 'none' && !(t.seriesId && !(t.installments > 1)));
+/** 0.3.310: despesas do mes fora as contas (a mesma conta do Controle de gastos de Financas: conta principal) e o teto
+ * que a pessoa definiu para o mes (0 = sem teto). */
+export function looseSpending(all: LeftData, today = todayISO()): {total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} {
+  const {d, accountId} = primaryScope(all), month = monthOf(today);
+  const list = looseExpenses(d.txs, month, accountId);
   const total = Math.round(list.reduce((s, t) => s + t.amount, 0) * 100) / 100;
   const big = [...list].sort((a, b) => b.amount - a.amount)[0];
-  return {total, count: list.length, biggest: big ? {title: big.desc, amount: big.amount} : null};
+  return {total, count: list.length, cap: spendCapFor(d.accounts.find(a => a.id === accountId), month), biggest: big ? {title: big.desc, amount: big.amount} : null};
 }
