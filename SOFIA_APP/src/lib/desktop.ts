@@ -16,15 +16,18 @@ export function useDesktop():boolean{const {width}=useWindowDimensions();return 
 
 /** Largura maxima do conteudo por aba: so onde a leitura pede (texto de Paginas, Conversa). O resto e fluido. */
 export function contentMaxWidth(tab:Tab):number|undefined{return baseMaxWidth(tab); /* 0.3.278: na escala de computador; a camada do site multiplica pelo fator da tela */}
+/** Largura maxima das telas no computador: grande o bastante para ocupar telas de ate ~2000 px (o resto vira respiro). */
+export const WIDE_COLUMN=1760;
 function baseMaxWidth(tab:Tab):number|undefined{
  // 0.3.251: Paginas ocupa a tela (capa e barra na largura toda; o texto se centraliza no proprio editor).
  // Apps: formularios e listas dos apps nao se esticam por 1900 px.
  if(tab==='chat')return 860;
- if(tab==='profile')return 1120;
- if(tab==='apps')return 1120;
+ // 0.3.298 (Pedro, foto da TV): as telas ocupam a largura toda, com respiro nas bordas (antes uma coluna de 1120 no meio)
+ if(tab==='profile')return WIDE_COLUMN;
+ if(tab==='apps')return WIDE_COLUMN;
  // 0.3.254: Inicio e Agenda tambem tem largura maxima - em monitores grandes (2560) o painel esticava de ponta a ponta
- if(tab==='home')return 1480;
- if(tab==='agenda')return 1120; // 0.3.277: mesma coluna das outras telas (antes 1280)
+ if(tab==='home')return WIDE_COLUMN;
+ if(tab==='agenda')return WIDE_COLUMN;
  return undefined;
 }
 /** Colunas do painel do Inicio pela largura disponivel do conteudo. */
