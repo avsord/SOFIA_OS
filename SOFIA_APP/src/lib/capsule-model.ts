@@ -17,7 +17,17 @@ export const MISSED_AFTER_MS=6*3600000;
 export type CapsuleDose={key:string;plan:Entity;day:string;time:string;date:Date;taken?:Entity;due:boolean;missed:boolean};
 export function capsuleTimes(plan:Entity):string[]{try{const times=JSON.parse(plan.data.times_json);return Array.isArray(times)?[...new Set(times.filter((t:unknown):t is string=>typeof t==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))].sort():[];}catch{return [];}}
 export function capsuleKey(id:string,day:string,time:string){return `${id}:${day}:${time}`;}
-export function capsuleDoses(plans:Entity[],history:Entity[],day=capsuleDay(new Date()),now=new Date()):CapsuleDose[]{const done=new Map(history.map(r=>[capsuleKey(r.data.capsule_id,r.data.day,r.data.time),r]));return plans.filter(p=>p.state==='active'&&capsuleOccurs(p.data,day)).flatMap(plan=>capsuleTimes(plan).map(time=>{const date=new Date(day+'T'+time+':00'),key=capsuleKey(plan.id,day,time);return {key,plan,day,time,date,taken:done.get(key),due:date.getTime()<=now.getTime(),missed:now.getTime()-date.getTime()>MISSED_AFTER_MS};})).sort((a,b)=>a.date.getTime()-b.date.getTime()||a.plan.title.localeCompare(b.plan.title));}
+/** 0.3.313 (Pedro: "mudei o horario de uma capsula e apareceram varias atrasadas"): o registro de "tomei" guarda o
+ * horario da epoca. Quando o horario muda, o registro antigo (horario que nao existe mais) continua valendo para o
+ * dia: cobre o primeiro horario de hoje que ficou sem registro. Assim mudar o horario nao desfaz o que ja foi tomado. */
+export function takenFor(plan:Entity,day:string,times:string[],history:Entity[]):Map<string,Entity>{
+ const mine=history.filter(r=>r.data?.capsule_id===plan.id&&r.data?.day===day),out=new Map<string,Entity>();
+ for(const t of times){const r=mine.find(x=>x.data.time===t);if(r)out.set(t,r);}
+ const orphans=mine.filter(r=>!times.includes(r.data.time)).sort((a,b)=>String(a.data.time).localeCompare(String(b.data.time)));
+ for(const t of [...times].sort()){if(!orphans.length)break;if(!out.has(t))out.set(t,orphans.shift()!);}
+ return out;
+}
+export function capsuleDoses(plans:Entity[],history:Entity[],day=capsuleDay(new Date()),now=new Date()):CapsuleDose[]{return plans.filter(p=>p.state==='active'&&capsuleOccurs(p.data,day)).flatMap(plan=>{const times=capsuleTimes(plan),taken=takenFor(plan,day,times,history);return times.map(time=>{const date=new Date(day+'T'+time+':00'),key=capsuleKey(plan.id,day,time);return {key,plan,day,time,date,taken:taken.get(time),due:date.getTime()<=now.getTime(),missed:now.getTime()-date.getTime()>MISSED_AFTER_MS};});}).sort((a,b)=>a.date.getTime()-b.date.getTime()||a.plan.title.localeCompare(b.plan.title));}
 export function capsuleNotificationPlan(plans:Entity[],history:Entity[],now=new Date(),days=366){const notices:{id:string;title:string;body:string;date:Date;day:string;planId:string;time:string;early:boolean}[]=[];for(let i=0;i<=days;i++){const date=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i,12);for(const dose of capsuleDoses(plans,history,capsuleDay(date),now)){if(dose.taken||!dose.plan.data.notifications)continue;if((dose.plan.tags||[]).includes('sofia-skip-v1:'+dose.day+'T'+dose.time))continue;const ahead=Math.max(0,Math.min(1440,Number(dose.plan.data.remind_minutes)||0));for(const minutes of ahead?[ahead,0]:[0]){const at=new Date(dose.date.getTime()-minutes*60000);if(at<=now)continue;notices.push({id:dose.key+':'+minutes,title:dose.plan.title,body:minutes?`Dose às ${dose.time} · aviso ${minutes} min antes${dose.plan.data.dose_text?' · '+dose.plan.data.dose_text:''}`:`Está no horário da dose: ${dose.time}${dose.plan.data.dose_text?' · '+dose.plan.data.dose_text:''}`,date:at,day:dose.day,planId:dose.plan.id,time:dose.time,early:minutes>0});}}}return notices.sort((a,b)=>a.date.getTime()-b.date.getTime());}
 
 export function capsuleRepeatLabel(data:any){const mode=data.repeat_type||'daily';if(mode==='once')return 'Uma única vez';if(mode==='weekdays'){let days:number[]=[];try{days=JSON.parse(data.weekdays_json||'[]');}catch{}return days.map(d=>['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(' · ');}if(mode==='interval')return 'A cada '+data.interval_days+' dias';if(mode==='monthly')return 'Todo mês no dia '+Number(String(data.start_date).slice(8,10));if(mode==='yearly')return 'Todo ano em '+String(data.start_date).slice(5).split('-').reverse().join('/');return 'Todos os dias';}
@@ -37,7 +47,11 @@ export function capsuleMissed(plans:Entity[],history:Entity[],since:string,today
  const t=new Date(today+'T12:00:00'),first=new Date(t.getFullYear(),t.getMonth(),t.getDate()-30),min=capsuleDay(first)>since?capsuleDay(first):since;
  for(let d=new Date(min+'T12:00:00');capsuleDay(d)<today;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)){const day=capsuleDay(d);
   for(const plan of plans){if(plan.state!=='active'||!capsuleOccurs(plan.data,day))continue;
-   for(const time of capsuleTimes(plan)){const key=capsuleKey(plan.id,day,time);if(done.has(key))continue;out.push({key,plan,day,time,date:new Date(day+'T'+time+':00'),due:true,missed:true});}}}
+   // 0.3.313: dia em que ja houve registro com o horario antigo nao vira atrasado depois de mudar o horario;
+   // e dias antes da ultima mudanca do item nao contam (o horario novo nao existia)
+   const times=capsuleTimes(plan),taken=takenFor(plan,day,times,history),changed=String(plan.data?.times_changed_on||'');
+   if(changed&&day<changed)continue;
+   for(const time of times){const key=capsuleKey(plan.id,day,time);if(done.has(key)||taken.has(time))continue;out.push({key,plan,day,time,date:new Date(day+'T'+time+':00'),due:true,missed:true});}}}
  return out.sort((a,b)=>a.date.getTime()-b.date.getTime());
 }
 /** "ontem" ou dd/mm. */

@@ -18,7 +18,9 @@ export type HomeBriefData = {
   left: {left: number; end: string} | null; // o que sobra depois de tudo pago (0.3.303)
   spend: {spent: number; available: number; pct: number} | null; // controle de gastos do mes (0.3.305)
   goal: GoalNumbers | null; // meta de guardar dinheiro, lida junto com o resto (0.3.306)
-  money: Due[]; // contas a pagar, receitas a receber e faturas dos proximos dias, para a linha do tempo (0.3.311)
+  money: Due[];
+  fin: any; // dados de Financas (para "Paguei"/"Recebi" pela linha do tempo)
+  reload: () => void; // contas a pagar, receitas a receber e faturas dos proximos dias, para a linha do tempo (0.3.311)
   loose: {total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} | null; // despesas do mes fora as contas (0.3.308)
   mailNew: Entity[];
 };
@@ -27,7 +29,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
   const capsules = useCapsules(api, active);
   // 0.3.302: encomendas lidas direto do servidor (o gancho de registros nao carregava fora do app Encomendas)
   const [pkgItems, setPkgItems] = useState<Entity[] | undefined>(undefined);
-  const [dues, setDues] = useState<Due[] | null | undefined>(undefined), [left, setLeft] = useState<{left: number; end: string} | null>(null), [spend, setSpend] = useState<{spent: number; available: number; pct: number} | null>(null), [goal, setGoal] = useState<GoalNumbers | null>(null), [moneyDues, setMoneyDues] = useState<Due[]>([]), [loose, setLoose] = useState<{total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} | null>(null);
+  const [dues, setDues] = useState<Due[] | null | undefined>(undefined), [left, setLeft] = useState<{left: number; end: string} | null>(null), [spend, setSpend] = useState<{spent: number; available: number; pct: number} | null>(null), [goal, setGoal] = useState<GoalNumbers | null>(null), [moneyDues, setMoneyDues] = useState<Due[]>([]), [fin, setFin] = useState<any>(null), [epoch, setEpoch] = useState(0), [loose, setLoose] = useState<{total: number; count: number; cap: number; biggest: {title: string; amount: number} | null} | null>(null);
   const [mailNew, setMailNew] = useState<Entity[] | undefined>(undefined);
   useEffect(() => {
     if (!active) return;
@@ -35,7 +37,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
     void (async () => {
       try {
         // 0.3.293: guardado neste aparelho se houver; senao busca no servidor (antes o bloco ficava "Abra Financas")
-        let bundle = await readCache(api);
+        let bundle = epoch ? null : await readCache(api);
         if (!bundle) {const month = new Date().toISOString().slice(0, 7); bundle = await loadAll(api, financeWindow(month, 'home'));}
         if (!alive) return;
         if (!bundle) {setDues(null); return;}
@@ -45,6 +47,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
         try {setLeft(leftAfterBills(data as any, today));} catch {setLeft(null);}
         try {setSpend(spendControl(data as any, today));} catch {setSpend(null);}
         try {setLoose(looseSpending(data as any, today));} catch {setLoose(null);}
+        setFin(data);
         try {setMoneyDues(upcoming((data as any).txs || [], (data as any).cards || [], today, 4).filter(x => !x.paid));} catch {setMoneyDues([]);}
         // a mesma meta que Financas mostra (papel "reserve"); antes vinha de outra leitura, que podia chegar tarde ou nao chegar
         try {const r = reserveOf((data as any).goals || []); if (r && Number(r.target) > 0) {const sp = moneySplit(r, (data as any).moves || [], (data as any).accounts, (data as any).txs, (data as any).cards, today.slice(0, 7)); setGoal({name: r.name || 'Sua meta', saved: sp.saved, target: Number(r.target), monthly: sp.planned || 0, deadline: String(r.entity?.data?.deadline || ''), today});} else setGoal(null);} catch {setGoal(null);}
@@ -64,8 +67,8 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
       } catch {if (alive) setMailNew([]);}
     })();
     return () => {alive = false;};
-  }, [api, active]);
+  }, [api, active, epoch]);
   const packs = (pkgItems || []).filter(i => i.state !== 'archived' && i.state !== 'delivered').map(classify).filter(x => !x.delivered);
   const ready = !!capsules.loaded && pkgItems !== undefined && dues !== undefined && mailNew !== undefined;
-  return {ready, capsules, packs, dues: dues ?? null, left, spend, goal, loose, money: moneyDues, mailNew: mailNew || []};
+  return {ready, capsules, packs, dues: dues ?? null, left, spend, goal, loose, money: moneyDues, fin, reload: () => setEpoch(e => e + 1), mailNew: mailNew || []};
 }

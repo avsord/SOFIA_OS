@@ -12,6 +12,7 @@ import type {Task} from '../lib/types';
 import type {DayRecord} from '../lib/dashboard';
 import type {MonitorWidgetRow} from '../lib/monitoring';
 import type {HomeBriefData} from '../lib/home-brief';
+import type {Due} from '../lib/finance';
 import {capsuleDoses, capsuleDay} from '../lib/capsule-model';
 import {agendaPriority, isHoliday, HOLIDAY_COLOR} from '../lib/agenda-priority';
 import {useReducedMotion} from '../lib/motion';
@@ -34,6 +35,7 @@ export type HomeBriefProps = {
   onOpenItem: (r: DayRecord) => void; onOpenTasks: () => void; onOpenTask?: (id: string) => void; onToggleTask: (t: Task) => void;
   onOpenModule: (id: string) => void; onOpenMonitoring: () => void; onOpenAgenda: () => void;
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
+  onMarkAction?: (m: TimeMark) => void;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -75,8 +77,60 @@ function useRowHeight(_root: React.RefObject<View | null>, _briefH: number) {
   return Math.round(ROW_H * uiScale());
 }
 
+/** 0.3.313 (Pedro): engrenagem do Seu dia - o que aparece na linha do tempo (por area e item por item na Rotina e em
+ * Financas) e a opacidade das marcas. Guardado neste navegador. */
+type TimelineSettings = {cats: Record<string, boolean>; items: Record<string, boolean>; opacity: number};
+const TL_KEY = 'sofia.timeline.v1';
+function useTimelineSettings(): [TimelineSettings, (s: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void] {
+  const [s, set] = useState<TimelineSettings>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(TL_KEY) || 'null'); if (v && v.cats) return {cats: v.cats || {}, items: v.items || {}, opacity: Number(v.opacity) || 1};} catch {} return {cats: {}, items: {}, opacity: 1};});
+  return [s, (f: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => set(old => {const v = typeof f === 'function' ? f(old) : f; try {globalThis.localStorage?.setItem(TL_KEY, JSON.stringify(v));} catch {} return v;})];
+}
+const TL_CATS: {id: string; label: string; color: string}[] = [{id: 'events', label: 'Compromissos', color: '#8fb4ff'}, {id: 'tasks', label: 'Tarefas', color: '#F5A0AE'}, {id: 'reminders', label: 'Lembretes', color: '#7FD1E8'}, {id: 'bill', label: 'Contas a pagar', color: '#E8B04A'}, {id: 'income', label: 'Receitas', color: '#7ED6A5'}, {id: 'invoice', label: 'Faturas do cartão', color: '#B49AE6'}, {id: 'package', label: 'Encomendas', color: '#F0956A'}, {id: 'routine', label: 'Rotina', color: '#5FD3C6'}];
+function Switch({on, onChange, label}: {on: boolean; onChange: (v: boolean) => void; label: string}) {
+  const c = useTheme();
+  return <Pressable accessibilityRole="switch" accessibilityState={{checked: on}} accessibilityLabel={label} onPress={() => onChange(!on)} hitSlop={6} style={{width: 34, height: 20, borderRadius: 10, padding: 2, backgroundColor: on ? c.accent : c.line, justifyContent: 'center'}}>
+    <View style={{width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', transform: [{translateX: on ? 14 : 0}]}} />
+  </Pressable>;
+}
+function TimelineSettingsPanel({s, set, plans, bills, incomes, onClose}: {s: TimelineSettings; set: (v: TimelineSettings | ((old: TimelineSettings) => TimelineSettings)) => void; plans: {id: string; title: string; type: string}[]; bills: string[]; incomes: string[]; onClose: () => void}) {
+  const c = useTheme(), [open, setOpen] = useState('');
+  const cat = (id: string) => s.cats[id] !== false, item = (k: string) => s.items[k] !== false;
+  const setCat = (id: string, v: boolean) => set(o => ({...o, cats: {...o.cats, [id]: v}})), setItem = (k: string, v: boolean) => set(o => ({...o, items: {...o.items, [k]: v}}));
+  const sub = (id: string) => id === 'routine' ? plans.map(p => ({k: 'routine:' + p.id, label: p.title, color: routineColor(p.type)})) : id === 'bill' ? bills.map(t => ({k: 'fin:' + t, label: t, color: '#E8B04A'})) : id === 'income' ? incomes.map(t => ({k: 'fin:' + t, label: t, color: '#7ED6A5'})) : [];
+  return <View style={{position: 'absolute', top: 52, right: 16, width: 340, maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
+    <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8}}>
+      <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Linha do tempo</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={15} color={c.muted} /></Pressable>
+    </View>
+    <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight: 400}} contentContainerStyle={{paddingHorizontal: 16, paddingBottom: 16, gap: 2}}>
+      <Text style={{fontSize: 12, color: c.muted, marginBottom: 6}}>O que aparece na linha do tempo do Início. Não muda avisos nem os apps.</Text>
+      {TL_CATS.map(k => {const items = sub(k.id); return <View key={k.id}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, height: 38}}>
+          <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: k.color}} />
+          <Pressable disabled={!items.length} onPress={() => setOpen(o => o === k.id ? '' : k.id)} style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6}}>
+            <Text style={{fontSize: 13, color: c.text}}>{k.label}</Text>
+            {items.length ? <Text style={{fontSize: 12, color: c.muted}}>{open === k.id ? '▴' : '▾'} {items.filter(i => item(i.k)).length}/{items.length}</Text> : null}
+          </Pressable>
+          <Switch label={k.label} on={cat(k.id)} onChange={v => setCat(k.id, v)} />
+        </View>
+        {open === k.id && items.length ? <View style={{marginLeft: 18, paddingLeft: 10, borderLeftWidth: 1, borderColor: c.line, opacity: cat(k.id) ? 1 : 0.45}}>
+          {items.map(i => <View key={i.k} style={{flexDirection: 'row', alignItems: 'center', gap: 8, height: 32}}>
+            <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: i.color}} />
+            <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{i.label}</Text>
+            <Switch label={i.label} on={item(i.k)} onChange={v => setItem(i.k, v)} />
+          </View>)}
+        </View> : null}
+      </View>;})}
+      <View style={{height: 1, backgroundColor: c.line, marginVertical: 10}} />
+      <Text style={{fontSize: 13, color: c.text, marginBottom: 8}}>Opacidade das marcas</Text>
+      <View style={{flexDirection: 'row', gap: 6}}>{[0.4, 0.6, 0.8, 1].map(o => <Pressable key={o} accessibilityRole="button" accessibilityState={{selected: s.opacity === o}} onPress={() => set(old => ({...old, opacity: o}))} style={({hovered}: any) => ({flex: 1, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: s.opacity === o ? c.accentSoft : hovered ? c.input : 'transparent', borderWidth: 1, borderColor: s.opacity === o ? c.accent : c.line})}>
+        <Text style={{fontSize: 12, color: s.opacity === o ? c.accent : c.text, fontWeight: s.opacity === o ? '600' : '400'}}>{Math.round(o * 100)}%</Text></Pressable>)}</View>
+    </ScrollView>
+  </View>;
+}
+
 export function HomeBrief(p: HomeBriefProps) {
-  const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief);
+  const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), [tl, setTl] = useTimelineSettings(), [gear, setGear] = useState(false);
   const rowH = useRowHeight(root, briefH);
   const open = useMemo(() => p.tasks.filter(t => t.state !== 'done'), [p.tasks]);
   const important = open.filter(isImportant);
@@ -86,7 +140,7 @@ export function HomeBrief(p: HomeBriefProps) {
   // 0.3.311: o que mais aparece na linha do tempo, cada area com a sua marca (Financas, Encomendas e Rotina)
   const timeMarks = useMemo(() => {
     const out: TimeMark[] = [], todayKey = new Date().toISOString().slice(0, 10), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
-    for (const d of p.data.money || []) out.push({id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
+    for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
     const from = Date.now() - 2 * 864e5;
     for (const pk of p.data.packs) {
       for (const ev of pk.events || []) {const t = Date.parse(ev.at); if (Number.isFinite(t) && t >= from) out.push({id: 'p' + pk.id + ev.at, kind: 'package', at: new Date(t), title: pk.title, sub: ev.status, done: true});}
@@ -110,14 +164,17 @@ export function HomeBrief(p: HomeBriefProps) {
 
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   return <View ref={root} style={{gap: 12}}>
-    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface}}>
+    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
         <View style={{flex: 1}} />
-        <Pressable accessibilityRole="link" onPress={p.onOpenAgenda}><Text style={{color: c.muted, fontSize: 12}}>Abrir agenda</Text></Pressable>
+        <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
-      <Timeline onMute={p.onMute} marks={timeMarks} onMark={m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance')} items={timelineItems} next={next} onEdit={r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r)} />
+      {gear ? <TimelineSettingsPanel s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula')}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
+      <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} opacity={tl.opacity}
+        marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance')}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -142,123 +199,118 @@ type BillMark = {id: string; title: string; date: string; amount: number; late: 
  * (receita a receber, losango verde "+"), invoice (fatura do cartao, losango lilas), package (status de encomenda,
  * quadrado laranja com caixa), routine (item da rotina, pilula verde-agua). */
 export type TimeMark = {id: string; kind: 'bill' | 'income' | 'invoice' | 'package' | 'routine'; at: Date; title: string; sub: string; late?: boolean; done?: boolean;
-  dose?: {planId: string; day: string; time: string; type: string; mutedOne: boolean; mutedAll: boolean}; more?: TimeMark[]};
+  dose?: {planId: string; day: string; time: string; type: string; mutedOne: boolean; mutedAll: boolean}; more?: TimeMark[]; due?: Due};
 /** 0.3.312: desligar o aviso so desta vez ou de todas as vezes (item da Agenda/lembrete ou dose da Rotina). */
 export type MuteTarget = {rec: DayRecord} | {dose: NonNullable<TimeMark['dose']>};
+import {ROTINA_TYPES} from '../lib/rotina';
 const ROUTINE_ICON: Record<string, IconName> = {capsula: 'capsule', cuidado: 'heart', habito: 'repeat', treino: 'barbell'};
 const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string[] = o.tags || [], iso = new Date(r.date).toISOString(); return {one: tags.includes('sofia-skip-v1:' + iso), all: tags.includes('sofia-notify-v1:off'), repeats: tags.some(t => t.startsWith('sofia-repeat-v1:'))};};
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
-function Timeline({items, next, onEdit, marks = [], onMark, onMute}: {items: DayRecord[]; next: DayRecord | null; onEdit: (r: DayRecord) => void; marks?: TimeMark[]; onMark?: (m: TimeMark) => void; onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void}) {
-  const c = useTheme(), [w, setW] = useState(0), [hover, setHover] = useState(-1), [hoverMark, setHoverMark] = useState(-1), [pinMark, setPinMark] = useState(-1), [muteOpen, setMuteOpen] = useState(''), [pin, setPin] = useState(-1), [start, setStart] = useState(7), box = useRef<View>(null);
+/** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
+ * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void};
+const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) || ROTINA_TYPES[0]).color;
+const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? routineColor(m.dose?.type) : MARK_COLOR[m.kind];
+const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
+type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
+function Timeline({items, next, marks = [], opacity = 1, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; opacity?: number; actions: TimelineActions}) {
+  const c = useTheme(), [w, setW] = useState(0), [start, setStart] = useState(7), box = useRef<View>(null);
+  const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
   const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
-  const hoursOf = (d: Date) => (d.getTime() - day0) / 3600000;
-  const pos = (d: Date) => (hoursOf(d) - start) / SPAN;
+  const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const nowX = pos(new Date());
-  const shown = items.filter(r => {const x = pos(new Date(r.date)); return x >= -0.01 && x <= 1.01;});
-  // 0.3.303 (Pedro): conta a pagar aparece na linha do tempo com marca especial (conexao com Financas)
-  // conta vencida vai para o comeco da linha (nao some); o resto na hora/dia de cada coisa
-  const billsShownRaw = marks.map(b => ({b, x: b.late ? 0.025 : pos(b.at)})).filter(z => z.x >= -0.01 && z.x <= 1.01);
-  // 0.3.312 (Pedro): itens da rotina colados juntam numa marca so (continua o simbolo, sem numero); a previa mostra todos
-  const billsShown: typeof billsShownRaw = [];
-  for (const z of billsShownRaw) {const prev = billsShown[billsShown.length - 1]; if (z.b.kind === 'routine' && prev && prev.b.kind === 'routine' && w && (z.x - prev.x) * w < 22) prev.b = {...prev.b, more: [...(prev.b.more || []), z.b]}; else billsShown.push({...z, b: {...z.b}});}
-  const groups: {x: number; list: DayRecord[]}[] = [];
-  for (const r of shown) {const x = pos(new Date(r.date)); const g = groups[groups.length - 1]; if (g && w && (x - g.x) * w < 22) g.list.push(r); else groups.push({x, list: [r]});}
+  // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
+  const points: Point[] = [];
+  const inView = (x: number) => x >= -0.01 && x <= 1.01;
+  for (const r of items) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && w && (x - p.x) * w < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
+  const mpoints: Point[] = [];
+  for (const m of marks) {const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && w && (x - p.x) * w < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
+  // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
+  if (w) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * w < 20)) mp.x += 22 / w;}
+  const all = [...points, ...mpoints];
   useEffect(() => {
     const el: any = box.current; if (!el || !el.addEventListener) return;
     let acc = 0;
-    const onWheel = (e: WheelEvent) => {e.preventDefault(); acc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; const steps = Math.trunc(acc / 40); if (!steps) return; acc -= steps * 40; setPin(-1); setStart(v => Math.max(0, Math.min(24 * 3 - SPAN, v + steps)));};
+    const onWheel = (e: WheelEvent) => {e.preventDefault(); acc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; const steps = Math.trunc(acc / 40); if (!steps) return; acc -= steps * 40; setPin(''); setHover(''); setStart(v => Math.max(0, Math.min(24 * 3 - SPAN, v + steps)));};
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
-  useEffect(() => {if (typeof window === 'undefined' || (pin < 0 && pinMark < 0)) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {setPin(-1); setPinMark(-1);}}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin, pinMark]);
+  useEffect(() => {if (typeof window === 'undefined' || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
+  const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
+  const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
   const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
-  const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.content || o.data?.location || '').trim();};
-  const shownGroup = pin >= 0 ? pin : hover;
-  // 0.3.302 (Pedro): sem os botoes de atalho; cada bolinha tem o rotulo fixo em cima (horario e nome), em duas fileiras
+  const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.data?.message || o.content || o.data?.location || '').trim();};
+  // rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so na previa
   // 0.3.310 (tela grande): o rotulo cresce com o espaco de cada hora (150 a 230 px), para o nome nao cortar a toa
-  const LW = Math.round(Math.max(150, Math.min(230, (w || 0) / SPAN * 1.45))), rowsAt: number[][] = [[], []], place: Record<number, number> = {};
-  // prioridade dos rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so com o mouse
-  const billRow: Record<number, number> = {};
-  const fits = (px: number) => {for (const r of [0, 1]) if (rowsAt[r].every(q => Math.abs(q - px) >= LW + 8)) {rowsAt[r].push(px); return r;} return -1;};
-  groups.forEach((g, i) => {const r = fits(g.x * (w || 1)); if (r >= 0) place[i] = r;});
-  billsShown.forEach((z, i) => {if (z.b.kind === 'routine') return; const r = fits(z.x * (w || 1)); if (r >= 0) billRow[i] = r;});
-  const OFF = 44; // espaco dos rotulos em cima da linha
+  const LW = Math.round(Math.max(150, Math.min(230, (w || 0) / SPAN * 1.45))), OFF = 44, rows: number[][] = [[], []], place: Record<string, number> = {};
+  const fits = (px: number) => {for (const r of [0, 1]) if (rows[r].every(q => Math.abs(q - px) >= LW + 8)) {rows[r].push(px); return r;} return -1;};
+  for (const p of points) {const r = fits(p.x * (w || 1)); if (r >= 0) place[p.key] = r;}
+  for (const p of mpoints) if (p.marks[0].kind !== 'routine') {const r = fits(p.x * (w || 1)); if (r >= 0) place[p.key] = r;}
+  const shown = all.find(p => p.key === (pin || hover));
+  const tagOf = (p: Point) => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
+    return {text: hhmm(new Date(r.date)) + ' ' + (p.recs.length > 1 ? p.recs.length + ' itens' : r.title), color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
   return <View ref={box} style={{marginTop: 12, height: 56 + OFF}} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
-    {groups.map((g, i) => {
-      const isNext = !!next && g.list.includes(next), many = g.list.length > 1, size = isNext ? 16 : many ? 20 : 12;
-      // 0.3.304: lembrete tem marca propria (sino num circulo contornado), diferente de compromisso e de conta
-      if (!many && g.list[0].kind === 'reminder') return <Pressable key={i} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(g.list[0].date)) + ' ' + g.list[0].title} onPress={() => setPin(p => p === i ? -1 : i)} hitSlop={12} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
-        style={({hovered}: any) => ({position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', transform: [{scale: hovered ? 1.12 : 1}], boxShadow: '0 0 0 4px ' + tint(REMIND, 0.16)} as any)}>
-        <Icon name="bell" size={11} color={REMIND} />
-      </Pressable>;
-      return <Pressable key={i} accessibilityRole="button" accessibilityLabel={g.list.map(r => hhmm(new Date(r.date)) + ' ' + r.title).join(', ')} onPress={() => {setPinMark(-1); setPin(p => p === i ? -1 : i);}} hitSlop={14} onHoverIn={() => setHover(i)} onHoverOut={() => setHover(h => h === i ? -1 : h)}
-        style={{position: 'absolute', left: (g.x * 100 + '%') as any, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(g.list[0], c.accent), alignItems: 'center', justifyContent: 'center'}}>
-        {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{g.list.length}</Text> : null}
-      </Pressable>;
-    })}
-    {billsShown.map((z, i) => {
-      const m = z.b, col = m.late ? c.danger : MARK_COLOR[m.kind], diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
-      const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
-      const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
-      return <React.Fragment key={'m' + m.id + i}>
-      <Pressable accessibilityRole="button" accessibilityLabel={m.title + ' · ' + m.sub} onPress={() => m.kind === 'routine' ? (setPin(-1), setPinMark(v => v === i ? -1 : i)) : onMark?.(m)} hitSlop={12} onHoverIn={() => setHoverMark(i)} onHoverOut={() => setHoverMark(h => h === i ? -1 : h)} style={({hovered}: any) => ({position: 'absolute', left: (z.x * 100 + '%') as any, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (m.more?.length ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered ? 0.3 : 0.16), zIndex: 2} as any)}>
-        {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : m.kind === 'package' ? <Icon name="box" size={11} color={m.done ? col : '#17122A'} /> : <Icon name={ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule'} size={10} color={m.done ? col : '#17122A'} />}
-      </Pressable>
-      {billRow[i] != null ? <View pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, z.x * (w || 1) - LW / 2)), top: billRow[i] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center'}}>
-        <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: col, backgroundColor: tint(col, 0.14), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden'}}>{m.title} · {m.sub}</Text>
-      </View> : null}
-    </React.Fragment>;})}
-    {(pinMark >= 0 ? billsShown[pinMark] : hoverMark >= 0 ? billsShown[hoverMark] : null) ? (() => {
-      const z = billsShown[pinMark >= 0 ? pinMark : hoverMark], pinned = pinMark >= 0, list = [z.b, ...(z.b.more || [])], W = pinned ? 300 : 240, x = Math.max(0, Math.min((w || 1) - W, z.x * (w || 1) - W / 2));
-      return <View pointerEvents={pinned ? 'auto' : 'none'} style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 7, backgroundColor: c.bg, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, gap: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
-        {list.slice(0, 6).map((m, k) => {const col = m.late ? c.danger : MARK_COLOR[m.kind], key = m.id; return <View key={key} style={{gap: 4}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-            {m.kind === 'routine' ? <Icon name={ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule'} size={12} color={col} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: col}} />}
-            <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}</Text>
-            <Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text, fontWeight: '600'}}>{m.title}</Text>
-            {pinned && m.dose && onMute ? <Pressable accessibilityRole="button" accessibilityLabel={'Aviso de ' + m.title} hitSlop={8} onPress={() => setMuteOpen(o => o === key ? '' : key)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || muteOpen === key ? c.input : 'transparent'})}><Icon name="bell" size={14} color={m.dose.mutedOne || m.dose.mutedAll ? c.muted : MARK_COLOR.routine} /></Pressable> : null}
-          </View>
-          {m.kind !== 'routine' || !pinned ? <Text numberOfLines={2} style={{fontSize: 12, color: col, marginLeft: 14}}>{m.sub}</Text> : (m.dose?.mutedAll ? <Text style={{fontSize: 11, color: c.muted, marginLeft: 20}}>Avisos desligados</Text> : m.dose?.mutedOne ? <Text style={{fontSize: 11, color: c.muted, marginLeft: 20}}>Sem aviso desta vez</Text> : null)}
-          {pinned && m.dose && muteOpen === key ? <MuteChoices muted={m.dose.mutedOne || m.dose.mutedAll} repeats onPick={(scope, on) => {setMuteOpen(''); onMute?.({dose: m.dose!}, scope, on);}} /> : null}
-        </View>;})}
-        {pinned ? <Pressable onPress={() => {setPinMark(-1); onMark?.(z.b);}} style={{alignSelf: 'flex-start', marginTop: 2}}><Text style={{fontSize: 12, color: c.accent, fontWeight: '600'}}>Abrir Rotina</Text></Pressable> : null}
-      </View>;})() : null}
-    {shownGroup >= 0 && groups[shownGroup] ? (() => {
-      // previa (mouse em cima) ou cartao fixo (clique): titulo, descricao e o lapis para editar
-      const g = groups[shownGroup], pinned = pin >= 0, W = pinned ? 300 : 230, x = Math.max(0, Math.min((w || 1) - W, g.x * (w || 1) - W / 2));
-      return <View pointerEvents={pinned ? 'auto' : 'none'} style={{position: 'absolute', left: x, bottom: 40, width: W, zIndex: 6, backgroundColor: c.bg, borderRadius: 12, paddingVertical: pinned ? 10 : 8, paddingHorizontal: 12, gap: pinned ? 10 : 4, boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.45)'} as any}>
-        {g.list.slice(0, pinned ? 4 : 5).map((r, k) => <View key={k} style={{gap: 2}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-            <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: colorOf(r, c.accent)}} />
-            <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}</Text>
-            <Text numberOfLines={pinned ? 2 : 1} style={{flex: 1, fontSize: 12, color: c.text, fontWeight: pinned ? '600' : '400'}}>{r.title}</Text>
-            {pinned && onMute && !r.isTask ? (() => {const st = recMute(r); return <Pressable accessibilityRole="button" accessibilityLabel={'Aviso de ' + r.title} hitSlop={8} onPress={() => setMuteOpen(o => o === r.id + r.date ? '' : r.id + r.date)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || muteOpen === r.id + r.date ? c.input : 'transparent'})}><Icon name="bell" size={14} color={st.one || st.all ? c.muted : c.accent} /></Pressable>;})() : null}
-            {pinned ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => {setPin(-1); onEdit(r);}} hitSlop={8} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="edit" size={14} color={c.muted} /></Pressable> : null}
-          </View>
-          {pinned && desc(r) ? <Text numberOfLines={3} style={{fontSize: 12, lineHeight: 17, color: c.muted, marginLeft: 14}}>{desc(r)}</Text> : null}
-          {pinned && !r.isTask && (recMute(r).one || recMute(r).all) && muteOpen !== r.id + r.date ? <Text style={{fontSize: 11, color: c.muted, marginLeft: 14}}>{recMute(r).all ? 'Avisos desligados' : 'Sem aviso desta vez'}</Text> : null}
-          {pinned && muteOpen === r.id + r.date ? <MuteChoices muted={recMute(r).one || recMute(r).all} repeats={recMute(r).repeats} onPick={(scope, on) => {setMuteOpen(''); onMute?.({rec: r}, scope, on);}} /> : null}
-        </View>)}
-        {g.list.length > (pinned ? 4 : 5) ? <Text style={{fontSize: 11, color: c.muted}}>+{g.list.length - (pinned ? 4 : 5)} mais</Text> : null}
-      </View>;
-    })() : null}
-    {groups.map((g, i) => place[i] == null ? null : <View key={'l' + i} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, g.x * (w || 1) - LW / 2)), top: place[i] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center'}}>
-      <Text numberOfLines={1} style={{fontSize: 12, color: g.list.length === 1 && g.list[0].kind === 'reminder' ? REMIND : next && g.list.includes(next) ? c.text : c.muted, fontWeight: next && g.list.includes(next) ? '600' : '400', backgroundColor: next && g.list.includes(next) ? tint(c.accent, 0.14) : 'transparent', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{hhmm(new Date(g.list[0].date))} {g.list.length > 1 ? g.list.length + ' itens' : g.list[0].title}</Text>
-    </View>)}
+    {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
+    <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, opacity}}>
+      {all.map(p => {
+        const m = p.marks[0], r = p.recs[0], open = () => setPin(k => k === p.key ? '' : p.key), hov = {onHoverIn: () => enter(p.key), onHoverOut: leave};
+        if (m) {
+          const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
+          const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
+          const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
+          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} {...hov} style={({hovered}: any) => ({position: 'absolute', left: (p.x * 100 + '%') as any, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
+            {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule'} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
+          </Pressable>;
+        }
+        const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1;
+        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} {...hov}
+          style={({hovered}: any) => ({position: 'absolute', left: (p.x * 100 + '%') as any, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
+        const size = isNext ? 16 : many ? 20 : 12;
+        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov}
+          style={{position: 'absolute', left: (p.x * 100 + '%') as any, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(r, c.accent), alignItems: 'center', justifyContent: 'center'}}>
+          {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{p.recs.length}</Text> : null}
+        </Pressable>;
+      })}
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p); return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min((w || 1) - LW, p.x * (w || 1) - LW / 2)), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center'}}>
+        <Text numberOfLines={1} style={{fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>
+      </View>;})())}
+    </View>
     {nowX >= 0 && nowX <= 1 ? <View pointerEvents="none" style={{position: 'absolute', left: (nowX * 100 + '%') as any, top: 18 + OFF, width: 2, height: 22, marginLeft: -1, borderRadius: 1, backgroundColor: c.danger}} /> : null}
     {[0, 0.25, 0.5, 0.75, 1].map(f => <Text key={f} style={{position: 'absolute', top: 42 + OFF, left: (f * 100 + '%') as any, transform: [{translateX: f === 0 ? 0 : f === 1 ? -60 : -30}], width: f === 1 ? 60 : undefined, textAlign: f === 1 ? 'right' : 'left', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(Math.round(start + f * SPAN))}</Text>)}
+    {shown ? <PreviewCard point={shown} width={w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} /> : null}
   </View>;
 }
 
-/** Escolhas do sino: desligar so desta vez ou todas (quando repete); ligar de novo. */
-function MuteChoices({muted, repeats, onPick}: {muted: boolean; repeats: boolean; onPick: (scope: 'one' | 'all', on: boolean) => void}) {
-  const c = useTheme();
-  const chip = (label: string, run: () => void) => <Pressable key={label} accessibilityRole="button" onPress={run} style={({hovered}: any) => ({height: 28, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center', backgroundColor: hovered ? tint(c.accent, 0.22) : c.accentSoft})}><Text style={{fontSize: 12, color: c.accent, fontWeight: '600'}}>{label}</Text></Pressable>;
-  return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 14}}>
-    {muted ? chip('Ligar o aviso de novo', () => onPick('all', true)) : repeats ? [chip('Desligar só desta vez', () => onPick('one', false)), chip('Desligar todos', () => onPick('all', false))] : chip('Desligar o aviso', () => onPick('all', false))}
+/** O cartao da previa: uma linha por item (simbolo na cor, horario, titulo e a acao do item a direita), descricao embaixo. */
+function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void}) {
+  const c = useTheme(), W = 320, x = Math.max(0, Math.min((width || 1) - W, point.x * (width || 1) - W / 2));
+  const Row = ({color, icon, time, title, sub, action, onAction, onEdit, done, check}: {color: string; icon?: IconName; time: string; title: string; sub?: string; action?: string; onAction?: () => void; onEdit?: () => void; done?: boolean; check?: () => void}) =>
+    <View style={{flexDirection: 'row', gap: 10, paddingVertical: 8}}>
+      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={8} style={({hovered}: any) => ({width: 18, height: 18, marginTop: 1, borderRadius: 9, borderWidth: 2, borderColor: done ? color : hovered ? color : c.muted, backgroundColor: done ? color : 'transparent', alignItems: 'center', justifyContent: 'center'})}>{done ? <Icon name="check" size={11} color={c.surface} /> : null}</Pressable>
+        : <View style={{width: 18, height: 18, marginTop: 1, borderRadius: 6, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}>{icon ? <Icon name={icon} size={11} color={color} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: color}} />}</View>}
+      <View style={{flex: 1, minWidth: 0, gap: 2}}>
+        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
+          <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>
+          <Text numberOfLines={2} style={{flex: 1, fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
+        </View>
+        {sub ? <Text numberOfLines={3} style={{fontSize: 12, lineHeight: 17, color: c.muted}}>{sub}</Text> : null}
+      </View>
+      <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 4}}>
+        {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered, pressed}: any) => ({height: 26, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center', backgroundColor: hovered ? tint(color, 0.28) : tint(color, 0.16), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
+        {onEdit ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + title} onPress={onEdit} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="edit" size={14} color={c.muted} /></Pressable> : null}
+      </View>
+    </View>;
+  const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
+  return <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 46, width: W, zIndex: 8, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 36px rgba(0,0,0,0.45)'} as any}>
+    {recs.map((r, i) => <View key={r.id + i} style={{borderTopWidth: i ? 1 : 0, borderColor: c.line}}>{Row({color: r.kind === 'reminder' ? REMIND : colorOf(r, c.accent), icon: r.kind === 'reminder' ? 'bell' : undefined, time: hhmm(new Date(r.date)), title: r.title, sub: desc(r) || undefined,
+      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, done: r.isTask ? (r.original as any)?.state === 'done' : false, onEdit: () => {onClose(); actions.onEdit(r);}})}</View>)}
+    {marks.map((m, i) => <View key={m.id} style={{borderTopWidth: i || recs.length ? 1 : 0, borderColor: c.line}}>{Row({color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule' : m.kind === 'income' ? 'plus' : 'wallet',
+      time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, sub: m.kind === 'routine' ? (m.done ? 'Feito' : '') : m.sub, done: m.done && m.kind === 'routine',
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined})}</View>)}
+    {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingBottom: 6}}>+{extra} mais</Text> : null}
   </View>;
 }
 
