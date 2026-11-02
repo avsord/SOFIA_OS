@@ -3,7 +3,7 @@
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Pressable, ScrollView, Text, View, useWindowDimensions} from 'react-native';
+import {Animated, Easing, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions} from 'react-native';
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
@@ -38,6 +38,7 @@ export type HomeBriefProps = {
   onMute?: (t: MuteTarget, scope: 'one' | 'all', on: boolean) => void;
   onMarkAction?: (m: TimeMark) => void;
   onMove?: (moves: Move[]) => void;
+  onQuickAdd?: (x: QuickAdd) => Promise<void>;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -195,7 +196,7 @@ export function HomeBrief(p: HomeBriefProps) {
       {gear ? <TimelineSettingsPanel s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined}} />
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onQuickAdd: p.onQuickAdd}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -229,9 +230,11 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void};
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onQuickAdd?: (x: QuickAdd) => Promise<void>};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
+/** 0.3.330 (Pedro): clicar num lugar vazio da linha do tempo adiciona ali mesmo, sem ir para o app. */
+export type QuickAdd = {kind: 'event' | 'task' | 'reminder' | 'routine'; title: string; at: Date; minutes?: number; routineType?: string; daily?: boolean};
 /** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
 export type Move = {t: MoveTarget; to: Date};
 const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
@@ -288,6 +291,9 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string};
   const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
   const [settle, setSettle] = useState<Record<string, number>>({});
+  // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
+  const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
+  const fxAt = (pageX: number) => {const el: any = lineBox.current; const r = el?.getBoundingClientRect?.(); return r && r.width ? Math.max(0, Math.min(1, (pageX - r.left) / r.width)) : null;};
   const hourAt = (fx: number) => startRef.current + fx * SPAN;
   const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
   const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
@@ -346,6 +352,16 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
     {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
+    {actions.onQuickAdd ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
+      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
+      {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
+      style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy'} as any} /> : null}
+    {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
+      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 9, width: 1, height: 18, backgroundColor: tint(c.accent, 0.6)}} />
+      <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
+        <Text style={{fontSize: 11, fontWeight: '600', color: c.accent, backgroundColor: tint(c.accent, 0.14), borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
+      </View>
+    </View> : null}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
@@ -393,12 +409,50 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
         <Text style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{dragLabel(drag.fx)}</Text>
       </View>
     </View> : null}
-    {shown && !drag?.live ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
+    {adding && actions.onQuickAdd ? <QuickAddCard fx={adding.fx} at={adding.at} label={dragLabel} onSave={actions.onQuickAdd} onClose={() => setAdding(null)} /> : null}
+    {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START, 520, true);}}
       style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
       {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
     </Pressable> : null}
+  </View>;
+}
+
+/** 0.3.330 (Pedro): janelinha que abre ao clicar num lugar vazio da linha do tempo - escolhe o que adicionar (compromisso,
+ * tarefa, lembrete ou item da Rotina), nome e horario (ja vem o do clique), e adiciona ali mesmo. Enter adiciona, Esc fecha.
+ * Mostra "Adicionando…" e nao deixa clicar duas vezes; se der erro, diz e mantem o que foi digitado. */
+function QuickAddCard({fx, at, label, onSave, onClose}: {fx: number; at: Date; label: (fx: number) => string; onSave: (x: QuickAdd) => Promise<void>; onClose: () => void}) {
+  const c = useTheme(), [kind, setKind] = useState<QuickAdd['kind']>('event'), [title, setTitle] = useState(''), [when, setWhen] = useState(at);
+  const [minutes, setMinutes] = useState(60), [rtype, setRtype] = useState('capsula'), [daily, setDaily] = useState(false), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  useEffect(() => {if (typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
+  const KINDS: {id: QuickAdd['kind']; label: string; ph: string}[] = [{id: 'event', label: 'Compromisso', ph: 'Ex.: Reunião com a Minerva'}, {id: 'task', label: 'Tarefa', ph: 'Ex.: Emitir nota'}, {id: 'reminder', label: 'Lembrete', ph: 'Ex.: Ligar para o banco'}, {id: 'routine', label: 'Rotina', ph: 'Ex.: Vitamina D'}];
+  const save = async () => {if (busy || !title.trim()) return; setBusy(true); setErr('');
+    try {await onSave({kind, title: title.trim(), at: when, minutes: kind === 'event' ? minutes : undefined, routineType: kind === 'routine' ? rtype : undefined, daily: kind === 'routine' ? daily : undefined}); onClose();}
+    catch (e: any) {setErr(String(e?.message || 'Não deu para adicionar.') + ' Tente de novo.');} finally {setBusy(false);}};
+  const shift = (m: number) => setWhen(d => new Date(d.getTime() + m * 60000));
+  const chip = (on: boolean, text: string, press: () => void, color = c.accent) => <Pressable key={text} accessibilityRole="button" accessibilityState={{selected: on}} onPress={press} style={({hovered}: any) => ({paddingHorizontal: 10, height: 28, borderRadius: 8, justifyContent: 'center', backgroundColor: on ? tint(color, 0.22) : hovered ? c.input : 'transparent', borderWidth: 1, borderColor: on ? tint(color, 0.5) : c.line})}><Text style={{fontSize: 12, fontWeight: on ? '600' : '400', color: on ? color : c.text}}>{text}</Text></Pressable>;
+  return <View testID="quick-add-card" style={{position: 'absolute', left: `clamp(0px, calc(${fx * 100}% - 200px), calc(100% - 400px))` as any, top: 29 + 44 + 22, width: 400, zIndex: 12, backgroundColor: c.bg, borderRadius: 16, padding: 16, gap: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+      <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Adicionar</Text>
+      <Pressable accessibilityLabel="15 minutos antes" onPress={() => shift(-15)} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
+      <Text style={{fontSize: 13, fontWeight: '600', color: c.accent, fontVariant: ['tabular-nums'], minWidth: 74, textAlign: 'center'}}>{label(((when.getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 3600000 - (at.getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 3600000) / SPAN + fx)}</Text>
+      <Pressable accessibilityLabel="15 minutos depois" onPress={() => shift(15)} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
+      <Pressable accessibilityLabel="Fechar" onPress={onClose} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={14} color={c.muted} /></Pressable>
+    </View>
+    <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{KINDS.map(k => chip(kind === k.id, k.label, () => setKind(k.id)))}</View>
+    <TextInput autoFocus value={title} onChangeText={setTitle} onSubmitEditing={() => void save()} placeholder={KINDS.find(k => k.id === kind)!.ph} placeholderTextColor={c.muted} editable={!busy}
+      style={{height: 40, borderRadius: 10, paddingHorizontal: 12, backgroundColor: c.input, color: c.text, fontSize: 14, outlineStyle: 'none'} as any} />
+    {kind === 'event' ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}><Text style={{fontSize: 12, color: c.muted, marginRight: 2}}>Duração</Text>{[30, 60, 120].map(m => chip(minutes === m, m < 60 ? m + ' min' : m / 60 + ' h', () => setMinutes(m)))}</View> : null}
+    {kind === 'routine' ? <View style={{gap: 8}}>
+      <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{ROTINA_TYPES.map(t => chip(rtype === t.id, t.one, () => setRtype(t.id), t.color))}</View>
+      <View style={{flexDirection: 'row', gap: 6}}>{chip(!daily, 'Só hoje', () => setDaily(false))}{chip(daily, 'Todo dia neste horário', () => setDaily(true))}</View>
+    </View> : null}
+    {err ? <Text style={{fontSize: 12, color: c.danger}}>{err}</Text> : null}
+    <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 8}}>
+      <Pressable accessibilityRole="button" onPress={onClose} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{fontSize: 13, color: c.muted}}>Cancelar</Text></Pressable>
+      <Pressable testID="quick-add-save" accessibilityRole="button" disabled={busy || !title.trim()} onPress={() => void save()} style={({hovered, pressed}: any) => ({height: 32, paddingHorizontal: 14, borderRadius: 9, justifyContent: 'center', backgroundColor: c.accent, opacity: busy || !title.trim() ? 0.5 : hovered ? 0.9 : 1, transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 13, fontWeight: '600', color: c.onAccent}}>{busy ? 'Adicionando…' : 'Adicionar'}</Text></Pressable>
+    </View>
   </View>;
 }
 

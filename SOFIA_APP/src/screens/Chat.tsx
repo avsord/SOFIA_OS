@@ -24,7 +24,7 @@ import { View, Text, Image, FlatList, Modal, ScrollView, Pressable, TextInput, K
 import * as Crypto from 'expo-crypto';
 import * as Clipboard from 'expo-clipboard';
 import { File } from 'expo-file-system';
-import {attachmentBase64} from '../lib/attachment-read';
+import {attachmentBase64,attachmentSize} from '../lib/attachment-read';
 import type { Bootstrap, Conversation, Message, VoiceDraft, ChatResult } from '../lib/types';
 import { SITE,SofiaApi } from '../lib/api';
 import { dayKey, errorText, mergeMessages, statusLabel } from '../lib/chat-model';
@@ -213,7 +213,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
      if(mounted.current){setConversation(page.conversation);setMessages(mergeMessages(recentChatPage(page).messages,[{...message,conversation_id:targetId,status:'sending'}]));}
     }
    }
-   if(message.localVoice){const file=new File(message.localVoice.uri);if(!file.exists)throw new Error('O áudio não está mais no celular. Grave novamente.');if(file.size>bootstrap.limits.audio_bytes)throw new Error('O áudio ficou grande demais para uma única mensagem. Grave em partes para concluir o envio.');const base64=await file.base64();result=await api.audio({...data,audio_base64:base64,mime:'audio/mp4',duration_ms:message.localVoice.duration});refreshBoardSoon(result.conversation_id);}
+   if(message.localVoice){/* 0.3.330: lido pelo leitor do aparelho ou do navegador (o do celular quebrava no site: "this.validatePath is not a function") */const size=await attachmentSize(message.localVoice.uri);if(!size)throw new Error('O áudio não está mais disponível. Grave novamente.');if(size>bootstrap.limits.audio_bytes)throw new Error('O áudio ficou grande demais para uma única mensagem. Grave em partes para concluir o envio.');const base64=await attachmentBase64(message.localVoice.uri);result=await api.audio({...data,audio_base64:base64,mime:'audio/mp4',duration_ms:message.localVoice.duration});refreshBoardSoon(result.conversation_id);}
    else {
     let content=message.content;
     if(message.localAttachments?.length){
