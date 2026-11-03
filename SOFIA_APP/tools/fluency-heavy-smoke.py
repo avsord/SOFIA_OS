@@ -164,7 +164,8 @@ def correctness(points,mode):
   adb('shell','input','keyevent','KEYCODE_MOVE_END')
   adb('shell','input','text','_R8_KEEP' if cycle==0 else str(cycle%10));adb('shell','input','keyevent','BACK');time.sleep(.15)
   typed=title_of(xml())
-  assert typed and typed!=prev and '_R8_KEEP' in typed,'Typing did not change the Page title; mode='+mode+' cycle='+str(cycle)+' title='+repr(typed)
+  # o digito pode entrar no meio do titulo (o cursor fica onde o dedo toca): o titulo precisa crescer; a marca inteira so no 1o ciclo
+  assert typed and typed!=prev and len(typed)>len(prev or '') and (cycle>0 or '_R8_KEEP' in typed),'Typing did not change the Page title; mode='+mode+' cycle='+str(cycle)+' title='+repr(typed)
   tap(points['Conversa']);time.sleep(.25);tap(points['Páginas']);time.sleep(.25)
   tree=xml();(OUT/(f'draft-{mode}-{cycle:02d}.xml')).write_text(tree)
   after=title_of(tree)
