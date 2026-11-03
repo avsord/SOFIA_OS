@@ -317,6 +317,12 @@ class GoogleService {
     }
     if (!ev.start || (!ev.start.date && !ev.start.dateTime)) { report.skipped++; return null; }
     const data = this.toData(ev, calId, readonly);
+    // 0.3.346 (Pedro: "evento criado pela Sofia so tem inicio; o fim nao existe se a pessoa nao colocar"): o Google exige um
+    // fim, entao ao enviar um compromisso sem fim mandamos inicio + 1 h (eventBody). Na volta, se o compromisso daqui nao
+    // tinha fim e o do Google e exatamente esse +1 h, continua SEM fim (fica so o ponto na linha do tempo). Se a pessoa
+    // mudar o fim no Google para outro horario, vale o que ela pos.
+    if (existing && !String(existing.data?.end_at || '') && data.start_at && data.end_at && !data.calendar_all_day
+      && Date.parse(data.end_at) - Date.parse(data.start_at) === 3600000) data.end_at = '';
     let title = String(ev.summary || '(sem título)').slice(0, 240), content = String(ev.description || '').replace(/<[^>]+>/g, ' ').slice(0, 15000);
     const state = ev.status === 'tentative' ? 'pending' : 'confirmed';
     const attempt = (t, c) => existing
