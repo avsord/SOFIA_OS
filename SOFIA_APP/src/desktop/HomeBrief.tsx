@@ -203,7 +203,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const dayDate = shownDay.toLocaleDateString('pt-BR', {day: 'numeric', month: 'long'});
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   return <View ref={root} style={{gap: 12}}>
-    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
+    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
@@ -286,7 +286,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(homeOf(0, SPAN_FULL, nowHours())), target = useRef(homeOf(0, SPAN_FULL, nowHours())), raf = useRef<any>(null), dayRef = useRef(0), manualAt = useRef(0);
-  const clampStart = (v: number) => {const d = dayRef.current; return Math.max(d * 24, Math.min(d * 24 + 24 - spanRef.current, v));}; // 0.3.337: fica dentro do dia mostrado (00:00 a meia-noite)
+  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - spanRef.current, v)); // 0.3.338 (Pedro): rolar passa de um dia para o outro, liso
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
   const tween = useRef({from: startRef.current, t0: 0, ms: 380, home: false});
@@ -307,9 +307,10 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
-  const [viewDay, setViewDayState] = useState(0);
+  // 0.3.338: o dia do cabecalho e o que esta no meio da linha (rolando, ele troca sozinho ao passar da meia-noite)
+  const viewDay = Math.max(0, Math.min(2, Math.floor((start + SPAN / 2) / 24))); dayRef.current = viewDay;
   useEffect(() => {onDay?.(viewDay);}, [viewDay]);
-  const goDay = (d: number) => {const dd = Math.max(0, Math.min(2, d)); dayRef.current = dd; setViewDayState(dd); manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
+  const goDay = (d: number) => {const dd = Math.max(0, Math.min(2, d)); dayRef.current = dd; manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
   if (nav) nav.current = {go: goDay};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
@@ -430,7 +431,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {SPAN <= 7 ? Array.from({length: Math.ceil(SPAN * 4) + 4}, (_, k) => Math.ceil(start * 4) / 4 + k / 4).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1 || Math.abs(h - Math.round(h)) < 0.01) return null; return <View key={'q' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - 3, width: 1, height: 6, marginLeft: -0.5, backgroundColor: 'rgba(255,255,255,0.05)'}} />;}) : null}
     {/* 0.3.335 (Pedro: "a cor que divide manha, tarde e noite quase nao aparece"): faixa de fundo de cada periodo, visivel */}
     {[0, 24, 48].flatMap(d => [[0, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi <= lo) return null; const rgb = k === 'm' ? '255,196,120' : k === 't' ? '195,220,130' : '140,165,255';
-      return <View key={'f' + a} pointerEvents="none" style={{position: 'absolute', left: `calc(${((lo - start) / SPAN) * 100}% + ${lo === a ? 1.5 : 0}px)` as any, width: `calc(${((hi - lo) / SPAN) * 100}% - ${(lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)}px)` as any, top: -22, height: 29 + OFF + 22 + 22, borderTopLeftRadius: lo === a ? 10 : 0, borderTopRightRadius: hi === b ? 10 : 0, backgroundImage: `linear-gradient(180deg, ${SOFT_FADE.map(([pc, f]) => `rgba(${rgb},${(0.038 * f).toFixed(4)}) ${pc}%`).join(', ')})`} as any} />;})}
+      return <View key={'f' + a} pointerEvents="none" style={{position: 'absolute', left: `calc(${((lo - start) / SPAN) * 100}% + ${lo === a ? 1.5 : 0}px)` as any, width: `calc(${((hi - lo) / SPAN) * 100}% - ${(lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)}px)` as any, top: -10, height: 29 + OFF + 10 + 22, borderTopLeftRadius: lo === a ? 10 : 0, borderTopRightRadius: hi === b ? 10 : 0, backgroundImage: `linear-gradient(180deg, ${SOFT_FADE.map(([pc, f]) => `rgba(${rgb},${(0.038 * f).toFixed(4)}) ${pc}%`).join(', ')})`} as any} />;})}
     {/* simbolos de manha, tarde e noite no meio de cada periodo visivel */}
     {[0, 24, 48].flatMap(d => [[6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi - lo < 0.8) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (((lo + hi) / 2 - start) / SPAN * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
@@ -1037,7 +1038,7 @@ export function HomeBriefSkeleton() {
     {wide ? <LoadingLines rows={3} /> : <View style={{marginTop: 'auto', gap: 8} as any}><ShimmerBlock width={70} height={22} radius={6} /><ShimmerBlock width={'80%'} height={11} radius={5} /><ShimmerBlock width={80} height={26} radius={8} /></View>}
   </View>;
   return <ShimmerGroup><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
-    <View style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, height: briefH}}>
+    <View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, height: briefH}}>
       <View style={{height: 24, justifyContent: 'center'}}><ShimmerBlock width={90} height={16} radius={6} /></View>
       <View style={{marginTop: 12, height: 100, justifyContent: 'center'}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
     </View>
