@@ -99,8 +99,8 @@ export function useDesktopCss(on:boolean,colors:{line:string;muted:string;accent
    // 0.3.268: todo hover com transicao curta (~100 ms), inclusive nos elementos clicaveis sem papel declarado
    '[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="checkbox"],[role="radio"],div[tabindex]{transition:box-shadow .1s ease,background-color .1s ease,border-color .1s ease,color .1s ease,opacity .1s ease}',
    // 0.3.263: hover que aparece de verdade (o brilho antigo sumia em fundo branco): um veu na cor da marca por cima
-   '[role="button"]:hover:not([aria-disabled="true"]),[role="menuitem"]:hover,[role="tab"]:hover,[role="checkbox"]:hover,[role="radio"]:hover{box-shadow:inset 0 0 0 999px '+colors.accent+'14}',
-   '[role="button"]:active:not([aria-disabled="true"]){box-shadow:inset 0 0 0 999px '+colors.accent+'26}',
+   '[role="button"]:hover:not([aria-disabled="true"]):not([data-noveil]),[role="menuitem"]:hover,[role="tab"]:hover,[role="checkbox"]:hover,[role="radio"]:hover{box-shadow:inset 0 0 0 999px '+colors.accent+'14}',
+   '[role="button"]:active:not([aria-disabled="true"]):not([data-noveil]){box-shadow:inset 0 0 0 999px '+colors.accent+'26}',
    '[role="link"]:hover{opacity:.78;text-decoration:underline;text-underline-offset:3px}',
    'div[tabindex="0"]{cursor:pointer}',
    '*:focus,*:focus-visible{outline:none!important}',
