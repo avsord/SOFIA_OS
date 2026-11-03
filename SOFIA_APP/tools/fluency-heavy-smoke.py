@@ -15,6 +15,13 @@ def point(tree,label):
  found=[x for x in ET.fromstring(tree).iter('node') if x.get('text')==label or x.get('content-desc')==label]
  assert found,'Missing QA control '+label
  b=list(map(int,re.findall(r'\d+',found[-1].attrib['bounds'])));return (b[0]+b[2])//2,(b[1]+b[3])//2
+def keyboard_shown(wait=3.0):
+ end=time.monotonic()+wait
+ while True:
+  out=adb('shell','dumpsys','input_method')
+  if re.search(r'mInputShown=true',out):time.sleep(.15);return True
+  if time.monotonic()>=end:return False
+  time.sleep(.1)
 def tap(coords):adb('shell','input','tap',*[str(n) for n in coords])
 def start():return adb('shell','am','start','-W','-n',PKG+'/.MainActivity')
 def stop():adb('shell','am','force-stop',PKG)
@@ -125,7 +132,10 @@ def correctness(points,mode):
  tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
  expected='_R8_KEEP'
  for cycle in range(20):
-  tap(point(tree,'Título da página'));adb('shell','input','keyevent','KEYCODE_MOVE_END')
+  # 03/11/2026: a #280 mostrou o BACK fechando a pagina (teclado ainda nao aberto) e o texto entrando no meio do titulo.
+  # Espera o teclado abrir antes de mover o cursor/digitar; sem teclado o teste falha com o motivo certo.
+  tap(point(tree,'Título da página'));assert keyboard_shown(),'Keyboard did not open on the Page title; mode='+mode+' cycle='+str(cycle)
+  adb('shell','input','keyevent','KEYCODE_MOVE_END')
   addition=expected if cycle==0 else str(cycle%10)
   if cycle:expected+=addition
   adb('shell','input','text',addition);adb('shell','input','keyevent','BACK');time.sleep(.15)
