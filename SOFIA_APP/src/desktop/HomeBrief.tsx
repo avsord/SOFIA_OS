@@ -314,7 +314,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   if (nav) nav.current = {go: goDay};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
-  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || Date.now() - manualAt.current < 180000) return; const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -341,7 +341,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
   // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
-  const [nearKey, setNearKey] = useState('');
+  const [nearKey, setNearKey] = useState(''), dotNear = useRef('');
   const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
   // 0.3.317 (Pedro): arrastar para frente ou para tras. A bolinha segue o mouse em tempo real (sem cortes), a hora aparece
   // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
@@ -397,6 +397,16 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   for (const p of points) {const r = fits(p.x * (wS || 1)); if (r >= 0) place[p.key] = r;}
   for (const p of mpoints) if (p.marks[0].kind !== 'routine') {const r = fits(p.x * (wS || 1)); if (r >= 0) place[p.key] = r;}
   const shown = all.find(p => p.key === (pin || hover));
+  // 0.3.350 (Pedro: "com o mouse parado em cima da bolinha a previa sai"): a previa aberta pelo mouse so fecha quando o
+  // mouse vai MESMO para longe (mais de 36 px da bolinha e fora da previa) - nao depende mais do "saiu de cima" do
+  // navegador, que disparava sozinho quando a tela se redesenhava (dados chegando, Rotina atualizando, linha andando)
+  const dotEls = useRef<Record<string, any>>({}), farT = useRef(false);
+  useEffect(() => {if (!hover || pin || typeof document === 'undefined') return;
+    const mv = (e: MouseEvent) => {const pv = document.querySelector('[data-testid="timeline-preview"]') as HTMLElement | null, dot = dotEls.current[hover];
+      const inside = (r?: DOMRect | null, pad = 0) => !!r && e.clientX >= r.left - pad && e.clientX <= r.right + pad && e.clientY >= r.top - pad && e.clientY <= r.bottom + pad;
+      const near = inside(pv?.getBoundingClientRect(), 6) || inside(dot?.getBoundingClientRect?.(), 30);
+      if (near) {clearTimeout(hide.current); farT.current = false;} else if (!farT.current) {farT.current = true; clearTimeout(hide.current); hide.current = setTimeout(() => {farT.current = false; setHover(''); setNearKey('');}, 140);}};
+    document.addEventListener('mousemove', mv); return () => document.removeEventListener('mousemove', mv);}, [hover, pin]);
   const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string; imp?: boolean; sub?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
     // 0.3.321 (revisao - Reconhecer): bolinha com varios itens mostra o primeiro e quantos mais ("09:00 Cafe +3"), nao so "4 itens"
     const imp = p.recs.length > 1 && urgOf(r) === 3, mins = isNext ? Math.round((new Date(r.date).getTime() - Date.now()) / 60000) : -1;
@@ -443,7 +453,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
       {...({onMouseMove: (e: any) => {if (dragRef.current || adding) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx);
-        if (near) {setGuide(null); if (hover !== near.key) enter(near.key); setNearKey(near.key);} else {if (nearKey) {leave(); setNearKey('');} setGuide(fx);}}, onMouseLeave: () => {setGuide(null); if (nearKey) {leave(); setNearKey('');}}} as any)}
+        if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
@@ -458,7 +468,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
-        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, onHoverOut: leave};
+        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
         // 0.3.317: da para arrastar a bolinha de um item so (compromisso, lembrete, tarefa) e a dose da Rotina sozinha
         // 0.3.318 (Pedro): tudo o que esta na linha arrasta - bolinha de um item ou de varios (andam juntos), dose ou pilula
         // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
@@ -717,7 +727,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
   const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
     return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
-  const shell = (inner: React.ReactNode, strip?: string) => <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 48, width: W, zIndex: 8} as any}>
+  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 48, width: W, zIndex: 8} as any}>
     <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
     <View style={{position: 'absolute', left: caret - 6, bottom: -6, width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
@@ -1047,9 +1057,18 @@ export function HomeBriefSkeleton() {
     {wide ? <LoadingLines rows={3} /> : <View style={{marginTop: 'auto', gap: 8} as any}><ShimmerBlock width={70} height={22} radius={6} /><ShimmerBlock width={'80%'} height={11} radius={5} /><ShimmerBlock width={80} height={26} radius={8} /></View>}
   </View>;
   return <ShimmerGroup><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
-    <View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, height: briefH}}>
-      <View style={{height: 24, justifyContent: 'center'}}><ShimmerBlock width={90} height={16} radius={6} /></View>
-      <View style={{marginTop: 12, height: 100, justifyContent: 'center'}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
+    {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
+        pronto - cabecalho de 30 (com o dia no meio e o placar), 26 de espaco e a linha de 100 com o traco na mesma altura */}
+    <View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
+      <View style={{height: 30, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        <ShimmerBlock width={24} height={24} radius={8} /><ShimmerBlock width={70} height={14} radius={6} />
+        <View style={{flex: 1, alignItems: 'center'}}><ShimmerBlock width={150} height={14} radius={6} /></View>
+        <ShimmerBlock width={110} height={12} radius={6} /><ShimmerBlock width={22} height={22} radius={11} />
+      </View>
+      <View style={{marginTop: 26, height: 100}}>
+        <View style={{position: 'absolute', left: 0, right: 0, top: 72}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
+        <View style={{position: 'absolute', left: 0, right: 0, top: 86, flexDirection: 'row', justifyContent: 'space-between'}}>{[0, 1, 2, 3, 4, 5].map(k => <ShimmerBlock key={k} width={34} height={10} radius={4} />)}</View>
+      </View>
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</View>
