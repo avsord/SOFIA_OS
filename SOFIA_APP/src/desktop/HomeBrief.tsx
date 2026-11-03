@@ -654,7 +654,8 @@ function NowBeacon({x, top}: {x: number; top: number}) {
     <Animated.View style={{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.35, 0]}), transform: [{scale: pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1.4]})}]}} />
     {/* ponto */}
     <View style={{position: 'absolute', left: at(6), top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
-    {/* 0.3.332 (Pedro): sem a linha vertical - so a bolinha pulsando e a hora */}
+    {/* fio ate a escala */}
+    <View style={{position: 'absolute', left: at(0.5), top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
     {/* etiqueta com a hora, na altura da escala */}
     <View style={{position: 'absolute', left: `clamp(0px, calc(${pct}% - ${dpx(24)}), calc(100% - ${dpx(48)}))` as any, top: top + 13, width: 48, alignItems: 'center'}}>
       <Text style={{fontSize: 11, fontWeight: '700', color: '#fff', backgroundColor: red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
