@@ -18,6 +18,7 @@ import {capsuleDoses, capsuleDay} from '../lib/capsule-model';
 import {agendaPriority, isHoliday, HOLIDAY_COLOR} from '../lib/agenda-priority';
 import {useReducedMotion} from '../lib/motion';
 import {Icon, type IconName} from '../components/Icon';
+import Svg, {Path, Circle} from 'react-native-svg';
 
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const brl = (v: number) => v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: v >= 1000 ? 0 : 2});
@@ -26,6 +27,9 @@ const isImportant = (t: Task) => t.priority_level === 'important';
 /** saiu para entrega (a etapa 2 sem ser retirada) */
 const isOut = (x: {step: number; needs: string; delivered: boolean}) => !x.delivered && x.step === 2 && x.needs !== 'pickup';
 /** cor do item na Agenda (tarefa usa a prioridade da tarefa; compromisso a do evento; feriado verde) */
+/** 0.3.332: urgencia do item (importante 3 > media 2 > leve 1 > sem 0) - o mais urgente manda no miolo da bolinha agrupada */
+const urgOf = (r: DayRecord) => {const o: any = r.original || {}; const v = o.data?.priority_level ?? o.priority_level; return v === 'important' ? 3 : v === 'medium' ? 2 : v === 'light' ? 1 : 0;};
+const LIME = '#C3DC82', IMPORTANT_RED = '#D94B57';
 const colorOf = (r: DayRecord, accent: string) => {const o: any = r.original || {}; return agendaPriority({data: {priority_level: o.data?.priority_level ?? o.priority_level, calendar_id: o.data?.calendar_id}} as any).color || accent;};
 /** hora (hoje) ou dia e hora (outros dias) */
 const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(), tm = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); const t = timed(r) ? hhmm(d) : ''; if (d.toDateString() === n.toDateString()) return t || 'hoje'; if (d.toDateString() === tm.toDateString()) return 'amanhã' + (t ? ' ' + t : ''); return d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) + (t ? ' ' + t : '');};
@@ -183,6 +187,11 @@ export function HomeBrief(p: HomeBriefProps) {
   if (important.length) actions.push({label: important.length === 1 ? 'Ver a tarefa' : 'Ver as ' + important.length + ' tarefas', run: p.onOpenTasks});
   if (low.length) actions.push({label: 'Ver ' + (low.length === 1 ? 'o ' + low[0].title : 'os produtos'), run: p.onOpenMonitoring});
 
+  // 0.3.332: placar do dia - tarefas de hoje e doses da Rotina de hoje
+  const score = useMemo(() => {const today = new Date().toDateString(); let done = 0, total = 0;
+    for (const r of timelineItems) if (r.isTask && new Date(r.date).toDateString() === today) {total++; if ((r.original as any)?.state === 'done') done++;}
+    try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(new Date()))) {total++; if (ds.taken) done++;}} catch {/* sem rotina */}
+    return {done, total};}, [timelineItems, p.data.capsules]);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   return <View ref={root} style={{gap: 12}}>
     <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
@@ -190,6 +199,7 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
         <View style={{flex: 1}} />
+        {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>Hoje · <Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
       {/* 0.3.318/0.3.331 (Pedro): clicar fora - em qualquer lugar, inclusive na barra lateral - ou Esc fecha os ajustes (useClickOutside) */}
@@ -327,14 +337,17 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.data?.message || o.content || o.data?.location || '').trim();};
   // rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so na previa
   // 0.3.310 (tela grande): o rotulo cresce com o espaco de cada hora (150 a 230 px), para o nome nao cortar a toa
-  const LW = Math.round(Math.max(150, Math.min(230, (wS || 0) / SPAN * 1.45))), OFF = 44, rows: number[][] = [[], []], place: Record<string, number> = {};
+  for (const p of points) p.recs.sort((a, b) => urgOf(b) - urgOf(a)); // 0.3.332: importante primeiro (miolo, rotulo e previa)
+  const LW = Math.round(Math.max(190, Math.min(270, (wS || 0) / SPAN * 1.75))), OFF = 44, rows: number[][] = [[], []], place: Record<string, number> = {};
   const fits = (px: number) => {for (const r of [0, 1]) if (rows[r].every(q => Math.abs(q - px) >= LW + 8)) {rows[r].push(px); return r;} return -1;};
   for (const p of points) {const r = fits(p.x * (wS || 1)); if (r >= 0) place[p.key] = r;}
   for (const p of mpoints) if (p.marks[0].kind !== 'routine') {const r = fits(p.x * (wS || 1)); if (r >= 0) place[p.key] = r;}
   const shown = all.find(p => p.key === (pin || hover));
-  const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
+  const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string; imp?: boolean; sub?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
     // 0.3.321 (revisao - Reconhecer): bolinha com varios itens mostra o primeiro e quantos mais ("09:00 Cafe +3"), nao so "4 itens"
-    return {text: hhmm(new Date(r.date)) + ' ' + r.title, more: p.recs.length - 1, color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined};};
+    const imp = p.recs.length > 1 && urgOf(r) === 3, mins = isNext ? Math.round((new Date(r.date).getTime() - Date.now()) / 60000) : -1;
+    const inTxt = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';
+    return {text: hhmm(new Date(r.date)) + ' ' + r.title, more: p.recs.length - 1, color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined, imp, sub: inTxt};};
   // 0.3.318 (Pedro): o "agora" fica na altura da linha, colado na borda para onde ele leva ("‹ agora" na esquerda,
   // "agora ›" na direita); a linha encolhe daquele lado (deslizando) para o botao nao cobrir a marca da ponta
   // 0.3.319: o espaco do botao abre e fecha JUNTO com o movimento da linha (sai da distancia ate 07:00), sem transicao
@@ -350,19 +363,27 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     setBtnTop(Math.round(((b.top + b.height / 2) - a.top) / z - 12 * k) + 'px');}, [side, w]);
   return <View ref={box} style={{marginTop: 12, height: 56 + OFF}}>
    <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
-    <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: c.line}} />
-    {nowX > 0 ? <View style={{position: 'absolute', left: 0, width: (Math.min(1, nowX) * 100 + '%') as any, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} /> : null}
+    <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
+    {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
+    {Array.from({length: Math.floor(SPAN) + 2}, (_, k) => Math.ceil(start) + k).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1) return null; const hd = ((h % 24) + 24) % 24, div = hd === 12 || hd === 18, major = hd % 4 === 3, ht = div ? 12 : major ? 14 : 8;
+      return <View key={'t' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - ht / 2, width: div ? 1.5 : 1, height: ht, marginLeft: div ? -0.75 : -0.5, borderRadius: 1, backgroundColor: div ? 'rgba(255,255,255,0.2)' : major ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)'}} />;})}
+    {/* simbolos de manha, tarde e noite no meio de cada periodo visivel */}
+    {[0, 24, 48].flatMap(d => [[6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi - lo < 0.8) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (((lo + hi) / 2 - start) / SPAN * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {actions.onAddAt ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
       {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy'} as any} /> : null}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
-      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 9, width: 1, height: 18, backgroundColor: tint(c.accent, 0.6)}} />
+      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: LIME}} />
       <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
-        <Text style={{fontSize: 11, fontWeight: '600', color: c.accent, backgroundColor: tint(c.accent, 0.14), borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
+        <Text style={{fontSize: 11, fontWeight: '700', color: '#1B2010', backgroundColor: LIME, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
       </View>
     </View> : null}
+    {/* 0.3.332 (aprovado por foto): compromisso com fim vira uma faixa do inicio ao fim; se encostar em outro, so se sobrepoe */}
+    {items.map(r => {const end = (r.original as any)?.data?.end_at; if (r.isTask || !end) return null; const a = pos(new Date(r.date)), b = pos(new Date(end)); if (!(b > a) || b < 0 || a > 1) return null;
+      const col = colorOf(r, c.accent), x0 = Math.max(0, a), x1 = Math.min(1, b);
+      return <View key={'d' + r.id + r.date} pointerEvents="none" style={{position: 'absolute', left: (x0 * 100 + '%') as any, width: ((x1 - x0) * 100 + '%') as any, top: 29 + OFF - 6, height: 12, borderRadius: 6, backgroundColor: tint(col, 0.18), boxShadow: 'inset 0 0 0 1px ' + tint(col, 0.5), opacity: op.rec(r)} as any} />;})}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
@@ -382,17 +403,23 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
             {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName)} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
           </Pressable>;
         }
-        const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1;
+        const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1, past = !isNext && p.recs.every(x => new Date(x.date).getTime() < Date.now()); // 0.3.332: o que ja passou fica mais apagado
         if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} {...hov} {...drg}
           style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
-        const size = isNext ? 16 : many ? 20 : 12;
+        // 0.3.332 (aprovado por foto): bolinha solta menor; agrupada do mesmo tamanho de antes, com o miolo na cor do mais
+        // urgente e um anel inteiro mostrando a mistura (um pedaco por item, na cor de cada um)
+        if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
+          const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
+          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
+            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', opacity: past ? 0.6 : 1} as any}>
+            <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{p.recs.length}</Text></View>
+          </Pressable>;}
+        const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
-          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, borderWidth: 3, borderColor: c.surface, backgroundColor: colorOf(r, c.accent), alignItems: 'center', justifyContent: 'center'}}>
-          {many && !isNext ? <Text style={{fontSize: 10, fontWeight: '700', color: c.onAccent}}>{p.recs.length}</Text> : null}
-        </Pressable>;
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, opacity: past ? 0.55 : 1} as any} />;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${LW / 2}px), calc(100% - ${LW}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: LW, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
-        <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}><Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text style={{fontSize: 12, fontWeight: '700', color: t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}</View>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${lw / 2}px), calc(100% - ${lw}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]) * (p.recs.every(x => new Date(x.date).getTime() < Date.now()) && !(next && p.recs.includes(next)) ? 0.65 : 1), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+        <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 12, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
       </View>;})())}
     </View>
     {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
@@ -444,6 +471,17 @@ function AddMenu({fx, when, onPick, onClose}: {fx: number; when: string; onPick:
   </>;
 }
 
+/** 0.3.332 (aprovado por foto): simbolo do periodo no meio dele - manha (nascer do sol), tarde (sol verde-limao), noite (lua com estrela) */
+function PeriodIcon({kind}: {kind: string}) {
+  const col = kind === 'm' ? 'rgba(255,200,140,0.88)' : kind === 't' ? 'rgba(195,220,130,0.9)' : 'rgba(150,175,255,0.92)';
+  const d = kind === 'm' ? 'M4 18h16M7 18a5 5 0 0 1 10 0M12 7v3M5.6 11.6l1.6 1.6M18.4 11.6l-1.6 1.6'
+    : kind === 't' ? 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4'
+    : 'M18 15.5A7 7 0 0 1 8.5 6a6.5 6.5 0 1 0 9.5 9.5zM17 3.5v3M15.5 5h3M20.5 9v2M19.5 10h2';
+  return <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <Path d={d} />{kind === 't' ? <Circle cx={12} cy={12} r={4} /> : null}
+  </Svg>;
+}
+
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
 function NowBeacon({x, top}: {x: number; top: number}) {
   const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
@@ -454,8 +492,7 @@ function NowBeacon({x, top}: {x: number; top: number}) {
     <Animated.View style={{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.35, 0]}), transform: [{scale: pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1.4]})}]}} />
     {/* ponto */}
     <View style={{position: 'absolute', left: at(6), top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
-    {/* fio ate a escala */}
-    <View style={{position: 'absolute', left: at(0.5), top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
+    {/* 0.3.332 (Pedro): sem a linha vertical - so a bolinha pulsando e a hora */}
     {/* etiqueta com a hora, na altura da escala */}
     <View style={{position: 'absolute', left: `clamp(0px, calc(${pct}% - ${dpx(24)}), calc(100% - ${dpx(48)}))` as any, top: top + 13, width: 48, alignItems: 'center'}}>
       <Text style={{fontSize: 11, fontWeight: '700', color: '#fff', backgroundColor: red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
@@ -463,39 +500,71 @@ function NowBeacon({x, top}: {x: number; top: number}) {
   </View>;
 }
 
-/** O cartao da previa: uma linha por item (simbolo na cor, horario, titulo e a acao do item a direita), descricao embaixo. */
+/** 0.3.332 (aprovado por foto): a previa mostra o que e cada item - tipo, duracao, onde, prioridade - e as acoes ficam nela.
+ * Compromisso sozinho: faixa de cor, nome grande, horario com a duracao, local e descricao. Varios itens: cabecalho com o
+ * horario, quantos sao e "1 importante"; cada linha com a barrinha da cor, o icone do tipo e uma segunda linha dizendo o que e;
+ * ao passar o mouse na linha aparecem concluir e editar. Setinha aponta para a bolinha. Mantem arrastar pelo horario (⠿). */
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
-  const c = useTheme(), W = 320, x = Math.max(0, Math.min((width || 1) - W, point.x * (width || 1) - W / 2));
-  const Row = ({color, icon, time, title, sub, action, onAction, onEdit, done, check, grab}: {color: string; icon?: IconName; time: string; title: string; sub?: string; action?: string; onAction?: () => void; onEdit?: () => void; done?: boolean; check?: () => void; grab?: (e: any) => void}) =>
-    // 0.3.324 (Pedro): o tique, a alca de arrastar e as acoes ficam centralizados na altura do NOME (uma linha ou duas
-    // quebradas); a descricao vai embaixo, alinhada com o nome
-    <View style={{paddingVertical: 8, gap: 2}}>
-     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={8} style={({hovered}: any) => ({width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: done ? color : hovered ? color : c.muted, backgroundColor: done ? color : 'transparent', alignItems: 'center', justifyContent: 'center'})}>{done ? <Icon name="check" size={11} color={c.surface} /> : null}</Pressable>
-        : <View style={{width: 18, height: 18, borderRadius: 6, backgroundColor: tint(color, 0.16), alignItems: 'center', justifyContent: 'center'}}>{icon ? <Icon name={icon} size={11} color={color} /> : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: color}} />}</View>}
-      <View style={{flex: 1, minWidth: 0}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-          {/* 0.3.317: no cartao, o horario e a alca para arrastar o item (util quando varios estao na mesma bolinha) */}
-          {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} style={({hovered}: any) => ({cursor: 'grab', borderRadius: 5, paddingHorizontal: 3, marginHorizontal: -3, backgroundColor: hovered ? tint(color, 0.18) : 'transparent'} as any)}><Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>⠿ {time}</Text></Pressable> : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
-          <Text numberOfLines={2} style={{flex: 1, fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
-        </View>
-      </View>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-        {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered, pressed}: any) => ({height: 26, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center', backgroundColor: hovered ? tint(color, 0.28) : tint(color, 0.16), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
-        {onEdit ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + title} onPress={onEdit} hitSlop={6} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="edit" size={14} color={c.muted} /></Pressable> : null}
-      </View>
-     </View>
-     {sub ? <Text numberOfLines={3} style={{marginLeft: 28, fontSize: 12, lineHeight: 17, color: c.muted}}>{sub}</Text> : null}
-    </View>;
-  const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
-  return <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 46, width: W, zIndex: 8, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 12, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 36px rgba(0,0,0,0.45)'} as any}>
-    {recs.map((r, i) => <View key={r.id + i} style={{borderTopWidth: i ? 1 : 0, borderColor: c.line}}>{Row({color: r.kind === 'reminder' ? REMIND : colorOf(r, c.accent), icon: r.kind === 'reminder' ? 'bell' : undefined, time: hhmm(new Date(r.date)), title: r.title, sub: desc(r) || undefined,
-      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, done: r.isTask ? (r.original as any)?.state === 'done' : false, onEdit: () => {onClose(); actions.onEdit(r);}, grab: onGrab && point.recs.length + point.marks.length > 1 ? (e: any) => onGrab(e, {rec: r}, r.kind === 'reminder' ? REMIND : colorOf(r, c.accent)) : undefined})}</View>)}
-    {marks.map((m, i) => <View key={m.id} style={{borderTopWidth: i || recs.length ? 1 : 0, borderColor: c.line}}>{Row({color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
-      time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, sub: m.kind === 'routine' ? (m.done ? 'Feito' : '') : m.sub, done: m.done && m.kind === 'routine',
-      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined})}</View>)}
-    {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingBottom: 6}}>+{extra} mais</Text> : null}
+  const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
+  const W = single ? 360 : 360, w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
+  const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
+  const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
+  const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
+  const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
+  const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
+    return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
+  const shell = (inner: React.ReactNode, strip?: string) => <View {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 48, width: W, zIndex: 8} as any}>
+    <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
+    <View style={{position: 'absolute', left: caret - 6, bottom: -6, width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
+  const chip = (icon: IconName, col: string, s = 28) => <View style={{width: s, height: s, borderRadius: 9, backgroundColor: tint(col, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={Math.round(s * 0.5)} color={col} /></View>;
+  const iconBtn = (icon: IconName, label: string, run: () => void) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} hitSlop={4} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name={icon} size={14} color={c.muted} /></Pressable>;
+  // --- compromisso sozinho
+  if (single) {const r = point.recs[0], col = colOf(r), o: any = r.original || {}, d = durOf(r), end = o.data?.end_at ? hhmm(new Date(o.data.end_at)) : '', loc = String(o.data?.location || '').trim(), text = desc(r);
+    const mins = Math.round((new Date(r.date).getTime() - Date.now()) / 60000), rel = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';
+    return shell(<View style={{padding: 16, gap: 10}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>{chip('calendar', col, 30)}<View style={{flex: 1, minWidth: 0}}>
+        <Text numberOfLines={2} style={{fontSize: 16, fontWeight: '600', color: c.text}}>{r.title}</Text>
+        <Text style={{fontSize: 12, color: c.muted, marginTop: 2, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}{end ? ' – ' + end : ''}{d ? ' · ' + d : ''}{rel ? <Text style={{color: c.accent}}>{'  ' + rel}</Text> : null}</Text></View></View>
+      {loc ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 7}}><Icon name="mapPin" size={13} color={c.muted} /><Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{loc}</Text></View> : null}
+      {text && !text.includes(loc || '\u0000') ? <Text numberOfLines={2} style={{fontSize: 12, lineHeight: 18, color: c.muted}}>{text}</Text> : null}
+      {o.data?.calendar_provider === 'google' ? <View style={{flexDirection: 'row'}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 6, height: 24, paddingHorizontal: 9, borderRadius: 7, backgroundColor: c.input}}><Icon name="calendar" size={12} color={c.muted} /><Text style={{fontSize: 11, color: c.text}}>Google Agenda</Text></View></View> : null}
+      <View style={{height: 1, backgroundColor: c.line, marginHorizontal: -16, marginTop: 2}} />
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+        <Pressable accessibilityRole="button" onPress={() => {onClose(); actions.onEdit(r);}} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 12, borderRadius: 9, backgroundColor: hovered ? c.line : c.input, transform: [{scale: pressed ? 0.97 : 1}]})}><Icon name="edit" size={13} color={c.text} /><Text style={{fontSize: 12, fontWeight: '600', color: c.text}}>Editar</Text></Pressable>
+        {onGrab ? null : null}
+      </View>
+    </View>, col);}
+  // --- varios itens (ou tarefa/lembrete/marca sozinhos)
+  const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
+  const total = point.recs.length + point.marks.length, imp = point.recs.filter(r => urgOf(r) === 3).length;
+  const firstAt = point.recs[0] ? new Date(point.recs[0].date) : point.marks[0]?.at;
+  const Row = ({k, color, icon, time, title, meta, done, check, onEdit, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
+    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, paddingHorizontal: 10, marginHorizontal: 6, borderRadius: 11, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>{({hovered}: any) => <>
+      <View style={{width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: color, opacity: done ? 0.4 : 1}} />
+      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={({hovered: h}: any) => ({width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: done ? tint(color, 0.3) : h ? tint(color, 0.24) : tint(color, 0.14)})}><Icon name={done ? 'checkCircle' : icon} size={14} color={color} /></Pressable> : chip(icon, color)}
+      <View style={{flex: 1, minWidth: 0}}>
+        <Text numberOfLines={1} style={{fontSize: 14, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
+        {meta ? <Text numberOfLines={1} style={{fontSize: 11, color: c.muted, marginTop: 1}}>{meta.split(' · ').map((part, n) => <Text key={n} style={{color: part === 'Importante' ? IMPORTANT_RED : c.muted}}>{(n ? ' · ' : '') + part}</Text>)}</Text> : null}
+      </View>
+      {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
+      {hovered && onEdit ? iconBtn('edit', 'Editar ' + title, onEdit)
+        : grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} style={({hovered: h}: any) => ({cursor: 'grab', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2, backgroundColor: h ? tint(color, 0.18) : 'transparent'} as any)}><Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>⠿ {time}</Text></Pressable>
+        : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
+    </>}</Pressable>;
+  const many = total > 1;
+  return shell(<View style={{paddingVertical: 6}}>
+    {many ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4}}>
+      <Text style={{fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums']}}>{firstAt ? hhmm(firstAt) : ''}</Text><Text style={{fontSize: 12, color: c.muted}}>{total} itens</Text>
+      <View style={{flex: 1}} />{imp ? <View style={{borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: tint(IMPORTANT_RED, 0.16)}}><Text style={{fontSize: 11, color: IMPORTANT_RED}}>{imp} importante{imp > 1 ? 's' : ''}</Text></View> : null}
+    </View> : null}
+    {recs.map((r, n) => Row({k: r.id + n, first: n === 0, color: colOf(r), icon: iconOf(r), time: hhmm(new Date(r.date)), title: r.title, meta: metaOf(r) + (desc(r) && !many ? ' · ' + desc(r) : ''), done: r.isTask ? (r.original as any)?.state === 'done' : false,
+      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, onEdit: () => {onClose(); actions.onEdit(r);}, grab: onGrab && total > 1 ? (e: any) => onGrab(e, {rec: r}, colOf(r)) : undefined}))}
+    {marks.map((m, n) => Row({k: m.id, first: !recs.length && n === 0, color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
+      time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: m.done && m.kind === 'routine',
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
+    {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 16, paddingVertical: 6}}>+{extra} mais</Text> : null}
+  </View>, !many && point.marks[0]?.kind === 'routine' ? markColor(point.marks[0], c.danger) : undefined);
 }
 
 /** 0.3.317 (Pedro): rodinha do mouse em cima do bloco passa os itens (um por passo, sem disparar varios de uma vez). */
