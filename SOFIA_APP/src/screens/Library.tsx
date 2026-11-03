@@ -89,7 +89,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [adding, setAdding] = useState<null | {seed?: string; files?: any[]; type?: string}>(null), [openId, setOpenId] = useState<string | null>(null), [flash, setFlash] = useState('');
   const [typeDialog, setTypeDialog] = useState<null | {edit: TypeDef | null}>(null), [organize, setOrganize] = useState(false), [moreOpen, setMoreOpen] = useState(false);
   // 03/11/2026: barra [Area ⌄] [Filtros ⌄]; so um painel aberto por vez; a busca abre pela lupa do topo (celular)
-  const [drop, setDrop] = useState<'' | 'area' | 'filter'>(''), [searchOpen, setSearchOpen] = useState(false);
+  const [drop, setDrop] = useState<'' | 'area' | 'filter' | 'order'>(''), [order, setOrder] = useState<'recent' | 'az' | 'rating'>('recent'), [searchOpen, setSearchOpen] = useState(false);
   const [pending, setPending] = useState<Entity[]>([]);
 
   const load = useCallback(async () => {
@@ -138,8 +138,10 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   // 03/11/2026: as caixinhas de etiqueta marcam varias (antes a segunda trocava a primeira); mostra quem tem qualquer uma
   const tagList = filter.tag ? filter.tag.split('\n') : [], hasTag = (tg: string) => tagList.some(x => fold(x) === fold(tg));
   const filterOn = !!(filter.status || filter.rating || filter.tag);
-  const shown = items.filter(i => (view === 'all' || i.type === view) && (!query.trim() || fold([i.title, i.creator, i.site, i.tags.join(' '), i.notes].join(' ')).includes(fold(query)))
-    && (!filter.tag || i.tags.some(t => hasTag(t))) && (!filter.rating || i.rating >= filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1)));
+  // 03/11/2026 (desenho 20): ordem escolhida na barra (Recentes, A a Z, Nota); a lista ja vem das mais recentes
+  const sortLib = (list: Item[]) => order === 'recent' ? list : [...list].sort((a, b) => order === 'az' ? a.title.localeCompare(b.title, 'pt-BR') : (b.rating || 0) - (a.rating || 0));
+  const shown = sortLib(items.filter(i => (view === 'all' || i.type === view) && (!query.trim() || fold([i.title, i.creator, i.site, i.tags.join(' '), i.notes].join(' ')).includes(fold(query)))
+    && (!filter.tag || i.tags.some(t => hasTag(t))) && (!filter.rating || i.rating >= filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1))));
   const open = items.find(i => i.id === openId) || null;
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(''), 1200); return () => clearTimeout(t); }, [flash]);
 
@@ -310,17 +312,19 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 2}}>
             {!desktop ? <BarPill testID="lib-area" label={curType ? curType.name : 'Tudo'} open={drop === 'area'} onPress={() => setDrop(d => d === 'area' ? '' : 'area')} /> : null}
             <BarPill testID="lib-filter" label="Filtros" count={tagList.length + (filter.rating ? 1 : 0)} open={drop === 'filter'} onPress={() => setDrop(d => d === 'filter' ? '' : 'filter')} />
+            {!desktop ? <><View style={{flex: 1}} /><Pressable testID="lib-order" accessibilityRole="button" accessibilityLabel="Ordem da lista" accessibilityState={{expanded: drop === 'order'}} onPress={() => setDrop(d => d === 'order' ? '' : 'order')} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{order === 'recent' ? 'Recentes' : order === 'az' ? 'A a Z' : 'Nota'} ⌄</Text></Pressable></> : null}
           </View>
+          {drop === 'order' && !desktop ? <DropPanel title="Ordem">{([['recent', 'Recentes'], ['az', 'A a Z'], ['rating', 'Maior nota']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={order === k} onPress={() => { setOrder(k); setDrop(''); }} />)}</DropPanel> : null}
           {drop === 'area' && !desktop ? <DropPanel title="Áreas" action={{label: 'Organizar', onPress: () => { setDrop(''); setOrganize(true); }}} footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setDrop(''); setTypeDialog({edit: null}); }} />}>
             <PanelRow label="Tudo" count={items.length} on={view === 'all'} onPress={() => { setView('all'); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />
             {types.map(t => <PanelRow key={t.id} label={t.name} count={count(t)} on={view === t.id} onPress={() => { setView(t.id); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />)}
           </DropPanel> : null}
-          {drop === 'filter' ? <DropPanel title={'Filtros' + (curType ? ' de ' + curType.name : '')} action={filterOn ? {label: 'Limpar', onPress: () => setFilter({status: '', rating: 0, tag: ''})} : undefined} footer={<PrimaryButton label={'Ver ' + shown.length + (shown.length === 1 ? ' item' : ' itens')} onPress={() => setDrop('')} />}>
-            {tagsFor(curType?.id || null).map(tg => <PanelRow key={tg} kind="check" label={tg} count={items.filter(i => (!curType || i.type === curType.id) && i.tags.some(x => fold(x) === fold(tg))).length} on={hasTag(tg)} onPress={() => setFilter(f => {const cur = f.tag ? f.tag.split('\n') : [], next = cur.some(x => fold(x) === fold(tg)) ? cur.filter(x => fold(x) !== fold(tg)) : [...cur, tg]; return {...f, tag: next.join('\n')};})} />)}
+          {drop === 'filter' ? <DropPanel title={'Filtros' + (curType ? ' de ' + curType.name : '')} action={filterOn ? {label: 'Limpar', onPress: () => setFilter({status: '', rating: 0, tag: ''})} : undefined} footer={<PrimaryButton label={'Ver ' + shown.length + ' ' + (curType ? curType.name.toLowerCase() : shown.length === 1 ? 'item' : 'itens')} onPress={() => setDrop('')} />}>
+            {!curType ? <Text style={{color: c.muted, fontSize: 13, paddingHorizontal: 4, paddingVertical: 8}}>Escolha uma área para filtrar pelas etiquetas dela.</Text> : null}{tagsFor(curType?.id || null).filter(() => !!curType).map(tg => <PanelRow key={tg} kind="check" label={tg} count={items.filter(i => (!curType || i.type === curType.id) && i.tags.some(x => fold(x) === fold(tg))).length} on={hasTag(tg)} onPress={() => setFilter(f => {const cur = f.tag ? f.tag.split('\n') : [], next = cur.some(x => fold(x) === fold(tg)) ? cur.filter(x => fold(x) !== fold(tg)) : [...cur, tg]; return {...f, tag: next.join('\n')};})} />)}
             <StarRow value={filter.rating} onChange={r => setFilter(f => ({...f, rating: r}))} />
             <View style={{height: 12}} />
           </DropPanel> : null}
-          <ResultLine text={[tagList.join(', '), filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
+          <ResultLine text={[tagList.join(', '), filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (curType ? curType.name.toLowerCase() : shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {shown.length ? <View style={desktop ? {borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'} : {gap: 8}}>{shown.map((it, k) => <Card key={it.id} it={it} first={!k} />)}</View> : null}
           {!shown.length ? <View style={{alignItems: 'center', gap: 10, paddingVertical: 40}}><Icon name={curType?.icon || 'book'} size={32} color={c.muted} /><Text style={{color: c.muted, textAlign: 'center', maxWidth: 360}}>{query || filterOn ? 'Nada encontrado com esse filtro.' : 'Nada aqui ainda. Adicione pelo nome, cole um link de qualquer site ou arraste um arquivo.'}</Text></View> : null}

@@ -22,8 +22,15 @@ def install_checked(apk,label):
   if out.returncode==0 and got==want:return
  raise AssertionError('Installed APK does not match '+label)
 def xml():
- adb('shell','uiautomator','dump','/sdcard/manual-startup.xml')
- return adb('shell','cat','/sdcard/manual-startup.xml').decode(errors='replace')
+ # 03/11/2026: o dump falha calado quando a tela nunca fica parada ("could not get idle state") e o cat devolvia o
+ # arquivo ANTERIOR (a #282 "viu" o semeador no lugar do app). Apaga antes, confere e tenta de novo.
+ for attempt in range(4):
+  subprocess.run(['adb','shell','rm','-f','/sdcard/manual-startup.xml'],capture_output=True,timeout=30)
+  out=subprocess.run(['adb','shell','uiautomator','dump','/sdcard/manual-startup.xml'],capture_output=True,text=True,timeout=60)
+  got=subprocess.run(['adb','shell','cat','/sdcard/manual-startup.xml'],capture_output=True,timeout=30).stdout.decode(errors='replace')
+  if got.strip().startswith('<?xml'):return got
+  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True);time.sleep(1)
+ raise AssertionError('UI dump failed (screen never idle?)')
 def cold(label):
  adb('shell','am','force-stop',pkg);adb('logcat','-c')
  manager=adb('shell','am','start','-W','-n',pkg+'/.MainActivity').decode(errors='replace')

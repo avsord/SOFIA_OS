@@ -22,7 +22,14 @@ def install_checked(apk,label):
   if out.returncode==0 and got==want:return
  raise AssertionError('Installed APK does not match '+label)
 def xml():
- adb('shell','uiautomator','dump','/sdcard/r7.xml');return adb('shell','cat','/sdcard/r7.xml')
+ # 03/11/2026: o dump falha calado quando a tela nunca fica parada e o cat devolvia o arquivo ANTERIOR; apaga, confere e repete
+ for attempt in range(4):
+  subprocess.run(['adb','shell','rm','-f','/sdcard/r7.xml'],capture_output=True,timeout=30)
+  out=subprocess.run(['adb','shell','uiautomator','dump','/sdcard/r7.xml'],capture_output=True,text=True,timeout=60)
+  got=subprocess.run(['adb','shell','cat','/sdcard/r7.xml'],capture_output=True,text=True,timeout=30).stdout
+  if got.strip().startswith('<?xml'):return got
+  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True);time.sleep(1)
+ raise AssertionError('UI dump failed (screen never idle?)')
 def point(tree,label):
  found=[x for x in ET.fromstring(tree).iter('node') if x.get('text')==label or x.get('content-desc')==label]
  assert found,'Missing QA control '+label
@@ -101,9 +108,11 @@ _geom=importlib.util.module_from_spec(_geom_spec);_geom_spec.loader.exec_module(
 def xml_bounded(remaining):
  before=time.monotonic()
  try:
+  subprocess.run(['adb','shell','rm','-f','/sdcard/r71.xml'],capture_output=True,timeout=max(.5,remaining)) # sem arquivo velho se o dump falhar
   subprocess.check_output(['adb','shell','uiautomator','dump','/sdcard/r71.xml'],stderr=subprocess.STDOUT,timeout=remaining)
   rest=max(.001,remaining-(time.monotonic()-before))
-  return subprocess.check_output(['adb','shell','cat','/sdcard/r71.xml'],stderr=subprocess.STDOUT,timeout=rest).decode(errors='replace')
+  got=subprocess.run(['adb','shell','cat','/sdcard/r71.xml'],capture_output=True,timeout=rest).stdout.decode(errors='replace')
+  return got if got.strip().startswith('<?xml') else '<?xml version="1.0"?><hierarchy rotation="0"></hierarchy>' # dump falhou: tela vazia, a medicao tenta de novo
  except subprocess.TimeoutExpired as error:
   raise TimeoutError('UIAutomator exceeded remaining observation window') from error
 

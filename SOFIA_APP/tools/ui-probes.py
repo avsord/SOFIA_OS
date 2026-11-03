@@ -10,7 +10,8 @@ def box(node):
 
 def home_pager_swipe(tree):
     nodes = list(ET.fromstring(tree).iter("node"))
-    headers = [n for n in nodes if n.get("text", "").startswith("Olá,")]
+    # 03/11/2026: o Inicio atual sauda com "Bom dia/Boa tarde/Boa noite, <nome>"; a tela de abertura ainda diz "Olá,"
+    headers = [n for n in nodes if re.match(r"(Olá|Bom dia|Boa tarde|Boa noite), ", n.get("text", ""))]
     pagers = [n for n in nodes if n.get("resource-id", "").startswith("sofia-pager-ready:")]
     calendars = [box(n) for n in nodes if n.get("resource-id") in ("calendar-month-swipe", "mini-agenda")]
     if not headers or not pagers:

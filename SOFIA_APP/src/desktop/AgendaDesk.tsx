@@ -155,7 +155,7 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
         </Pressable>) : <Text style={{fontSize: 12, color: c.muted}}>Nada para o dia todo.</Text>}
       </View>
     </View>
-    <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingTop: 10, paddingBottom: 12}}>
+    <ScrollView ref={scroll} nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingTop: 10, paddingBottom: 12}}>
       <View style={{marginLeft: p.compact ? 58 : 84, marginRight: p.compact ? 12 : 20, height: 24 * HOUR, position: 'relative'}}>
         {/* 03/11/2026: segurar num horario vazio do Dia cria naquele horario (celular e site) */}
         {Array.from({length: 24}, (_, h) => <Pressable key={h} accessibilityRole="button" accessibilityLabel={'Segure para criar às ' + String(h).padStart(2, '0') + ':00'} delayLongPress={380} onLongPress={() => p.onCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h), true)} style={({pressed}: any) => ({position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.accentSoft : 'transparent'})}>
@@ -302,13 +302,14 @@ export function AgendaDesk(p: AgendaDeskProps) {
 
   // ---------- barra ----------
   const d = p.selected;
-  const seg = ([['day', 'Dia'], ['month', 'Mês'], ['year', 'Ano']] as [Level, string][]);
+  const seg = ([['year', 'Ano'], ['month', 'Mês'], ['day', 'Dia']] as [Level, string][]);
   const crumbBtn = (label: string, onPress: () => void) => <Pressable accessibilityRole="link" onPress={onPress}>{({hovered}: any) => <Text style={{fontSize: 18, fontWeight: '500', color: hovered ? c.text : c.muted}}>{label}</Text>}</Pressable>;
   const sep = <Text style={{fontSize: 18, color: c.muted}}>›</Text>;
   const ghost = (label: string, onPress: () => void, a11y?: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y || label} onPress={onPress} style={({hovered}: any) => ({height: 36, minWidth: 36, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.text, fontSize: 14}}>{label}</Text></Pressable>;
-  const segBar = <View accessibilityRole="tablist" style={{flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: 'hidden', flex: p.compact ? 1 : undefined}}>
+  // 03/11/2026 (desenho 03): no celular as abas sao um seletor segmentado (trilho cinza, aba escolhida em cartao)
+  const segBar = <View accessibilityRole="tablist" style={p.compact ? {flexDirection: 'row', flex: 1, padding: 3, gap: 2, borderRadius: 11, backgroundColor: c.input} : {flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: 'hidden'}}>
         {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? new Date() : d)}
-          style={{flex: p.compact ? 1 : undefined, alignItems: 'center', height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
+          style={p.compact ? {flex: 1, alignItems: 'center', height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: level === l ? c.surface : 'transparent', ...(level === l ? {boxShadow: '0 1px 2px rgba(0,0,0,0.3)'} : null)} as any : {alignItems: 'center', height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: p.compact ? 13 : 14, color: level === l ? c.text : c.muted, fontWeight: p.compact || level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
       </View>;
   if (p.compact) return <View style={{flex: 1}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10}}>{segBar}{ghost('Hoje', () => go(level, new Date()))}</View>

@@ -3,7 +3,7 @@
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
+import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
 /** 03/11/2026: no Android o `window` existe (e o objeto global) mas nao tem addEventListener/innerWidth; o teste
  * `!WEB` nao protegia e o Inicio do celular quebrava. Tudo que e so do navegador usa WEB. */
 const WEB = Platform.OS === 'web' && typeof document !== 'undefined';
@@ -240,8 +240,10 @@ export function HomeBrief(p: HomeBriefProps) {
       <Timeline nav={dayNav} onDay={setViewDay} items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
         actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
+      {/* 03/11/2026 (desenho 01): no celular, a dica de como criar pela linha */}
+      {p.compact && p.onAskAt ? <Text style={{fontSize: 11, color: c.muted, paddingTop: 2, paddingHorizontal: 2}}>Segure num horário vazio para criar · arraste para ver outras horas</Text> : null}
     </View>
-    {p.compact ? <>
+    {p.compact ? <CompactCtx.Provider value={true}>
       {/* celular: os blocos de verdade do site, adaptados. Agenda, Rotina e Financas na largura toda (tem seletor/duas
           colunas de numeros); Tarefas, E-mails, Price Tracker e Encomendas em pares do mesmo tamanho. */}
       <AgendaTile style={{height: 176}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -255,7 +257,7 @@ export function HomeBrief(p: HomeBriefProps) {
         <PackagesTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       </View>
       <FinanceTile style={{height: 176}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
-    </> : <>
+    </CompactCtx.Provider> : <>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
@@ -332,6 +334,16 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // que estar sempre na hora certa, como se tivesse andado com o site fechado. Ao voltar para a aba (ou quando o atraso e
   // grande) ela ja aparece no lugar, sem deslizar; o deslize suave fica so para o passo normal de meio minuto.
   const jump = (to: number) => {if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} const st = clampStart(to); startRef.current = st; target.current = st; setStartRaw(st);};
+  // 03/11/2026: no celular a linha do tempo anda arrastando o dedo para os lados (antes so a roda do mouse mexia nas horas).
+  // A area tem o nativeID que o guarda nativo usa para nao trocar de aba durante o gesto.
+  const jumpRef = useRef(jump); jumpRef.current = jump; const wRef = useRef(0); wRef.current = w; const panFrom = useRef(0);
+  const pan = useMemo(() => WEB ? null : PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3,
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3,
+    onPanResponderGrant: () => {panFrom.current = startRef.current; manualAt.current = Date.now(); setPin(''); setHover('');},
+    onPanResponderMove: (_, g) => {if (wRef.current > 0) jumpRef.current(panFrom.current - g.dx / wRef.current * spanRef.current);},
+    onPanResponderTerminationRequest: () => false,
+  }), []);
   const snapNext = useRef(false);
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
   // 0.3.326 (Pedro: "abrir e fechar a barra lateral faz as bolinhas e os nomes tremerem"): a largura que decide quem junta
@@ -478,7 +490,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
   return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF, userSelect: 'none', outlineStyle: 'none'} as any}>
-   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v); if (!WEB) (lineBox.current as any)?.measureInWindow?.((x: number, _y: number, w2: number) => {lineRect.current = {left: x, width: w2};});}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
+   <View ref={lineBox} {...(pan ? pan.panHandlers : {})} nativeID={WEB ? undefined : 'sofia-calendar-gesture'} collapsable={false} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v); if (!WEB) (lineBox.current as any)?.measureInWindow?.((x: number, _y: number, w2: number) => {lineRect.current = {left: x, width: w2};});}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
     {Array.from({length: Math.floor(SPAN) + 2}, (_, k) => Math.ceil(start) + k).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1) return null; const hd = ((h % 24) + 24) % 24, div = hd === 6 || hd === 12 || hd === 18, major = hd % 4 === 3, ht = div ? 12 : major ? 14 : 8;
@@ -745,7 +757,7 @@ function PeriodIcon({kind}: {kind: string}) {
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {if (reduced) return; const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false})); loop.start(); return () => loop.stop();}, [reduced]);
+  useEffect(() => {if (reduced) return; const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false}), {iterations: WEB ? -1 : 4}); /* 03/11/2026: no celular pulsa 4 vezes e para (economiza bateria; a tela fica parada) */ loop.start(); return () => loop.stop();}, [reduced]);
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
     {/* aureola */}
@@ -852,8 +864,12 @@ function ItemDots({n, i, color, done, onGo, what = 'Item'}: {n: number; i: numbe
 }
 /** 03/11/2026: entrada do pronto no lugar do esqueleto (StyleSheet.create: o site so anima por ele). */
 const ENTER = StyleSheet.create({brief: {animationKeyframes: {'0%': {opacity: 0.35}, '100%': {opacity: 1}}, animationDuration: '280ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any});
+/** 03/11/2026 (desenho 01): no celular os blocos sao metade da largura e o "‹ 1 de N ›" cobria o titulo; la fica so "1/N"
+ * no canto e os pontinhos de baixo trocam o item. */
+const CompactCtx = React.createContext(false);
 function Pager({i, n, onGo, what}: {i: number; n: number; onGo: (k: number) => void; what: string}) {
-  const c = useTheme(); if (n < 2) return null;
+  const c = useTheme(), compact = React.useContext(CompactCtx); if (n < 2) return null;
+  if (compact) return <Text style={{position: 'absolute', top: 17, right: 14, fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{(i % n) + 1}/{n}</Text>;
   const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={7} onPress={() => onGo(k)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>{label}</Text></Pressable>;
   return <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
     {btn('‹', (i - 1 + n) % n, what + ' anterior')}<Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % n) + 1} de {n}</Text>{btn('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase())}
@@ -948,6 +964,7 @@ function TasksTile({style, card, open, onOpen, onDone}: {style: any; card: any; 
   </View>;
 }
 function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
+  const compact = React.useContext(CompactCtx); // 03/11/2026 (desenho 01): no celular o grupo e so o texto "Cápsulas ⌄"
   const c = useTheme(), s = data.capsules, today = new Date().toDateString();
   const doses = capsuleDoses(s.plans, s.history).filter(d => d.date.toDateString() === today).sort((a, b) => a.date.getTime() - b.date.getTime());
   // 0.3.317 (Pedro): igual ao Price Tracker - cada grupo da Rotina (Capsulas, Cuidados, Habitos, Treino e os tipos criados)
@@ -975,12 +992,12 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
     {late && groups.length < 2 ? <Dot reason={(() => {const d = doses.find(x => !x.taken && x.date.getTime() < Date.now()); return d ? d.plan.title + ' passou da hora (' + hhmm(d.date) + ')' : 'Algo da rotina passou da hora';})()} /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
     {g && groups.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 5}}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Grupo anterior" hitSlop={7} onPress={() => pickGroup(gi - 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
-      <Pressable testID="rotina-group" accessibilityRole="button" accessibilityLabel={'Grupo da Rotina: ' + g.name + '. Escolher outro'} onPress={() => setMenu(v => !v)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint(g.color, hovered || menu ? 0.22 : 0.12)})}>
-        <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: g.color}} /><Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: g.color, maxWidth: 110}}>{g.name}</Text><Text style={{fontSize: 10, color: g.color}}>▾</Text>
+      {compact ? null : <Pressable accessibilityRole="button" accessibilityLabel="Grupo anterior" hitSlop={7} onPress={() => pickGroup(gi - 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>}
+      <Pressable testID="rotina-group" accessibilityRole="button" accessibilityLabel={'Grupo da Rotina: ' + g.name + '. Escolher outro'} onPress={() => setMenu(v => !v)} style={({hovered}: any) => compact ? {flexDirection: 'row', alignItems: 'center', gap: 3, height: 22, paddingLeft: 6, paddingRight: 2, backgroundColor: 'transparent'} : ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint(g.color, hovered || menu ? 0.22 : 0.12)})}>
+        {compact ? null : <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: g.color}} />}<Text numberOfLines={1} style={{fontSize: 12, fontWeight: '600', color: g.color, maxWidth: 110}}>{g.name}</Text><Text style={{fontSize: compact ? 12 : 10, color: g.color}}>{compact ? '⌄' : '▾'}</Text>
         {late ? <View accessibilityLabel="Tem item da rotina que passou da hora (veja na lista)" style={{width: 6, height: 6, borderRadius: 3, backgroundColor: c.danger, marginLeft: 1}} /> : null}
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Próximo grupo" hitSlop={7} onPress={() => pickGroup(gi + 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
+      {compact ? null : <Pressable accessibilityRole="button" accessibilityLabel="Próximo grupo" hitSlop={7} onPress={() => pickGroup(gi + 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>}
       {menu ? <View style={{position: 'absolute', top: 32, right: 24, minWidth: 180, paddingVertical: 6, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
         {groups.map((x, n) => <Pressable key={x.id} accessibilityRole="button" accessibilityState={{selected: n === gi}} onPress={() => pickGroup(n)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 9, height: 34, paddingHorizontal: 12, backgroundColor: hovered ? c.input : 'transparent'})}>
           <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: x.color}} /><Text style={{flex: 1, fontSize: 13, color: c.text, fontWeight: n === gi ? '600' : '400'}}>{x.name}</Text>
@@ -1055,6 +1072,7 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
 }
 /** Price Tracker: mostra um produto por vez; as setas passam para o proximo (0.3.293: sem trocar sozinho). */
 function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: MonitorWidgetRow[] | null; onOpen: () => void}) {
+  const compact = React.useContext(CompactCtx);
   const c = useTheme(), reduced = useReducedMotion();
   const list = useMemo(() => [...(rows || [])].filter(r => r.price != null).sort((a, b) => Number(b.atLow) - Number(a.atLow) || Math.abs(b.change || 0) - Math.abs(a.change || 0)), [rows]);
   const [i, setI] = useState(0), [hover, setHover] = useState(false), fade = useRef(new Animated.Value(1)).current;
@@ -1066,7 +1084,8 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
   return <View ref={wheel} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)}>
     
     <TileHead icon="tag" color="#88CFB8" name="Price Tracker" onOpen={onOpen} />
-    {list.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
+    {list.length > 1 && compact ? <Text style={{position: 'absolute', top: 17, right: 14, fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{(i % list.length) + 1}/{list.length}</Text> : null}
+    {list.length > 1 && !compact ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Produto anterior" hitSlop={7} onPress={() => go((i - 1 + list.length) % list.length)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>
       <Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % list.length) + 1} de {list.length}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Próximo produto" hitSlop={7} onPress={() => go((i + 1) % list.length)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
@@ -1074,7 +1093,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
     {r ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
       <Big value={fmtMoney(r.price || 0, r.currency || 'BRL')} unit={r.title} />
       <Line text={r.atLow ? 'Menor preço já visto' + (r.store ? ' · ' + r.store : '') : r.change ? (r.change < 0 ? 'Caiu ' : 'Subiu ') + Math.abs(r.change).toFixed(1).replace('.', ',') + '%' + (r.store ? ' · ' + r.store : '') : 'Estável' + (r.store ? ' · ' + r.store : '')} />
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label="Ver o produto" onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#88CFB8" /></View>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label="Ver o produto" onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#88CFB8" onGo={go} what="Produto" /></View>
     </Animated.View> : <Quiet text="Nenhum produto" sub="Cole o link de um produto no Price Tracker." />}
   </View>;
 }
@@ -1092,7 +1111,7 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
     {cur ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
       <Big value={String(list.length)} unit={'a caminho' + (today ? ' · ' + today + (today === 1 ? ' chega hoje' : ' chegam hoje') : '')} />
       <Line text={cur.title + ': ' + cur.status.charAt(0).toLowerCase() + cur.status.slice(1)} />
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label={cur.needs === 'fee' ? 'Pagar taxa' : cur.needs === 'pickup' ? 'Ver retirada' : 'Rastrear'} onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#E8B04A" /></View>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label={cur.needs === 'fee' ? 'Pagar taxa' : cur.needs === 'pickup' ? 'Ver retirada' : 'Rastrear'} onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#E8B04A" onGo={go} what="Encomenda" /></View>
     </Animated.View> : <Quiet text="Nada a caminho" sub="Tudo o que você pediu já chegou." />}
   </View>;
 }

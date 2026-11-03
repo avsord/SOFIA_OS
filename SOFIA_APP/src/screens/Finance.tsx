@@ -188,7 +188,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
-            <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>Finanças</Text>
+            <Text style={{fontSize: 28, fontWeight: '600', letterSpacing: -1, color: c.text}}>Finanças</Text>
           </View>
           <IconButton name="settings" label="Contas e cartões" onPress={() => setManage(true)} />
         </View>

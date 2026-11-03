@@ -28,7 +28,7 @@ test('chat has no product character or audio-duration ceiling',()=>{
 test('notification bell can mark local and remote notices read in one action',()=>{
  const center=file('src/components/NotificationCenter.tsx'),bell=file('src/lib/bell-inbox.ts'),screen=file('src/screens/Notifications.tsx');
  assert.ok(center.includes('async function readAll()'));assert.ok(center.includes('Marcar tudo como lido'));assert.ok(center.includes('pending.slice(i,i+8).map(n=>api.markRead(n.id))'));
- assert.ok(bell.includes('readAll(){'));assert.ok(screen.includes('label="Marcar tudo como lido"'));
+ assert.ok(bell.includes('readAll(){'));assert.ok(/[lL]abel="Marcar tudo como lido"/.test(screen)&&screen.includes('n.readAll()'),'tela de notificacoes tem o "Ler todas" (desenho 03/11: texto, nao icone)');
 });
 test('task editor exposes an explicit destructive action in its header and body',()=>{
  const workspace=file('src/screens/Workspace.tsx');

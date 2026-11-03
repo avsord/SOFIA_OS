@@ -83,16 +83,16 @@ raw=subprocess.check_output(['ffmpeg','-v','error','-i',str(out/'bell-motion.mp4
 values=list(raw);assert values and min(values)>90,(min(values) if values else None)
 cut=(min(values)+max(values))/2;states=[v<cut for v in values];transitions=sum(a!=b for a,b in zip(states,states[1:]));assert 4<=transitions<=6,('backdrop pulsed',transitions,min(values),max(values))
 (out/'bell-backdrop-luminance.json').write_text(json.dumps({'frames':len(values),'min':min(values),'max':max(values),'transitions':transitions,'passed':True}))
-tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('ATIVIDADES · AVISOS');wait('Agenda · 1');snapshot('04-notification-center');back()
+tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('Notificações');wait('Agenda · 1');snapshot('04-notification-center');back()
 # Settings split, appearance, real version, and configured state visible.
 tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.33');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
 # Apps goes back exactly to Apps; hardware back does not jump to Home.
-tap('Apps');wait('Seus espaços');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Seus espaços');snapshot('08-apps-back')
+tap('Apps');wait('Apps');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Apps');snapshot('08-apps-back')
 # Apps with slow responses preserve their confirmed rows/empty message on reentry.
 from PIL import Image,ImageChops
 import io
 for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas','Nenhum registro aqui','empty-list')]:
- tap(module);wait(label);snapshot('08b-'+stem+'-loaded');reference=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');back();wait('Seus espaços')
+ tap(module);wait(label);snapshot('08b-'+stem+'-loaded');reference=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');back();wait('Apps')
  coords=box(wait(module));adb('shell','input','tap',str((coords[0]+coords[2])//2),str((coords[1]+coords[3])//2))
  metrics=[]
  for frame_id in range(3):
@@ -125,8 +125,8 @@ for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas',
   for _ in range(5):
    if find(tree(),'Salvar registro') is not None:break
    swipe(640,1240,640,550,250)
-  tap('Salvar registro');wait('Artista test');wait('Filtrar por Estilo');tap('Filtrar por Estilo');tap('Retrato');tap('Filtrar por estrelas');tap('5 estrelas');wait('Artista test');snapshot('08n-custom-auto-filters');tap('Artista test');wait('5 de 5 estrelas');assert wait('Estilo').get('text')=='Retrato';snapshot('08o-custom-record-reopened');tap('Fechar área da Biblioteca');back();wait('Seus espaços');tap('Biblioteca');wait('Tudo');wait('Artista test');snapshot('08p-custom-in-all')
- back();wait('Seus espaços')
+  tap('Salvar registro');wait('Artista test');wait('Filtrar por Estilo');tap('Filtrar por Estilo');tap('Retrato');tap('Filtrar por estrelas');tap('5 estrelas');wait('Artista test');snapshot('08n-custom-auto-filters');tap('Artista test');wait('5 de 5 estrelas');assert wait('Estilo').get('text')=='Retrato';snapshot('08o-custom-record-reopened');tap('Fechar área da Biblioteca');back();wait('Apps');tap('Biblioteca');wait('Tudo');wait('Artista test');snapshot('08p-custom-in-all')
+ back();wait('Apps')
 # Entry-path navigation: direct tree entry returns to menu, nested entry returns to parent.
 tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir página principal Teste principal');assert find(tree(),'Título da página') is None
 
@@ -165,7 +165,7 @@ tap('Confirmar data e horário');snapshot('21i-manual-created-date')
 tap('Conteúdo da nota');wait('leaf-format-toolbar');snapshot('21j-keyboard-toolbar');tap('Estilos de texto');wait('Título 1');wait('Lista de tarefas');wait('Citação');snapshot('21h-text-styles');tap('Título 1');wait('Conteúdo da nota')
 tap('Ações da nota');tap('Duplicar');wait('Título da nota');snapshot('21f-leaf-duplicate');tap('Voltar às notas');wait('Abrir nota Reuniao');root=snapshot('21g-leaf-direct-return');assert find(root,'Título da pasta') is None;back();wait('Criar página')
 # Apps repeated tap returns to root, then editor shows visual dates safely below status bar.
-tap('Apps');tap('Tarefas');wait('Nova tarefa');tap('Apps');wait('Seus espaços');snapshot('21b-apps-reset')
+tap('Apps');tap('Tarefas');wait('Nova tarefa');tap('Apps');wait('Apps');snapshot('21b-apps-reset')
 tap('Agenda');tap('Criar item na data selecionada');wait('Criar · Compromisso');tap('Início');wait('Confirmar data e horário');snapshot('21c-date-picker');back();back()
 # Chat remains a dedicated destination; existing messages and selection work.
 tap('Conversa');wait('Você: Mensagem preservada');hold('Você: Mensagem preservada');snapshot('22-chat-selection');back()

@@ -20,7 +20,7 @@ import {IconButton} from '../components/UI';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {BarPill, DropPanel, PanelRow} from '../components/FilterBar';
+import {BarPill, DropPanel, PanelRow, ResultLine} from '../components/FilterBar';
 import {AppFrame, NavTabs, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 const COLORS = ['#b49ae6', '#7f9ad8', '#7fcf9f', '#e8b04a', '#e08ad0', '#7fc0c9', '#f0997b', '#a3a0ad'];
@@ -40,7 +40,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const [notesE, setNotesE] = useState<Entity[] | null>(null), [tagsE, setTagsE] = useState<Entity[]>([]), [error, setError] = useState('');
   const [view, setView] = useState<View_>('all'), [query, setQuery] = useState(''), [sort, setSort] = useState<'recent' | 'created' | 'az'>('recent');
   // 03/11/2026: no celular a area sai da fileira de chips e vai para a barra [Area ⌄] (lista que desce logo abaixo); busca pela lupa do topo
-  const [areaOpen, setAreaOpen] = useState(false), [searchOpen, setSearchOpen] = useState(false);
+  const [areaOpen, setAreaOpen] = useState(false), [searchOpen, setSearchOpen] = useState(false), [orderOpen, setOrderOpen] = useState(false);
   const [draft, setDraft] = useState(''), [openId, setOpenId] = useState<string | null>(null), [tagDialog, setTagDialog] = useState<{tag: Tag | null} | null>(null);
   const keys = useRef(new Map<string, Uint8Array>()), [, bump] = useState(0), [plain, setPlain] = useState<Record<string, {title: string; body: string}>>({});
   const lastAct = useRef(Date.now()); const touch = () => { lastAct.current = Date.now(); };
@@ -219,16 +219,21 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             {!desktop ? <IconButton name="search" label="Buscar nas notas" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
           </View>
           {!desktop ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-            <BarPill testID="notes-area" label={view === 'all' ? 'Todas' : title} dot={curTag?.color} open={areaOpen} onPress={() => setAreaOpen(v => !v)} />
+            <BarPill testID="notes-area" label={view === 'all' ? 'Todas as áreas' : title} dot={curTag?.color} open={areaOpen} onPress={() => {setOrderOpen(false); setAreaOpen(v => !v);}} />
             <View style={{flex: 1}} />
-            <Pressable accessibilityRole="button" onPress={() => setSort(s2 => s2 === 'recent' ? 'created' : s2 === 'created' ? 'az' : 'recent')} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{sort === 'recent' ? 'Editadas' : sort === 'created' ? 'Criadas' : 'A a Z'} ⌄</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Ordem e notas fixadas ou arquivadas" accessibilityState={{expanded: orderOpen}} onPress={() => {setAreaOpen(false); setOrderOpen(v => !v);}} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{sort === 'recent' ? 'Editadas' : sort === 'created' ? 'Criadas' : 'A a Z'} ⌄</Text></Pressable>
           </View> : null}
           {!desktop && areaOpen ? <DropPanel title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
-            <PanelRow label="Todas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
-            <PanelRow label="Fixadas" count={notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go('pinned'); setAreaOpen(false); }} />
+            <PanelRow label="Todas as áreas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
             {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => !n.archived && (n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key)).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
-            <PanelRow label="Arquivadas" count={notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go('archived'); setAreaOpen(false); }} />
           </DropPanel> : null}
+          {/* 03/11/2026 (desenho 24): Fixadas e Arquivadas sairam da lista de areas (recusado misturar); ficam aqui, com a ordem */}
+          {!desktop && orderOpen ? <DropPanel title="Ordem">
+            {([['recent', 'Editadas por último'], ['created', 'Criadas por último'], ['az', 'A a Z']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={sort === k} onPress={() => { setSort(k as any); setOrderOpen(false); }} />)}
+            <PanelRow kind="plain" icon="pin" label={'Fixadas · ' + notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go(view === 'pinned' ? 'all' : 'pinned'); setOrderOpen(false); }} />
+            <PanelRow kind="plain" icon="box" label={'Arquivadas · ' + notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go(view === 'archived' ? 'all' : 'archived'); setOrderOpen(false); }} />
+          </DropPanel> : null}
+          {!desktop ? <ResultLine text={visible.length + (visible.length === 1 ? ' nota' : ' notas') + (view === 'pinned' ? ' fixadas' : view === 'archived' ? ' arquivadas' : '')} onClear={view === 'pinned' || view === 'archived' ? () => go('all') : undefined} /> : null}
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {lockedView ? <LockScreen tag={curTag!} count={notes.filter(n => tagKey(n.lockTag) === curTag!.key).length} onUnlock={async pw => { const k = await unlock(pw, curTag!.lock!); if (!k) return false; keys.current.set(curTag!.key, k); await decryptAll(curTag!.key, k); bump(x => x + 1); touch(); return true; }} /> : <>

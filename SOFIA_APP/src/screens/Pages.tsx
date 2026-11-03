@@ -242,12 +242,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </View>
   </PageDocumentScroll>;
  }
-  const recentPages=useMemo(()=>desktop?[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6):[],[desktop,displayPages]);
+  const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
  const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
   header={<>
-  <ScreenTitle title="Páginas" eyebrow="IDEIAS · NOTAS · SEUS ESPAÇOS" right={<IconButton name="plus" label="Criar página" disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
+  <ScreenTitle title="Páginas" right={<IconButton name="plus" label="Criar página" disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   {/* 0.3.262 (fase 3 — Paginas): no computador, as paginas mexidas por ultimo em cartoes no topo (voltar ao que se estava
@@ -259,6 +259,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     <View style={{gap:2}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
    </Pressable>)}</View>
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600',marginTop:10}}>Todas as páginas</Text>
+  </View>:null}
+  {/* 03/11/2026 (desenho 36): no celular, "Recentes" em cartoezinhos que rolam para o lado (dentro do bloco, a tela nao
+      rola de lado) e o rotulo "Todas as paginas" em cima da arvore. Recusado: cartao grande "abriu por ultimo". */}
+  {!desktop&&orderReady&&recentPages.length>1?<View testID="pages-recent-phone" style={{paddingBottom:6}}>
+   <Text style={{paddingHorizontal:16,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.5,paddingBottom:8}}>RECENTES</Text>
+   <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:16,gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir recente '+(p.title||'Sem título')} onPress={()=>open(p)} style={({pressed}:any)=>({width:120,padding:12,borderRadius:14,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:8,opacity:pressed?0.7:1})}>
+    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
+    <Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:13,lineHeight:17}}>{p.title||'Sem título'}</Text>
+   </Pressable>)}</ScrollView>
+   <Text style={{paddingHorizontal:16,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.5,paddingTop:16,paddingBottom:4}}>TODAS AS PÁGINAS</Text>
   </View>:null}
   </>}
   footer={<>
