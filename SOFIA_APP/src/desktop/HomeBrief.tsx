@@ -500,6 +500,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
     {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 60)) return null;
+      if (side && wS && (side === 'left' ? x * wS < 86 : (1 - x) * wS < 86)) return null; // a hora que ficaria embaixo do botao "agora" some
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
@@ -519,7 +520,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => goDay(0)}
-      style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
+      style={({hovered}: any) => ({position: 'absolute', top: 42 + OFF + 7 - 12, [side]: 0, /* 0.3.348 (Pedro): o "agora" fica na linha das horas, alinhado no meio dela */ opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
       {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
     </Pressable> : null}
   </View>;
@@ -552,24 +553,24 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     try {const reply = await sofia.ask((t || 'Veja este arquivo.') + '\n\n(Pedido pela linha do tempo do Início, para ' + dayTxt + ' às ' + hm + '.)', f); setMsgs(m => [...m, {who: 'sofia', text: reply || 'Pronto.'}]);}
     catch (e: any) {setErr(String(e?.message || 'Não deu para falar com a Sofia agora.')); setMsgs(m => m.slice(0, -1)); if (!custom) setText(t); if (f) {setFile(f); setPreview(img);}}
     finally {setBusy(false);}};
-  const W = 470, lw = lineW || 1, left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));
+  const W = 400, lw = lineW || 1, /* 0.3.347 (Pedro): janela bem menor */ left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));
   const shell = (inner: React.ReactNode, strip?: string) => <View ref={box} testID="sofia-add" style={{position: 'absolute', left, top: 29 + 44 + 22, width: W, zIndex: 12} as any}>
     <View style={{position: 'absolute', left: caret - 7, top: -7, width: 14, height: 14, backgroundColor: c.bg, transform: [{rotate: '45deg'}], borderRadius: 3, boxShadow: '-1px -1px 0 rgba(255,255,255,0.06)'} as any} />
     <View style={{backgroundColor: c.bg, borderRadius: 22, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.55)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
   </View>;
   const avatar = (s = 36) => <View style={{width: s, height: s, borderRadius: s / 2, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px ' + tint(c.accent, 0.4)} as any}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: s >= 30 ? 14 : 11}}>S</Text><View style={{position: 'absolute', right: 0, bottom: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#5FD3A2', boxShadow: '0 0 0 2px ' + c.bg} as any} /></View>;
   if (kind) return <MiniEditor kind={kind} at={when} setAt={setWhen} sofia={sofia} shell={shell} onBack={() => setKind(null)} onMore={k => onMore(k)} onSaved={onSaved} onAsk={async (q, label) => {setKind(null); setOpen(false); await send(q, label);}} />;
-  const roundBtn = (icon: IconName, label: string, run: () => void, filled = false, red = false) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered, pressed}: any) => ({width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: red ? '#F57A8C' : filled ? c.accent : hovered ? c.input : 'transparent', transform: [{scale: pressed ? 0.95 : 1}]})}><Icon name={icon} size={17} color={filled || red ? c.onAccent : c.muted} /></Pressable>;
-  return shell(<View style={{padding: 16}}>
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
-      {avatar()}
-      <View style={{flex: 1, minWidth: 0}}><Text style={[DISPLAY_ITALIC, {fontSize: 20, color: c.text}]}>Oi, {sofia.first}.</Text>
-        <Text style={{fontSize: 13, color: c.text, marginTop: 1}}>O que fica para as <Text style={{color: c.accent, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
-      <Pressable testID="sofia-add-more" accessibilityRole="button" accessibilityLabel={open ? 'Fechar os tipos' : 'Escolher e preencher eu mesmo'} onPress={() => setOpen(v => !v)} style={({hovered}: any) => ({width: 36, height: 36, marginRight: 5, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{rotate: open ? '-90deg' : '90deg'}], transitionProperty: 'transform', transitionDuration: '200ms'} as any)}><Icon name="chevron" size={16} color={c.muted} /></Pressable>
+  const roundBtn = (icon: IconName, label: string, run: () => void, filled = false, red = false) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered, pressed}: any) => ({width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: red ? '#F57A8C' : filled ? c.accent : hovered ? c.input : 'transparent', transform: [{scale: pressed ? 0.95 : 1}]})}><Icon name={icon} size={15} color={filled || red ? c.onAccent : c.muted} /></Pressable>;
+  return shell(<View style={{padding: 12}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+      {avatar(28)}
+      <View style={{flex: 1, minWidth: 0}}><Text style={[DISPLAY_ITALIC, {fontSize: 16, color: c.text}]}>Oi, {sofia.first}.</Text>
+        <Text style={{fontSize: 12, color: c.text, marginTop: 0}}>O que fica para as <Text style={{color: c.accent, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
+      <Pressable testID="sofia-add-more" accessibilityRole="button" accessibilityLabel={open ? 'Fechar os tipos' : 'Escolher e preencher eu mesmo'} onPress={() => setOpen(v => !v)} style={({hovered}: any) => ({width: 30, height: 30, marginRight: 4, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{rotate: open ? '-90deg' : '90deg'}], transitionProperty: 'transform', transitionDuration: '200ms'} as any)}><Icon name="chevron" size={16} color={c.muted} /></Pressable>
     </View>
-    {open ? <View style={{flexDirection: 'row', marginTop: 14}}>
-      {TYPE_INFO.map(t => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" onPress={() => setKind(t.id)} style={({hovered}: any) => ({flex: 1, alignItems: 'center', gap: 7, paddingTop: 9, paddingBottom: 8, borderRadius: 12, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>
-        <Icon name={t.icon} size={19} color={t.color} /><Text style={{fontSize: 11, color: c.muted}}>{t.label}</Text></Pressable>)}
+    {open ? <View style={{flexDirection: 'row', marginTop: 10}}>
+      {TYPE_INFO.map(t => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" onPress={() => setKind(t.id)} style={({hovered}: any) => ({flex: 1, alignItems: 'center', gap: 5, paddingTop: 7, paddingBottom: 6, borderRadius: 10, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>
+        <Icon name={t.icon} size={16} color={t.color} /><Text style={{fontSize: 10, color: c.muted}}>{t.label}</Text></Pressable>)}
     </View> : null}
     {msgs.length || busy ? <ScrollView ref={scroller} keyboardShouldPersistTaps="handled" style={{maxHeight: 300, marginTop: 14}} contentContainerStyle={{gap: 10}}>
       {msgs.map((m, i) => m.who === 'me' ? <View key={i} style={{alignSelf: 'flex-end', maxWidth: '80%' as any, backgroundColor: c.bubble, borderRadius: 18, borderBottomRightRadius: 6, padding: m.img ? 8 : 0, gap: 6, overflow: 'hidden'}}>
@@ -579,9 +580,9 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     </ScrollView> : null}
     {err ? <Text style={{fontSize: 12, color: c.danger, marginTop: 10}}>{err}</Text> : null}
     {preview || file ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12}}>{preview ? <Image source={{uri: preview}} style={{width: 40, height: 40, borderRadius: 8}} /> : <Icon name="clip" size={16} color={c.muted} />}<Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.muted}}>{file?.name || 'Foto'}</Text><Pressable accessibilityLabel="Tirar a foto" onPress={() => {setFile(null); setPreview('');}}><Icon name="close" size={14} color={c.muted} /></Pressable></View> : null}
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, marginTop: 14, paddingLeft: 14, paddingRight: 5, borderRadius: 23, backgroundColor: c.input, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)'} as any}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, marginTop: 10, paddingLeft: 12, paddingRight: 4, borderRadius: 19, backgroundColor: c.input, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)'} as any}>
       <TextInput testID="sofia-add-input" autoFocus value={text} onChangeText={setText} onSubmitEditing={() => void send()} placeholder={msgs.length ? 'Mais alguma coisa?' : listening ? 'Ouvindo…' : 'Escreva, fale ou mande uma foto…'} placeholderTextColor={c.muted} editable={!busy}
-        style={{flex: 1, fontSize: 14, color: c.text, outlineStyle: 'none', height: 44} as any} />
+        style={{flex: 1, fontSize: 13, color: c.text, outlineStyle: 'none', height: 36} as any} />
       {roundBtn('camera', 'Mandar uma foto', pickFile)}
       {text.trim() || file ? roundBtn('send', 'Enviar', () => void send(), true) : SR ? roundBtn('mic', listening ? 'Parar de ouvir' : 'Falar', mic, true, listening) : roundBtn('send', 'Enviar', () => void send(), true)}
     </View>
@@ -709,7 +710,7 @@ function NowBeacon({x, top}: {x: number; top: number}) {
  * ao passar o mouse na linha aparecem concluir e editar. Setinha aponta para a bolinha. Mantem arrastar pelo horario (⠿). */
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
-  const W = single ? 360 : 360, w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
+  const W = single ? 300 : 300, /* 0.3.347 (Pedro): janelas bem menores */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
   const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
   const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
   const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
@@ -720,21 +721,21 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
     <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
     <View style={{position: 'absolute', left: caret - 6, bottom: -6, width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
-  const chip = (icon: IconName, col: string, s = 28) => <View style={{width: s, height: s, borderRadius: 9, backgroundColor: tint(col, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={Math.round(s * 0.5)} color={col} /></View>;
+  const chip = (icon: IconName, col: string, s = 24) => <View style={{width: s, height: s, borderRadius: 9, backgroundColor: tint(col, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={Math.round(s * 0.5)} color={col} /></View>;
   const iconBtn = (icon: IconName, label: string, run: () => void) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} hitSlop={4} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name={icon} size={14} color={c.muted} /></Pressable>;
   // --- compromisso sozinho
   if (single) {const r = point.recs[0], col = colOf(r), o: any = r.original || {}, d = durOf(r), end = o.data?.end_at ? hhmm(new Date(o.data.end_at)) : '', loc = String(o.data?.location || '').trim(), text = desc(r);
     const mins = Math.round((new Date(r.date).getTime() - Date.now()) / 60000), rel = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';
-    return shell(<View style={{padding: 16, gap: 10}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>{chip('calendar', col, 30)}<View style={{flex: 1, minWidth: 0}}>
-        <Text numberOfLines={2} style={{fontSize: 16, fontWeight: '600', color: c.text}}>{r.title}</Text>
-        <Text style={{fontSize: 12, color: c.muted, marginTop: 2, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}{end ? ' – ' + end : ''}{d ? ' · ' + d : ''}{rel ? <Text style={{color: c.accent}}>{'  ' + rel}</Text> : null}</Text></View></View>
+    return shell(<View style={{padding: 12, gap: 8}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{chip('calendar', col, 24)}<View style={{flex: 1, minWidth: 0}}>
+        <Text numberOfLines={2} style={{fontSize: 14, fontWeight: '600', color: c.text}}>{r.title}</Text>
+        <Text style={{fontSize: 11, color: c.muted, marginTop: 1, fontVariant: ['tabular-nums']}}>{hhmm(new Date(r.date))}{end ? ' – ' + end : ''}{d ? ' · ' + d : ''}{rel ? <Text style={{color: c.accent}}>{'  ' + rel}</Text> : null}</Text></View></View>
       {loc ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 7}}><Icon name="mapPin" size={13} color={c.muted} /><Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.text}}>{loc}</Text></View> : null}
       {text && !text.includes(loc || '\u0000') ? <Text numberOfLines={2} style={{fontSize: 12, lineHeight: 18, color: c.muted}}>{text}</Text> : null}
-      {o.data?.calendar_provider === 'google' ? <View style={{flexDirection: 'row'}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 6, height: 24, paddingHorizontal: 9, borderRadius: 7, backgroundColor: c.input}}><Icon name="calendar" size={12} color={c.muted} /><Text style={{fontSize: 11, color: c.text}}>Google Agenda</Text></View></View> : null}
-      <View style={{height: 1, backgroundColor: c.line, marginHorizontal: -16, marginTop: 2}} />
+      {o.data?.calendar_provider === 'google' ? <View style={{flexDirection: 'row'}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 5, height: 22, paddingHorizontal: 8, borderRadius: 7, backgroundColor: c.input}}><Icon name="calendar" size={11} color={c.muted} /><Text style={{fontSize: 11, color: c.text}}>Google Agenda</Text></View></View> : null}
+      <View style={{height: 1, backgroundColor: c.line, marginHorizontal: -12, marginTop: 0}} />
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-        <Pressable accessibilityRole="button" onPress={() => {onClose(); actions.onEdit(r);}} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 12, borderRadius: 9, backgroundColor: hovered ? c.line : c.input, transform: [{scale: pressed ? 0.97 : 1}]})}><Icon name="edit" size={13} color={c.text} /><Text style={{fontSize: 12, fontWeight: '600', color: c.text}}>Editar</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => {onClose(); actions.onEdit(r);}} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 10, borderRadius: 8, backgroundColor: hovered ? c.line : c.input, transform: [{scale: pressed ? 0.97 : 1}]})}><Icon name="edit" size={12} color={c.text} /><Text style={{fontSize: 12, fontWeight: '600', color: c.text}}>Editar</Text></Pressable>
         {onGrab ? null : null}
       </View>
     </View>, col);}
@@ -743,11 +744,11 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const total = point.recs.length + point.marks.length, imp = point.recs.filter(r => urgOf(r) === 3).length;
   const firstAt = point.recs[0] ? new Date(point.recs[0].date) : point.marks[0]?.at;
   const Row = ({k, color, icon, time, title, meta, done, check, onEdit, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
-    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, paddingHorizontal: 10, marginHorizontal: 6, borderRadius: 11, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
+    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: 4, borderRadius: 10, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
       <View style={{width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: color, opacity: done ? 0.4 : 1}} />
-      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={{width: 28, height: 28, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{({hovered: h}: any) => <View style={{width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: done || h ? color : tint(color, 0.7), backgroundColor: done ? color : h ? tint(color, 0.18) : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{done || h ? <Icon name="check" size={12} color={done ? c.bg : color} /> : null}</View>}</Pressable> : chip(icon, color)} {/* 0.3.345 (Pedro): tarefa tem a bolinha de tique - vazia, ao passar o mouse mostra o tique; feita fica cheia com o tique */}
+      {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={{width: 24, height: 24, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{({hovered: h}: any) => <View style={{width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: done || h ? color : tint(color, 0.7), backgroundColor: done ? color : h ? tint(color, 0.18) : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{done || h ? <Icon name="check" size={12} color={done ? c.bg : color} /> : null}</View>}</Pressable> : chip(icon, color)} {/* 0.3.345 (Pedro): tarefa tem a bolinha de tique - vazia, ao passar o mouse mostra o tique; feita fica cheia com o tique */}
       <View style={{flex: 1, minWidth: 0}}>
-        <Text numberOfLines={1} style={{fontSize: 14, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
+        <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
         {meta ? <Text numberOfLines={1} style={{fontSize: 11, color: c.muted, marginTop: 1}}>{meta.split(' · ').map((part, n) => <Text key={n} style={{color: part === 'Importante' ? IMPORTANT_RED : c.muted}}>{(n ? ' · ' : '') + part}</Text>)}</Text> : null}
       </View>
       {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
@@ -757,8 +758,8 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
     </>}</Pressable>;
   const many = total > 1;
   return shell(<View style={{paddingVertical: 6}}>
-    {many ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4}}>
-      <Text style={{fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums']}}>{firstAt ? hhmm(firstAt) : ''}</Text><Text style={{fontSize: 12, color: c.muted}}>{total} itens</Text>
+    {many ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2}}>
+      <Text style={{fontSize: 14, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums']}}>{firstAt ? hhmm(firstAt) : ''}</Text><Text style={{fontSize: 12, color: c.muted}}>{total} itens</Text>
       <View style={{flex: 1}} />{imp ? <View style={{borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: tint(IMPORTANT_RED, 0.16)}}><Text style={{fontSize: 11, color: IMPORTANT_RED}}>{imp} importante{imp > 1 ? 's' : ''}</Text></View> : null}
     </View> : null}
     {recs.map((r, n) => Row({k: r.id + n, first: n === 0, color: colOf(r), icon: iconOf(r), time: hhmm(new Date(r.date)), title: r.title, meta: metaOf(r) + (desc(r) && !many ? ' · ' + desc(r) : ''), done: r.isTask ? (r.original as any)?.state === 'done' : false,
