@@ -31,6 +31,9 @@ const isOut = (x: {step: number; needs: string; delivered: boolean}) => !x.deliv
 /** 0.3.332: urgencia do item (importante 3 > media 2 > leve 1 > sem 0) - o mais urgente manda no miolo da bolinha agrupada */
 const urgOf = (r: DayRecord) => {const o: any = r.original || {}; const v = o.data?.priority_level ?? o.priority_level; return v === 'important' ? 3 : v === 'medium' ? 2 : v === 'light' ? 1 : 0;};
 const LIME = '#C3DC82', IMPORTANT_RED = '#D94B57';
+/** 0.3.335 (Pedro: "naturaliza mais o degrade"): curva suave para o fundo dos periodos - nasce devagar em cima (sem borda),
+ * chega ao tom cheio logo abaixo e vai sumindo em curva (smoothstep) ate a linha, sem degraus */
+const SOFT_FADE: [number, number][] = Array.from({length: 26}, (_, k) => {const t = k / 25; return [Math.round(t * 100), Math.max(0, Math.pow(1 - t, 1.15))];}); // 0.3.335 (Pedro): degrade bem longo, quase reto, sumindo aos poucos ate abaixo da linha
 const colorOf = (r: DayRecord, accent: string) => {const o: any = r.original || {}; return agendaPriority({data: {priority_level: o.data?.priority_level ?? o.priority_level, calendar_id: o.data?.calendar_id}} as any).color || accent;};
 /** hora (hoje) ou dia e hora (outros dias) */
 const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(), tm = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); const t = timed(r) ? hhmm(d) : ''; if (d.toDateString() === n.toDateString()) return t || 'hoje'; if (d.toDateString() === tm.toDateString()) return 'amanhã' + (t ? ' ' + t : ''); return d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) + (t ? ' ' + t : '');};
@@ -189,11 +192,15 @@ export function HomeBrief(p: HomeBriefProps) {
   if (important.length) actions.push({label: important.length === 1 ? 'Ver a tarefa' : 'Ver as ' + important.length + ' tarefas', run: p.onOpenTasks});
   if (low.length) actions.push({label: 'Ver ' + (low.length === 1 ? 'o ' + low[0].title : 'os produtos'), run: p.onOpenMonitoring});
 
-  // 0.3.332: placar do dia - tarefas de hoje e doses da Rotina de hoje
-  const score = useMemo(() => {const today = new Date().toDateString(); let done = 0, total = 0;
-    for (const r of timelineItems) if (r.isTask && new Date(r.date).toDateString() === today) {total++; if ((r.original as any)?.state === 'done') done++;}
-    try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(new Date()))) {total++; if (ds.taken) done++;}} catch {/* sem rotina */}
-    return {done, total};}, [timelineItems, p.data.capsules]);
+  // 0.3.332/0.3.335: placar do dia mostrado na linha (hoje, amanha...) - tarefas do dia e doses da Rotina do dia
+  const [viewDay, setViewDay] = useState(0), dayNav = useRef<{go: (d: number) => void} | null>(null);
+  const shownDay = useMemo(() => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + viewDay); return d;}, [viewDay]);
+  const score = useMemo(() => {const key = shownDay.toDateString(); let done = 0, total = 0;
+    for (const r of timelineItems) if (r.isTask && new Date(r.date).toDateString() === key) {total++; if ((r.original as any)?.state === 'done') done++;}
+    try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(shownDay))) {total++; if (ds.taken) done++;}} catch {/* sem rotina */}
+    return {done, total};}, [timelineItems, p.data.capsules, shownDay]);
+  const dayWord = viewDay === 0 ? 'Hoje' : viewDay === 1 ? 'Amanhã' : shownDay.toLocaleDateString('pt-BR', {weekday: 'long'}).replace(/^./, ch => ch.toUpperCase()).replace('-feira', '');
+  const dayDate = shownDay.toLocaleDateString('pt-BR', {day: 'numeric', month: 'long'});
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   return <View ref={root} style={{gap: 12}}>
     <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
@@ -201,12 +208,19 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
         <View style={{flex: 1}} />
-        {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>Hoje · <Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
+        {/* 0.3.335: dia no meio do cabecalho, com setas para o dia anterior/seguinte (clicar no dia volta para hoje) */}
+        <View testID="day-nav" style={{position: 'absolute', left: '50%' as any, top: 0, bottom: 0, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 4} as any}>
+          <Pressable testID="day-prev" accessibilityRole="button" accessibilityLabel="Dia anterior" disabled={viewDay <= 0} onPress={() => dayNav.current?.go(viewDay - 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay <= 0 ? 0.3 : 1, backgroundColor: hovered && viewDay > 0 ? c.input : 'transparent', transform: [{rotate: '180deg'}]})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
+          <Pressable testID="day-label" accessibilityRole="button" accessibilityLabel="Voltar para hoje" onPress={() => dayNav.current?.go(0)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}>
+            <Text style={{fontSize: 14, fontWeight: '600', color: viewDay === 0 ? c.accent : c.text}}>{dayWord}</Text><Text style={{fontSize: 13, color: c.muted}}>{dayDate}</Text></Pressable>
+          <Pressable testID="day-next" accessibilityRole="button" accessibilityLabel="Próximo dia" disabled={viewDay >= 2} onPress={() => dayNav.current?.go(viewDay + 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay >= 2 ? 0.3 : 1, backgroundColor: hovered && viewDay < 2 ? c.input : 'transparent'})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
+        </View>
+        {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>{dayWord} · <Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
       {/* 0.3.318/0.3.331 (Pedro): clicar fora - em qualquer lugar, inclusive na barra lateral - ou Esc fecha os ajustes (useClickOutside) */}
       {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
-      <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
+      <Timeline nav={dayNav} onDay={setViewDay} items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
         actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
     </View>
@@ -259,7 +273,7 @@ const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) |
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
-function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions}) {
+function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions; nav?: React.MutableRefObject<{go: (d: number) => void} | null>; onDay?: (d: number) => void}) {
   const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null), lineBox = useRef<View>(null);
   // 0.3.333 (aprovado por foto): Ctrl + rodinha aproxima a linha (ate 4 h na tela) e afasta de volta ate o dia inteiro (16 h)
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
@@ -285,6 +299,10 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
   const nowX = pos(new Date());
+  // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
+  const viewDay = Math.max(0, Math.min(2, Math.floor((start + SPAN / 2) / 24)));
+  useEffect(() => {onDay?.(viewDay);}, [viewDay]);
+  if (nav) nav.current = {go: (d: number) => {const dd = Math.max(0, Math.min(2, d)); setPin(''); setHover(''); glide(dd * 24 + DAY_START, 520);}};
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -353,7 +371,7 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   };
   const dragLabel = (fx: number) => {const d = snapDate(fx), dd = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - day0) / 864e5);
     return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : dd === -1 ? 'ontem ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hhmm(d);};
-  const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24); return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + String(d.getHours()).padStart(2, '0') + ':00';};
+  const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24), hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); return d.getHours() === 0 && dd > 0 ? (dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hh : hh;}; // 0.3.335: o dia aparece no cabecalho; na escala so a hora
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.data?.message || o.content || o.data?.location || '').trim();};
   // rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so na previa
   // 0.3.310 (tela grande): o rotulo cresce com o espaco de cada hora (150 a 230 px), para o nome nao cortar a toa
@@ -392,13 +410,16 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
       else if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && (actions.sofia || actions.onAddAt)) {e.preventDefault(); const now = new Date(), fx = Math.max(0.02, Math.min(0.98, pos(now))); setPin(''); setHover(''); setAdding({fx, at: new Date(Math.ceil(now.getTime() / 300000) * 300000)});}
       else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
-  return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 12, height: 56 + OFF}}>
+  return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF}}>
    <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
     {Array.from({length: Math.floor(SPAN) + 2}, (_, k) => Math.ceil(start) + k).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1) return null; const hd = ((h % 24) + 24) % 24, div = hd === 12 || hd === 18, major = hd % 4 === 3, ht = div ? 12 : major ? 14 : 8;
       return <View key={'t' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - ht / 2, width: div ? 1.5 : 1, height: ht, marginLeft: div ? -0.75 : -0.5, borderRadius: 1, backgroundColor: div ? 'rgba(255,255,255,0.2)' : major ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)'}} />;})}
     {SPAN <= 7 ? Array.from({length: Math.ceil(SPAN * 4) + 4}, (_, k) => Math.ceil(start * 4) / 4 + k / 4).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1 || Math.abs(h - Math.round(h)) < 0.01) return null; return <View key={'q' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - 3, width: 1, height: 6, marginLeft: -0.5, backgroundColor: 'rgba(255,255,255,0.05)'}} />;}) : null}
+    {/* 0.3.335 (Pedro: "a cor que divide manha, tarde e noite quase nao aparece"): faixa de fundo de cada periodo, visivel */}
+    {[0, 24, 48].flatMap(d => [[0, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi <= lo) return null; const rgb = k === 'm' ? '255,196,120' : k === 't' ? '195,220,130' : '140,165,255';
+      return <View key={'f' + a} pointerEvents="none" style={{position: 'absolute', left: `calc(${((lo - start) / SPAN) * 100}% + ${lo === a ? 1.5 : 0}px)` as any, width: `calc(${((hi - lo) / SPAN) * 100}% - ${(lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)}px)` as any, top: -22, height: 29 + OFF + 22 + 22, borderTopLeftRadius: lo === a ? 10 : 0, borderTopRightRadius: hi === b ? 10 : 0, backgroundImage: `linear-gradient(180deg, ${SOFT_FADE.map(([pc, f]) => `rgba(${rgb},${(0.038 * f).toFixed(4)}) ${pc}%`).join(', ')})`} as any} />;})}
     {/* simbolos de manha, tarde e noite no meio de cada periodo visivel */}
     {[0, 24, 48].flatMap(d => [[6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi - lo < 0.8) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (((lo + hi) / 2 - start) / SPAN * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
@@ -443,14 +464,14 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
           return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
-            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', opacity: past ? 0.6 : 1} as any}>
+            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{p.recs.length}</Text></View>
           </Pressable>;}
         const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
-          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, opacity: past ? 0.55 : 1} as any} />;
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface} as any} />;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${lw / 2}px), calc(100% - ${lw}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]) * (p.recs.every(x => new Date(x.date).getTime() < Date.now()) && !(next && p.recs.includes(next)) ? 0.65 : 1), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${lw / 2}px), calc(100% - ${lw}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 12, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
       </View>;})())}
     </View>
