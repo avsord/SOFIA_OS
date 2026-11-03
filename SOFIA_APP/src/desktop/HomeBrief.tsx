@@ -324,6 +324,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (wS) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * wS < 20)) mp.x += 22 / wS;}
   const all = [...points, ...mpoints];
+  const nearPoint = (fx: number) => {const W0 = wS || w || 1; let best: Point | null = null, bd = 26; for (const q of all) {if (q.x < -0.01 || q.x > 1.01) continue; const dpx = Math.abs(q.x - fx) * W0; if (dpx < bd) {bd = dpx; best = q;}} return best;};
   useEffect(() => {setSettle(o => {const keys = Object.keys(o); if (!keys.length) return o; let ch = false; const n = {...o};
     for (const k of keys) {const pt = all.find(q => q.key === k); if (!pt || Math.abs(pt.x * SPAN + startRef.current - o[k]) < 0.05) {delete n[k]; ch = true;}} return ch ? n : o;});}, [items, marks]);
   useEffect(() => {
@@ -338,6 +339,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   }, []);
   useEffect(() => {if (typeof window === 'undefined' || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
+  // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
+  // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
+  const [nearKey, setNearKey] = useState('');
   const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
   // 0.3.317 (Pedro): arrastar para frente ou para tras. A bolinha segue o mouse em tempo real (sem cortes), a hora aparece
   // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
@@ -436,9 +440,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {[0, 24, 48].flatMap(d => [[6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi - lo < 0.8) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (((lo + hi) / 2 - start) / SPAN * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {actions.onAddAt ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
-      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
-      {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
-      style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy', outlineStyle: 'none'} as any} /> : null}
+      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
+        if (near) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
+      {...({onMouseMove: (e: any) => {if (dragRef.current || adding) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx);
+        if (near) {setGuide(null); if (hover !== near.key) enter(near.key); setNearKey(near.key);} else {if (nearKey) {leave(); setNearKey('');} setGuide(fx);}}, onMouseLeave: () => {setGuide(null); if (nearKey) {leave(); setNearKey('');}}} as any)}
+      style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
       <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
@@ -736,7 +742,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const total = point.recs.length + point.marks.length, imp = point.recs.filter(r => urgOf(r) === 3).length;
   const firstAt = point.recs[0] ? new Date(point.recs[0].date) : point.marks[0]?.at;
   const Row = ({k, color, icon, time, title, meta, done, check, onEdit, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
-    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, paddingHorizontal: 10, marginHorizontal: 6, borderRadius: 11, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>{({hovered}: any) => <>
+    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, paddingHorizontal: 10, marginHorizontal: 6, borderRadius: 11, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
       <View style={{width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: color, opacity: done ? 0.4 : 1}} />
       {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={({hovered: h}: any) => ({width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: done ? tint(color, 0.3) : h ? tint(color, 0.24) : tint(color, 0.14)})}><Icon name={done ? 'checkCircle' : icon} size={14} color={color} /></Pressable> : chip(icon, color)}
       <View style={{flex: 1, minWidth: 0}}>
