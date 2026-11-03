@@ -3,7 +3,7 @@
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions} from 'react-native';
+import {Animated, Easing, Image, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions} from 'react-native';
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
@@ -19,6 +19,7 @@ import {agendaPriority, isHoliday, HOLIDAY_COLOR} from '../lib/agenda-priority';
 import {useReducedMotion} from '../lib/motion';
 import {Icon, type IconName} from '../components/Icon';
 import Svg, {Path, Circle} from 'react-native-svg';
+import {DISPLAY_ITALIC} from '../lib/sofia-font';
 
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const brl = (v: number) => v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: v >= 1000 ? 0 : 2});
@@ -43,6 +44,7 @@ export type HomeBriefProps = {
   onMarkAction?: (m: TimeMark) => void;
   onMove?: (moves: Move[]) => void;
   onAddAt?: (kind: AddKind, at: Date) => void;
+  sofia?: SofiaBridge;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -206,7 +208,7 @@ export function HomeBrief(p: HomeBriefProps) {
       {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt}} />
+        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
     </View>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -225,7 +227,7 @@ export function HomeBrief(p: HomeBriefProps) {
 /** Linha do tempo: 16 horas por vez, comecando nas 7h de hoje. A rodinha do mouse em cima dela anda pelas horas e
  * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
-const SPAN = 16, REMIND = '#7FD1E8'; // cor dos lembretes na linha do tempo
+const SPAN_FULL = 16, SPAN_MIN = 4, REMIND = '#7FD1E8'; // cor dos lembretes na linha do tempo
 type BillMark = {id: string; title: string; date: string; amount: number; late: boolean};
 /** 0.3.311 (Pedro): cada area na linha do tempo do seu jeito. kind: bill (conta a pagar, losango ambar "$"), income
  * (receita a receber, losango verde "+"), invoice (fatura do cartao, losango lilas), package (status de encomenda,
@@ -240,12 +242,16 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void};
+export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
 /** 0.3.331 (Pedro): clicar num lugar vazio da linha do tempo abre um seletor pequeno; a escolha abre o editor da propria
  * funcao (compromisso, tarefa, lembrete, Rotina) ja com o horario do clique. */
 export type AddKind = 'event' | 'task' | 'reminder' | 'routine';
+/** 0.3.333 (aprovado por foto): o que o mini editor preso ao ponto grava (o Inicio grava como o app grava cada um). */
+export type MiniSave = {kind: AddKind; title: string; at: Date; minutes?: number; notify?: boolean; google?: boolean; priority?: string; repeat?: string; message?: string; rtype?: string; dose?: string; daily?: boolean};
+/** Ponte do Inicio com a Sofia: conversar (texto e foto) e gravar pelo mini editor; save devolve o "Desfazer". */
+export type SofiaBridge = {first: string; ask: (text: string, file?: any) => Promise<string>; save: (x: MiniSave) => Promise<(() => Promise<void>) | void>};
 /** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
 export type Move = {t: MoveTarget; to: Date};
 const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
@@ -255,9 +261,11 @@ const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
 function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions}) {
   const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null), lineBox = useRef<View>(null);
+  // 0.3.333 (aprovado por foto): Ctrl + rodinha aproxima a linha (ate 4 h na tela) e afasta de volta ate o dia inteiro (16 h)
+  const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(DAY_START), target = useRef(DAY_START), raf = useRef<any>(null);
-  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - SPAN, v));
+  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - spanRef.current, v));
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
   const tween = useRef({from: DAY_START, t0: 0, ms: 380, home: false});
@@ -290,7 +298,11 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     for (const k of keys) {const pt = all.find(q => q.key === k); if (!pt || Math.abs(pt.x * SPAN + startRef.current - o[k]) < 0.05) {delete n[k]; ch = true;}} return ch ? n : o;});}, [items, marks]);
   useEffect(() => {
     const el: any = box.current; if (!el || !el.addEventListener) return;
-    const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return; const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; setPin(''); setHover(''); glide(target.current + d / 40);};
+    const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return;
+      if (e.ctrlKey || e.metaKey) {const r = (lineBox.current as any)?.getBoundingClientRect?.(); if (!r?.width) return; const fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), at = startRef.current + fx * spanRef.current;
+        const ns = Math.max(SPAN_MIN, Math.min(SPAN_FULL, spanRef.current * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); if (Math.abs(ns - spanRef.current) < 0.01) return; spanRef.current = ns; setSpanState(ns);
+        const st = clampStart(at - fx * ns); if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} startRef.current = st; target.current = st; setStartRaw(st); setPin(''); setHover(''); return;}
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; setPin(''); setHover(''); glide(target.current + d / 40 * spanRef.current / SPAN_FULL);};
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
@@ -299,11 +311,14 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   const leave = () => {clearTimeout(hide.current); hide.current = setTimeout(() => setHover(''), 180);};
   // 0.3.317 (Pedro): arrastar para frente ou para tras. A bolinha segue o mouse em tempo real (sem cortes), a hora aparece
   // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
-  type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string};
+  type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string; snap?: string};
   const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
   const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
+  // confirmacao depois de adicionar pelo mini editor ("Reuniao adicionada as 21:30 · Desfazer"), some em 6 s
+  const [toast, setToast] = useState<{text: string; undo?: () => Promise<void>} | null>(null), toastT = useRef<any>(null);
+  const showToast = (text: string, undo?: (() => Promise<void>) | void) => {setToast({text, undo: undo || undefined}); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 6000);};
   const fxAt = (pageX: number) => {const el: any = lineBox.current; const r = el?.getBoundingClientRect?.(); return r && r.width ? Math.max(0, Math.min(1, (pageX - r.left) / r.width)) : null;};
   const hourAt = (fx: number) => startRef.current + fx * SPAN;
   const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
@@ -317,7 +332,12 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
       document.body.style.userSelect = ''; document.body.style.cursor = ''; const d = dragRef.current; dragRef.current = null; setDrag(null); return d;};
     const move = (ev: PointerEvent) => {lastX = ev.pageX; const live = dragRef.current?.live || Math.abs(ev.pageX - sx) > 4; if (!live) return;
       if (!dragRef.current?.live) {setPin(''); setHover(''); document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing';}
-      const d = {key, items, fx: fxOf(ev.pageX), live: true, color}; dragRef.current = d; setDrag(d);
+      // 0.3.333 (aprovado por foto): ima - perto (ate 10 min) do comeco ou do fim de outro item, encosta nele e diz o motivo
+      let fx = fxOf(ev.pageX), snap = ''; const ids = new Set(items.map(x => (x.t as any).rec?.id).filter(Boolean)), h = startRef.current + fx * spanRef.current; let best = 10 / 60;
+      for (const r of recsRef.current) {if (ids.has(r.id)) continue; const a = (new Date(r.date).getTime() - day0) / 3600000, endIso = (r.original as any)?.data?.end_at, b = endIso ? (new Date(endIso).getTime() - day0) / 3600000 : null;
+        if (b != null && Math.abs(h - b) < best) {best = Math.abs(h - b); fx = (b - startRef.current) / spanRef.current; const m = Math.round((b - a) * 60); snap = 'logo depois de ' + r.title + (m > 0 ? ' (' + (m >= 60 ? (m / 60).toLocaleString('pt-BR', {maximumFractionDigits: 1}) + ' h' : m + ' min') + ')' : '');}
+        else if (Math.abs(h - a) < best) {best = Math.abs(h - a); fx = (a - startRef.current) / spanRef.current; snap = (r.isTask ? 'junto com ' : 'no começo de ') + r.title;}}
+      const d = {key, items, fx, live: true, color, snap}; dragRef.current = d; setDrag(d);
       const px = ev.pageX - rect.left; edge = px < 28 ? -1 : px > rect.width - 28 ? 1 : 0; if (edge && !edgeRaf) edgeRaf = requestAnimationFrame(tickEdge);};
     // 0.3.318 (Pedro): Esc cancela o arrastar - tudo volta para onde estava, nada e gravado
     const esc = (ev: KeyboardEvent) => {if (ev.key !== 'Escape') return; ev.preventDefault(); ev.stopPropagation(); const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);}};
@@ -361,12 +381,24 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
   useLayoutEffect(() => {const el: any = box.current, card = el?.closest?.('[data-testid="home-brief"]'); if (!el?.getBoundingClientRect || !card) return;
     const a = el.getBoundingClientRect(), b = card.getBoundingClientRect(), z = homeZoom(), k = uiScale();
     setBtnTop(Math.round(((b.top + b.height / 2) - a.top) / z - 12 * k) + 'px');}, [side, w]);
-  return <View ref={box} style={{marginTop: 12, height: 56 + OFF}}>
+  // 0.3.333 (aprovado): teclado com o mouse sobre a linha - setas andam entre os itens (abre a previa), Enter abre o item,
+  // N adiciona agora (abre a Sofia no horario de agora), Esc fecha
+  const overLine = useRef(false), kbIdx = useRef(-1);
+  useEffect(() => {if (typeof window === 'undefined') return;
+    const k = (e: KeyboardEvent) => {if (!overLine.current || adding || dragRef.current) return; const t = e.target as any; if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
+      const list = [...all].sort((a, b) => a.x - b.x).filter(q => q.x >= 0 && q.x <= 1);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {if (!list.length) return; e.preventDefault(); kbIdx.current = Math.max(0, Math.min(list.length - 1, kbIdx.current < 0 ? (e.key === 'ArrowRight' ? 0 : list.length - 1) : kbIdx.current + (e.key === 'ArrowRight' ? 1 : -1))); setPin(list[kbIdx.current].key); setHover(list[kbIdx.current].key);}
+      else if (e.key === 'Enter' && kbIdx.current >= 0 && list[kbIdx.current]) {e.preventDefault(); const q = list[kbIdx.current]; setPin(''); setHover(''); if (q.recs[0]) actions.onEdit(q.recs[0]); else if (q.marks[0] && actions.onMarkOpen) actions.onMarkOpen(q.marks[0]);}
+      else if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && (actions.sofia || actions.onAddAt)) {e.preventDefault(); const now = new Date(), fx = Math.max(0.02, Math.min(0.98, pos(now))); setPin(''); setHover(''); setAdding({fx, at: new Date(Math.ceil(now.getTime() / 300000) * 300000)});}
+      else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
+  return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 12, height: 56 + OFF}}>
    <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
     {Array.from({length: Math.floor(SPAN) + 2}, (_, k) => Math.ceil(start) + k).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1) return null; const hd = ((h % 24) + 24) % 24, div = hd === 12 || hd === 18, major = hd % 4 === 3, ht = div ? 12 : major ? 14 : 8;
       return <View key={'t' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - ht / 2, width: div ? 1.5 : 1, height: ht, marginLeft: div ? -0.75 : -0.5, borderRadius: 1, backgroundColor: div ? 'rgba(255,255,255,0.2)' : major ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)'}} />;})}
+    {SPAN <= 7 ? Array.from({length: Math.ceil(SPAN * 4) + 4}, (_, k) => Math.ceil(start * 4) / 4 + k / 4).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1 || Math.abs(h - Math.round(h)) < 0.01) return null; return <View key={'q' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - 3, width: 1, height: 6, marginLeft: -0.5, backgroundColor: 'rgba(255,255,255,0.05)'}} />;}) : null}
     {/* simbolos de manha, tarde e noite no meio de cada periodo visivel */}
     {[0, 24, 48].flatMap(d => [[6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi - lo < 0.8) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (((lo + hi) / 2 - start) / SPAN * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
@@ -428,16 +460,23 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
-    {Array.from({length: 6}, (_, k) => Math.ceil((start - 3) / 4) * 4 + 3 + k * 4).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 46)) return null;
+    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: 6}, (_, k) => Math.ceil((start - 3) / 4) * 4 + 3 + k * 4)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 46)) return null;
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
       <View style={{position: 'absolute', left: `calc(${drag.fx * 100}% - ${dpx(9)})` as any, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
-      <View style={{position: 'absolute', left: `clamp(0px, calc(${drag.fx * 100}% - 55px), calc(100% - 110px))` as any, top: OFF - 4, width: 110, alignItems: 'center'}}>
-        <Text style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{dragLabel(drag.fx)}</Text>
+      {drag.snap ? <View style={{position: 'absolute', left: `calc(${drag.fx * 100}% - 0.5px)` as any, top: 0, height: 29 + OFF + 12, width: 1, backgroundImage: 'repeating-linear-gradient(180deg, ' + tint(c.accent, 0.7) + ' 0 4px, transparent 4px 8px)'} as any} /> : null}
+      <View style={{position: 'absolute', left: `clamp(0px, calc(${drag.fx * 100}% - ${drag.snap ? 160 : 55}px), calc(100% - ${drag.snap ? 320 : 110}px))` as any, top: OFF - 4, width: drag.snap ? 320 : 110, alignItems: 'center'}}>
+        <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{dragLabel(drag.fx)}{drag.snap ? ' · ' + drag.snap : ''}</Text>
       </View>
     </View> : null}
-    {adding && actions.onAddAt ? <AddMenu fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
+    {adding ? <View pointerEvents="none" style={{position: 'absolute', left: `calc(${adding.fx * 100}% - 7px)` as any, top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: LIME, backgroundColor: c.surface, zIndex: 7}} /> : null}
+    {adding && actions.sofia ? <SofiaAdd lineW={wS || w} fx={adding.fx} at={adding.at} sofia={actions.sofia} onMore={k => {const at = adding.at; setAdding(null); actions.onAddAt?.(k, at);}} onSaved={(text, undo) => {setAdding(null); showToast(text, undo);}} onClose={() => setAdding(null)} />
+     : adding && actions.onAddAt ? <AddMenu fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
+    {toast ? <View testID="timeline-toast" style={{position: 'absolute', left: '50%' as any, top: 29 + OFF + 34, zIndex: 13, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
+      <Icon name="checkCircle" size={15} color="#5FD3A2" /><Text style={{fontSize: 13, color: c.text}}>{toast.text}</Text>
+      {toast.undo ? <Pressable accessibilityRole="button" onPress={() => {const u = toast.undo; setToast(null); void u?.();}}><Text style={{fontSize: 13, fontWeight: '600', color: c.accent}}>Desfazer</Text></Pressable> : null}
+    </View> : null}
     {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START, 520, true);}}
@@ -445,6 +484,129 @@ function Timeline({items, next, marks = [], op, actions}: {items: DayRecord[]; n
       {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
     </Pressable> : null}
   </View>;
+}
+
+/** 0.3.333 (aprovado por foto): ao clicar num lugar vazio da linha a Sofia te recebe ali mesmo - "Oi, Pedro. O que fica
+ * para as 21:30?" - com o campo (escrever, foto ou falar). A seta discreta abre os seis tipos (Compromisso, Tarefa,
+ * Lembrete, Rotina, Despesa, Receita); cada um abre o mini editor no mesmo cartao. Despesa e Receita vao pela Sofia (ela ja
+ * cria o lancamento em Financas com conta e categoria). Esc ou clique fora fecham. */
+type ChatMsg = {who: 'me' | 'sofia'; text: string; img?: string};
+const TYPE_INFO: {id: AddKind | 'expense' | 'income'; label: string; color: string; icon: IconName; title: string}[] = [
+  {id: 'event', label: 'Compromisso', color: '#8fb4ff', icon: 'calendar', title: 'Novo compromisso'}, {id: 'task', label: 'Tarefa', color: '#F5A0AE', icon: 'checklist', title: 'Nova tarefa'},
+  {id: 'reminder', label: 'Lembrete', color: '#7FD1E8', icon: 'bell', title: 'Novo lembrete'}, {id: 'routine', label: 'Rotina', color: '#5FD3C6', icon: 'capsule', title: 'Novo na Rotina'},
+  {id: 'expense', label: 'Despesa', color: '#F08A8A', icon: 'trendDown', title: 'Nova despesa'}, {id: 'income', label: 'Receita', color: '#5FD3A2', icon: 'trendUp', title: 'Nova receita'}];
+function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: number; fx: number; at: Date; sofia: SofiaBridge; onMore: (k: AddKind) => void; onSaved: (text: string, undo?: (() => Promise<void>) | void) => void; onClose: () => void}) {
+  const c = useTheme(), box = useRef<View>(null), [open, setOpen] = useState(false), [kind, setKind] = useState<(typeof TYPE_INFO)[number]['id'] | null>(null);
+  const [text, setText] = useState(''), [file, setFile] = useState<any>(null), [preview, setPreview] = useState(''), [msgs, setMsgs] = useState<ChatMsg[]>([]), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [listening, setListening] = useState(false);
+  const [when, setWhen] = useState(at), fileIn = useRef<any>(null), rec = useRef<any>(null), scroller = useRef<any>(null);
+  useClickOutside(box, onClose);
+  useEffect(() => {if (typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
+  useEffect(() => () => {if (preview) URL.revokeObjectURL(preview); try {rec.current?.stop();} catch {/* sem microfone */}}, []);
+  useEffect(() => {setTimeout(() => {const el = scroller.current as any; if (el?.scrollTo) el.scrollTo({y: 99999, animated: true});}, 30);}, [msgs.length, busy]);
+  const hm = hhmm(when), dayTxt = (() => {const d = new Date(when), n = new Date(); return d.toDateString() === n.toDateString() ? 'hoje' : d.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'numeric'});})();
+  const pickFile = () => {if (typeof document === 'undefined') return; if (!fileIn.current) {const el = document.createElement('input'); el.type = 'file'; el.accept = 'image/*,application/pdf'; el.onchange = () => {const f = el.files?.[0]; if (f) {setFile(f); setPreview(f.type.startsWith('image/') ? URL.createObjectURL(f) : '');} el.value = '';}; fileIn.current = el;} fileIn.current.click();};
+  const SR: any = typeof window !== 'undefined' ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
+  const mic = () => {if (!SR) return; if (listening) {try {rec.current?.stop();} catch {/* ja parou */} return;} const r = new SR(); r.lang = 'pt-BR'; r.interimResults = true; r.continuous = false; const base = text ? text + ' ' : '';
+    r.onresult = (e: any) => {let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setText(base + t);}; r.onend = () => setListening(false); r.onerror = () => setListening(false); rec.current = r; setListening(true); try {r.start();} catch {setListening(false);}};
+  const send = async (custom?: string, label?: string) => {const t = (custom ?? text).trim(); if (busy || (!t && !file)) return; const shown = label || t || (file ? 'Foto enviada' : ''), img = preview;
+    setMsgs(m => [...m, {who: 'me', text: shown, img}]); setText(''); setBusy(true); setErr(''); const f = file; setFile(null); setPreview('');
+    try {const reply = await sofia.ask((t || 'Veja este arquivo.') + '\n\n(Pedido pela linha do tempo do Início, para ' + dayTxt + ' às ' + hm + '.)', f); setMsgs(m => [...m, {who: 'sofia', text: reply || 'Pronto.'}]);}
+    catch (e: any) {setErr(String(e?.message || 'Não deu para falar com a Sofia agora.')); setMsgs(m => m.slice(0, -1)); if (!custom) setText(t); if (f) {setFile(f); setPreview(img);}}
+    finally {setBusy(false);}};
+  const W = 470, lw = lineW || 1, left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));
+  const shell = (inner: React.ReactNode, strip?: string) => <View ref={box} testID="sofia-add" style={{position: 'absolute', left, top: 29 + 44 + 22, width: W, zIndex: 12} as any}>
+    <View style={{position: 'absolute', left: caret - 7, top: -7, width: 14, height: 14, backgroundColor: c.bg, transform: [{rotate: '45deg'}], borderRadius: 3, boxShadow: '-1px -1px 0 rgba(255,255,255,0.06)'} as any} />
+    <View style={{backgroundColor: c.bg, borderRadius: 22, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.55)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
+  </View>;
+  const avatar = (s = 36) => <View style={{width: s, height: s, borderRadius: s / 2, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px ' + tint(c.accent, 0.4)} as any}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: s >= 30 ? 14 : 11}}>S</Text><View style={{position: 'absolute', right: 0, bottom: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#5FD3A2', boxShadow: '0 0 0 2px ' + c.bg} as any} /></View>;
+  if (kind) return <MiniEditor kind={kind} at={when} setAt={setWhen} sofia={sofia} shell={shell} onBack={() => setKind(null)} onMore={k => onMore(k)} onSaved={onSaved} onAsk={async (q, label) => {setKind(null); setOpen(false); await send(q, label);}} />;
+  const roundBtn = (icon: IconName, label: string, run: () => void, filled = false, red = false) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered, pressed}: any) => ({width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: red ? '#F57A8C' : filled ? c.accent : hovered ? c.input : 'transparent', transform: [{scale: pressed ? 0.95 : 1}]})}><Icon name={icon} size={17} color={filled || red ? c.onAccent : c.muted} /></Pressable>;
+  return shell(<View style={{padding: 16}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+      {avatar()}
+      <View style={{flex: 1, minWidth: 0}}><Text style={[DISPLAY_ITALIC, {fontSize: 20, color: c.text}]}>Oi, {sofia.first}.</Text>
+        <Text style={{fontSize: 13, color: c.text, marginTop: 1}}>O que fica para as <Text style={{color: LIME, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
+      <Pressable testID="sofia-add-more" accessibilityRole="button" accessibilityLabel={open ? 'Fechar os tipos' : 'Escolher e preencher eu mesmo'} onPress={() => setOpen(v => !v)} style={({hovered}: any) => ({width: 36, height: 36, marginRight: 5, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{rotate: open ? '-90deg' : '90deg'}], transitionProperty: 'transform', transitionDuration: '200ms'} as any)}><Icon name="chevron" size={16} color={c.muted} /></Pressable>
+    </View>
+    {open ? <View style={{flexDirection: 'row', marginTop: 14}}>
+      {TYPE_INFO.map(t => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" onPress={() => setKind(t.id)} style={({hovered}: any) => ({flex: 1, alignItems: 'center', gap: 7, paddingTop: 9, paddingBottom: 8, borderRadius: 12, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>
+        <Icon name={t.icon} size={19} color={t.color} /><Text style={{fontSize: 11, color: c.muted}}>{t.label}</Text></Pressable>)}
+    </View> : null}
+    {msgs.length || busy ? <ScrollView ref={scroller} keyboardShouldPersistTaps="handled" style={{maxHeight: 300, marginTop: 14}} contentContainerStyle={{gap: 10}}>
+      {msgs.map((m, i) => m.who === 'me' ? <View key={i} style={{alignSelf: 'flex-end', maxWidth: '80%' as any, backgroundColor: c.bubble, borderRadius: 18, borderBottomRightRadius: 6, padding: m.img ? 8 : 0, gap: 6, overflow: 'hidden'}}>
+          {m.img ? <Image source={{uri: m.img}} style={{width: 150, height: 100, borderRadius: 12}} resizeMode="cover" /> : null}<Text style={{fontSize: 13, color: c.text, paddingHorizontal: m.img ? 4 : 12, paddingVertical: m.img ? 0 : 8}}>{m.text}</Text></View>
+        : <Text key={i} style={{fontSize: 14, lineHeight: 21, color: c.text, paddingHorizontal: 4}}>{m.text}</Text>)}
+      {busy ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4}}><View style={{flexDirection: 'row', gap: 4}}>{[1, 0.6, 0.3].map((o, i) => <View key={i} style={{width: 7, height: 7, borderRadius: 4, backgroundColor: c.accent, opacity: o}} />)}</View><Text style={{fontSize: 13, color: c.muted, fontStyle: 'italic'}}>{msgs[msgs.length - 1]?.img ? 'lendo a foto…' : 'pensando…'}</Text></View> : null}
+    </ScrollView> : null}
+    {err ? <Text style={{fontSize: 12, color: c.danger, marginTop: 10}}>{err}</Text> : null}
+    {preview || file ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12}}>{preview ? <Image source={{uri: preview}} style={{width: 40, height: 40, borderRadius: 8}} /> : <Icon name="clip" size={16} color={c.muted} />}<Text numberOfLines={1} style={{flex: 1, fontSize: 12, color: c.muted}}>{file?.name || 'Foto'}</Text><Pressable accessibilityLabel="Tirar a foto" onPress={() => {setFile(null); setPreview('');}}><Icon name="close" size={14} color={c.muted} /></Pressable></View> : null}
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, marginTop: 14, paddingLeft: 14, paddingRight: 5, borderRadius: 23, backgroundColor: c.input, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)'} as any}>
+      <TextInput testID="sofia-add-input" autoFocus value={text} onChangeText={setText} onSubmitEditing={() => void send()} placeholder={msgs.length ? 'Mais alguma coisa?' : listening ? 'Ouvindo…' : 'Escreva, fale ou mande uma foto…'} placeholderTextColor={c.muted} editable={!busy}
+        style={{flex: 1, fontSize: 14, color: c.text, outlineStyle: 'none', height: 44} as any} />
+      {roundBtn('camera', 'Mandar uma foto', pickFile)}
+      {text.trim() || file ? roundBtn('send', 'Enviar', () => void send(), true) : SR ? roundBtn('mic', listening ? 'Parar de ouvir' : 'Falar', mic, true, listening) : roundBtn('send', 'Enviar', () => void send(), true)}
+    </View>
+  </View>);
+}
+/** Mini editor de cada tipo, no mesmo cartao (faixa da cor, nome grande, horario com ‹ ›, campos do tipo, "Mais opcoes ↗"
+ * para o editor completo e "Adicionar ↵"). Despesa e Receita sao pedidas a Sofia, que cria o lancamento com conta e categoria. */
+function MiniEditor({kind, at, setAt, sofia, shell, onBack, onMore, onSaved, onAsk}: {kind: (typeof TYPE_INFO)[number]['id']; at: Date; setAt: (d: Date) => void; sofia: SofiaBridge; shell: (inner: React.ReactNode, strip?: string) => React.ReactNode; onBack: () => void; onMore: (k: AddKind) => void; onSaved: (text: string, undo?: (() => Promise<void>) | void) => void; onAsk: (q: string, label?: string) => Promise<void>}) {
+  const c = useTheme(), info = TYPE_INFO.find(t => t.id === kind)!, money = kind === 'expense' || kind === 'income';
+  const [title, setTitle] = useState(''), [minutes, setMinutes] = useState(60), [notify, setNotify] = useState(true), [google, setGoogle] = useState(true), [priority, setPriority] = useState('none');
+  const [repeat, setRepeat] = useState('none'), [message, setMessage] = useState(''), [rtype, setRtype] = useState('capsula'), [dose, setDose] = useState(''), [daily, setDaily] = useState(true);
+  const [amount, setAmount] = useState(''), [cat, setCat] = useState(kind === 'income' ? 'Trabalho' : 'Alimentação'), [paid, setPaid] = useState(true), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const chip = (on: boolean, label: string, press: () => void, col = info.color) => <Pressable key={label} accessibilityRole="button" accessibilityState={{selected: on}} onPress={press} style={({hovered}: any) => ({height: 28, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center', backgroundColor: on ? tint(col, 0.2) : hovered ? c.input : 'transparent', boxShadow: 'inset 0 0 0 1px ' + (on ? tint(col, 0.55) : c.line)} as any)}><Text style={{fontSize: 12, fontWeight: on ? '600' : '400', color: on ? col : c.text}}>{label}</Text></Pressable>;
+  const toggle = (on: boolean, label: string, press: () => void) => <Pressable accessibilityRole="switch" accessibilityState={{checked: on}} onPress={press} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><View style={{width: 34, height: 20, borderRadius: 10, backgroundColor: on ? c.accent : c.line, justifyContent: 'center', paddingHorizontal: 3}}><View style={{width: 14, height: 14, borderRadius: 7, backgroundColor: on ? c.onAccent : c.muted, alignSelf: on ? 'flex-end' : 'flex-start'}} /></View><Text style={{fontSize: 12, color: c.text}}>{label}</Text></Pressable>;
+  const lbl = (t: string) => <Text style={{fontSize: 10, letterSpacing: 1, color: c.muted, fontWeight: '600', marginBottom: 6}}>{t}</Text>;
+  const shift = (m: number) => setAt(new Date(at.getTime() + m * 60000));
+  const dayTxt = (() => {const n = new Date(); return at.toDateString() === n.toDateString() ? 'Hoje' : at.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'numeric'});})();
+  const timePill = <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 10, borderRadius: 9, backgroundColor: c.input}}><Icon name="calendar" size={13} color={c.muted} /><Text style={{fontSize: 12, color: c.text}}>{dayTxt}</Text></View>
+    <View style={{flexDirection: 'row', alignItems: 'center', height: 30, borderRadius: 9, backgroundColor: c.input}}>
+      <Pressable accessibilityLabel="15 minutos antes" onPress={() => shift(-15)} style={{paddingHorizontal: 8, height: 30, justifyContent: 'center'}}><Text style={{color: c.muted}}>‹</Text></Pressable>
+      <Text style={{fontSize: 12, fontWeight: '600', color: info.color, fontVariant: ['tabular-nums']}}>{hhmm(at)}{kind === 'event' ? ' → ' + hhmm(new Date(at.getTime() + minutes * 60000)) : ''}</Text>
+      <Pressable accessibilityLabel="15 minutos depois" onPress={() => shift(15)} style={{paddingHorizontal: 8, height: 30, justifyContent: 'center'}}><Text style={{color: c.muted}}>›</Text></Pressable></View>
+  </View>;
+  const save = async () => {if (busy) return; setErr('');
+    if (money) {const v = Number(String(amount).replace(/\./g, '').replace(',', '.')); if (!(v > 0)) {setErr('Digite o valor.'); return;}
+      const brl = v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+      setBusy(true); try {await onAsk('Registre uma ' + (kind === 'expense' ? 'despesa' : 'receita') + ' de ' + brl + (title.trim() ? ' — ' + title.trim() : '') + ', categoria ' + cat + ', ' + (paid ? (kind === 'expense' ? 'já paga' : 'já recebida') : (kind === 'expense' ? 'a pagar' : 'a receber')) + ', em ' + at.toLocaleDateString('pt-BR') + ' às ' + hhmm(at) + '.', (kind === 'expense' ? 'Despesa' : 'Receita') + ': ' + brl + (title.trim() ? ' — ' + title.trim() : '') + ' · ' + cat);} finally {setBusy(false);} return;}
+    if (!title.trim()) {setErr('Dê um nome.'); return;}
+    setBusy(true);
+    try {const undo = await sofia.save({kind: kind as AddKind, title: title.trim(), at, minutes, notify, google, priority, repeat, message, rtype, dose, daily});
+      onSaved(title.trim() + ' adicionado' + (kind === 'task' ? 'a' : '') + ' às ' + hhmm(at), undo);}
+    catch (e: any) {setErr(String(e?.message || 'Não deu para adicionar.') + ' Tente de novo.');} finally {setBusy(false);}};
+  return <>{shell(<View>
+    <View style={{padding: 16, gap: 12}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        <View style={{width: 30, height: 30, borderRadius: 9, backgroundColor: tint(info.color, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={info.icon} size={15} color={info.color} /></View>
+        <Text style={{flex: 1, fontSize: 13, color: c.muted}}>{info.title}</Text>
+        <Pressable accessibilityLabel="Voltar" onPress={onBack} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={14} color={c.muted} /></Pressable>
+      </View>
+      {money ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}><Text style={{fontSize: 20, fontWeight: '600', color: c.muted}}>R$</Text><TextInput testID="mini-amount" autoFocus value={amount} onChangeText={v => setAmount(v.replace(/[^0-9.,]/g, ''))} onSubmitEditing={() => void save()} placeholder="0,00" placeholderTextColor={c.muted} keyboardType="decimal-pad" style={{flex: 1, fontSize: 28, fontWeight: '700', color: c.text, outlineStyle: 'none', fontVariant: ['tabular-nums']} as any} /></View> : null}
+      <TextInput testID="mini-title" autoFocus={!money} value={title} onChangeText={setTitle} onSubmitEditing={() => void save()} placeholder={money ? 'Descrição (opcional)' : kind === 'event' ? 'Ex.: Reunião com a Minerva' : kind === 'task' ? 'Ex.: Emitir nota' : kind === 'reminder' ? 'Ex.: Ligar para o contador' : 'Ex.: Magnésio'} placeholderTextColor={c.muted}
+        style={{fontSize: money ? 14 : 18, fontWeight: money ? '400' : '600', color: c.text, outlineStyle: 'none'} as any} />
+      {timePill}
+      {kind === 'event' ? <><View style={{flexDirection: 'row', gap: 6}}>{[30, 60, 120].map(m => chip(minutes === m, m < 60 ? m + ' min' : m / 60 + ' h', () => setMinutes(m)))}</View>
+        <View style={{flexDirection: 'row', gap: 18}}>{toggle(notify, 'Avisar 10 min antes', () => setNotify(v => !v))}{toggle(google, 'Google Agenda', () => setGoogle(v => !v))}</View></> : null}
+      {kind === 'task' ? <><View>{lbl('PRIORIDADE')}<View style={{flexDirection: 'row', gap: 6}}>{[['important', 'Importante', IMPORTANT_RED], ['medium', 'Média', '#B77713'], ['light', 'Leve', '#378E78'], ['none', 'Nenhuma', c.accent]].map(([v, l, col]) => chip(priority === v, l, () => setPriority(v), col))}</View></View>
+        {toggle(notify, 'Avisar no horário', () => setNotify(v => !v))}</> : null}
+      {kind === 'reminder' ? <><View>{lbl('REPETIR')}<View style={{flexDirection: 'row', gap: 6}}>{[['none', 'Não'], ['weekly', 'Toda semana'], ['monthly', 'Todo mês'], ['yearly', 'Todo ano']].map(([v, l]) => chip(repeat === v, l, () => setRepeat(v)))}</View></View>
+        <TextInput value={message} onChangeText={setMessage} placeholder="Mensagem (opcional)" placeholderTextColor={c.muted} style={{height: 38, borderRadius: 10, paddingHorizontal: 12, backgroundColor: c.input, color: c.text, fontSize: 13, outlineStyle: 'none'} as any} /></> : null}
+      {kind === 'routine' ? <><View>{lbl('TIPO')}<View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{ROTINA_TYPES.map(t => chip(rtype === t.id, t.one, () => setRtype(t.id), t.color))}</View></View>
+        <TextInput value={dose} onChangeText={setDose} placeholder="Dose (opcional) — ex.: 1 cápsula" placeholderTextColor={c.muted} style={{height: 36, borderRadius: 10, paddingHorizontal: 12, backgroundColor: c.input, color: c.text, fontSize: 13, outlineStyle: 'none'} as any} />
+        <View>{lbl('REPETIR')}<View style={{flexDirection: 'row', gap: 6}}>{chip(!daily, 'Só hoje', () => setDaily(false))}{chip(daily, 'Todo dia', () => setDaily(true))}</View></View>
+        {toggle(notify, 'Avisar no horário', () => setNotify(v => !v))}</> : null}
+      {money ? <><View>{lbl('CATEGORIA')}<View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap'}}>{(kind === 'income' ? ['Trabalho', 'Freela', 'Reembolso', 'Outros'] : ['Alimentação', 'Mercado', 'Saúde', 'Transporte', 'Casa', 'Outros']).map(x => chip(cat === x, x, () => setCat(x)))}</View></View>
+        <View style={{flexDirection: 'row', gap: 6}}>{chip(paid, kind === 'income' ? 'Já recebida' : 'Já paga', () => setPaid(true), '#5FD3A2')}{chip(!paid, kind === 'income' ? 'A receber' : 'A pagar', () => setPaid(false))}</View></> : null}
+      {err ? <Text style={{fontSize: 12, color: c.danger}}>{err}</Text> : null}
+    </View>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: c.line}}>
+      {money ? <Text style={{fontSize: 11, color: c.muted}}>A Sofia registra em Finanças</Text> : <Pressable accessibilityRole="link" onPress={() => onMore(kind as AddKind)}><Text style={{fontSize: 12, color: c.muted}}>Mais opções ↗</Text></Pressable>}
+      <View style={{flex: 1}} /><Text style={{fontSize: 12, color: c.muted}}>Esc</Text>
+      <Pressable testID="mini-save" accessibilityRole="button" disabled={busy} onPress={() => void save()} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, height: 34, paddingHorizontal: 15, borderRadius: 10, backgroundColor: info.color, opacity: busy ? 0.6 : hovered ? 0.92 : 1, transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 13, fontWeight: '600', color: '#17122A'}}>{busy ? 'Adicionando…' : 'Adicionar'}</Text><Text style={{fontSize: 10, color: '#17122A', opacity: 0.6}}>↵</Text></Pressable>
+    </View>
+  </View>, info.color)}</>;
 }
 
 /** 0.3.331 (Pedro): seletor pequeno que abre ao clicar num lugar vazio da linha do tempo. A escolha abre o editor completo
