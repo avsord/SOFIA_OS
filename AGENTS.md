@@ -1,14 +1,20 @@
 # Sofia OS — entrega de alterações
 
 ## Primeiro passo de qualquer agente
-Leia [docs/SOFIA_MASTER.md](docs/SOFIA_MASTER.md) inteiro. É o ponto único de continuidade. Os demais documentos de continuidade são históricos. Se o MASTER divergir do código, dos logs ou do pedido atual do dono, verifique a evidência e atualize o MASTER; não use o documento para ignorar essa divergência. O estado vivo (HEAD, versão, release publicada) se lê pelos comandos da seção 3 dele, nunca de número escrito.
+Leia [docs/SOFIA_MASTER.md](docs/SOFIA_MASTER.md) (é curto). É o ponto único de continuidade. O histórico das rodadas fica em docs/historico/DIARIO_DE_RODADAS.md e só é consultado com grep, nunca lido inteiro; as notas antigas de versão ficam em docs/historico/app/. Os demais documentos de continuidade são históricos. Se o MASTER divergir do código, dos logs ou do pedido atual do dono, verifique a evidência e atualize o MASTER; não use o documento para ignorar essa divergência. O estado vivo (HEAD, versão, release publicada) se lê pelos comandos da seção 3 dele, nunca de número escrito.
+
+## Leitura econômica (gasto de tokens do agente)
+- Leia só o necessário para o pedido: o MASTER (curto) e os arquivos do delta. Não leia o histórico inteiro (docs/historico/), use grep.
+- Vários arquivos têm linhas de milhares de caracteres (ex.: Home.tsx). Nunca imprima o arquivo inteiro nem linhas inteiras: use `grep -n -o '.{0,120}trecho.{0,120}'` ou `cut -c1-300`.
+- Saídas de teste e de build: mostre só o resumo (pass/fail e as falhas).
+- Prints e imagens custam caro: tire só os necessários para conferir a mudança, recortados na área que mudou.
 
 ## Pedido de alteração gera candidato, publicação só com aprovação
 Quando o dono pede para corrigir ou alterar a Sofia, implemente, valide e entregue um APK candidato `[manual-apk]` no mesmo trabalho, sem esperar outro pedido de "gerar APK". Publicar no atualizador (`[approved-apk]`) exige o "aprovado" explícito do dono para aquele candidato. Uma conversa sobre ideias, por si só, não autoriza implementação.
 
 ## Manter o MASTER vivo (obrigatório em toda rodada)
 No mesmo PR de qualquer rodada que mude comportamento, decisão ou pendência:
-- acrescente uma linha na seção 10 (Diário de rodadas) do `docs/SOFIA_MASTER.md`: data, versão, PR, o quê, resultado real;
+- acrescente UMA linha curta (até ~300 caracteres) na seção 10 do `docs/SOFIA_MASTER.md` (que guarda só as 5 últimas; apague a mais antiga) e a mesma linha no fim de `docs/historico/DIARIO_DE_RODADAS.md`: data, versão, o quê, resultado real;
 - atualize a seção 9 (Pendências): remova o que foi concluído, acrescente o que surgiu;
 - registre na seção 7 qualquer decisão nova do dono.
 Não grave no MASTER valores que o repositório já informa ao vivo. Não crie outro documento de continuidade.
