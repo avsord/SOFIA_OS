@@ -268,21 +268,26 @@ export type MiniSave = {kind: AddKind; title: string; at: Date; minutes?: number
 export type SofiaBridge = {first: string; ask: (text: string, file?: any) => Promise<string>; save: (x: MiniSave) => Promise<(() => Promise<void>) | void>};
 /** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
 export type Move = {t: MoveTarget; to: Date};
-const DAY_START = 7; // posicao de inicio do dia na linha do tempo (o botao "agora" volta para ca)
+const DAY_START = 7; // (legado) inicio fixo de antes
+/** 0.3.336 (Pedro): cada dia da linha vai das 05:00 a meia-noite; a janela de hoje acompanha o ritmo do dia - de manha
+ * mostra o comeco, ao longo do dia vai andando com o "agora" (5 h antes dele) e a noite termina na meia-noite. */
+const DAY_FROM = 5, LEAD = 5;
+const homeOf = (d: number, span: number, nowH: number) => d === 0 ? Math.max(DAY_FROM, Math.min(24 - span, nowH - LEAD)) : d * 24 + DAY_FROM;
+const nowHours = () => {const n = new Date(), z = new Date(n); z.setHours(0, 0, 0, 0); return (n.getTime() - z.getTime()) / 3600000;};
 const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) || ROTINA_TYPES[0]).color;
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
 function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions; nav?: React.MutableRefObject<{go: (d: number) => void} | null>; onDay?: (d: number) => void}) {
-  const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(DAY_START), box = useRef<View>(null), lineBox = useRef<View>(null);
+  const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(() => homeOf(0, SPAN_FULL, nowHours())), box = useRef<View>(null), lineBox = useRef<View>(null);
   // 0.3.333 (aprovado por foto): Ctrl + rodinha aproxima a linha (ate 4 h na tela) e afasta de volta ate o dia inteiro (16 h)
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
-  const startRef = useRef(DAY_START), target = useRef(DAY_START), raf = useRef<any>(null);
-  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - spanRef.current, v));
+  const startRef = useRef(homeOf(0, SPAN_FULL, nowHours())), target = useRef(homeOf(0, SPAN_FULL, nowHours())), raf = useRef<any>(null), dayRef = useRef(0), manualAt = useRef(0);
+  const clampStart = (v: number) => {const d = dayRef.current; return Math.max(d * 24 + DAY_FROM, Math.min(d * 24 + 24 - spanRef.current, v));}; // 0.3.336: fica dentro do dia mostrado (05:00 a meia-noite)
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
-  const tween = useRef({from: DAY_START, t0: 0, ms: 380, home: false});
+  const tween = useRef({from: startRef.current, t0: 0, ms: 380, home: false});
   const glide = (to: number, ms = 380, home = false) => {target.current = clampStart(to); tween.current = {from: startRef.current, t0: Date.now(), ms, home}; if (raf.current) return;
     const step = () => {const {from, t0, ms: dur} = tween.current, t = Math.min(1, (Date.now() - t0) / dur), e = 1 - Math.pow(1 - t, 3);
       const nx = t >= 1 ? target.current : from + (target.current - from) * e; startRef.current = nx; setStartRaw(nx); raf.current = t >= 1 ? null : requestAnimationFrame(step);};
@@ -294,15 +299,19 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // barra abre ou fecha, tudo anda junto em porcentagem da linha (antes os nomes eram em pixels de um quadro atras e as
   // bolinhas juntavam e separavam a cada quadro)
   useEffect(() => {if (!w) return; if (!wS) {setWS(w); return;} const t = setTimeout(() => setWS(w), 180); return () => clearTimeout(t);}, [w]);
-  const day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, []);
+  const dayKey = new Date().toDateString(), day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, [dayKey]); // 0.3.336: troca a meia-noite
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
-  const viewDay = Math.max(0, Math.min(2, Math.floor((start + SPAN / 2) / 24)));
+  const [viewDay, setViewDayState] = useState(0);
   useEffect(() => {onDay?.(viewDay);}, [viewDay]);
-  if (nav) nav.current = {go: (d: number) => {const dd = Math.max(0, Math.min(2, d)); setPin(''); setHover(''); glide(dd * 24 + DAY_START, 520);}};
+  const goDay = (d: number) => {const dd = Math.max(0, Math.min(2, d)); dayRef.current = dd; setViewDayState(dd); manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
+  if (nav) nav.current = {go: goDay};
+  // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
+  // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || Date.now() - manualAt.current < 180000) return; const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -320,7 +329,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       if (e.ctrlKey || e.metaKey) {const r = (lineBox.current as any)?.getBoundingClientRect?.(); if (!r?.width) return; const fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), at = startRef.current + fx * spanRef.current;
         const ns = Math.max(SPAN_MIN, Math.min(SPAN_FULL, spanRef.current * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); if (Math.abs(ns - spanRef.current) < 0.01) return; spanRef.current = ns; setSpanState(ns);
         const st = clampStart(at - fx * ns); if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} startRef.current = st; target.current = st; setStartRaw(st); setPin(''); setHover(''); return;}
-      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; setPin(''); setHover(''); glide(target.current + d / 40 * spanRef.current / SPAN_FULL);};
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; manualAt.current = Date.now(); setPin(''); setHover(''); glide(target.current + d / 40 * spanRef.current / SPAN_FULL);};
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
@@ -371,7 +380,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   };
   const dragLabel = (fx: number) => {const d = snapDate(fx), dd = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - day0) / 864e5);
     return (dd === 0 ? '' : dd === 1 ? 'amanhã ' : dd === -1 ? 'ontem ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hhmm(d);};
-  const label = (h: number) => {const d = new Date(day0 + h * 3600000), dd = Math.floor(h / 24), hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); return d.getHours() === 0 && dd > 0 ? (dd === 1 ? 'amanhã ' : d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ') + hh : hh;}; // 0.3.335: o dia aparece no cabecalho; na escala so a hora
+  const label = (h: number) => {const d = new Date(day0 + h * 3600000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');}; // 0.3.336: o dia aparece no cabecalho; a meia-noite do fim do dia e 00:00 // 0.3.335: o dia aparece no cabecalho; na escala so a hora
   const desc = (r: DayRecord) => {const o: any = r.original || {}; return String(o.description || o.data?.description || o.data?.message || o.content || o.data?.location || '').trim();};
   // rotulos fixos: compromissos e tarefas primeiro, depois dinheiro e encomendas; rotina so na previa
   // 0.3.310 (tela grande): o rotulo cresce com o espaco de cada hora (150 a 230 px), para o nome nao cortar a toa
@@ -391,9 +400,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // 0.3.319: o espaco do botao abre e fecha JUNTO com o movimento da linha (sai da distancia ate 07:00), sem transicao
   // separada - antes o botao sumia no meio do caminho, a linha alargava e os itens voltavam para tras no fim
   // na volta pelo botao, o espaco fecha na mesma proporcao do caminho (cada item anda sempre para o mesmo lado, sem tranco)
-  const span0 = tween.current.home ? Math.max(0.75, Math.abs(tween.current.from - DAY_START)) : 0.75;
-  const dist = start - DAY_START, ease = Math.min(1, Math.abs(dist) / span0), INSET = 84;
-  const side = Math.abs(dist) > 0.02 ? (dist > 0 ? 'left' : 'right') : '', inset = Math.round(INSET * ease * 10) / 10;
+  // 0.3.336 (Pedro: "esse corte quando desloca a linha nao ta bom"): a linha nao encolhe mais; o botao "agora" so aparece por cima
+  const homeNow = homeOf(0, SPAN, nowHours()), dist = viewDay ? 1 : start - homeNow, ease = viewDay ? 1 : Math.min(1, Math.abs(dist) / 0.75);
+  const side = viewDay || Math.abs(dist) > 0.05 ? (dist > 0 ? 'left' : 'right') : '', inset = 0;
   // 0.3.318 (Pedro): o "agora" fica no MEIO do cartao inteiro (Seu dia), nao na altura da linha
   const [btnTop, setBtnTop] = useState<string>('');
   useLayoutEffect(() => {const el: any = box.current, card = el?.closest?.('[data-testid="home-brief"]'); if (!el?.getBoundingClientRect || !card) return;
@@ -410,7 +419,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       else if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && (actions.sofia || actions.onAddAt)) {e.preventDefault(); const now = new Date(), fx = Math.max(0.02, Math.min(0.98, pos(now))); setPin(''); setHover(''); setAdding({fx, at: new Date(Math.ceil(now.getTime() / 300000) * 300000)});}
       else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
-  return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF}}>
+  return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF, userSelect: 'none', outlineStyle: 'none'} as any}>
    <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
@@ -426,7 +435,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {actions.onAddAt ? <Pressable testID="timeline-add-area" accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
       {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
-      style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy'} as any} /> : null}
+      style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy', outlineStyle: 'none'} as any} /> : null}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: LIME}} />
       <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
@@ -464,12 +473,12 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
           return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
-            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center'} as any}>
+            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{p.recs.length}</Text></View>
           </Pressable>;}
         const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} {...hov} {...drg}
-          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface} as any} />;
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}
       {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${lw / 2}px), calc(100% - ${lw}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 12, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
@@ -481,7 +490,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
-    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: 6}, (_, k) => Math.ceil((start - 3) / 4) * 4 + 3 + k * 4)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 46)) return null;
+    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 46)) return null;
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
@@ -500,7 +509,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     </View> : null}
     {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
-    {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => {setPin(''); setHover(''); glide(DAY_START, 520, true);}}
+    {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => goDay(0)}
       style={({hovered}: any) => ({position: 'absolute', top: btnTop || 29 + OFF - 12, [side]: 0, opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
       {({hovered}: any) => <Text style={{fontSize: 11, fontWeight: '700', color: hovered ? '#fff' : c.danger}}>{side === 'left' ? '‹ agora' : 'agora ›'}</Text>}
     </Pressable> : null}
