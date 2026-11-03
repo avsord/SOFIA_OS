@@ -13,7 +13,19 @@ const {migrate119}=require('./migration119');
 const {migrate317}=require('./migration317');
 const TABLES_PRE82=[...BASE_TABLES,...EXTRA_TABLES,...EXTRA_TABLES_46,...EXTRA_TABLES_49,'voice_messages'];
 const TABLES=[...TABLES_PRE82,...EXTRA_TABLES_82];
-const EXTRA_BACKUP_TABLES=['mobile_capsule_doses','md_kv','google_tombstones','profile_photo']; // 0.3.325: a foto do perfil tambem volta num restauro
+const EXTRA_BACKUP_TABLES=['mobile_capsule_doses','md_kv','google_tombstones','profile_photo'];
+/** 03/11/2026: a restauracao pelos scripts abre um Store simples, sem as tabelas que os servicos criam ao subir; sem isto
+ * o historico de doses, os widgets, os apagados do Google e a foto sumiam calados. Mesma estrutura dos servicos. */
+const EXTRA_BACKUP_SCHEMAS={
+ mobile_capsule_doses:'CREATE TABLE IF NOT EXISTS mobile_capsule_doses (owner TEXT NOT NULL,capsule_id TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,taken_at TEXT NOT NULL,title TEXT NOT NULL,dose_text TEXT NOT NULL,PRIMARY KEY(owner,capsule_id,day,time)) STRICT',
+ md_kv:'CREATE TABLE IF NOT EXISTS md_kv(key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+ google_tombstones:'CREATE TABLE IF NOT EXISTS google_tombstones(calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(calendar_id, event_id))',
+ profile_photo:'CREATE TABLE IF NOT EXISTS profile_photo(owner TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL)'};
+const SAFE_COLUMN=/^[a-z_][a-z0-9_]{0,62}$/i;
+// tipos das colunas que os servicos acrescentam ao subir (google.js, api45.js); o resto entra como TEXT (aceito em STRICT)
+const RUNTIME_COLUMN_TYPES={thumb:'BLOB',drive_id:'TEXT',sha256:'TEXT',removed_at:'TEXT'};
+const bindable=v=>v&&typeof v==='object'&&!Buffer.isBuffer(v)&&v.type==='Buffer'&&Array.isArray(v.data)?Buffer.from(v.data):v;
+function columnDefault(col){const d=col.dflt_value;if(d==null)return null;const q=/^'(.*)'$/s.exec(d);if(q)return q[1].replace(/''/g,"'");if(/^-?\d+(\.\d+)?$/.test(d))return Number(d);if(/^CURRENT_TIMESTAMP$/i.test(d))return new Date().toISOString();return null;} // 0.3.325: a foto do perfil tambem volta num restauro
 const { AppError, now, id, cleanText, cleanMessage, rejectSecrets, searchTerms, normalize } = require('../core/util');
 const OWNER = 'owner-local';
 const DEFAULTS = { privacyMode: 'auto', dailyCallLimit: 50, maxOutputTokens: 1200, routingEnabled: false, privateConfirmed: false, sharedConfirmed: false, sharedBillingAcknowledged: false, legacyRoute: 'none', privateDailyUSD: 0, privateMonthlyUSD: 0, sharedDailyUSD: 0, sharedMonthlyUSD: 0, privateInputPerMillion: 0, privateOutputPerMillion: 0, sharedInputPerMillion: 0, sharedOutputPerMillion: 0, privateModel: '', sharedModel: 'gpt-5.6-terra', sharedDailyTokenCap: 250000, sharedIncentiveDailyTokens: 2500000, sharedUsageAlertPercent: 90, privateUsageAlertPercent: 90, privateUsageTotalUSD: 5, privateUsageTotalUserSet: false, timezone: 'America/Sao_Paulo', developerModeAllowed: true, uiMode: 'user', homeWidgets: ['priorities','tasks','commitments','notifications','study'], userNavWidgets: ['lists','library'], listViews: ['market','pharmacy','purchase','blackfriday','monitor'], libraryViews: ['recipe','recipe_session','music','film','video','reading','source','asset','file'], profileName: 'Pedro Silva', profileEmail: 'sofiaos.core@gmail.com' };
@@ -110,10 +122,12 @@ class Store {
     if (!m) throw new AppError('NOT_FOUND','Mensagem não encontrada.',404);
     return m;
   }
+  dropBoard(conversationId) { try { this.db.prepare('DELETE FROM conversation_board WHERE conversation_id=?').run(conversationId); } catch { /* tabela so existe com o servidor completo */ } }
   deleteMessage(messageId) {
     const m=this.message(messageId);if(m.status==='pending')throw new AppError('IN_PROGRESS','Espere a resposta terminar antes de apagar esta mensagem.',409);
     return this.tx(()=>{
       this.db.prepare('DELETE FROM voice_messages WHERE message_id=?').run(m.id);
+      this.dropBoard(m.conversation_id); // 03/11/2026: o Quadro (resumo da IA) refaz sem a mensagem apagada
       this.db.prepare('DELETE FROM search_index WHERE entity_id=?').run(m.id);
       this.db.prepare("DELETE FROM annotations WHERE entity_type='message' AND entity_id=?").run(m.id);
       this.db.prepare('DELETE FROM route_decisions WHERE message_id=?').run(m.id);
@@ -134,6 +148,7 @@ class Store {
       let messages=0;
       for(const conv of conversations){
         const ids=this.db.prepare('SELECT id FROM messages WHERE conversation_id=? AND owner=?').all(conv.id,OWNER).map(r=>r.id);messages+=ids.length;
+        this.dropBoard(conv.id); // 03/11/2026: apagar o historico apaga tambem os resumos do Quadro
         for(const mid of ids){
           this.db.prepare('DELETE FROM voice_messages WHERE message_id=?').run(mid);
           this.db.prepare('DELETE FROM search_index WHERE entity_id=?').run(mid);
@@ -353,7 +368,8 @@ class Store {
     if (!extra || typeof extra!=='object') return;
     const have=this.existingTables();
     for (const table of EXTRA_BACKUP_TABLES) {
-      const rows=extra[table]; if (!Array.isArray(rows) || !have.has(table)) continue;
+      const rows=extra[table]; if (!Array.isArray(rows)) continue;
+      if (!have.has(table)) { if (!EXTRA_BACKUP_SCHEMAS[table]) continue; this.db.exec(EXTRA_BACKUP_SCHEMAS[table]); }
       const fields=this.db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name);
       this.db.prepare(`DELETE FROM ${table}`).run();
       const insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
@@ -368,9 +384,15 @@ class Store {
       for (const table of [...TABLES].reverse()) this.db.prepare(`DELETE FROM ${table}`).run();
       this.db.prepare('DELETE FROM search_index').run();
       for (const table of importTables) {
-        const fields=this.db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name);
-        const insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
+        let cols=this.db.prepare(`PRAGMA table_info(${table})`).all(),fields=cols.map(c=>c.name);
+        let insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
         for (const sourceRow of snapshot.tables[table]) {
+          // 03/11/2026: backup de antes de uma coluna nova (ex.: planned_due_at, 02/11) recebe o valor padrao da coluna; coluna
+          // que o servidor cria ao subir (ex.: attachments.drive_id) e o Store simples ainda nao tem e criada antes de inserir.
+          if(sourceRow&&typeof sourceRow==='object'){let added=false;for(const k of Object.keys(sourceRow))if(!fields.includes(k)){if(!SAFE_COLUMN.test(k))throw new AppError('BAD_BACKUP','Estrutura de backup inválida.');this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${k} ${RUNTIME_COLUMN_TYPES[k]||'TEXT'}`);added=true;}
+            if(added){cols=this.db.prepare(`PRAGMA table_info(${table})`).all();fields=cols.map(c=>c.name);insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);}
+            for(const col of cols)if(!(col.name in sourceRow)&&(col.dflt_value!=null||!col.notnull)&&!col.pk&&!['task_details'].includes(table))sourceRow[col.name]=columnDefault(col);
+            if(table==='task_details'&&sourceRow.planned_due_at===undefined)sourceRow.planned_due_at='';}
           const row=sourceRow&&typeof sourceRow==='object'?{...sourceRow}:sourceRow;if(table==='task_details'&&row){if(row.priority_level===undefined)row.priority_level='none';if(row.calendar_provider===undefined)row.calendar_provider='local';if(row.external_calendar_id===undefined)row.external_calendar_id='';if(row.external_event_id===undefined)row.external_event_id='';if(row.sync_state===undefined)row.sync_state='local';}
           if (!row || typeof row!=='object' || Object.keys(row).length!==fields.length || fields.some(k=>!(k in row))) throw new AppError('BAD_BACKUP','Estrutura de backup inválida.');
           if ('owner' in row && row.owner!==OWNER) throw new AppError('BAD_BACKUP','Este backup não pertence ao perfil local suportado.');
@@ -379,7 +401,7 @@ class Store {
             const bytes=Buffer.from(row.blob,'base64');if(bytes.length!==row.bytes||require('node:crypto').createHash('sha256').update(bytes).digest('hex')!==row.sha256)throw new AppError('BAD_BACKUP','Anexo do backup não passou na integridade.');
           }
           if(table==='entities'){try{const data=JSON.parse(row.data),tags=JSON.parse(row.tags);if(!data||Array.isArray(data)||typeof data!=='object'||!Array.isArray(tags))throw new Error();}catch{throw new AppError('BAD_BACKUP','Registro estruturado inválido no backup.');}}
-          insert.run(...fields.map(k=>['attachments','voice_messages'].includes(table)&&k==='blob'?Buffer.from(row[k],'base64'):row[k]));
+          insert.run(...fields.map(k=>['attachments','voice_messages'].includes(table)&&k==='blob'?Buffer.from(row[k],'base64'):bindable(row[k])));
         }
       }
       this.importExtra(snapshot.extra);

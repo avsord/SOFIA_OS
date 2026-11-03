@@ -9,6 +9,18 @@ ROOT=Path(__file__).resolve().parents[1];DIST=ROOT/'dist';OUT=DIST/'fluency-evid
 PKG='com.avsord.sofiaapp';SEED=DIST/'QA-ONLY-fluency-seed.apk';QA=DIST/'QA-ONLY-manual-universal.apk'
 RESULT={'pages_trials':[],'original_failure_mode':'new','correctness_passed':False,'performance_gate_enforced':False,'physical_device':False,'owner_apk_directly_executed':False,'same_qa_binary_both_modes':True,'offline':True,'trials':[], 'scope':'same-emulator New versus instrumented Old policy; cache only, no real user data'}
 def adb(*args): return subprocess.check_output(['adb',*args],stderr=subprocess.STDOUT,timeout=90).decode(errors='replace')
+def install_checked(apk,label):
+ # 03/11/2026 (#282): o emulador continuou mostrando o APK anterior depois do "install -r"; confere os bytes instalados
+ # e tenta mais uma vez (por cima, sem apagar dados) antes de seguir.
+ import hashlib as _h,json as _j
+ want=_h.sha256(Path(apk).read_bytes()).hexdigest()
+ for attempt in (1,2):
+  out=subprocess.run(['adb','install','-r',str(apk)],capture_output=True,text=True,timeout=120)
+  path=subprocess.run(['adb','shell','pm','path','com.avsord.sofiaapp'],capture_output=True,text=True,timeout=30).stdout.strip().split('\n')[0].replace('package:','').strip()
+  got=subprocess.run(['adb','shell','sha256sum',path],capture_output=True,text=True,timeout=60).stdout.split(' ')[0].strip() if path else ''
+  print('SOFIA_INSTALL_DIAG '+_j.dumps({'label':label,'attempt':attempt,'rc':out.returncode,'out':(out.stdout+out.stderr).strip()[-300:],'path':path,'match':got==want}),flush=True)
+  if out.returncode==0 and got==want:return
+ raise AssertionError('Installed APK does not match '+label)
 def xml():
  adb('shell','uiautomator','dump','/sdcard/r7.xml');return adb('shell','cat','/sdcard/r7.xml')
 def point(tree,label):
@@ -39,7 +51,7 @@ def seed(mode,scale=1):
  else:raise AssertionError('Heavy QA seed did not finish')
  logs=collect_logs();entries=re.findall(r'SOFIA_QA_VOLUME (\{.*\})',logs)
  assert entries,'QA seed volume not recorded'
- volume=json.loads(entries[-1]);stop();adb('install','-r',str(QA));return volume
+ volume=json.loads(entries[-1]);stop();install_checked(QA,'qa-'+mode);return volume
 def wait_data():
  for _ in range(120):
   logs=collect_logs()

@@ -136,7 +136,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                         <View style={{flex: 1, gap: 3}}>
                           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
                             <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{(() => { const n = primaryNow(p); return n ? money(n.price, p.currency) : '—'; })()}</Text>
-                            <Delta value={p.change} />
+                            <Delta value={primaryNow(p)?.change ?? null} />
                           </View>
                           <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>
                             {(() => { const n = primaryNow(p); return n ? 'na ' + n.store.name : 'aguardando a primeira leitura'; })()} · {p.stores.length} {p.stores.length === 1 ? 'loja' : 'lojas'}{p.monitor.state === 'paused' ? ' · pausado' : ''}

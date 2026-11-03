@@ -29,6 +29,7 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 - **Commits sem `[manual-apk]` também falham** em "Native checks - navigation/workspace" (boot-smoke da cópia QA) — não investigado nesta rodada.
 - **Não confirmado no aparelho:** toque/arrastar e segurar para criar na linha do tempo do celular; zoom da Agenda no celular.
 - **Chat, 03/11 ~19h:** a proteção do Início/Agenda do site para o Android (`window` existe no Android sem `addEventListener`/`innerWidth`; o teste `typeof window === 'undefined'` não protegia → o Início quebrava ao abrir no celular) estava só no `.bat` da #277, que não foi rodado. Subiu agora junto com `docs/design/2026-11-03/` (desenho aprovado + regras e recusas). É a causa provável de o Início não aparecer no emulador na #279.
+- **Em andamento (Claude Code, 03/11 noite):** revisão geral + desenho de 03/11. Lote 1 (funções que não funcionavam no celular, servidor de backup/lembretes) subiu; lote 2 (desenho tela por tela) em seguida. Passagem completa no fim da rodada.
 - **Próximo passo:** se o teste pesado do rascunho falhar de novo, ler a linha `SOFIA_DRAFT_DIAG` no log (`gh run view <id> --log-failed | grep SOFIA_DRAFT_DIAG`) e corrigir a causa; depois o Pedro testa o candidato no celular.
 
 ## 1. O dono e a forma de trabalhar

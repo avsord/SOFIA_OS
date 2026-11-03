@@ -9,6 +9,18 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[1];dist=root/'dist';out=dist/'manual-evidence';out.mkdir(parents=True,exist_ok=True)
 pkg='com.avsord.sofiaapp'
 def adb(*args):return subprocess.check_output(['adb',*args],timeout=60)
+def install_checked(apk,label):
+ # 03/11/2026 (#282): o emulador continuou mostrando o APK anterior depois do "install -r"; confere os bytes instalados
+ # e tenta mais uma vez (por cima, sem apagar dados) antes de seguir.
+ import hashlib as _h,json as _j
+ want=_h.sha256(Path(apk).read_bytes()).hexdigest()
+ for attempt in (1,2):
+  out=subprocess.run(['adb','install','-r',str(apk)],capture_output=True,text=True,timeout=120)
+  path=subprocess.run(['adb','shell','pm','path','com.avsord.sofiaapp'],capture_output=True,text=True,timeout=30).stdout.strip().split('\n')[0].replace('package:','').strip()
+  got=subprocess.run(['adb','shell','sha256sum',path],capture_output=True,text=True,timeout=60).stdout.split(' ')[0].strip() if path else ''
+  print('SOFIA_INSTALL_DIAG '+_j.dumps({'label':label,'attempt':attempt,'rc':out.returncode,'out':(out.stdout+out.stderr).strip()[-300:],'path':path,'match':got==want}),flush=True)
+  if out.returncode==0 and got==want:return
+ raise AssertionError('Installed APK does not match '+label)
 def xml():
  adb('shell','uiautomator','dump','/sdcard/manual-startup.xml')
  return adb('shell','cat','/sdcard/manual-startup.xml').decode(errors='replace')
@@ -119,7 +131,7 @@ try:
  result['policy_mode']='old'
  result['new_policy_measured_in_separate_heavy_job']=True
  adb('shell','am','force-stop',pkg)
- adb('install','-r',str(dist/'QA-ONLY-manual-universal.apk'));result['in_place_install']=True
+ install_checked(dist/'QA-ONLY-manual-universal.apk','candidate');result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  time.sleep(.5)

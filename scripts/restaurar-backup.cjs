@@ -20,14 +20,19 @@ async function main() {
   const snapshot = openBackup(fs.readFileSync(file), {passphrase});
   fs.mkdirSync(dataDir, {recursive: true});
   const db = path.join(dataDir, 'sofia.sqlite');
+  if (fs.existsSync(db) && !replace) { console.error('Ja existe ' + db + '. Rode de novo com --substituir para trocar por este backup.'); process.exit(3); }
+  // 03/11/2026: restaura primeiro num arquivo separado; so troca se deu certo. Antes, uma falha deixava um banco VAZIO no
+  // lugar do sofia.sqlite (o antigo ficava renomeado) e a Sofia abria sem nada.
+  const tmp = path.join(dataDir, 'restauracao-' + process.pid + '-' + Date.now() + '.sqlite');
+  let result;
+  try { const store = new Store(tmp); result = store.importSnapshot(snapshot); store.close(); }
+  catch (e) { for (const ext of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmp + ext); } catch { /* nao existia */ } } throw e; }
   if (fs.existsSync(db)) {
-    if (!replace) { console.error('Ja existe ' + db + '. Rode de novo com --substituir para trocar por este backup.'); process.exit(3); }
     fs.renameSync(db, db + '.antes-da-restauracao');
     for (const ext of ['-wal', '-shm']) { try { fs.unlinkSync(db + ext); } catch { /* nao existia */ } }
   }
-  const store = new Store(db);
-  const result = store.importSnapshot(snapshot);
-  store.close();
+  fs.renameSync(tmp, db);
+  for (const ext of ['-wal', '-shm']) { try { fs.unlinkSync(tmp + ext); } catch { /* nao existia */ } }
   if (snapshot.vault_key) fs.writeFileSync(path.join(dataDir, 'cofre-chave-restaurada.txt'), snapshot.vault_key + '\n', {mode: 0o600});
   console.log('Restaurado em ' + db + '.');
   console.log('Registros importados: ' + JSON.stringify(result && result.counts ? result.counts : result));

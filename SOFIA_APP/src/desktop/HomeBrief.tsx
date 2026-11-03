@@ -7,6 +7,10 @@ import {Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Te
 /** 03/11/2026: no Android o `window` existe (e o objeto global) mas nao tem addEventListener/innerWidth; o teste
  * `!WEB` nao protegia e o Inicio do celular quebrava. Tudo que e so do navegador usa WEB. */
 const WEB = Platform.OS === 'web' && typeof document !== 'undefined';
+/** 03/11/2026: o Android nao entende calc()/clamp() em left/width (o item ia para a borda esquerda). No navegador continua
+ * o CSS de antes; no celular a posicao vem em pixels da largura medida da linha (w). */
+const cx = (frac: number, off: number, w: number): any => WEB ? `calc(${frac * 100}% - ${off}px)` : frac * w - off;
+const clampX = (frac: number, half: number, width: number, w: number): any => WEB ? `clamp(0px, calc(${frac * 100}% - ${half}px), calc(100% - ${width}px))` : Math.max(0, Math.min(Math.max(0, w - width), frac * w - half));
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
@@ -18,6 +22,7 @@ import type {MonitorWidgetRow} from '../lib/monitoring';
 import {money as fmtMoney} from '../lib/monitoring';
 import type {HomeBriefData} from '../lib/home-brief';
 import type {Due} from '../lib/finance';
+import {todayISO} from '../lib/finance';
 import {capsuleDoses, capsuleDay} from '../lib/capsule-model';
 import {agendaPriority, isHoliday, HOLIDAY_COLOR} from '../lib/agenda-priority';
 import {useReducedMotion} from '../lib/motion';
@@ -135,7 +140,7 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
       <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Linha do tempo</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={15} color={c.muted} /></Pressable>
     </View>
-    <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight: 400}} contentContainerStyle={{paddingHorizontal: 16, paddingBottom: 16, gap: 2}}>
+    <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{maxHeight: 400}} contentContainerStyle={{paddingHorizontal: 16, paddingBottom: 16, gap: 2}}>
       <Text style={{fontSize: 12, color: c.muted, marginBottom: 6}}>O que aparece na linha do tempo do Início e com que força (toque na porcentagem). Não muda avisos nem os apps.</Text>
       {TL_CATS.map(k => {const items = sub(k.id); return <View key={k.id}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, height: 38}}>
@@ -179,7 +184,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const gearBox = useRef<View>(null); useClickOutside(gearBox, () => setGear(false), gear, '[data-testid="timeline-gear"]');
   useEffect(() => {if (!gear || !WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
   const timeMarks = useMemo(() => {
-    const out: TimeMark[] = [], todayKey = new Date().toISOString().slice(0, 10), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
+    const out: TimeMark[] = [], todayKey = todayISO(), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
     for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
     const from = Date.now() - 2 * 864e5;
     for (const pk of p.data.packs) {
@@ -481,7 +486,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {SPAN <= 7 ? Array.from({length: Math.ceil(SPAN * 4) + 4}, (_, k) => Math.ceil(start * 4) / 4 + k / 4).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1 || Math.abs(h - Math.round(h)) < 0.01) return null; return <View key={'q' + h} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 29 + OFF - 3, width: 1, height: 6, marginLeft: -0.5, backgroundColor: 'rgba(255,255,255,0.05)'}} />;}) : null}
     {/* 0.3.335 (Pedro: "a cor que divide manha, tarde e noite quase nao aparece"): faixa de fundo de cada periodo, visivel */}
     {[0, 24, 48].flatMap(d => [[0, 6, 'd'], [6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const lo = Math.max(a, start), hi = Math.min(b, start + SPAN); if (hi <= lo) return null; const rgb = k === 'd' ? '170,140,255' : k === 'm' ? '255,196,120' : k === 't' ? '195,220,130' : '140,165,255'; /* 0.3.344 (Pedro): madrugada (00-06) e um periodo proprio */
-      return <View key={'f' + a} pointerEvents="none" style={{position: 'absolute', left: `calc(${((lo - start) / SPAN) * 100}% + ${lo === a ? 1.5 : 0}px)` as any, width: `calc(${((hi - lo) / SPAN) * 100}% - ${(lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)}px)` as any, top: -10, height: 29 + OFF + 10 + 22, borderTopLeftRadius: lo === a ? 10 : 0, borderTopRightRadius: hi === b ? 10 : 0, backgroundImage: `linear-gradient(180deg, ${SOFT_FADE.map(([pc, f]) => `rgba(${rgb},${(0.038 * f).toFixed(4)}) ${pc}%`).join(', ')})`} as any} />;})}
+      return <View key={'f' + a} pointerEvents="none" style={{position: 'absolute', left: (WEB ? `calc(${((lo - start) / SPAN) * 100}% + ${lo === a ? 1.5 : 0}px)` : ((lo - start) / SPAN) * w + (lo === a ? 1.5 : 0)) as any, width: (WEB ? `calc(${((hi - lo) / SPAN) * 100}% - ${(lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)}px)` : Math.max(0, ((hi - lo) / SPAN) * w - ((lo === a ? 1.5 : 0) + (hi === b ? 1.5 : 0)))) as any, top: -10, height: 29 + OFF + 10 + 22, borderTopLeftRadius: lo === a ? 10 : 0, borderTopRightRadius: hi === b ? 10 : 0, ...(WEB ? {backgroundImage: `linear-gradient(180deg, ${SOFT_FADE.map(([pc, f]) => `rgba(${rgb},${(0.038 * f).toFixed(4)}) ${pc}%`).join(', ')})`} : {backgroundColor: `rgba(${rgb},0.035)`})} as any} />;})}
     {/* simbolos de manha, tarde e noite no meio de cada periodo visivel */}
     {[0, 24, 48].flatMap(d => [[0, 6, 'd'], [6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const x = ((a + b) / 2 - start) / SPAN; if (x < 0.02 || x > 0.98) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})} {/* 0.3.341 (Pedro): o simbolo anda junto com a linha (no meio real de cada periodo: 09:00, 15:00, 21:00) */}
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
@@ -493,8 +498,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
-      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
-      <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
+      <View style={{position: 'absolute', left: cx(guide, 0.5, w), top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
+      <View style={{position: 'absolute', left: clampX(guide, 34, 68, w), top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
         <Text style={{fontSize: 11, fontWeight: '700', color: c.onAccent, backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
       </View>
     </View> : null}
@@ -529,20 +534,20 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
           return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
-            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, backgroundImage: ring, boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
+            style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, ...(WEB ? {backgroundImage: ring} : {backgroundColor: tint(cols[0], 0.45)}), boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{p.recs.length}</Text></View>
           </Pressable>;}
         const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}
-      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: `clamp(0px, calc(${lx * 100}% - ${lw / 2}px), calc(100% - ${lw}px))` as any, top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+      {all.map(p => place[p.key] == null ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: clampX(lx, lw / 2, lw, w), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 12, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
       </View>;})())}
     </View>
     {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
         passou fica preenchido. Se a pessoa rolar para longe, aparece um botao para voltar para agora. */}
-    {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} top={29 + OFF} /> : null}
+    {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} top={29 + OFF} lw={w} /> : null}
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
@@ -551,20 +556,20 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
-      <View style={{position: 'absolute', left: `calc(${drag.fx * 100}% - ${dpx(9)})` as any, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
-      {drag.snap ? <View style={{position: 'absolute', left: `calc(${drag.fx * 100}% - 0.5px)` as any, top: 0, height: 29 + OFF + 12, width: 1, backgroundImage: 'repeating-linear-gradient(180deg, ' + tint(c.accent, 0.7) + ' 0 4px, transparent 4px 8px)'} as any} /> : null}
-      <View style={{position: 'absolute', left: `clamp(0px, calc(${drag.fx * 100}% - ${drag.snap ? 160 : 55}px), calc(100% - ${drag.snap ? 320 : 110}px))` as any, top: OFF - 4, width: drag.snap ? 320 : 110, alignItems: 'center'}}>
+      <View style={{position: 'absolute', left: (WEB ? `calc(${drag.fx * 100}% - ${dpx(9)})` : drag.fx * w - 9) as any, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
+      {drag.snap ? <View style={{position: 'absolute', left: cx(drag.fx, 0.5, w), top: 0, height: 29 + OFF + 12, width: 1, backgroundImage: 'repeating-linear-gradient(180deg, ' + tint(c.accent, 0.7) + ' 0 4px, transparent 4px 8px)'} as any} /> : null}
+      <View style={{position: 'absolute', left: clampX(drag.fx, drag.snap ? 160 : 55, drag.snap ? 320 : 110, w), top: OFF - 4, width: drag.snap ? 320 : 110, alignItems: 'center'}}>
         <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{dragLabel(drag.fx)}{drag.snap ? ' · ' + drag.snap : ''}</Text>
       </View>
     </View> : null}
-    {adding ? <View pointerEvents="none" style={{position: 'absolute', left: `calc(${adding.fx * 100}% - 7px)` as any, top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: c.surface, zIndex: 7}} /> : null}
+    {adding ? <View pointerEvents="none" style={{position: 'absolute', left: cx(adding.fx, 7, w), top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: c.surface, zIndex: 7}} /> : null}
     {adding && actions.sofia ? <SofiaAdd lineW={wS || w} fx={adding.fx} at={adding.at} sofia={actions.sofia} onMore={k => {const at = adding.at; setAdding(null); actions.onAddAt?.(k, at);}} onSaved={(text, undo) => {setAdding(null); showToast(text, undo);}} onClose={() => setAdding(null)} />
-     : adding && actions.onAddAt ? <AddMenu fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
+     : adding && actions.onAddAt ? <AddMenu lw={w} fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
     {toast ? <View testID="timeline-toast" style={{position: 'absolute', left: '50%' as any, top: 29 + OFF + 34, zIndex: 13, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
       <Icon name="checkCircle" size={15} color="#5FD3A2" /><Text style={{fontSize: 13, color: c.text}}>{toast.text}</Text>
       {toast.undo ? <Pressable accessibilityRole="button" onPress={() => {const u = toast.undo; setToast(null); void u?.();}}><Text style={{fontSize: 13, fontWeight: '600', color: c.accent}}>Desfazer</Text></Pressable> : null}
     </View> : null}
-    {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
+    {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onGrab={actions.onMove && WEB /* 03/11/2026: arrastar so existe no navegador; no celular a alca nao aparece */ ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => goDay(0)}
       style={({hovered}: any) => ({position: 'absolute', top: 42 + OFF + 7 - 12, [side]: 0, /* 0.3.348 (Pedro): o "agora" fica na linha das horas, alinhado no meio dela */ opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
@@ -624,7 +629,7 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
       {TYPE_INFO.map((t, i) => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" accessibilityLabel={t.title} onPress={() => setKind(t.id)} style={({hovered}: any) => ({alignItems: 'center', gap: 3, paddingTop: 5, paddingBottom: 4, paddingHorizontal: 5, marginLeft: i === 0 ? -5 : 0, marginRight: i === TYPE_INFO.length - 1 ? -5 : 0, borderRadius: 8, backgroundColor: hovered ? 'rgba(255,255,255,0.05)' : 'transparent', outlineStyle: 'none'} as any)}>
         <Icon name={t.icon} size={14} color={t.color} /><Text style={{fontSize: 10, color: c.muted}}>{t.label}</Text></Pressable>)}
     </View> : null}
-    {msgs.length || busy ? <ScrollView ref={scroller} keyboardShouldPersistTaps="handled" style={{maxHeight: 300, marginTop: 14}} contentContainerStyle={{gap: 10}}>
+    {msgs.length || busy ? <ScrollView ref={scroller} nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{maxHeight: 300, marginTop: 14}} contentContainerStyle={{gap: 10}}>
       {msgs.map((m, i) => m.who === 'me' ? <View key={i} style={{alignSelf: 'flex-end', maxWidth: '80%' as any, backgroundColor: c.bubble, borderRadius: 18, borderBottomRightRadius: 6, padding: m.img ? 8 : 0, gap: 6, overflow: 'hidden'}}>
           {m.img ? <Image source={{uri: m.img}} style={{width: 150, height: 100, borderRadius: 12}} resizeMode="cover" /> : null}<Text style={{fontSize: 13, color: c.text, paddingHorizontal: m.img ? 4 : 12, paddingVertical: m.img ? 0 : 8}}>{m.text}</Text></View>
         : <Text key={i} style={{fontSize: 14, lineHeight: 21, color: c.text, paddingHorizontal: 4}}>{m.text}</Text>)}
@@ -709,14 +714,14 @@ function useClickOutside(ref: React.RefObject<View | null>, onOut: () => void, o
   useEffect(() => {if (!on || !WEB) return; const h = (e: PointerEvent) => {const el: any = ref.current, t: any = e.target; if (ignore && t?.closest?.(ignore)) return; if (el && el.contains && !el.contains(t)) cb.current();};
     const t = setTimeout(() => document.addEventListener('pointerdown', h, true), 0); return () => {clearTimeout(t); document.removeEventListener('pointerdown', h, true);};}, [on]);
 }
-function AddMenu({fx, when, onPick, onClose}: {fx: number; when: string; onPick: (k: AddKind) => void; onClose: () => void}) {
+function AddMenu({fx, when, onPick, onClose, lw = 0}: {fx: number; when: string; onPick: (k: AddKind) => void; onClose: () => void; lw?: number}) {
   const c = useTheme(), box = useRef<View>(null);
   useClickOutside(box, onClose);
   useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
   const ITEMS: {id: AddKind; label: string; icon: IconName; color: string}[] = [{id: 'event', label: 'Compromisso', icon: 'calendar', color: '#8fb4ff'}, {id: 'task', label: 'Tarefa', icon: 'checklist', color: '#F5A0AE'}, {id: 'reminder', label: 'Lembrete', icon: 'bell', color: REMIND}, {id: 'routine', label: 'Rotina', icon: 'capsule', color: '#5FD3C6'}];
   return <>
-    <View ref={box} testID="add-menu" accessibilityRole="menu" style={{position: 'absolute', left: `clamp(0px, calc(${fx * 100}% - 110px), calc(100% - 220px))` as any, top: 29 + 44 + 14, width: 220, zIndex: 12, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)'} as any}>
-      <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 6}}>Adicionar · <Text style={{color: c.accent, fontWeight: '600', fontVariant: ['tabular-nums']}}>{when}</Text></Text>
+    <View ref={box} testID="add-menu" accessibilityRole="menu" style={{position: 'absolute', left: clampX(fx, 110, 220, lw), top: 29 + 44 + 14, width: 220, zIndex: 12, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)'} as any}>
+      <View style={{flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 4}}><Text style={{flex: 1, fontSize: 11, color: c.muted, paddingTop: 6, paddingBottom: 6}}>Adicionar · <Text style={{color: c.accent, fontWeight: '600', fontVariant: ['tabular-nums']}}>{when}</Text></Text>{/* 03/11/2026: no celular nao ha clique fora nem Esc - o X fecha o menu */}{!WEB ? <Pressable testID="add-menu-close" accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={8} onPress={onClose} style={{width: 28, height: 28, alignItems: 'center', justifyContent: 'center'}}><Icon name="close" size={14} color={c.muted} /></Pressable> : null}</View>
       {ITEMS.map(it => <Pressable key={it.id} testID={'add-' + it.id} accessibilityRole="menuitem" onPress={() => onPick(it.id)} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 36, marginHorizontal: 6, paddingHorizontal: 8, borderRadius: 9, backgroundColor: hovered || pressed ? c.input : 'transparent'})}>
         <View style={{width: 24, height: 24, borderRadius: 7, backgroundColor: tint(it.color, 0.16), alignItems: 'center', justifyContent: 'center'}}><Icon name={it.icon} size={13} color={it.color} /></View>
         <Text style={{fontSize: 13, color: c.text}}>{it.label}</Text>
@@ -738,10 +743,10 @@ function PeriodIcon({kind}: {kind: string}) {
 }
 
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
-function NowBeacon({x, top}: {x: number; top: number}) {
+function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {if (reduced) return; const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false})); loop.start(); return () => loop.stop();}, [reduced]);
-  const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => `calc(${pct}% - ${dpx(off)})` as any, red = '#F57A8C';
+  const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
     {/* aureola */}
     <Animated.View style={{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.35, 0]}), transform: [{scale: pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1.4]})}]}} />
@@ -750,7 +755,7 @@ function NowBeacon({x, top}: {x: number; top: number}) {
     {/* fio ate a escala */}
     <View style={{position: 'absolute', left: at(0.5), top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
     {/* etiqueta com a hora, na altura da escala */}
-    <View style={{position: 'absolute', left: `clamp(0px, calc(${pct}% - ${dpx(24)}), calc(100% - ${dpx(48)}))` as any, top: top + 13, width: 48, alignItems: 'center'}}>
+    <View style={{position: 'absolute', left: (WEB ? `clamp(0px, calc(${pct}% - ${dpx(24)}), calc(100% - ${dpx(48)}))` : Math.max(0, Math.min(lw - 48, x * lw - 24))) as any, top: top + 13, width: 48, alignItems: 'center'}}>
       <Text style={{fontSize: 11, fontWeight: '700', color: '#fff', backgroundColor: red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
     </View>
   </View>;
@@ -911,7 +916,7 @@ function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; 
   // 03/11/2026: o rotulo diz se ha compromissos (leitores de tela e o teste do celular, que confere a agenda salva na abertura)
   return <View accessibilityLabel={list.length ? 'Agenda, com compromissos' : 'Agenda, sem compromissos'} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
-    {list.length ? <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2, ...FADE_END} as any} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
+    {list.length ? <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2, ...FADE_END} as any} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
       <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>
       <View style={{width: 3, height: 16, borderRadius: 2, backgroundColor: colorOf(r, c.accent)}} />
       <Text numberOfLines={1} style={{flex: 1, fontSize: 13, color: c.text}}>{r.title}</Text>
@@ -1008,7 +1013,7 @@ function goalTicks(target: number): {f: number; label: string}[] {
   return out;
 }
 function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void; onToggleMask?: () => void}) {
-  const c = useTheme(), dues = data.dues, first = dues?.[0], today = new Date().toISOString().slice(0, 10);
+  const c = useTheme(), dues = data.dues, first = dues?.[0], today = todayISO(); // 03/11/2026: data local (UTC virava o dia as 21h)
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
   const g = goal && goal.target > 0 ? goalStats(goal) : null, sp = data.spend && data.spend.available > 0 ? data.spend : null, lo = data.loose;

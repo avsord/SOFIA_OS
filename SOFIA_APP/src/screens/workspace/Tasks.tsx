@@ -69,6 +69,8 @@ import {Spinner,LoadingLines} from '../../components/Loading';
 import {appAlert} from '../../lib/app-alert';
 // 0.3.263: parte de Workspace (ver src/screens/Workspace.tsx).
 import {Input} from './core';
+// 03/11/2026 (desenho 35): Tarefas na ordem em que foram criadas, no celular e no computador (o servidor manda por prioridade)
+const byCreation=<T extends {created_at?:string}>(list:T[])=>[...list].sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||'')));
 export function Tasks({api,onBack,active,areas,onDiscussTask}:{onDiscussTask?:(task:Task)=>void;api:SofiaApi;onBack:()=>void;active:boolean;areas:string[]}){const deskNoBack=useDesktop();const [stateTab,setStateTab]=React.useState<'todo'|'scheduled'|'done'>('todo');
  const pad=useColumnPad(); // 0.3.254 (computador): busca e filtros alinhados a coluna
  // 0.3.263 (fase 3 — listas): no computador largo os cartoes ficam em duas colunas (menos caminho para o olho)
@@ -95,7 +97,7 @@ export function Tasks({api,onBack,active,areas,onDiscussTask}:{onDiscussTask?:(t
  useEffect(()=>{if(typeof window==='undefined'||!window.addEventListener)return;const tryOpen=()=>{const id=String((window as any).__sofiaOpenTask||'');if(!id)return;const t=items.find(x=>x.id===id);if(t){(window as any).__sofiaOpenTask='';setError('');setEditing({...t});}};tryOpen();const on=()=>tryOpen();window.addEventListener('sofia:open-task',on);return()=>window.removeEventListener('sofia:open-task',on);},[items]);
  // 0.3.255: Tarefas backlog - a que subiu para a agenda (estado "scheduled") sai daqui e vive na Agenda
  const [toAgenda,setToAgenda]=useState<Task|null>(null);
- const visible=filterTasks(items.filter(t=>deskNoBack?(stateTab==='done'?t.state==='done':stateTab==='scheduled'?t.state==='scheduled':t.state!=='scheduled'&&t.state!=='done'):t.state!=='scheduled'),{query,area:areaFilter,priority:priorityFilter});
+ const visible=byCreation(filterTasks(items.filter(t=>deskNoBack?(stateTab==='done'?t.state==='done':stateTab==='scheduled'?t.state==='scheduled':t.state!=='scheduled'&&t.state!=='done'):t.state!=='scheduled'),{query,area:areaFilter,priority:priorityFilter}));
  // 0.3.296: abrir a tarefa pedida por outra tela (bolinha da linha do tempo do Inicio)
  useEffect(()=>{const open=()=>{if(!active)return;const id=peekFocusedTask();if(!id)return;const t=items.find(x=>x.id===id);if(t){takeFocusedTask();setError('');setEditing({...t});}else if(!loading){takeFocusedTask();api.tasks().then(r=>{const f=r.items.find(x=>x.id===id);if(f){setError('');setEditing({...f});}}).catch(()=>undefined);}};open();return onFocusTask(open);},[active,items,loading]);
  // 0.3.331: rascunho vindo da linha do tempo do Inicio (horario do clique) abre o editor de tarefa nova ja preenchido

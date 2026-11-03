@@ -297,7 +297,7 @@ export function DeskNotificationsPage(){const n=useNotifications(),c=useTheme(),
    <DeskFilter on={tab==='all'&&area==='all'} label="Todas" count={n.items.length} icon="bell" onPress={()=>{setTab('all');setArea('all');}}/>
    <DeskFilter on={tab==='unread'&&area==='all'} label="Não lidas" count={n.unread} icon="check" onPress={()=>{setTab('unread');setArea('all');}}/>
    {areas.length?<View style={{height:1,backgroundColor:c.line,marginVertical:8,marginHorizontal:4}}/>:null}
-   {areas.map(([a,cnt])=>{const st=AREA_STYLE[a]||AREA_STYLE.Outros;return <DeskFilter key={a} on={area===a} label={AREA_SHORT[a]||a} count={cnt} icon={((st as {glyph?:string}).glyph||'bell') as IconName} color={st.color} onPress={()=>setArea(area===a?'all':a)}/>;})}
+   {areas.map(([a,cnt])=>{const st=AREA_STYLE[a]||AREA_STYLE.Outros;return <DeskFilter key={a} on={area===a} label={AREA_SHORT[a]||a} count={cnt} icon={((st as {glyph?:string}).glyph||'bell') as IconName} color={st.color} onPress={()=>{setTab('all');setArea(area===a?'all':a);}}/> /* 03/11/2026: a contagem da area e de todas; o filtro Nao lidas nao fica escondido */;})}
   </View>
   <View style={{flex:1,minWidth:0,gap:14}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{flex:1,fontSize:13,color:c.muted}}>{n.unread?(n.unread===1?'1 não lida':n.unread+' não lidas')+' · ':''}{n.items.length===1?'1 no total':n.items.length+' no total'}</Text>{n.unread>0?<DeskPageBtn label="Ler todas" onPress={()=>void n.readAll()}/>:null}{read.length?<DeskPageBtn label="Limpar lidas" onPress={()=>{for(const i of read)void n.clear(i);}}/>:null}</View>

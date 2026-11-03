@@ -43,6 +43,8 @@ function createConversationBoard({store,provider}){
     decided:(t.decided||[]).map(String).slice(0,8),todo:(t.todo||[]).map(String).slice(0,8),open:(t.open||[]).map(o=>({title:String(o.title||''),detail:String(o.detail||'')})).slice(0,6),
     numbers:(t.numbers||[]).map(n=>({label:String(n.label||''),value:String(n.value||'')})).slice(0,8),refs:(t.refs||[]).map(String).slice(0,6)};}).filter(t=>t.message_id);
    const now=new Date().toISOString();
+   // 03/11/2026: se o historico foi apagado enquanto a IA respondia, nao grava o resumo de volta
+   if(!store.messages(id,1).some(m=>m.status!=='deleted'))return {topics:[],updated_at:now};
    store.db.prepare('INSERT INTO conversation_board(conversation_id,json,message_count,updated_at) VALUES(?,?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET json=excluded.json,message_count=excluded.message_count,updated_at=excluded.updated_at').run(id,JSON.stringify({topics}),seq,now);
    // titulo da conversa = assunto (so troca o titulo automatico; um titulo escrito pela pessoa fica)
    const c=store.db.prepare('SELECT title FROM conversations WHERE id=? AND owner=?').get(id,OWNER);

@@ -216,7 +216,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}
-            {!desktop ? <IconButton name="search" label="Buscar nas notas" onPress={() => setSearchOpen(v => !v)} /> : null}
+            {!desktop ? <IconButton name="search" label="Buscar nas notas" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
           </View>
           {!desktop ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
             <BarPill testID="notes-area" label={view === 'all' ? 'Todas' : title} dot={curTag?.color} open={areaOpen} onPress={() => setAreaOpen(v => !v)} />
@@ -226,7 +226,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
           {!desktop && areaOpen ? <DropPanel title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
             <PanelRow label="Todas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
             <PanelRow label="Fixadas" count={notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go('pinned'); setAreaOpen(false); }} />
-            {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
+            {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => !n.archived && (n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key)).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
             <PanelRow label="Arquivadas" count={notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go('archived'); setAreaOpen(false); }} />
           </DropPanel> : null}
           {desktop ? <NavTabs nav={mobileNav} /> : null}

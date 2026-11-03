@@ -38,7 +38,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
       try {
         // 0.3.293: guardado neste aparelho se houver; senao busca no servidor (antes o bloco ficava "Abra Financas")
         let bundle = epoch ? null : await readCache(api);
-        if (!bundle) {const month = new Date().toISOString().slice(0, 7); bundle = await loadAll(api, financeWindow(month, 'home'));}
+        if (!bundle) {const month = (() => {const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');})(); /* mes local */ bundle = await loadAll(api, financeWindow(month, 'home'));}
         if (!alive) return;
         if (!bundle) {setDues(null); return;}
         const data = toData(bundle.items || {}, bundle.carry || {});

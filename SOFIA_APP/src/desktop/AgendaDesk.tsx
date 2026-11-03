@@ -30,7 +30,7 @@ const tint = (hex: string, a: number) => {const h = hex.replace('#', ''); if (h.
 export type AgendaDeskProps = {
   api: SofiaApi; active: boolean; items: AgendaItem[]; month: Date; setMonth: (d: Date) => void;
   selected: Date; setSelected: (d: Date) => void; start: (i: AgendaItem) => string;
-  onOpen: (i: AgendaItem) => void; onToggle: (i: AgendaItem) => void; onCreate: (d: Date) => void;
+  onOpen: (i: AgendaItem) => void; onToggle: (i: AgendaItem) => void; onCreate: (d: Date, exact?: boolean) => void;
   /** 03/11/2026 (Pedro: "na agenda seria legal a funcionalidade e ate a animacao que a gente ja tem na agenda do site"):
    * a mesma Agenda no celular - Ano, Mes e Dia com o zoom; no Mes os dias mostram bolinhas em vez dos titulos. */
   compact?: boolean;
@@ -119,7 +119,7 @@ function MonthView({x, m}: {x: Ctx; m: Date}) {
           const list = !out && cur ? byDay.get(k) || [] : [];
           return <Pressable key={k} accessibilityRole="button" accessibilityLabel={day.toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}) + (list.length ? ', ' + list.length + ' itens' : '')}
             onLayout={keep('d' + k, 'row' + r)}
-            onPress={() => go('day', day, 'd' + k)}
+            onPress={() => go('day', day, 'd' + k)} delayLongPress={420} onLongPress={() => x.p.onCreate(day)} /* 03/11/2026: segurar o dia cria nele (como o mes antigo do celular) */
             style={({hovered}: any) => ({flex: 1, minWidth: 0, borderLeftWidth: d ? 1 : 0, borderTopWidth: r ? 1 : 0, borderColor: c.line, paddingVertical: 8, paddingHorizontal: 6, gap: 3, overflow: 'hidden', backgroundColor: hovered ? c.input : 'transparent'})}>
             <View style={{height: 20, justifyContent: 'center', paddingLeft: 6, marginBottom: 2}}>
               <Text style={{alignSelf: 'flex-start', marginLeft: t ? -7 : 0, paddingHorizontal: t ? 7 : 0, borderRadius: 8, overflow: 'hidden', fontSize: 13, fontWeight: t ? '700' : '500', color: t ? c.onAccent : c.muted, backgroundColor: t ? c.accent : 'transparent', opacity: out ? 0.4 : 1, fontVariant: ['tabular-nums']}}>{day.getDate()}</Text>
@@ -158,7 +158,7 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
     <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingTop: 10, paddingBottom: 12}}>
       <View style={{marginLeft: p.compact ? 58 : 84, marginRight: p.compact ? 12 : 20, height: 24 * HOUR, position: 'relative'}}>
         {/* 03/11/2026: segurar num horario vazio do Dia cria naquele horario (celular e site) */}
-        {Array.from({length: 24}, (_, h) => <Pressable key={h} accessibilityRole="button" accessibilityLabel={'Segure para criar às ' + String(h).padStart(2, '0') + ':00'} delayLongPress={380} onLongPress={() => p.onCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h))} style={({pressed}: any) => ({position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.accentSoft : 'transparent'})}>
+        {Array.from({length: 24}, (_, h) => <Pressable key={h} accessibilityRole="button" accessibilityLabel={'Segure para criar às ' + String(h).padStart(2, '0') + ':00'} delayLongPress={380} onLongPress={() => p.onCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h), true)} style={({pressed}: any) => ({position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.accentSoft : 'transparent'})}>
           <Text style={{position: 'absolute', left: p.compact ? -50 : -64, top: -8, width: p.compact ? 42 : 52, textAlign: 'right', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{String(h).padStart(2, '0')}:00</Text>
         </Pressable>)}
         {timed.map(i => {
@@ -307,7 +307,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
   const sep = <Text style={{fontSize: 18, color: c.muted}}>›</Text>;
   const ghost = (label: string, onPress: () => void, a11y?: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y || label} onPress={onPress} style={({hovered}: any) => ({height: 36, minWidth: 36, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.text, fontSize: 14}}>{label}</Text></Pressable>;
   const segBar = <View accessibilityRole="tablist" style={{flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: 'hidden', flex: p.compact ? 1 : undefined}}>
-        {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() ? new Date() : d)}
+        {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? new Date() : d)}
           style={{flex: p.compact ? 1 : undefined, alignItems: 'center', height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
       </View>;
   if (p.compact) return <View style={{flex: 1}}>
@@ -338,7 +338,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
       </View>
       <View style={{flex: 1}} />
       <View accessibilityRole="tablist" style={{flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: 'hidden'}}>
-        {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() ? new Date() : d)}
+        {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? new Date() : d)}
           style={{height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
       </View>
     </View>

@@ -135,9 +135,11 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const typeOf = (id: string): TypeDef => types.find(t => t.id === id) || (MODELS[id] ? {...MODELS[id], id, e: null, position: 999, pinned: false, inMore: false} : {...MODELS.blank, id, name: 'Outros', one: 'Item', e: null, position: 999, pinned: false, inMore: false});
   const curType = view !== 'all' ? typeOf(view) : null;
   const tagsFor = (typeId: string | null) => [...new Map(items.filter(i => !typeId || i.type === typeId).flatMap(i => i.tags).map(t => [fold(t), t] as const)).values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // 03/11/2026: as caixinhas de etiqueta marcam varias (antes a segunda trocava a primeira); mostra quem tem qualquer uma
+  const tagList = filter.tag ? filter.tag.split('\n') : [], hasTag = (tg: string) => tagList.some(x => fold(x) === fold(tg));
   const filterOn = !!(filter.status || filter.rating || filter.tag);
   const shown = items.filter(i => (view === 'all' || i.type === view) && (!query.trim() || fold([i.title, i.creator, i.site, i.tags.join(' '), i.notes].join(' ')).includes(fold(query)))
-    && (!filter.tag || i.tags.some(t => fold(t) === fold(filter.tag))) && (!filter.rating || i.rating >= filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1)));
+    && (!filter.tag || i.tags.some(t => hasTag(t))) && (!filter.rating || i.rating >= filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1)));
   const open = items.find(i => i.id === openId) || null;
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(''), 1200); return () => clearTimeout(t); }, [flash]);
 
@@ -300,25 +302,25 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
               {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : null}
             </View>
             {desktop && curType && !curType.area ? <GhostButton icon="edit" label="Editar tipo" onPress={() => setTypeDialog({edit: curType})} /> : null}
-            {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => !v)} /> : null}
+            {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
             {desktop ? <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} /> : <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} />}
           </View>
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca') + (desktop ? ' (N adiciona; Ctrl+V cola um link)' : '')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View></View> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 2}}>
             {!desktop ? <BarPill testID="lib-area" label={curType ? curType.name : 'Tudo'} open={drop === 'area'} onPress={() => setDrop(d => d === 'area' ? '' : 'area')} /> : null}
-            <BarPill testID="lib-filter" label="Filtros" count={(filter.tag ? 1 : 0) + (filter.rating ? 1 : 0)} open={drop === 'filter'} onPress={() => setDrop(d => d === 'filter' ? '' : 'filter')} />
+            <BarPill testID="lib-filter" label="Filtros" count={tagList.length + (filter.rating ? 1 : 0)} open={drop === 'filter'} onPress={() => setDrop(d => d === 'filter' ? '' : 'filter')} />
           </View>
           {drop === 'area' && !desktop ? <DropPanel title="Áreas" action={{label: 'Organizar', onPress: () => { setDrop(''); setOrganize(true); }}} footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setDrop(''); setTypeDialog({edit: null}); }} />}>
             <PanelRow label="Tudo" count={items.length} on={view === 'all'} onPress={() => { setView('all'); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />
             {types.map(t => <PanelRow key={t.id} label={t.name} count={count(t)} on={view === t.id} onPress={() => { setView(t.id); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />)}
           </DropPanel> : null}
           {drop === 'filter' ? <DropPanel title={'Filtros' + (curType ? ' de ' + curType.name : '')} action={filterOn ? {label: 'Limpar', onPress: () => setFilter({status: '', rating: 0, tag: ''})} : undefined} footer={<PrimaryButton label={'Ver ' + shown.length + (shown.length === 1 ? ' item' : ' itens')} onPress={() => setDrop('')} />}>
-            {tagsFor(curType?.id || null).map(tg => <PanelRow key={tg} kind="check" label={tg} count={items.filter(i => (!curType || i.type === curType.id) && i.tags.some(x => fold(x) === fold(tg))).length} on={fold(filter.tag) === fold(tg)} onPress={() => setFilter(f => ({...f, tag: fold(f.tag) === fold(tg) ? '' : tg}))} />)}
+            {tagsFor(curType?.id || null).map(tg => <PanelRow key={tg} kind="check" label={tg} count={items.filter(i => (!curType || i.type === curType.id) && i.tags.some(x => fold(x) === fold(tg))).length} on={hasTag(tg)} onPress={() => setFilter(f => {const cur = f.tag ? f.tag.split('\n') : [], next = cur.some(x => fold(x) === fold(tg)) ? cur.filter(x => fold(x) !== fold(tg)) : [...cur, tg]; return {...f, tag: next.join('\n')};})} />)}
             <StarRow value={filter.rating} onChange={r => setFilter(f => ({...f, rating: r}))} />
             <View style={{height: 12}} />
           </DropPanel> : null}
-          <ResultLine text={[filter.tag, filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
+          <ResultLine text={[tagList.join(', '), filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {shown.length ? <View style={desktop ? {borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'} : {gap: 8}}>{shown.map((it, k) => <Card key={it.id} it={it} first={!k} />)}</View> : null}
           {!shown.length ? <View style={{alignItems: 'center', gap: 10, paddingVertical: 40}}><Icon name={curType?.icon || 'book'} size={32} color={c.muted} /><Text style={{color: c.muted, textAlign: 'center', maxWidth: 360}}>{query || filterOn ? 'Nada encontrado com esse filtro.' : 'Nada aqui ainda. Adicione pelo nome, cole um link de qualquer site ou arraste um arquivo.'}</Text></View> : null}
