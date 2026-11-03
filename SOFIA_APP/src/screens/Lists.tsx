@@ -368,7 +368,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const header = <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
     {!desktop ? <IconButton name="back" label={inGroup ? 'Voltar para ' + L.name : 'Voltar aos apps'} onPress={() => inGroup ? setGfilter('all') : onBack()} /> : inGroup ? <IconButton name="back" label={'Voltar para ' + L.name} onPress={() => setGfilter('all')} /> : null}
     <View style={{flex: 1, minWidth: 0}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{desktop ? null : inGroup ? <View style={{width: 11, height: 11, borderRadius: 4, backgroundColor: myGroups.find(g => g.id === gfilter)?.color || c.line}} /> : <Icon name={L.icon} size={22} color={c.text} />}<Text numberOfLines={1} style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0, flexShrink: 1}}>{inGroup ? gname(gfilter) : L.name}</Text></View>
+      <Text accessibilityRole="header" numberOfLines={1} style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1, flexShrink: 1}}>{desktop ? (inGroup ? gname(gfilter) : L.name) : 'Listas'}</Text>{/* 03/11/2026: no celular o titulo e sempre o nome do app */}
       {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { /* 0.3.275: a frase da Sofia no lugar dos numeros emendados */
         const open = (L.model === 'shopping' && !inGroup ? mine : todo).filter(i => !i.done), tot = open.reduce((s, i) => s + (i.price || 0), 0);
         if (!open.length) return done.length ? 'Tudo no carrinho. É só finalizar a compra.' : 'Lista vazia. Escreva no campo abaixo e aperte Enter.';

@@ -50,6 +50,10 @@ export type HomeBriefProps = {
   onMove?: (moves: Move[]) => void;
   onAddAt?: (kind: AddKind, at: Date) => void;
   sofia?: SofiaBridge;
+  /** 03/11/2026: o mesmo Inicio do site no celular (aprovado no quadro): Seu dia, Agenda e os blocos em duas colunas. */
+  compact?: boolean;
+  /** celular: segurar num horario vazio leva para a Conversa com esse horario (03/11/2026) */
+  onAskAt?: (at: Date) => void;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -86,6 +90,8 @@ let lastBrief = Math.round(170 * uiScale()); // o esqueleto e o Inicio pronto us
  * aumenta tudo por igual e o homeZoom. 183 = distancia do topo do bloco ao numero de Financas + do numero dos outros
  * ao pe (medido na tela). */
 const ROW_H = 183;
+/** Altura dos blocos em par no celular (quase quadrados na largura de um celular comum). */
+const HALF_H = 176;
 function useRowHeight(_root: React.RefObject<View | null>, _briefH: number) {
   useWindowDimensions(); // recalcula quando a janela muda (fator da tela)
   return Math.round(ROW_H * uiScale());
@@ -215,18 +221,33 @@ export function HomeBrief(p: HomeBriefProps) {
         <View testID="day-nav" style={{position: 'absolute', left: '50%' as any, top: 0, bottom: 0, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 4} as any}>
           <Pressable testID="day-prev" accessibilityRole="button" accessibilityLabel="Dia anterior" disabled={viewDay <= 0} onPress={() => dayNav.current?.go(viewDay - 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay <= 0 ? 0.3 : 1, backgroundColor: hovered && viewDay > 0 ? c.input : 'transparent', transform: [{rotate: '180deg'}]})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
           <Pressable testID="day-label" accessibilityRole="button" accessibilityLabel="Voltar para hoje" onPress={() => dayNav.current?.go(0)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}>
-            <Text style={{fontSize: 14, fontWeight: '600', color: viewDay === 0 ? c.accent : c.text}}>{dayWord}</Text><Text style={{fontSize: 13, color: c.muted}}>{dayDate}</Text></Pressable>
+            <Text style={{fontSize: 14, fontWeight: '600', color: viewDay === 0 ? c.accent : c.text}}>{dayWord}</Text>{p.compact ? null : <Text style={{fontSize: 13, color: c.muted}}>{dayDate}</Text>}</Pressable>
           <Pressable testID="day-next" accessibilityRole="button" accessibilityLabel="Próximo dia" disabled={viewDay >= 2} onPress={() => dayNav.current?.go(viewDay + 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay >= 2 ? 0.3 : 1, backgroundColor: hovered && viewDay < 2 ? c.input : 'transparent'})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
         </View>
-        {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>{dayWord} · <Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
+        {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>{p.compact ? '' : dayWord + ' · '}<Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
       </View>
       {/* 0.3.318/0.3.331 (Pedro): clicar fora - em qualquer lugar, inclusive na barra lateral - ou Esc fecha os ajustes (useClickOutside) */}
       {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline nav={dayNav} onDay={setViewDay} items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
+        actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
     </View>
+    {p.compact ? <>
+      {/* celular: os blocos de verdade do site, adaptados. Agenda, Rotina e Financas na largura toda (tem seletor/duas
+          colunas de numeros); Tarefas, E-mails, Price Tracker e Encomendas em pares do mesmo tamanho. */}
+      <AgendaTile style={{height: 176}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
+      <View style={{flexDirection: 'row', gap: 10}}>
+        <TasksTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
+        <MailTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
+      </View>
+      <RotinaTile style={{height: 168}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
+      <View style={{flexDirection: 'row', gap: 10}}>
+        <PriceTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
+        <PackagesTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
+      </View>
+      <FinanceTile style={{height: 176}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
+    </> : <>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
@@ -238,6 +259,7 @@ export function HomeBrief(p: HomeBriefProps) {
       <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
     </View>
+    </>}
   </View>;
 }
 
@@ -259,7 +281,7 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type TimelineActions = {onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
+export type TimelineActions = {onAskAt?: (at: Date) => void; onEdit: (r: DayRecord) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
 /** 0.3.331 (Pedro): clicar num lugar vazio da linha do tempo abre um seletor pequeno; a escolha abre o editor da propria
@@ -462,6 +484,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {actions.onAddAt ? <Pressable testID="timeline-add-area" dataSet={{noveil: "1"}} accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
+      onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
       {...({onMouseMove: (e: any) => {if (dragRef.current || adding) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx);
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
@@ -1077,7 +1100,7 @@ function MailTile({style, card, data, onOpen}: {style: any; card: any; data: Hom
 
 /** 0.3.295: esqueleto no MESMO desenho do Inicio novo (cartao Seu dia + duas fileiras de blocos, mesmas alturas):
  * quando os dados chegam, so o conteudo aparece - nada muda de lugar nem de tamanho. */
-export function HomeBriefSkeleton() {
+export function HomeBriefSkeleton({compact = false}: {compact?: boolean} = {}) {
   const c = useTheme(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), rowH = useRowHeight(root, briefH);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
@@ -1098,7 +1121,12 @@ export function HomeBriefSkeleton() {
         <View style={{position: 'absolute', left: 0, right: 0, top: 86, flexDirection: 'row', justifyContent: 'space-between'}}>{[0, 1, 2, 3, 4, 5].map(k => <ShimmerBlock key={k} width={34} height={10} radius={4} />)}</View>
       </View>
     </View>
+    {compact ? <>
+      <View style={[card, {height: 176, gap: 10}]}><ShimmerBlock width={130} height={14} radius={6} /><LoadingLines rows={3} immediate /></View>
+      <View style={{flexDirection: 'row', gap: 10}}><View style={[card, {flex: 1, height: HALF_H}]} /><View style={[card, {flex: 1, height: HALF_H}]} /></View>
+    </> : <>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</View>
     <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</View>
+    </>}
   </View></ShimmerGroup>;
 }

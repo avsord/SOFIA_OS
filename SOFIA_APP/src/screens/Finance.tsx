@@ -1,4 +1,5 @@
 import {DeskPageSkeleton} from '../components/Loading';
+import {useDraft} from '../lib/draft-bus';
 import {Presence} from '../components/Presence';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PALETTE} from '../lib/palette';
@@ -163,7 +164,9 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
       txs: transactionsForAccount(d.txs,d.cards,account.id)};
   },[d,accountId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [newMenu, setNewMenu] = useState(false), [aporteKey, setAporteKey] = useState(0);
-  const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), accountId, paid: true});
+  const newTx = (kind: TxKind = 'expense', date = todayISO()) => setEditing({kind, date, accountId, paid: true});
+  // 03/11/2026: a seta da barrinha "Criar" da Conversa abre Despesa/Receita ja no dia segurado na linha do tempo
+  useDraft<{kind: TxKind; date: string}>('financeNew', active, d => newTx(d.kind, d.date));
   useEffect(() => {
     if (!active || !d) return;
     let valid = true;

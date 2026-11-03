@@ -41,8 +41,8 @@ test('024 rendered mini agenda: equal halves, same row, selecting day updates ev
  const render=()=>h.render(()=>MiniAgenda({items,viewOwner,onOpen:d=>opened.push(d),onItem:i=>opened.push(i.id)}));
  let nodes=descendants(render()),row=nodes.find(n=>n.props?.testID==='agenda-split-row');assert.equal(row.props.style.flexDirection,'row');
  const halves=nodes.filter(n=>['agenda-calendar-half','agenda-items-half'].includes(n.props?.testID));assert.equal(halves.length,2);assert.equal(halves[0].props.testID,'agenda-items-half');assert.equal(halves[1].props.testID,'agenda-calendar-half');halves.forEach(n=>assert.equal(n.props.style.width,'50%'));
- assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));
- nodes.find(n=>n.props?.testID==='agenda-day-'+other).props.onPress();nodes=descendants(render());assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.deepEqual(opened,[]);
+ assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));if(other<day)assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));
+ nodes.find(n=>n.props?.testID==='agenda-day-'+other).props.onPress();nodes=descendants(render());{/* 03/11/2026 (Pedro): a lista comeca no dia escolhido e, rolando, segue com os proximos dias */const labels=nodes.map(n=>n.props?.accessibilityLabel).filter(Boolean);assert.ok(labels.includes('Outra data teste'));if(other<day)assert.ok(labels.indexOf('Outra data teste')<labels.indexOf('Hoje teste'));else assert.ok(!labels.includes('Hoje teste'));}assert.deepEqual(opened,[]);
  const list=nodes.find(n=>n.props?.testID==='agenda-day-items');assert.equal(list.props.nestedScrollEnabled,false);assert.equal(list.props.showsVerticalScrollIndicator,false);assert.equal(list.props.bounces,false);assert.equal(list.props.style.height,190);
 });
 test('024 popover: top follows actual bell across mobile/tablet widths, never screen centre',()=>{

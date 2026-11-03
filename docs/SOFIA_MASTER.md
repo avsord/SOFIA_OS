@@ -259,11 +259,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | 0.3.354 (servidor) | Custo de IA — rodada 2: tipos de apps tirados saem da IA | Pedro aprovou: project, dream, course, lesson e study_progress (Projetos e rotina, Sonhos, Estudos/Cursos/Aulas) não são mais descritos no APPS DA SOFIA nem aceitos como entity_kind (RETIRED em app-bridge.js; enum do… | servidor |
 | 2026-11-03 | docs | — | Projeto mais leve para o agente: diário saiu do MASTER (120 mil → 36 mil car.; só 5 últimas linhas ficam), 241 notas antigas de versão foram para docs/historico/app/, regra de leitura econômica no AGENTS | testes app 947 e servidor 408+84 ok |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: brilho do esqueleto em CSS (não trava ao abrir); Agenda do Início "hoje 14:30"; X da notificação após excluir; Início mais alto (folga 60); Price Tracker = loja principal no app e no Início; campo da Conversa cortado | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site recompilado (public/web): a rodada anterior subiu só o código e o site não mudou; Perfil do site em duas colunas (identidade + seções); tela de Notificações do site com filtros à esquerda e cartões por dia | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: animações CSS passam a funcionar (iam em estilo solto e o react-native-web descartava; agora StyleSheet.create e a camada do computador separa a animação); Início entra com fade; linha do tempo já no lugar ao voltar à aba; bolinhas dos itens no Price Tracker/Encomendas e setas na Rotina | aguardando teste do Pedro |
+| 2026-11-03 | (versão escolhida pelo delivery) | App com a cara do site (aprovado no quadro): Início do celular = Início do site compacto (Seu dia + blocos, sem mini chat); Agenda do celular = Agenda do site (Ano/Mês/Dia com zoom, bolinhas no mês); segurar na linha do tempo leva à Conversa com a barrinha "Criar · hoje às HH:MM" e a seta de criação manual; títulos padrão (nome do app) em Listas, Encomendas, E-mails, Biblioteca, Notas; + simples; Biblioteca/Notas com barra Área/Filtros; Agenda do Início rola para os próximos dias; Conversa mostra listas como lista; segurar no Dia da Agenda cria no horário; Despesa/Receita pela barrinha já no dia; Perfil do celular em cartões | aguardando teste do Pedro |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

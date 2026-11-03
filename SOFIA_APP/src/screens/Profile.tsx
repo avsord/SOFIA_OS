@@ -52,37 +52,42 @@ export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckU
  // 03/11/2026 (Pedro: "arrumar a diagramacao da tela de perfil... profissional e premium"; desenho aprovado no quadro):
  // no computador, coluna da esquerda com a identidade (foto, nome, e-mail) e o menu das secoes; a direita, cada secao em
  // cartoes com o texto a esquerda e o controle a direita. Mesmas funcoes de antes, so organizadas. O celular nao muda.
- if(desktop){
+ // 03/11/2026: o celular usa o mesmo Perfil organizado (aprovado no quadro): cartao de identidade e as secoes em
+ // cartoes, uma embaixo da outra; no computador continua com o menu das secoes a esquerda.
+ const show=(id:string)=>!desktop||deskSection===id;
+ if(true){
   const card={backgroundColor:c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,paddingHorizontal:20,paddingBottom:6,boxShadow:'0 1px 2px rgba(0,0,0,0.18), 0 8px 20px rgba(0,0,0,0.12)'} as any;
   const sections=[['conta','Conta','user'],['aparencia','Aparência','eye'],['conversa','Conversa','chat'],['conexoes','Conexões','link'],['armazenamento','Armazenamento','box'],['notificacoes','Notificações','bell'],['seguranca','Segurança','shield'],['sobre','Sobre','info']] as const;
   const themes=([{id:'schedule',label:'Horário'},{id:'system',label:'Sistema'},{id:'light',label:'Claro'},{id:'dark',label:'Escuro'}] as {id:Appearance;label:string}[]);
   return <><Presence>{perfOpen?<FluencyPanel onClose={()=>setPerfOpen(false)}/>:null}</Presence><ScrollView onScroll={noteFluencyMovement} scrollEventThrottle={100} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:32}}><ScreenTitle title="Perfil" subtitle="Sua conta, a aparência e as configurações do app."/>
-   <View testID="profile-layout" style={{flexDirection:'row',alignItems:'flex-start',gap:28,paddingLeft:dpx(40),paddingRight:dpx(40),width:'100%',maxWidth:1180,alignSelf:'center'} as any}>
-    <View style={{width:260,gap:16}}>
+   <View testID="profile-layout" style={(desktop?{flexDirection:'row',alignItems:'flex-start',gap:28,paddingLeft:dpx(40),paddingRight:dpx(40),width:'100%',maxWidth:1180,alignSelf:'center'}:{gap:16,paddingHorizontal:16}) as any}>
+    <View style={desktop?{width:260,gap:16}:{gap:16}}>
      <View style={[card,{paddingVertical:22,paddingBottom:22,alignItems:'center',gap:10}]}><ProfilePhotoEditor scope={bootstrap.profile.email} name={bootstrap.profile.name}/><View style={{alignItems:'center',gap:3}}><Text numberOfLines={1} style={{color:c.text,fontSize:18,fontWeight:'700'}}>{bootstrap.profile.name}</Text><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Proprietário</Text><Text selectable numberOfLines={1} style={{color:c.muted,fontSize:12}}>{bootstrap.profile.email}</Text></View></View>
-     <View accessibilityRole="tablist" accessibilityLabel="Seções do perfil" style={{gap:2}}>{sections.map(([id,label,icon])=><Pressable key={id} accessibilityRole="tab" accessibilityState={{selected:deskSection===id}} onPress={()=>setDeskSection(id)} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:10,height:36,paddingHorizontal:12,borderRadius:9,backgroundColor:deskSection===id?c.accentSoft:hovered?c.input:'transparent'})}><Icon name={icon} size={15} color={deskSection===id?c.accent:c.muted}/><Text style={{fontSize:13,color:deskSection===id?c.text:c.muted,fontWeight:deskSection===id?'600':'500'}}>{label}</Text></Pressable>)}</View>
+     {desktop?<View accessibilityRole="tablist" accessibilityLabel="Seções do perfil" style={{gap:2}}>{sections.map(([id,label,icon])=><Pressable key={id} accessibilityRole="tab" accessibilityState={{selected:deskSection===id}} onPress={()=>setDeskSection(id)} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:10,height:36,paddingHorizontal:12,borderRadius:9,backgroundColor:deskSection===id?c.accentSoft:hovered?c.input:'transparent'})}><Icon name={icon} size={15} color={deskSection===id?c.accent:c.muted}/><Text style={{fontSize:13,color:deskSection===id?c.text:c.muted,fontWeight:deskSection===id?'600':'500'}}>{label}</Text></Pressable>)}</View>:null}
     </View>
     <View style={{flex:1,minWidth:0,gap:16}}>{error?<ErrorBanner text={error}/>:null}
-     {deskSection==='conta'?<View style={card}><DeskHead title="Conta" desc="Seus dados de acesso à Sofia."/>
+     {show('conta')?<View style={card}><DeskHead title="Conta" desc="Seus dados de acesso à Sofia."/>
       <DeskRow title="Nome" desc="Aparece na saudação do Início."><View style={{flexDirection:'row',alignItems:'center',gap:8}}><TextInput value={name} onChangeText={setName} maxLength={80} accessibilityLabel="Nome do perfil" style={{width:240,height:34,paddingHorizontal:12,borderRadius:9,borderWidth:1,borderColor:c.line,backgroundColor:c.input,color:c.text,fontSize:13,outlineStyle:'none'} as any}/><DeskBtn label={saving?'Salvando…':'Salvar'} primary disabled={saving||!name.trim()||name.trim()===bootstrap.profile.name} onPress={()=>void save()}/></View></DeskRow>
       <DeskRow title="E-mail de login" desc={bootstrap.profile.email}/>
       <DeskRow title="Foto do perfil" desc="Clique na foto à esquerda para escolher, enquadrar ou remover."/></View>:null}
-     {deskSection==='aparencia'?<View style={card}><DeskHead title="Aparência" desc="Vale para este computador."/>
+     {show('aparencia')?<View style={card}><DeskHead title="Aparência" desc="Vale para este computador."/>
       <DeskRow title="Tema" desc="Pelo horário, igual ao sistema, claro ou escuro."><View style={{flexDirection:'row',padding:3,gap:2,borderRadius:10,backgroundColor:c.input}}>{themes.map(mode=><Pressable key={mode.id} accessibilityRole="button" accessibilityState={{selected:prefs.appearance===mode.id}} onPress={()=>void preference({...prefs,appearance:mode.id})} style={{height:28,paddingHorizontal:12,borderRadius:8,justifyContent:'center',backgroundColor:prefs.appearance===mode.id?c.surface:'transparent'}}><Text style={{fontSize:13,fontWeight:'600',color:prefs.appearance===mode.id?c.text:c.muted}}>{mode.label}</Text></Pressable>)}</View></DeskRow>
       {prefs.appearance==='schedule'?<View style={{borderTopWidth:1,borderColor:c.line,paddingVertical:12}}><ThemeScheduleSettings prefs={prefs} onSave={preference}/></View>:null}</View>:null}
-     {deskSection==='conversa'?<View style={card}><DeskHead title="Conversa" desc="App e site usam o mesmo histórico."/>
+     {show('conversa')?<View style={card}><DeskHead title="Conversa" desc="App e site usam o mesmo histórico."/>
       <DeskRow title="Enter para enviar" desc="Desligado: Enter quebra a linha."><Switch value={prefs.enterToSend} onValueChange={v=>void preference({...prefs,enterToSend:v})}/></DeskRow>
       <DeskRow title="Enviar áudio ao parar" desc="Ligado: ao parar a gravação, a mensagem de voz já é enviada."><Switch value={prefs.autoSendVoice} onValueChange={v=>void preference({...prefs,autoSendVoice:v})}/></DeskRow>
       <DeskRow title="Histórico da conversa" desc="Apaga as conversas do app e do site. Memórias, tarefas e registros continuam."><DeskBtn label="Apagar histórico" danger onPress={clearHistory}/></DeskRow></View>:null}
-     {deskSection==='conexoes'?<><ConnectionsSettings api={api}/><GoogleCalendarSettings api={api}/><StoreConnections api={api}/></>:null}
-     {deskSection==='armazenamento'?<StorageCard api={api}/>:null}
-     {deskSection==='notificacoes'?<AgendaNotificationSettings/>:null}
-     {deskSection==='seguranca'?<View style={card}><DeskHead title="Segurança e sessão" desc="Você continua conectado até sair. A senha não fica salva neste computador."/>
+     {show('conexoes')?<><ConnectionsSettings api={api}/><GoogleCalendarSettings api={api}/><StoreConnections api={api}/></>:null}
+     {show('armazenamento')?<StorageCard api={api}/>:null}
+     {show('notificacoes')?<AgendaNotificationSettings/>:null}
+     {show('seguranca')?<View style={card}><DeskHead title="Segurança e sessão" desc="Você continua conectado até sair. A senha não fica salva neste computador."/>
       <DeskRow title="Senha" desc="Use pelo menos 12 caracteres."><DeskBtn label="Alterar senha" onPress={()=>{setError('');setPasswordModal(true);}}/></DeskRow>
       <DeskRow title="Este computador" desc="Sai só daqui."><DeskBtn label="Sair" onPress={()=>{appAlert('Sair da Sofia?','Você precisará entrar novamente.',[{text:'Cancelar',style:'cancel'},{text:'Sair',onPress:()=>void onLogout()}]);}}/></DeskRow>
       <DeskRow title="Todas as sessões" desc="Será preciso entrar de novo no site e em todos os celulares."><DeskBtn label="Encerrar todas" danger onPress={logoutAll}/></DeskRow></View>:null}
-     {deskSection==='sobre'?<View style={card}><DeskHead title="Sobre"/>
+     {show('sobre')?<View style={card}><DeskHead title="Sobre"/>
       <DeskRow title="Versão" desc={'Sofia OS '+APP_VERSION+' · Servidor '+bootstrap.version}><Text onPress={versionTap} accessibilityLabel={'Versão instalada '+APP_VERSION} style={{fontSize:12,color:c.muted,fontVariant:['tabular-nums']}}>{APP_VERSION}</Text></DeskRow>
+      {!desktop?<DeskRow title="Atualizações" desc="A Sofia verifica sozinha; a instalação sempre pede sua confirmação no Android."><DeskBtn label="Verificar" onPress={()=>void onCheckUpdate()}/></DeskRow>:null}
+      {!desktop?<DeskRow title="Diagnóstico de abertura" desc="Tempos de abertura deste celular."><DeskBtn label="Ver" onPress={()=>void launchTimings()}/></DeskRow>:null}
       {[['Site público','site'],['Privacidade','privacy'],['Termos de serviço','terms'],['Solicitar exclusão de dados','data-deletion']].map(([label,path])=><Pressable key={path} accessibilityRole="link" onPress={()=>void Linking.openURL(SITE+'/'+path)} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',paddingVertical:13,borderTopWidth:1,borderColor:c.line,opacity:hovered?0.8:1})}><Text style={{flex:1,color:c.text,fontSize:14,fontWeight:'500'}}>{label}</Text><Icon name="chevron" color={c.muted} size={15}/></Pressable>)}</View>:null}
     </View>
    </View></ScrollView>{passwordModalNode}</>;

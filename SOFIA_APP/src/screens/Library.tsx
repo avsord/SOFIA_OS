@@ -20,6 +20,7 @@ import {libraryRating, libraryTags, isLibraryMeta} from '../lib/library-filters'
 import {AREA_TAG, MEMBER_TAG, customPayload, customValues, readArea, type LibraryArea} from '../lib/library-areas';
 import {Icon, type IconName} from '../components/Icon';
 import {IconButton} from '../components/UI';
+import {BarPill, DropPanel, PanelRow, StarRow, ResultLine} from '../components/FilterBar';
 import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
@@ -87,6 +88,8 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [view, setView] = useState('all'), [query, setQuery] = useState(''), [filter, setFilter] = useState<{status: string; rating: number; tag: string}>({status: '', rating: 0, tag: ''}), [filterOpen, setFilterOpen] = useState(false);
   const [adding, setAdding] = useState<null | {seed?: string; files?: any[]; type?: string}>(null), [openId, setOpenId] = useState<string | null>(null), [flash, setFlash] = useState('');
   const [typeDialog, setTypeDialog] = useState<null | {edit: TypeDef | null}>(null), [organize, setOrganize] = useState(false), [moreOpen, setMoreOpen] = useState(false);
+  // 03/11/2026: barra [Area ⌄] [Filtros ⌄]; so um painel aberto por vez; a busca abre pela lupa do topo (celular)
+  const [drop, setDrop] = useState<'' | 'area' | 'filter'>(''), [searchOpen, setSearchOpen] = useState(false);
   const [pending, setPending] = useState<Entity[]>([]);
 
   const load = useCallback(async () => {
@@ -134,7 +137,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const tagsFor = (typeId: string | null) => [...new Map(items.filter(i => !typeId || i.type === typeId).flatMap(i => i.tags).map(t => [fold(t), t] as const)).values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const filterOn = !!(filter.status || filter.rating || filter.tag);
   const shown = items.filter(i => (view === 'all' || i.type === view) && (!query.trim() || fold([i.title, i.creator, i.site, i.tags.join(' '), i.notes].join(' ')).includes(fold(query)))
-    && (!filter.tag || i.tags.some(t => fold(t) === fold(filter.tag))) && (!filter.rating || i.rating === filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1)));
+    && (!filter.tag || i.tags.some(t => fold(t) === fold(filter.tag))) && (!filter.rating || i.rating >= filter.rating) && (!filter.status || (filter.status === 'done' ? i.status === typeOf(i.type).statuses.length - 1 && typeOf(i.type).statuses.length > 1 : i.status !== typeOf(i.type).statuses.length - 1 || typeOf(i.type).statuses.length === 1)));
   const open = items.find(i => i.id === openId) || null;
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(''), 1200); return () => clearTimeout(t); }, [flash]);
 
@@ -288,29 +291,34 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const kbd = (k: string) => <Text style={{color: c.muted, fontSize: 11, borderWidth: 1, borderColor: c.line, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1}}>{k}</Text>;
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={desktop ? mobileNav : undefined}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curType && !desktop ? <Icon name={curType.icon} size={22} color={c.text} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0}}>{curType ? curType.name : 'Biblioteca'}</Text></View>
-              {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : <Text style={{color: c.muted, fontSize: 13}}>{shown.length} {shown.length === 1 ? 'item' : 'itens'}</Text>}
+              <Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Biblioteca</Text>
+              {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : null}
             </View>
-            {curType && !curType.area ? <GhostButton icon="edit" label={desktop ? 'Editar tipo' : undefined} onPress={() => setTypeDialog({edit: curType})} /> : null}
-            <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} />
+            {desktop && curType && !curType.area ? <GhostButton icon="edit" label="Editar tipo" onPress={() => setTypeDialog({edit: curType})} /> : null}
+            {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => !v)} /> : null}
+            {desktop ? <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} /> : <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} />}
           </View>
           {desktop ? <NavTabs nav={mobileNav} /> : null}
-          <View style={{flexDirection: 'row', gap: 10}}>
-            <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca') + (desktop ? ' (N adiciona; Ctrl+V cola um link)' : '')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View>
-            {/* botao de filtro neutro quando nao ha filtro ativo */}
-            <GhostButton testID="lib-filter" icon="filter" on={filterOn} label={desktop ? (filterOn ? 'Filtros ativos' : 'Filtrar') : undefined} onPress={() => setFilterOpen(v => !v)} />
+          {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca') + (desktop ? ' (N adiciona; Ctrl+V cola um link)' : '')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View></View> : null}
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 2}}>
+            {!desktop ? <BarPill testID="lib-area" label={curType ? curType.name : 'Tudo'} open={drop === 'area'} onPress={() => setDrop(d => d === 'area' ? '' : 'area')} /> : null}
+            <BarPill testID="lib-filter" label="Filtros" count={(filter.tag ? 1 : 0) + (filter.rating ? 1 : 0)} open={drop === 'filter'} onPress={() => setDrop(d => d === 'filter' ? '' : 'filter')} />
           </View>
-          {filterOpen ? <View style={{gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
-            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}><Chip label="Todos" selected={!filter.status} onPress={() => setFilter(f => ({...f, status: ''}))} /><Chip label="Para ver / fazer" selected={filter.status === 'todo'} onPress={() => setFilter(f => ({...f, status: 'todo'}))} /><Chip label="Concluídos" selected={filter.status === 'done'} onPress={() => setFilter(f => ({...f, status: 'done'}))} /></View>
-            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{[0, 5, 4, 3, 2, 1].map(r => <Chip key={r} label={r ? '★'.repeat(r) : 'Qualquer nota'} selected={filter.rating === r} onPress={() => setFilter(f => ({...f, rating: r}))} />)}</View>
-            {tagsFor(curType?.id || null).length ? <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{tagsFor(curType?.id || null).map(tg => <Chip key={tg} label={tg} selected={fold(filter.tag) === fold(tg)} onPress={() => setFilter(f => ({...f, tag: fold(f.tag) === fold(tg) ? '' : tg}))} />)}</View> : null}
-            {filterOn ? <Pressable accessibilityRole="button" onPress={() => setFilter({status: '', rating: 0, tag: ''})}><Text style={{color: c.accent, fontSize: 13}}>Limpar filtros</Text></Pressable> : null}
-          </View> : filter.tag ? <View style={{flexDirection: 'row'}}><Chip label={'Etiqueta: ' + filter.tag + '  ✕'} selected onPress={() => setFilter(f => ({...f, tag: ''}))} /></View> : null}
+          {drop === 'area' && !desktop ? <DropPanel title="Áreas" action={{label: 'Organizar', onPress: () => { setDrop(''); setOrganize(true); }}} footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setDrop(''); setTypeDialog({edit: null}); }} />}>
+            <PanelRow label="Tudo" count={items.length} on={view === 'all'} onPress={() => { setView('all'); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />
+            {types.map(t => <PanelRow key={t.id} label={t.name} count={count(t)} on={view === t.id} onPress={() => { setView(t.id); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />)}
+          </DropPanel> : null}
+          {drop === 'filter' ? <DropPanel title={'Filtros' + (curType ? ' de ' + curType.name : '')} action={filterOn ? {label: 'Limpar', onPress: () => setFilter({status: '', rating: 0, tag: ''})} : undefined} footer={<PrimaryButton label={'Ver ' + shown.length + (shown.length === 1 ? ' item' : ' itens')} onPress={() => setDrop('')} />}>
+            {tagsFor(curType?.id || null).map(tg => <PanelRow key={tg} kind="check" label={tg} count={items.filter(i => (!curType || i.type === curType.id) && i.tags.some(x => fold(x) === fold(tg))).length} on={fold(filter.tag) === fold(tg)} onPress={() => setFilter(f => ({...f, tag: fold(f.tag) === fold(tg) ? '' : tg}))} />)}
+            <StarRow value={filter.rating} onChange={r => setFilter(f => ({...f, rating: r}))} />
+            <View style={{height: 12}} />
+          </DropPanel> : null}
+          <ResultLine text={[filter.tag, filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {shown.length ? <View style={desktop ? {borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'} : {gap: 8}}>{shown.map((it, k) => <Card key={it.id} it={it} first={!k} />)}</View> : null}
           {!shown.length ? <View style={{alignItems: 'center', gap: 10, paddingVertical: 40}}><Icon name={curType?.icon || 'book'} size={32} color={c.muted} /><Text style={{color: c.muted, textAlign: 'center', maxWidth: 360}}>{query || filterOn ? 'Nada encontrado com esse filtro.' : 'Nada aqui ainda. Adicione pelo nome, cole um link de qualquer site ou arraste um arquivo.'}</Text></View> : null}

@@ -20,6 +20,7 @@ import {IconButton} from '../components/UI';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
+import {BarPill, DropPanel, PanelRow} from '../components/FilterBar';
 import {AppFrame, NavTabs, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
 
 const COLORS = ['#b49ae6', '#7f9ad8', '#7fcf9f', '#e8b04a', '#e08ad0', '#7fc0c9', '#f0997b', '#a3a0ad'];
@@ -38,6 +39,8 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const c = useTheme(), desktop = useDesktop(), {toast, toastNode} = useToast();
   const [notesE, setNotesE] = useState<Entity[] | null>(null), [tagsE, setTagsE] = useState<Entity[]>([]), [error, setError] = useState('');
   const [view, setView] = useState<View_>('all'), [query, setQuery] = useState(''), [sort, setSort] = useState<'recent' | 'created' | 'az'>('recent');
+  // 03/11/2026: no celular a area sai da fileira de chips e vai para a barra [Area ⌄] (lista que desce logo abaixo); busca pela lupa do topo
+  const [areaOpen, setAreaOpen] = useState(false), [searchOpen, setSearchOpen] = useState(false);
   const [draft, setDraft] = useState(''), [openId, setOpenId] = useState<string | null>(null), [tagDialog, setTagDialog] = useState<{tag: Tag | null} | null>(null);
   const keys = useRef(new Map<string, Uint8Array>()), [, bump] = useState(0), [plain, setPlain] = useState<Record<string, {title: string; body: string}>>({});
   const lastAct = useRef(Date.now()); const touch = () => { lastAct.current = Date.now(); };
@@ -203,17 +206,29 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!notesE) return <AppSkeleton label="Carregando notas…" />;
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={desktop ? mobileNav : undefined}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{curTag && !desktop ? <View style={{width: 12, height: 12, borderRadius: 4, backgroundColor: curTag.color}} /> : null}<Text style={{color: c.text, fontSize: desktop ? 28 : 20, fontWeight: desktop ? '600' : '700', letterSpacing: desktop ? -1 : 0}}>{title}</Text></View>
-              <Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 0}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text>
+              <Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Notas</Text>
+              {desktop ? <Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 0}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text> : null}
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}
+            {!desktop ? <IconButton name="search" label="Buscar nas notas" onPress={() => setSearchOpen(v => !v)} /> : null}
           </View>
+          {!desktop ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <BarPill testID="notes-area" label={view === 'all' ? 'Todas' : title} dot={curTag?.color} open={areaOpen} onPress={() => setAreaOpen(v => !v)} />
+            <View style={{flex: 1}} />
+            <Pressable accessibilityRole="button" onPress={() => setSort(s2 => s2 === 'recent' ? 'created' : s2 === 'created' ? 'az' : 'recent')} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{sort === 'recent' ? 'Editadas' : sort === 'created' ? 'Criadas' : 'A a Z'} ⌄</Text></Pressable>
+          </View> : null}
+          {!desktop && areaOpen ? <DropPanel title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
+            <PanelRow label="Todas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
+            <PanelRow label="Fixadas" count={notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go('pinned'); setAreaOpen(false); }} />
+            {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
+            <PanelRow label="Arquivadas" count={notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go('archived'); setAreaOpen(false); }} />
+          </DropPanel> : null}
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {lockedView ? <LockScreen tag={curTag!} count={notes.filter(n => tagKey(n.lockTag) === curTag!.key).length} onUnlock={async pw => { const k = await unlock(pw, curTag!.lock!); if (!k) return false; keys.current.set(curTag!.key, k); await decryptAll(curTag!.key, k); bump(x => x + 1); touch(); return true; }} /> : <>
@@ -223,10 +238,10 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
                 onSubmitEditing={() => { const v = draft.trim(); if (!v) return; setDraft(''); void create(v); }} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 13}} />
               <Text style={{color: c.muted, fontSize: 12}}>#etiqueta</Text>
             </View>
-            <View style={{flexDirection: 'row', gap: 10}}>
+            {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}>
               <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar em Notas" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + title} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View>
-              <GhostButton icon="filter" label={desktop ? (sort === 'recent' ? 'Editadas recentemente' : sort === 'created' ? 'Criadas recentemente' : 'A a Z') : undefined} onPress={() => setSort(s => s === 'recent' ? 'created' : s === 'created' ? 'az' : 'recent')} />
-            </View>
+              {desktop ? <GhostButton icon="filter" label={sort === 'recent' ? 'Editadas recentemente' : sort === 'created' ? 'Criadas recentemente' : 'A a Z'} onPress={() => setSort(s => s === 'recent' ? 'created' : s === 'created' ? 'az' : 'recent')} /> : null}
+            </View> : null}
             {pinned.length ? <View style={{gap: 8}}><Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Fixadas <Text style={{fontWeight: '400', color: c.muted}}>{pinned.length}</Text></Text>{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{pinned.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : pinned.map(n => <Card key={n.id} n={n} />)}</View> : null}
             {rest.length ? <View style={{gap: 8}}>{pinned.length ? <Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Notas <Text style={{fontWeight: '400', color: c.muted}}>{rest.length}</Text></Text> : null}{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{rest.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : rest.map(n => <Card key={n.id} n={n} />)}</View> : null}
             {!visible.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 24}}>{query ? 'Nada encontrado.' : view === 'archived' ? 'Nenhuma nota arquivada.' : 'Nenhuma nota aqui ainda. Escreva o título no campo acima e aperte Enter.'}</Text> : null}

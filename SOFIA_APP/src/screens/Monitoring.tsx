@@ -82,7 +82,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
             
             <View><Text style={{fontSize: deskNoBack ? 28 : 24, fontWeight: deskNoBack ? '600' : '700', letterSpacing: deskNoBack ? -1 : 0, color: c.text}}>Price Tracker</Text>{deskNoBack ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{!products?.length ? 'Cole o link de um produto e a Sofia acompanha o preço para você.' : null}{(() => { if (!products?.length) return ''; const low = products.filter(p => p.atLow); return low.length ? (low.length === 1 ? low[0].monitor.title + ' está no menor preço já visto.' : low.length + ' produtos estão no menor preço já visto.') : 'Nenhum produto no menor preço agora. A Sofia avisa quando cair.'; })()}</Text> : null}</View>
           </View>
-          {deskNoBack ? <Button title="Acompanhar produto" onPress={() => setAdding(true)} /> : <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />}
+          {deskNoBack ? <Button title="Acompanhar produto" onPress={() => setAdding(true)} /> : <IconButton name="plus" label="Adicionar produto" onPress={() => setAdding(true)} />}
         </View>
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16, ...pad(18)}}

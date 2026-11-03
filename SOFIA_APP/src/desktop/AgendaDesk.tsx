@@ -31,6 +31,9 @@ export type AgendaDeskProps = {
   api: SofiaApi; active: boolean; items: AgendaItem[]; month: Date; setMonth: (d: Date) => void;
   selected: Date; setSelected: (d: Date) => void; start: (i: AgendaItem) => string;
   onOpen: (i: AgendaItem) => void; onToggle: (i: AgendaItem) => void; onCreate: (d: Date) => void;
+  /** 03/11/2026 (Pedro: "na agenda seria legal a funcionalidade e ate a animacao que a gente ja tem na agenda do site"):
+   * a mesma Agenda no celular - Ano, Mes e Dia com o zoom; no Mes os dias mostram bolinhas em vez dos titulos. */
+  compact?: boolean;
 };
 
 const isTask = (i: AgendaItem) => i.kind === 'task';
@@ -76,7 +79,7 @@ function YearView({x, y}: {x: Ctx; y: number}) {
       {Array.from({length: 12}, (_, m) => {
         const first = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate(), cur = m === today.getMonth() && y === today.getFullYear();
         return <Pressable key={m} accessibilityRole="button" accessibilityLabel={'Abrir ' + MONTHS[m] + ' de ' + y} onLayout={keep('m' + m, 'yeargrid')} onPress={() => go('month', new Date(y, m, 1), 'm' + m)}
-          style={({hovered}: any) => ({width: '25%', height: '33.33%', padding: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
+          style={({hovered}: any) => ({width: x.p.compact ? '33.33%' : '25%', height: x.p.compact ? '25%' : '33.33%', padding: x.p.compact ? 6 : 10, paddingHorizontal: x.p.compact ? 6 : 12, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
           <Text style={{fontSize: 14, fontWeight: '600', color: cur ? c.accent : c.text, marginBottom: 6}}>{MONTHS[m]}</Text>
           <View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
             {WD.map((w, i) => <Text key={'w' + i} style={{width: '14.2857%', textAlign: 'center', fontSize: 11, color: c.muted, paddingVertical: 2}}>{w[0].toUpperCase()}</Text>)}
@@ -108,7 +111,7 @@ function MonthView({x, m}: {x: Ctx; m: Date}) {
   const begin = new Date(y, mo, 1 - first);
   const cur = y === p.month.getFullYear() && mo === p.month.getMonth();
   return <View style={{flex: 1}}>
-    <View style={{flexDirection: 'row', borderBottomWidth: 1, borderColor: c.line}}>{WD.map((w, i) => <Text key={w} style={{flex: 1, paddingVertical: 10, paddingHorizontal: 12, fontSize: 12, color: c.muted, borderLeftWidth: i ? 1 : 0, borderColor: c.line}}>{w}</Text>)}</View>
+    <View style={{flexDirection: 'row', borderBottomWidth: 1, borderColor: c.line}}>{WD.map((w, i) => <Text key={w} style={{flex: 1, paddingVertical: 10, paddingHorizontal: x.p.compact ? 6 : 12, fontSize: 12, color: c.muted, borderLeftWidth: i ? 1 : 0, borderColor: c.line}}>{w}</Text>)}</View>
     <View style={{flex: 1}} onLayout={keep('monthgrid')}>
       {Array.from({length: rows}, (_, r) => <View key={r} style={{flex: 1, flexDirection: 'row'}} onLayout={keep('row' + r, 'monthgrid')}>
         {Array.from({length: 7}, (_, d) => {
@@ -121,8 +124,9 @@ function MonthView({x, m}: {x: Ctx; m: Date}) {
             <View style={{height: 20, justifyContent: 'center', paddingLeft: 6, marginBottom: 2}}>
               <Text style={{alignSelf: 'flex-start', marginLeft: t ? -7 : 0, paddingHorizontal: t ? 7 : 0, borderRadius: 8, overflow: 'hidden', fontSize: 13, fontWeight: t ? '700' : '500', color: t ? c.onAccent : c.muted, backgroundColor: t ? c.accent : 'transparent', opacity: out ? 0.4 : 1, fontVariant: ['tabular-nums']}}>{day.getDate()}</Text>
             </View>
+            {x.p.compact ? (list.length ? <View style={{flexDirection: 'row', gap: 3, paddingLeft: 6}}>{list.slice(0, 3).map(i => <View key={i.id + (i as any).occurrence_start} style={{width: 5, height: 5, borderRadius: 3, backgroundColor: colorOf(i, c.accent)}} />)}</View> : null) : <>
             {list.slice(0, 3).map(i => <Chip x={x} key={i.id + (i as any).occurrence_start} i={i} />)}
-            {list.length > 3 ? <Text style={{fontSize: 11, color: c.muted, paddingLeft: 6}}>+{list.length - 3} mais</Text> : null}
+            {list.length > 3 ? <Text style={{fontSize: 11, color: c.muted, paddingLeft: 6}}>+{list.length - 3} mais</Text> : null}</>}
           </Pressable>;
         })}
       </View>)}
@@ -152,10 +156,11 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
       </View>
     </View>
     <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingTop: 10, paddingBottom: 12}}>
-      <View style={{marginLeft: 84, marginRight: 20, height: 24 * HOUR, position: 'relative'}}>
-        {Array.from({length: 24}, (_, h) => <View key={h} style={{position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line}}>
-          <Text style={{position: 'absolute', left: -64, top: -8, width: 52, textAlign: 'right', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{String(h).padStart(2, '0')}:00</Text>
-        </View>)}
+      <View style={{marginLeft: p.compact ? 58 : 84, marginRight: p.compact ? 12 : 20, height: 24 * HOUR, position: 'relative'}}>
+        {/* 03/11/2026: segurar num horario vazio do Dia cria naquele horario (celular e site) */}
+        {Array.from({length: 24}, (_, h) => <Pressable key={h} accessibilityRole="button" accessibilityLabel={'Segure para criar às ' + String(h).padStart(2, '0') + ':00'} delayLongPress={380} onLongPress={() => p.onCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h))} style={({pressed}: any) => ({position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.accentSoft : 'transparent'})}>
+          <Text style={{position: 'absolute', left: p.compact ? -50 : -64, top: -8, width: p.compact ? 42 : 52, textAlign: 'right', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{String(h).padStart(2, '0')}:00</Text>
+        </Pressable>)}
         {timed.map(i => {
           const st = p.start(i), s = new Date(st), e = endOf(i, st), dur = Math.max(15, (e - +s) / 60000), y = (s.getHours() + s.getMinutes() / 60) * HOUR, h = (dur / 60) * HOUR, short = dur <= 48;
           const col = colorOf(i, c.accent), done = isTask(i) && isDone(i);
@@ -301,6 +306,22 @@ export function AgendaDesk(p: AgendaDeskProps) {
   const crumbBtn = (label: string, onPress: () => void) => <Pressable accessibilityRole="link" onPress={onPress}>{({hovered}: any) => <Text style={{fontSize: 18, fontWeight: '500', color: hovered ? c.text : c.muted}}>{label}</Text>}</Pressable>;
   const sep = <Text style={{fontSize: 18, color: c.muted}}>›</Text>;
   const ghost = (label: string, onPress: () => void, a11y?: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y || label} onPress={onPress} style={({hovered}: any) => ({height: 36, minWidth: 36, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.text, fontSize: 14}}>{label}</Text></Pressable>;
+  const segBar = <View accessibilityRole="tablist" style={{flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: 'hidden', flex: p.compact ? 1 : undefined}}>
+        {seg.map(([l, label]) => <Pressable key={l} accessibilityRole="tab" accessibilityState={{selected: level === l}} onPress={() => go(l, l === 'day' && level !== 'day' && d.getMonth() === new Date().getMonth() ? new Date() : d)}
+          style={{flex: p.compact ? 1 : undefined, alignItems: 'center', height: 34, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: level === l ? c.accentSoft : 'transparent'}}><Text style={{fontSize: 14, color: level === l ? c.text : c.muted, fontWeight: level === l ? '600' : '400'}}>{label}</Text></Pressable>)}
+      </View>;
+  if (p.compact) return <View style={{flex: 1}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10}}>{segBar}{ghost('Hoje', () => go(level, new Date()))}</View>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10}}>
+      {ghost('‹', () => step(-1), 'Anterior')}
+      <View style={{flex: 1, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 6}}>
+        {level === 'year' ? <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{d.getFullYear()}</Text> : level === 'month' ? <>{crumbBtn(String(d.getFullYear()), () => go('year', d))}{sep}<Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{MONTHS[d.getMonth()]}</Text></>
+          : <>{crumbBtn(MONTHS[d.getMonth()], () => go('month', d))}{sep}<Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{d.getDate()}</Text></>}
+      </View>
+      {ghost('›', () => step(1), 'Próximo')}
+    </View>
+    <View ref={stageRef} style={{height: 520, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: c.line}} onLayout={e => {const l = e.nativeEvent.layout; stage.current = {x: 0, y: 0, w: l.width, h: l.height};}}>{layers}</View>
+  </View>;
   return <View style={{flex: 1}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12}}>
       {ghost('Hoje', () => go(level, new Date()))}
