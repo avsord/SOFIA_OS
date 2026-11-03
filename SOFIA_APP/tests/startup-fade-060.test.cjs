@@ -11,7 +11,7 @@ function seed(s){s.remember('/home',home);s.remember('/tasks',{items:home.tasks}
 function apiFixture(s,handler){
  const {SofiaApi}=load('src/lib/api.ts',{
   './startup-snapshot':snapshot,'./encrypted-storage':{encryptedStorage:disk()},'./startup-preload':load('src/lib/startup-preload.ts'),
-  './theme-schedule':{themeTimes:()=>({})},'./agenda-events':{agendaChanged(){}},'./system-events':{systemChanged(){}},
+  './theme-schedule':{themeTimes:()=>({})},'./agenda-events':{agendaChanged(){},recordRemoved(){}},'./system-events':{systemChanged(){}},
   './chat-model':load('src/lib/chat-model.ts'),'./legacy-md':{LegacyMdAdapter:class{}},'expo-secure-store':{},'@react-native-async-storage/async-storage':{default:{}}
  },{process:{env:{}},AbortController,fetch:async(url,options)=>{const answer=await handler(new URL(url).pathname.replace('/api/mobile',''),options);return{ok:answer.status!==500,status:answer.status||200,json:async()=>answer.body};}});
  return new SofiaApi('token',()=>{},'owner',s);

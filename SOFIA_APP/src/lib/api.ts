@@ -22,7 +22,7 @@ export type DriveFile={id:string;name:string;mime:string;size:number;modified:st
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];item_errors?:{id:string;title:string;reason:string}[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string;selected?:boolean;primary?:boolean}[];email?:string;redirect_uri?:string;history?:{at:string;imported:number;created:number;updated:number;sent:number;removed:number;skipped:number;conflicts:number;ms:number}[];gmail?:{connected:boolean};drive?:{connected:boolean;mode?:'hidden'|'folder';needs_reconnect?:boolean;migration?:{state:string;moved:number;left:number;error:string;finished_at:string};portable?:{configured:boolean;at:string;error:string};folders?:string[];attachments?:{total:number;in_drive:number;local_mb:number};voices?:{total:number;in_drive:number;local_mb:number};pages?:number;last_backup?:string;last_backup_error?:string;backups:number;folder:string}};
 import {StartupReads,preloadStartup} from './startup-preload';
 import {themeTimes} from './theme-schedule';
-import {agendaChanged} from './agenda-events';
+import {agendaChanged,recordRemoved} from './agenda-events';
 import {systemChanged} from './system-events';
 import {mergeMessages} from './chat-model';
 import {LegacyMdAdapter} from './legacy-md';
@@ -280,10 +280,13 @@ export class SofiaApi {
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
   tasks() { return this.request<{items: Task[]}>('/tasks'); }
   /** 0.3.255: qualquer estado valido (ex.: "scheduled" = tarefa que esta na agenda) */
-  taskSetState(task: Pick<Task,'id'|'revision'>, state: 'done' | 'todo' | 'scheduled') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
-  taskState(task: Task, state: 'done' | 'todo') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
+  async taskSetState(task: Pick<Task,'id'|'revision'>, state: 'done' | 'todo' | 'scheduled') { const r=await this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH');this.taskTouched();return r; }
+  async taskState(task: Task, state: 'done' | 'todo') { const r=await this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH');this.taskTouched();return r; }
   async saveTask(task: Partial<Task>) { const saved=await this.request<{item: Task}>('/tasks' + (task.id ? '/' + encodeURIComponent(task.id) : ''), task, task.id ? 'PATCH' : 'POST');systemChanged(this);return saved; }
-  deleteTask(id: string) { return this.request<{ok: boolean}>('/tasks/' + encodeURIComponent(id), undefined, 'DELETE'); }
+  /** 0.3.351 (Pedro: apagou "Emitir nota" na agenda e continuou na linha do tempo): apagar, ticar ou desticar tarefa avisa
+   * as outras telas na hora (antes so o salvar avisava e o Inicio esperava ate 60 s para atualizar). */
+  async deleteTask(id: string) { const r=await this.request<{ok: boolean}>('/tasks/' + encodeURIComponent(id), undefined, 'DELETE');recordRemoved(this,id);this.taskTouched();return r; }
+  private taskTouched(){agendaChanged(this);systemChanged(this);}
   agenda(month?:string) { return this.request<{items: AgendaItem[];refresh_pending?:boolean}>('/agenda'+(month?'?month='+encodeURIComponent(month):'')); }
   createEvent(title: string, start_at: string) { return this.request<{item: AgendaItem}>('/agenda', { title, start_at }); }
   notifications() { return this.request<{items: Notice[]; push_enabled: boolean}>('/notifications'); }
@@ -313,7 +316,7 @@ export class SofiaApi {
     // 0.3.227: se o servidor ainda nao conhece um campo novo (app atualizado antes do servidor), salva sem ele em vez de dar erro
     for(let attempt=0;;attempt++){try{saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');break;}
       catch(e){const m=/Campo não previsto: ([a-z_]+)/.exec(String((e as Error)?.message||''));const data=(body as {data?: Record<string, unknown>}).data;if(!m||attempt>=6||!data||!(m[1] in data))throw e;const next={...data};delete next[m[1]];body={...(body as object),data:next} as typeof body;}}if(['commitment','reminder'].includes(saved.kind))agendaChanged(this);systemChanged(this);return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }
-  async deleteEntity(id: string) { const result=await this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE');agendaChanged(this);return result; }
+  async deleteEntity(id: string) { const result=await this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE');recordRemoved(this,id);agendaChanged(this);systemChanged(this);return result; }
   uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
   /** 0.3.199: miniatura minuscula da foto (o chat mostra desfocada sem baixar o original do Drive). */
   attachmentThumb(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?thumb=1',headers:{Authorization:'Bearer '+this.token}}; }

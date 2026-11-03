@@ -20,6 +20,7 @@ import {useReducedMotion} from '../lib/motion';
 import {Icon, type IconName} from '../components/Icon';
 import Svg, {Path, Circle} from 'react-native-svg';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
+import {HoverPressable} from '../components/HoverPressable';
 
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const brl = (v: number) => v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: v >= 1000 ? 0 : 2});
@@ -566,7 +567,10 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
   const W = 400, lw = lineW || 1, /* 0.3.347 (Pedro): janela bem menor */ left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));
   const shell = (inner: React.ReactNode, strip?: string) => <View ref={box} testID="sofia-add" style={{position: 'absolute', left, top: 29 + 44 + 22, width: W, zIndex: 12} as any}>
     <View style={{position: 'absolute', left: caret - 7, top: -7, width: 14, height: 14, backgroundColor: c.bg, transform: [{rotate: '45deg'}], borderRadius: 3, boxShadow: '-1px -1px 0 rgba(255,255,255,0.06)'} as any} />
-    <View style={{backgroundColor: c.bg, borderRadius: 22, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.55)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
+    {/* 0.3.351 (Pedro: "alinhamento ta errado"): sem a faixa de cor no topo (com o canto arredondado ela ficava estreita, como
+     uma aba fora do lugar) e com overflow clip - o hidden deixava o navegador rolar o cartao para o lado ao focar o campo,
+     e o conteudo colava na borda esquerda. A cor do tipo fica no icone e no botao. */}
+    <View style={{backgroundColor: c.bg, borderRadius: 22, overflow: 'clip', boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.55)'} as any}>{inner}</View>
   </View>;
   const avatar = (s = 36) => <View style={{width: s, height: s, borderRadius: s / 2, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px ' + tint(c.accent, 0.4)} as any}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: s >= 30 ? 14 : 11}}>S</Text><View style={{position: 'absolute', right: 0, bottom: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#5FD3A2', boxShadow: '0 0 0 2px ' + c.bg} as any} /></View>;
   if (kind) return <MiniEditor kind={kind} at={when} setAt={setWhen} sofia={sofia} shell={shell} onBack={() => setKind(null)} onMore={k => onMore(k)} onSaved={onSaved} onAsk={async (q, label) => {setKind(null); setOpen(false); await send(q, label);}} />;
@@ -578,9 +582,11 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
         <Text style={{fontSize: 12, color: c.text, marginTop: 0}}>O que fica para as <Text style={{color: c.accent, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
       <Pressable testID="sofia-add-more" accessibilityRole="button" accessibilityLabel={open ? 'Fechar os tipos' : 'Escolher e preencher eu mesmo'} onPress={() => setOpen(v => !v)} style={({hovered}: any) => ({width: 30, height: 30, marginRight: 4, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{rotate: open ? '-90deg' : '90deg'}], transitionProperty: 'transform', transitionDuration: '200ms'} as any)}><Icon name="chevron" size={16} color={c.muted} /></Pressable>
     </View>
-    {open ? <View style={{flexDirection: 'row', marginTop: 10}}>
-      {TYPE_INFO.map(t => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" onPress={() => setKind(t.id)} style={({hovered}: any) => ({flex: 1, alignItems: 'center', gap: 5, paddingTop: 7, paddingBottom: 6, borderRadius: 10, backgroundColor: hovered ? 'rgba(255,255,255,0.04)' : 'transparent'})}>
-        <Icon name={t.icon} size={16} color={t.color} /><Text style={{fontSize: 10, color: c.muted}}>{t.label}</Text></Pressable>)}
+    {/* 0.3.351 (Pedro: ferramentas grandes e fora de alinhamento): menores, a primeira alinhada com a foto da Sofia e a
+        ultima com o botao do microfone (as colunas iguais deixavam sobra nas pontas) */}
+    {open ? <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 8}}>
+      {TYPE_INFO.map((t, i) => <Pressable key={t.id} testID={'sofia-type-' + t.id} accessibilityRole="button" accessibilityLabel={t.title} onPress={() => setKind(t.id)} style={({hovered}: any) => ({alignItems: 'center', gap: 3, paddingTop: 5, paddingBottom: 4, paddingHorizontal: 5, marginLeft: i === 0 ? -5 : 0, marginRight: i === TYPE_INFO.length - 1 ? -5 : 0, borderRadius: 8, backgroundColor: hovered ? 'rgba(255,255,255,0.05)' : 'transparent', outlineStyle: 'none'} as any)}>
+        <Icon name={t.icon} size={14} color={t.color} /><Text style={{fontSize: 10, color: c.muted}}>{t.label}</Text></Pressable>)}
     </View> : null}
     {msgs.length || busy ? <ScrollView ref={scroller} keyboardShouldPersistTaps="handled" style={{maxHeight: 300, marginTop: 14}} contentContainerStyle={{gap: 10}}>
       {msgs.map((m, i) => m.who === 'me' ? <View key={i} style={{alignSelf: 'flex-end', maxWidth: '80%' as any, backgroundColor: c.bubble, borderRadius: 18, borderBottomRightRadius: 6, padding: m.img ? 8 : 0, gap: 6, overflow: 'hidden'}}>
@@ -754,9 +760,9 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const total = point.recs.length + point.marks.length, imp = point.recs.filter(r => urgOf(r) === 3).length;
   const firstAt = point.recs[0] ? new Date(point.recs[0].date) : point.marks[0]?.at;
   const Row = ({k, color, icon, time, title, meta, done, check, onEdit, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
-    <Pressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: 4, borderRadius: 10, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
+    <HoverPressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: 4, borderRadius: 10, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
       {/* 0.3.349 (Pedro): a alca de arrastar fica no comeco, a esquerda */}
-      {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} {...({dataSet: {noveil: '1'}} as any)} style={({hovered: h}: any) => ({cursor: 'grab', width: 14, alignSelf: 'stretch', marginRight: -4, borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: h ? tint(color, 0.18) : 'transparent'} as any)}><Text style={{fontSize: 12, color: c.muted, lineHeight: 14}}>⠿</Text></Pressable> : null}
+      {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} {...({dataSet: {noveil: '1'}} as any)} style={{cursor: 'grab', width: 14, alignSelf: 'stretch', marginRight: -4, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{/* 0.3.351 (Pedro): sem a selecao colorida na alca; so a maozinha de arrastar */}<Text style={{fontSize: 12, color: c.muted, lineHeight: 14}}>⠿</Text></Pressable> : null}
       <View style={{width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: color, opacity: done ? 0.4 : 1}} />
       {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={{width: 24, height: 24, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{({hovered: h}: any) => <View style={{width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: done || h ? color : tint(color, 0.7), backgroundColor: done ? color : h ? tint(color, 0.18) : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{done || h ? <Icon name="check" size={12} color={done ? c.bg : color} /> : null}</View>}</Pressable> : chip(icon, color)} {/* 0.3.345 (Pedro): tarefa tem a bolinha de tique - vazia, ao passar o mouse mostra o tique; feita fica cheia com o tique */}
       <View style={{flex: 1, minWidth: 0}}>
@@ -766,7 +772,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
       {hovered && onEdit ? iconBtn('edit', 'Editar ' + title, onEdit)
         : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
-    </>}</Pressable>;
+    </>}</HoverPressable>;
   const many = total > 1;
   return shell(<View style={{paddingVertical: 6}}>
     {many ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2}}>

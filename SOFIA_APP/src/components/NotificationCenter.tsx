@@ -1,4 +1,5 @@
 import {uiScale} from '../web/desktop-scale';
+import {HoverPressable} from './HoverPressable';
 import {capsuleStore} from '../lib/capsule-store';
 import {PALETTE} from '../lib/palette';
 import {capsuleDoseOfNotice,capsuleKey} from '../lib/capsule-model';
@@ -192,7 +193,7 @@ const S=(n:number)=>dpx(n) as any;
 function DeskRow({item,first=false}:{item:Notice;first?:boolean}){const c=useTheme(),n=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread',dose=item.category==='capsule'?capsuleDoseOfNotice(item.id):null;
  async function take(){if(!dose)return;await capsuleStore(n.api).take(dose.planId,dose.day,dose.time,true);await n.clear(item);}
  async function snooze(){const at=new Date(Date.now()+30*60e3);try{await n.api.saveEntity({kind:'reminder',title:item.title,content:'',area:'Lembretes',privacy:'private',state:'active',tags:[],data:{remind_at:at.toISOString(),message:item.body||'',location:''}});await n.clear(item);}catch{/* fica como estava */}}
- return <Pressable testID={'desk-notice-'+item.id} accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>n.open(item)} style={({hovered}:any)=>({flexDirection:'row',gap:S(14),paddingTop:S(14),paddingBottom:S(14),paddingLeft:S(24),paddingRight:S(20),backgroundColor:hovered?c.input:'transparent'})}>{({hovered}:any)=><>
+ return <HoverPressable testID={'desk-notice-'+item.id} accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>n.open(item)} style={({hovered}:any)=>({flexDirection:'row',gap:S(14),paddingTop:S(14),paddingBottom:S(14),paddingLeft:S(24),paddingRight:S(20),backgroundColor:hovered?c.input:'transparent'})}>{({hovered}:any)=><>
   {/* separador fino entre avisos, alinhado com o texto */}{!first?<View style={{position:'absolute',top:0,right:S(20),left:S(74),height:1,backgroundColor:c.line,opacity:.6}}/>:null}
   {unread?<View style={{position:'absolute',left:S(9),top:S(29),width:7,height:7,borderRadius:4,backgroundColor:c.accent}}/>:null}
   <View style={{width:36,height:36,borderRadius:11,backgroundColor:st.color+'26',alignItems:'center',justifyContent:'center'}}><Icon name={((st as {glyph?:string}).glyph||'bell') as IconName} size={17} color={st.color}/></View>
@@ -203,7 +204,7 @@ function DeskRow({item,first=false}:{item:Notice;first?:boolean}){const c=useThe
   </View>
   {hovered?<View style={{flexDirection:'row',gap:4,alignSelf:'flex-start'}}>{unread?<Pressable accessibilityLabel={'Marcar como lida: '+item.title} onPress={()=>void n.read(item)} style={{width:26,height:26,borderRadius:7,backgroundColor:c.line,alignItems:'center',justifyContent:'center'}}><Icon name="check" size={13} color={c.muted}/></Pressable>:null}<Pressable accessibilityLabel={'Limpar notificação: '+item.title} onPress={()=>void n.clear(item)} style={{width:26,height:26,borderRadius:7,backgroundColor:c.line,alignItems:'center',justifyContent:'center'}}><Icon name="close" size={13} color={c.muted}/></Pressable></View>
    :<Text style={{color:c.muted,fontSize:12,marginTop:S(2)}}>{relativeTime(item.created_at)}</Text>}
- </>}</Pressable>;}
+ </>}</HoverPressable>;}
 function DeskList(){const n=useNotifications(),c=useTheme(),digest=useDigest(),[tab,setTab]=useState<'all'|'unread'>('all'),[area,setArea]=useState('all');
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=n.items.filter(i=>(tab==='all'||i.state==='unread')&&(area==='all'||noticeArea(i)===area));

@@ -50,6 +50,7 @@ import {Brand,Empty,ErrorBanner,ScreenTitle} from '../components/UI';
 import {Icon} from '../components/Icon';
 import {NotificationBell} from '../components/NotificationCenter';
 import {subscribeSystemChanged} from '../lib/system-events';
+import {subscribeRecordRemoved} from '../lib/agenda-events';
 import {MiniAgenda} from '../components/DashboardWidgets';
 import {MonitorWidget} from '../components/MonitorWidget';
 import {productsFrom,onCollector,collectorState} from '../lib/monitor-collector';
@@ -87,6 +88,9 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  const [widgets,setWidgets]=useState(()=>(()=>{const w=api.cached<{widgets:string[]|null}>('/md/dashboard')?.widgets;return Array.isArray(w)?w.filter(x=>HOME_WIDGET_IDS.includes(x)):null;})()||['monitoring','tasks']),[dragging,setDragging]=useState(false);
  const c=useTheme(),[data,setData]=useState<HomeData|null>(()=>api.cached<HomeData>('/home')||null),[tasks,setTasks]=useState<Task[]>(()=>api.cached<{items:Task[]}>('/tasks')?.items||[]),[tasksReady,setTasksReady]=useState(()=>!!api.cached('/tasks')),[series,setSeries]=useState<MonitorWidgetRow[]|null>(()=>validWidgetRows(api.cached(MONITOR_WIDGET_PATH))),[seriesFailed,setSeriesFailed]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState(''),[refreshEpoch,setRefreshEpoch]=useState(0);
  useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)setRefreshEpoch(x=>x+1);}),[api]);
+ // 0.3.351: item apagado em qualquer tela sai da linha do tempo na hora (a releitura do servidor so confirma)
+ const [gone,setGone]=useState<ReadonlySet<string>>(()=>new Set());
+ useEffect(()=>subscribeRecordRemoved((owner,id)=>{if(owner!==api)return;setGone(prev=>{const next=new Set(prev);next.add(id);next.add('task:'+id);return next;});setTasks(prev=>prev.some(t=>t.id===id)?prev.filter(t=>t.id!==id):prev);}),[api]);
  useEffect(()=>{if(!refreshEpoch)return;let alive=true;void api.catalog().then(value=>{if(alive)setAgendaCatalog(value);}).catch(()=>{});return()=>{alive=false;};},[api,refreshEpoch]);
  const homeActive=useRef(active);homeActive.current=active;
  useEffect(()=>{let alive=true;async function load(){
@@ -108,7 +112,9 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // Monitoring may involve many reads; it must not compete with the first usable frame.
  useEffect(()=>{if(!launchVisible)return;let alive=true;async function load(){try{const monitors:Entity[]=[];for(let offset=0;;offset+=100){const r=await api.entities('monitor','',offset);monitors.push(...r.items);if(r.items.length<100)break;}const result=await productsFrom(api,monitors);/* One broken monitor must not turn the whole Home into an error. */if(alive){setSeriesFailed(false);const rows=widgetRows(result);api.rememberLocal(MONITOR_WIDGET_PATH,rows);startTransition(()=>setSeries(rows));}}catch{/* Monitoring is secondary; Home, Agenda and Tasks stay usable. */if(alive)setSeriesFailed(true);}}const cancel=scheduleIdleTask(()=>{void load();});const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});const stop=onCollector(()=>{if(!collectorState().running&&homeActive.current)void load();});return()=>{alive=false;cancel();clearInterval(timer);foreground.remove();stop();};},[api,refreshEpoch,launchVisible]);
  const [calendarDate,setCalendarDate]=useState(()=>new Date());
- const calendar=useAgendaMonth(api,calendarDate,active,launchVisible),events=calendar.items;
+ const calendar=useAgendaMonth(api,calendarDate,active,launchVisible);
+ const notGone=useCallback((list:AgendaItem[]|undefined)=>!gone.size||!list?list||[]:list.filter(e=>!gone.has(e.id)&&!gone.has(String((e.data as {task_id?:string}|undefined)?.task_id||''))),[gone]);
+ const events=useMemo(()=>notGone(calendar.items),[calendar.items,notGone]);
  const calendarMonth=useCallback((month:Date)=>setCalendarDate(month),[]);
  useEffect(()=>{if(refreshEpoch)void calendar.refresh();},[refreshEpoch]);
  // 0.3.321: devolve se deu certo (o bloco Tarefas do Inicio confirma ou oferece tentar de novo)
@@ -135,7 +141,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // 0.3.296: o bloco Agenda do Inicio mostra TODOS os proximos compromissos (este mes e os dois seguintes), com rolagem
  const wideWebHome=Platform.OS==='web'&&typeof window!=='undefined'&&window.innerWidth>=1024;
  const calNext1=useAgendaMonth(api,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1),active&&wideWebHome,false),calNext2=useAgendaMonth(api,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+2,1),active&&wideWebHome,false);
- const futureRecords=useMemo(()=>dayRecords(expandForHome([...events,...(calNext1.items||[]),...(calNext2.items||[])]),tasks),[events,calNext1.items,calNext2.items,tasks]);
+ const futureRecords=useMemo(()=>dayRecords(expandForHome([...events,...notGone(calNext1.items),...notGone(calNext2.items)]),tasks),[events,calNext1.items,calNext2.items,tasks,notGone]);
  const areaOptions=useMemo(()=>[...new Set([...(agendaCatalog?.areas||[]),...tasks.map(t=>t.area?.trim()||'Pessoal'),...events.map(e=>(e as AgendaItem & {area?:string}).area?.trim()||'').filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'pt-BR')),[agendaCatalog,events,tasks]);
  const [taskQuery,setTaskQuery]=useState(''),[quick,setQuick]=useState<Task|null>(null);
  const first=bootstrap.profile.name.split(' ')[0],todo=useMemo(()=>fuzzyFilter([...tasks].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).filter(t=>!['done','cancelled'].includes(t.state)&&(!priority||taskPriority(t).value===priority)&&(!areaFilter||(t.area?.trim()||'Pessoal')===areaFilter)),taskQuery,t=>t.title+' '+(t.description||'')),[tasks,priority,areaFilter,taskQuery]);
