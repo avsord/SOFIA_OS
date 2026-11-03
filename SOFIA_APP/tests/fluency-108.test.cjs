@@ -76,9 +76,12 @@ test('new isolated heavy job reuses signed binaries and timing goals are reporte
  assert.ok(manual.includes("result['policy_mode']='old'"));assert.ok(manual.includes("result['native_first_taps']>=12"));
  // The R8 observer strengthens the single marker check to twenty real edits
  // in each policy; keep the exact typed suffix and screen-error guards.
- assert.ok(heavy.includes("expected='_R8_KEEP'"));
+ // 03/11/2026: o cursor fica onde o dedo toca e o teclado sugere letras; a protecao passou a ser "o titulo digitado
+ // volta IGUAL depois de esconder/mostrar a tela, e cada ciclo muda o titulo" (marca _R8_KEEP continua).
+ assert.ok(heavy.includes("'_R8_KEEP' in typed"));
  assert.ok(heavy.includes('for cycle in range(20):'));
- assert.ok(heavy.includes('assert expected in tree'));
+ assert.ok(heavy.includes("assert after==typed,'Actual Page draft lost across Activity hide/show"));
+ assert.ok(heavy.includes('typed!=prev'));
  assert.ok(heavy.includes("RESULT.setdefault('draft_cycles',{})[mode]=20"));
  assert.ok(heavy.includes("for mode in ['old','new']:"));
  assert.ok(heavy.includes("'Algo deu errado nesta tela' not in tree"));

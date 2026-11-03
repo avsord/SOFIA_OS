@@ -136,7 +136,9 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
   const setOp = (k: string, base = 1) => set(o => {const cur = o.op[k] ?? base, nx = cur > 0.9 ? 0.8 : cur > 0.7 ? 0.6 : cur > 0.5 ? 0.4 : 1; return {...o, op: {...o.op, [k]: nx}};});
   const setCat = (id: string, v: boolean) => set(o => ({...o, cats: {...o.cats, [id]: v}})), setItem = (k: string, v: boolean) => set(o => ({...o, items: {...o.items, [k]: v}}));
   const sub = (id: string) => id === 'routine' ? plans.map(p => ({k: 'routine:' + p.id, label: p.title, color: p.color || routineColor(p.type)})) : id === 'bill' ? bills.map(t => ({k: 'fin:' + t, label: t, color: '#E8B04A'})) : id === 'income' ? incomes.map(t => ({k: 'fin:' + t, label: t, color: '#7ED6A5'})) : [];
-  return <View ref={boxRef} style={{position: 'absolute', top: 52, right: 16, width: 340, maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
+  // 03/11/2026: no celular o painel cabe na tela (340 saia pela esquerda)
+  const winW = useWindowDimensions().width;
+  return <View ref={boxRef} style={{position: 'absolute', top: 52, right: WEB ? 16 : 0, width: WEB ? 340 : Math.min(340, winW - 32), maxHeight: 460, zIndex: 20, backgroundColor: c.bg, borderRadius: 16, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 44px rgba(0,0,0,0.5)'} as any}>
     <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8}}>
       <Text style={{flex: 1, fontSize: 14, fontWeight: '600', color: c.text}}>Linha do tempo</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={8} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Icon name="close" size={15} color={c.muted} /></Pressable>

@@ -151,24 +151,29 @@ def correctness(points,mode):
  tree=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
  (OUT/'pages-heavy.xml').write_text(tree)
  tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
- expected='_R8_KEEP'
+ # 03/11/2026: a #285 mostrou que o rascunho NAO se perdia - o cursor fica onde o dedo toca e o teclado do emulador
+ # sugere letras, entao "texto colado no fim" nao e o que se protege. Agora: le o titulo logo depois de digitar e exige
+ # o MESMO titulo depois de esconder (Conversa) e mostrar (Paginas) a tela; e cada ciclo precisa mudar o titulo.
+ def title_of(t):
+  for n in ET.fromstring(t).iter('node'):
+   if n.get('content-desc')=='Título da página' or 'Título da página' in (n.get('hint') or ''):return n.get('text') or ''
+  return None
+ prev=title_of(tree)
  for cycle in range(20):
-  # 03/11/2026: a #280 mostrou o BACK fechando a pagina (teclado ainda nao aberto) e o texto entrando no meio do titulo.
-  # Espera o teclado abrir antes de mover o cursor/digitar; sem teclado o teste falha com o motivo certo.
   tap(point(tree,'Título da página'));assert keyboard_shown(),'Keyboard did not open on the Page title; mode='+mode+' cycle='+str(cycle)
   adb('shell','input','keyevent','KEYCODE_MOVE_END')
-  addition=expected if cycle==0 else str(cycle%10)
-  if cycle:expected+=addition
-  adb('shell','input','text',addition);adb('shell','input','keyevent','BACK');time.sleep(.15)
+  adb('shell','input','text','_R8_KEEP' if cycle==0 else str(cycle%10));adb('shell','input','keyevent','BACK');time.sleep(.15)
+  typed=title_of(xml())
+  assert typed and typed!=prev and '_R8_KEEP' in typed,'Typing did not change the Page title; mode='+mode+' cycle='+str(cycle)+' title='+repr(typed)
   tap(points['Conversa']);time.sleep(.25);tap(points['Páginas']);time.sleep(.25)
   tree=xml();(OUT/(f'draft-{mode}-{cycle:02d}.xml')).write_text(tree)
-  if expected not in tree:
-   # 03/11/2026: diagnostico no log (os artefatos nem sempre podem ser baixados): o campo do titulo existe? o que tem nele?
+  after=title_of(tree)
+  if after!=typed:
    nodes=list(ET.fromstring(tree).iter('node'))
-   title=[(n.get('text'),n.get('focused'),n.get('bounds')) for n in nodes if n.get('content-desc')=='Título da página' or 'Título da página' in (n.get('hint') or '')]
    seen=[n.get('text') or n.get('content-desc') for n in nodes if (n.get('text') or n.get('content-desc'))][:40]
-   print('SOFIA_DRAFT_DIAG '+json.dumps({'mode':mode,'cycle':cycle,'expected':expected,'title_nodes':title,'visible':seen},ensure_ascii=False),flush=True)
-  assert expected in tree,'Actual Page draft lost across Activity hide/show; mode='+mode+' cycle='+str(cycle)
+   print('SOFIA_DRAFT_DIAG '+json.dumps({'mode':mode,'cycle':cycle,'typed':typed,'after':after,'visible':seen},ensure_ascii=False),flush=True)
+  assert after==typed,'Actual Page draft lost across Activity hide/show; mode='+mode+' cycle='+str(cycle)
+  prev=typed
   assert 'Algo deu errado nesta tela' not in tree and 'Vamos reabrir' not in tree,'Screen error while preserving Page draft'
  RESULT.setdefault('draft_cycles',{})[mode]=20
  RESULT['page_draft_preserved']=True

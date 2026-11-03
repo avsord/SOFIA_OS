@@ -21,16 +21,14 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-03 ~18:40 (horário de Brasília), no **Claude Code** (sessão na nuvem, repositório clonado; sem emulador Android aqui, sem KVM).
-- **O "Corrige #277" do chat nunca subiu** (o `.bat` não chegou a ser rodado). Refeito aqui direto no Git.
-- **Causa real da #277 (e das #274–276):** o teste do emulador `SOFIA_APP/tools/manual-apk-smoke.py` procurava "Olá, Teste." e "com compromissos", textos que o Início novo não tem mais (saudação "Bom dia/Boa tarde/Boa noite, Teste" com nome em itálico; no celular a Agenda do site no lugar do mini calendário). Teste atualizado mantendo a proteção: conta autenticada visível + agenda salva aparecendo ("Você tem N compromissos hoje", "Agenda · próximos" com itens ou o "com compromissos" antigo), esperando até 6 s.
-- **Segunda falha, antiga (desde ~#140, 12/10):** `fluency-heavy-smoke.py` "Actual Page draft lost across Activity hide/show; mode=old". O código do rascunho (`src/lib/page-editor.ts`) não mostra perda; os artefatos do CI não puderam ser baixados desta sessão. Acrescentei o diagnóstico `SOFIA_DRAFT_DIAG` no log (texto e foco do campo do título, o que está na tela) para a próxima falha mostrar a causa.
-- **Compilação:** #280 mostrou a causa real: o Início do celular quebrava ("Algo deu errado nesta tela", `TypeError: undefined is not a function em Timeline > HomeBrief`): no Android `window` existe sem `addEventListener`. Corrigido no commit 68bc5e0 (guarda `WEB` = `Platform.OS === 'web'` em `HomeBrief.tsx`/`AgendaDesk.tsx`); travado pelo teste `native-window-277`. O rascunho de Página não se perdia: o BACK fechava a página porque o teclado ainda não tinha aberto; o teste agora espera o teclado.
-- **Commits sem `[manual-apk]` também falham** em "Native checks - navigation/workspace" (boot-smoke da cópia QA) — não investigado nesta rodada.
-- **Não confirmado no aparelho:** toque/arrastar e segurar para criar na linha do tempo do celular; zoom da Agenda no celular.
-- **Chat, 03/11 ~19h:** a proteção do Início/Agenda do site para o Android (`window` existe no Android sem `addEventListener`/`innerWidth`; o teste `typeof window === 'undefined'` não protegia → o Início quebrava ao abrir no celular) estava só no `.bat` da #277, que não foi rodado. Subiu agora junto com `docs/design/2026-11-03/` (desenho aprovado + regras e recusas). É a causa provável de o Início não aparecer no emulador na #279.
-- **Em andamento (Claude Code, 03/11 noite):** revisão geral + desenho de 03/11. Lote 1 (funções que não funcionavam no celular, servidor de backup/lembretes) subiu; lote 2 (desenho tela por tela) em seguida. Passagem completa no fim da rodada.
-- **Próximo passo:** se o teste pesado do rascunho falhar de novo, ler a linha `SOFIA_DRAFT_DIAG` no log (`gh run view <id> --log-failed | grep SOFIA_DRAFT_DIAG`) e corrigir a causa; depois o Pedro testa o candidato no celular.
+- **Atualizado em:** 2026-11-03 ~21h15 (Brasília), no **Claude Code** (sessão na nuvem; sem emulador aqui — o emulador é o do GitHub Actions).
+- **Feito nesta sessão:** revisão geral (app, site, servidor) + desenho de 03/11 (`docs/design/2026-11-03/`), em 4 lotes `[manual-apk]` (3effb56, 1e9e86b…, lote 3 e lote 4 com o painel de ajustes da linha do tempo). Lista completa nos commits e na §10.
+- **Por que o CI estava vermelho desde 10/10 (corrigido):** (1) o Início do celular quebrava (`window` sem `addEventListener`, guarda `WEB`); (2) o teste procurava textos que o Início não tem mais ("Olá, Teste.", "com compromissos"); (3) o `uiautomator dump` falhava calado ("could not get idle state") e o teste lia o arquivo ANTERIOR — por isso "via" o semeador; o "agora" da linha do tempo pulsava sem parar pelo JavaScript e a tela nunca ficava parada. Agora: leitura conferida e repetida, e no celular o "agora" fica parado. (4) "Rascunho perdido" não era perda: o Voltar fechava a página porque o teclado não tinha aberto; o teste espera o teclado.
+- **Compilação:** #285 (lote 3): APK ok, **emulador principal (identidade + abertura logado + conversa) VERDE** pela 1ª vez desde 10/10; teste pesado R7: 9 de 10 medições de Páginas ok (5–7 s), 1 passou de 8 s (instável perto do limite; já era assim na #277). Resultado do lote 4 / nova tentativa: ver `gh run list --branch sofia-app-android --workflow "Sofia Android 0.3.47 update"`.
+- **Commits sem `[manual-apk]`** ainda falham em "Native checks - navigation/workspace" — não investigado (os roteiros `native-*-smoke.py` tocam textos antigos; alguns foram atualizados: Apps, Notificações).
+- **Servidor:** as correções (restauração de backup, lembretes, Quadro, apagar conversas, retenção de backups) estão no código e nos testes (413 ok), mas **só valem depois de publicar o servidor no Railway** (não feito nesta sessão).
+- **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; Agenda Ano/Mês/Dia no celular (abas novas, segurar dia cria); Recentes em Páginas; filtros de Notas/Biblioteca.
+- **Próximo passo:** se o R7 continuar instável na medição de Páginas, olhar o que anima na abertura das Páginas (esqueleto com brilho) — não afrouxar o limite de 8 s. Depois o Pedro testa o candidato no celular; publicar só com "aprovado".
 
 ## 1. O dono e a forma de trabalhar
 
@@ -229,7 +227,10 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-- **CI Android vermelho desde a #118 (10/10):** smoke do Início corrigido em 03/11; falta o teste pesado "Page draft lost" (modo Antigo, desde ~#140) e os "Native checks" dos commits sem `[manual-apk]`.
+- **CI Android (03/11):** emulador principal verde no lote 3; R7 pesado instável na medição de Páginas (1 de 10 passou de 8 s). Falta: "Native checks" dos commits sem `[manual-apk]`.
+- **Servidor a publicar no Railway:** restauração de backup, lembretes (só ativos, dia do mês, marcas usadas), Quadro apagado com a conversa, apagar conversas selecionadas, retenção de backups por dia. Antes: confirmar backup/volume.
+- **Desenho 03/11 ainda não feito:** Agenda Mês com lista do dia embaixo e faixa da semana no Dia; Tarefas com chips de prioridade (seletor mantido: os roteiros nativos tocam nele); Finanças com + no cabeçalho (o botão redondo continua); painéis da Biblioteca/Notas por cima com fundo escuro; botões 32 px em todos os cabeçalhos; Perfil do celular em lista compacta; arrastar itens na linha do tempo do celular; Rotina e Finanças quadradas (ficaram na largura toda: não cabem).
+- **Áudio pela barrinha "Criar":** a foto leva o horário; o áudio não (o servidor usa só a transcrição) — precisa de campo novo no servidor.
 
 - **Site no computador (após 0.3.253):** fundação pronta (escala e rolagem). Próximo: seguir docs/WEB_DIAGNOSTICO.md — Finanças em 2 colunas e tabelas, Price Tracker e Tarefas em tabela, E-mails em 3 colunas, arrastar páginas com mouse, clique direito no lugar de segurar.
 
@@ -276,11 +277,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | (versão escolhida pelo delivery) | Site: brilho do esqueleto em CSS (não trava ao abrir); Agenda do Início "hoje 14:30"; X da notificação após excluir; Início mais alto (folga 60); Price Tracker = loja principal no app e no Início; campo da Conversa cortado | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site recompilado (public/web): a rodada anterior subiu só o código e o site não mudou; Perfil do site em duas colunas (identidade + seções); tela de Notificações do site com filtros à esquerda e cartões por dia | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: animações CSS passam a funcionar (iam em estilo solto e o react-native-web descartava; agora StyleSheet.create e a camada do computador separa a animação); Início entra com fade; linha do tempo já no lugar ao voltar à aba; bolinhas dos itens no Price Tracker/Encomendas e setas na Rotina | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | App com a cara do site (aprovado no quadro): Início do celular = Início do site compacto (Seu dia + blocos, sem mini chat); Agenda do celular = Agenda do site (Ano/Mês/Dia com zoom, bolinhas no mês); segurar na linha do tempo leva à Conversa com a barrinha "Criar · hoje às HH:MM" e a seta de criação manual; títulos padrão (nome do app) em Listas, Encomendas, E-mails, Biblioteca, Notas; + simples; Biblioteca/Notas com barra Área/Filtros; Agenda do Início rola para os próximos dias; Conversa mostra listas como lista; segurar no Dia da Agenda cria no horário; Despesa/Receita pela barrinha já no dia; Perfil do celular em cartões | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Claude Code: corrige #277 — teste do emulador do Início atualizado para a saudação e a Agenda novas (mesma proteção); diagnóstico no log do teste do rascunho de Página | compilação em andamento |
+| 2026-11-03 | (delivery) | Claude Code: revisão geral + desenho 03/11 em 4 lotes; Início do celular abre (WEB, calc→px, "agora" parado), linha do tempo arrasta, testes do emulador leem a tela de verdade; servidor: restauração, lembretes, apagar conversas | emulador principal verde (#285); R7 instável em Páginas |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
