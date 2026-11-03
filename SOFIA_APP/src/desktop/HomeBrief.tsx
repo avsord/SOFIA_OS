@@ -440,9 +440,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       {...({onMouseMove: (e: any) => {if (!dragRef.current && !adding) setGuide(fxAt(e.pageX));}, onMouseLeave: () => setGuide(null)} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 52, cursor: 'copy', outlineStyle: 'none'} as any} /> : null}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
-      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: LIME}} />
+      <View style={{position: 'absolute', left: `calc(${guide * 100}% - 0.5px)` as any, top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
       <View style={{position: 'absolute', left: `clamp(0px, calc(${guide * 100}% - 34px), calc(100% - 68px))` as any, top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
-        <Text style={{fontSize: 11, fontWeight: '700', color: '#1B2010', backgroundColor: LIME, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
+        <Text style={{fontSize: 11, fontWeight: '700', color: c.onAccent, backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
       </View>
     </View> : null}
     {/* 0.3.332 (aprovado por foto): compromisso com fim vira uma faixa do inicio ao fim; se encostar em outro, so se sobrepoe */}
@@ -503,7 +503,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         <Text numberOfLines={1} style={{fontSize: 12, fontWeight: '700', color: c.onAccent, backgroundColor: drag.color, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden', fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{dragLabel(drag.fx)}{drag.snap ? ' · ' + drag.snap : ''}</Text>
       </View>
     </View> : null}
-    {adding ? <View pointerEvents="none" style={{position: 'absolute', left: `calc(${adding.fx * 100}% - 7px)` as any, top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: LIME, backgroundColor: c.surface, zIndex: 7}} /> : null}
+    {adding ? <View pointerEvents="none" style={{position: 'absolute', left: `calc(${adding.fx * 100}% - 7px)` as any, top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: c.surface, zIndex: 7}} /> : null}
     {adding && actions.sofia ? <SofiaAdd lineW={wS || w} fx={adding.fx} at={adding.at} sofia={actions.sofia} onMore={k => {const at = adding.at; setAdding(null); actions.onAddAt?.(k, at);}} onSaved={(text, undo) => {setAdding(null); showToast(text, undo);}} onClose={() => setAdding(null)} />
      : adding && actions.onAddAt ? <AddMenu fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
     {toast ? <View testID="timeline-toast" style={{position: 'absolute', left: '50%' as any, top: 29 + OFF + 34, zIndex: 13, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
@@ -558,7 +558,7 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
       {avatar()}
       <View style={{flex: 1, minWidth: 0}}><Text style={[DISPLAY_ITALIC, {fontSize: 20, color: c.text}]}>Oi, {sofia.first}.</Text>
-        <Text style={{fontSize: 13, color: c.text, marginTop: 1}}>O que fica para as <Text style={{color: LIME, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
+        <Text style={{fontSize: 13, color: c.text, marginTop: 1}}>O que fica para as <Text style={{color: c.accent, fontWeight: '700', fontVariant: ['tabular-nums']}}>{hm}</Text>{dayTxt === 'hoje' ? '' : ' de ' + dayTxt}?</Text></View>
       <Pressable testID="sofia-add-more" accessibilityRole="button" accessibilityLabel={open ? 'Fechar os tipos' : 'Escolher e preencher eu mesmo'} onPress={() => setOpen(v => !v)} style={({hovered}: any) => ({width: 36, height: 36, marginRight: 5, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent', transform: [{rotate: open ? '-90deg' : '90deg'}], transitionProperty: 'transform', transitionDuration: '200ms'} as any)}><Icon name="chevron" size={16} color={c.muted} /></Pressable>
     </View>
     {open ? <View style={{flexDirection: 'row', marginTop: 14}}>
