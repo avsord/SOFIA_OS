@@ -55,7 +55,7 @@ export function LoadingLines({rows = 3, separated = true, immediate = false}: {r
   const widths = ['78%', '64%', '72%', '56%', '68%', '60%'];
   if (!show) return <View style={{minHeight: rows * 47}} />;
   return (
-    <Animated.View style={web ? {animationKeyframes: {'0%': {opacity: 0.5}, '50%': {opacity: 1}, '100%': {opacity: 0.5}}, animationDuration: '1400ms', animationTimingFunction: 'linear', animationIterationCount: 'infinite'} as any : {opacity: pulse}}>
+    <Animated.View style={web ? WEB_ANIM.breathe : {opacity: pulse}}>
       {Array.from({length: rows}, (_, i) => (
         <View key={i} style={{paddingVertical: 18, borderBottomWidth: separated ? 1 : 0, borderColor: c.line}}>
           <View style={{height: 10, width: widths[i % widths.length] as any, borderRadius: 5, backgroundColor: c.line}} />
@@ -131,6 +131,12 @@ export function ShimmerGroup({children, duration = 1300}: {children: React.React
   return <ShimmerContext.Provider value={x}>{children}</ShimmerContext.Provider>;
 }
 const BAND = 140, TRAVEL = 520;
+/** 03/11/2026: as animacoes CSS do site precisam passar pelo StyleSheet.create - o react-native-web ignora
+ * animationKeyframes em estilo solto (inline). Aqui ficam as do esqueleto: brilho andando e linhas respirando. */
+const WEB_ANIM = StyleSheet.create({
+  band: {animationKeyframes: {'0%': {transform: 'translateX(' + -BAND + 'px)'}, '100%': {transform: 'translateX(' + TRAVEL + 'px)'}}, animationDuration: '1300ms', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite'} as any,
+  breathe: {animationKeyframes: {'0%': {opacity: 0.5}, '50%': {opacity: 1}, '100%': {opacity: 0.5}}, animationDuration: '1400ms', animationTimingFunction: 'linear', animationIterationCount: 'infinite'} as any,
+});
 // (0.3.138) Each block used to be an outer View + an inner Animated.View + 3 segment
 // Views (soft edge / shine / soft edge) = 5 native views. On Home's first paint this
 // repeats for every row (title+subtitle+price = 3 blocks/row), all before the native
@@ -148,9 +154,7 @@ export function ShimmerBlock({width, height, radius = 6, style}: {width: number 
         // 03/11/2026 (Pedro: "da um stalo no esqueleto e no shimmer" ao entrar no site): no navegador o Animated roda no
         // JavaScript, que fica ocupado montando o site e congela o brilho. Aqui o brilho e animacao CSS (compositor do
         // navegador): continua liso mesmo com o JavaScript ocupado. Mesmo desenho, mesma duracao, mesma curva.
-        <View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine, willChange: 'transform',
-          animationKeyframes: {'0%': {transform: [{translateX: -BAND}]}, '100%': {transform: [{translateX: TRAVEL}]}},
-          animationDuration: '1300ms', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite'} as any}
+        <View pointerEvents="none" style={[{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine, willChange: 'transform'} as any, WEB_ANIM.band]}
         />
       ) : x ? (
         <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine,

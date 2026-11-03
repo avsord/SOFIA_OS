@@ -22,7 +22,15 @@ try{
 export function isDesktopScale(){return desktop;}
 
 const flat=(style:any)=>RNW.StyleSheet.flatten(style);
-function scaled(style:any){if(!desktop||!style)return style;return scaleStyle(flat(style));}
+// 03/11/2026: animacao CSS (animationKeyframes) so funciona compilada pelo StyleSheet.create - em estilo solto o
+// react-native-web descarta. Como aqui todo estilo vira um objeto solto para a escala, a parte da animacao e separada e
+// compilada uma vez por desenho (cache); o resto segue escalado como antes.
+const ANIM_KEYS=['animationKeyframes','animationDuration','animationDelay','animationTimingFunction','animationIterationCount','animationFillMode','animationDirection','animationPlayState'];
+const animCache=new Map<string,any>();
+function scaled(style:any){if(!desktop||!style)return style;const f=flat(style);if(!f||f.animationKeyframes==null)return scaleStyle(f);
+ const rest:any={...f},anim:any={};for(const k of ANIM_KEYS)if(k in rest){anim[k]=rest[k];delete rest[k];}
+ const key=JSON.stringify(anim);let a=animCache.get(key);if(!a){a=RNW.StyleSheet.create({a:anim}).a;animCache.set(key,a);}
+ return [scaleStyle(rest),a];}
 function scaledPressable(style:any){return typeof style==='function'?(state:any)=>scaled(style(state)):scaled(style);}
 
 function wrap<P>(Base:any,name:string,extra?:(props:any,max:number|undefined)=>any){

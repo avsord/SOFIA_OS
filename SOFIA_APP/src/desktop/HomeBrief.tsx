@@ -3,7 +3,7 @@
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Image, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions} from 'react-native';
+import {Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
@@ -204,7 +204,8 @@ export function HomeBrief(p: HomeBriefProps) {
   const dayWord = viewDay === 0 ? 'Hoje' : viewDay === 1 ? 'Amanhã' : shownDay.toLocaleDateString('pt-BR', {weekday: 'long'}).replace(/^./, ch => ch.toUpperCase()).replace('-feira', '');
   const dayDate = shownDay.toLocaleDateString('pt-BR', {day: 'numeric', month: 'long'});
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
-  return <View ref={root} style={{gap: 12}}>
+  // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
+  return <View ref={root} style={[{gap: 12}, ENTER.brief]}>
     <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
@@ -297,6 +298,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const nx = t >= 1 ? target.current : from + (target.current - from) * e; startRef.current = nx; setStartRaw(nx); raf.current = t >= 1 ? null : requestAnimationFrame(step);};
     raf.current = requestAnimationFrame(step);};
   useEffect(() => () => {if (raf.current) cancelAnimationFrame(raf.current);}, []);
+  // 03/11/2026 (Pedro: "quando volto para o site depois de muito tempo a linha do tempo percorre o caminho"): a linha tem
+  // que estar sempre na hora certa, como se tivesse andado com o site fechado. Ao voltar para a aba (ou quando o atraso e
+  // grande) ela ja aparece no lugar, sem deslizar; o deslize suave fica so para o passo normal de meio minuto.
+  const jump = (to: number) => {if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} const st = clampStart(to); startRef.current = st; target.current = st; setStartRaw(st);};
+  const snapNext = useRef(false);
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
   // 0.3.326 (Pedro: "abrir e fechar a barra lateral faz as bolinhas e os nomes tremerem"): a largura que decide quem junta
   // numa bolinha, em que fileira vai cada nome e o tamanho dos nomes so muda quando a largura PARA de mudar; enquanto a
@@ -307,6 +313,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
+  useEffect(() => {if (typeof document === 'undefined') return; const back = () => {if (document.visibilityState === 'visible') {snapNext.current = true; tick(n => n + 1);}};
+    document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
   // 0.3.338: o dia do cabecalho e o que esta no meio da linha (rolando, ele troca sozinho ao passar da meia-noite)
@@ -316,7 +324,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   if (nav) nav.current = {go: goDay};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
-  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current || gap > 0.25) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -799,6 +807,19 @@ function useWheelStep(onStep: (dir: 1 | -1) => void, enabled: boolean) {
   return ref;
 }
 /** Setas "‹ 1 de N ›" no canto do bloco (Price Tracker, Encomendas). */
+/** 03/11/2026 (Pedro: "ter para price e rotina"): bolinhas dos itens no pe dos blocos que passam itens (Price Tracker,
+ * Encomendas, Rotina). Com onGo, setas dos dois lados para passar os itens sem a rodinha. */
+function ItemDots({n, i, color, done, onGo, what = 'Item'}: {n: number; i: number; color: string; done?: (k: number) => boolean; onGo?: (k: number) => void; what?: string}) {
+  const c = useTheme(); if (n < 2) return null;
+  const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={6} onPress={() => onGo?.(k)} style={({hovered}: any) => ({width: 20, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 13}}>{label}</Text></Pressable>;
+  return <View style={{marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 2}}>
+    {onGo ? btn('‹', (i - 1 + n) % n, what + ' anterior') : null}
+    <View style={{flexDirection: 'row', gap: 4, paddingHorizontal: onGo ? 2 : 0}}>{Array.from({length: n}, (_, k) => <View key={k} style={{width: k === i ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: k === i ? color : done?.(k) ? tint(color, 0.5) : c.line}} />)}</View>
+    {onGo ? btn('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase()) : null}
+  </View>;
+}
+/** 03/11/2026: entrada do pronto no lugar do esqueleto (StyleSheet.create: o site so anima por ele). */
+const ENTER = StyleSheet.create({brief: {animationKeyframes: {'0%': {opacity: 0.35}, '100%': {opacity: 1}}, animationDuration: '280ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any});
 function Pager({i, n, onGo, what}: {i: number; n: number; onGo: (k: number) => void; what: string}) {
   const c = useTheme(); if (n < 2) return null;
   const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={7} onPress={() => onGo(k)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>{label}</Text></Pressable>;
@@ -942,7 +963,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
       </Animated.View>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         {conf ? <ConfirmRow conf={conf} onClear={() => setConf(null)} /> : !cur.taken ? <Act label={busy ? 'Marcando…' : 'Tomei'} busy={busy} onPress={() => void takeIt(cur)} /> : <View style={{height: 28, marginTop: 8, justifyContent: 'center'}}><Text style={{fontSize: 12, color: g.color, fontWeight: '600'}}>✓ Feito</Text></View>}
-        {list.length > 1 ? <View style={{marginTop: 8, flexDirection: 'row', gap: 4}}>{list.map((d, n) => <View key={d.key} style={{width: d === cur ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: d === cur ? g.color : d.taken ? tint(g.color, 0.5) : c.line}} />)}</View> : null}
+        <ItemDots n={list.length} i={Math.max(0, curIdx)} color={g.color} done={k => !!list[k]?.taken} what="Item da rotina" onGo={k => swap(() => setK(k))} />
       </View>
     </View> : <Quiet text="Nada hoje" sub="Nenhum item da rotina para hoje." />}
   </View>;
@@ -1020,7 +1041,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
     {r ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
       <Big value={fmtMoney(r.price || 0, r.currency || 'BRL')} unit={r.title} />
       <Line text={r.atLow ? 'Menor preço já visto' + (r.store ? ' · ' + r.store : '') : r.change ? (r.change < 0 ? 'Caiu ' : 'Subiu ') + Math.abs(r.change).toFixed(1).replace('.', ',') + '%' + (r.store ? ' · ' + r.store : '') : 'Estável' + (r.store ? ' · ' + r.store : '')} />
-      <Act label="Ver o produto" onPress={onOpen} />
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label="Ver o produto" onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#88CFB8" /></View>
     </Animated.View> : <Quiet text="Nenhum produto" sub="Cole o link de um produto no Price Tracker." />}
   </View>;
 }
@@ -1038,7 +1059,7 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
     {cur ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
       <Big value={String(list.length)} unit={'a caminho' + (today ? ' · ' + today + (today === 1 ? ' chega hoje' : ' chegam hoje') : '')} />
       <Line text={cur.title + ': ' + cur.status.charAt(0).toLowerCase() + cur.status.slice(1)} />
-      <Act label={cur.needs === 'fee' ? 'Pagar taxa' : cur.needs === 'pickup' ? 'Ver retirada' : 'Rastrear'} onPress={onOpen} />
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Act label={cur.needs === 'fee' ? 'Pagar taxa' : cur.needs === 'pickup' ? 'Ver retirada' : 'Rastrear'} onPress={onOpen} /><ItemDots n={list.length} i={i % Math.max(1, list.length)} color="#E8B04A" /></View>
     </Animated.View> : <Quiet text="Nada a caminho" sub="Tudo o que você pediu já chegou." />}
   </View>;
 }

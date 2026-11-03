@@ -259,11 +259,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | 0.3.353 (servidor) | Custo de IA — rodada 1 (sem mudar comportamento) | Pedro: "tá gastando muito token". Medido com a OpenAI substituída por uma falsa que registra cada pedido: cada mensagem custava ~18,6 mil fichas de entrada (planejamento ~16,3 mil = instruções 22,6 mil car. + APPS DA… | servidor |
 | 2026-11-03 | 0.3.354 (servidor) | Custo de IA — rodada 2: tipos de apps tirados saem da IA | Pedro aprovou: project, dream, course, lesson e study_progress (Projetos e rotina, Sonhos, Estudos/Cursos/Aulas) não são mais descritos no APPS DA SOFIA nem aceitos como entity_kind (RETIRED em app-bridge.js; enum do… | servidor |
 | 2026-11-03 | docs | — | Projeto mais leve para o agente: diário saiu do MASTER (120 mil → 36 mil car.; só 5 últimas linhas ficam), 241 notas antigas de versão foram para docs/historico/app/, regra de leitura econômica no AGENTS | testes app 947 e servidor 408+84 ok |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: brilho do esqueleto em CSS (não trava ao abrir); Agenda do Início "hoje 14:30"; X da notificação após excluir; Início mais alto (folga 60); Price Tracker = loja principal no app e no Início; campo da Conversa cortado | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site recompilado (public/web): a rodada anterior subiu só o código e o site não mudou; Perfil do site em duas colunas (identidade + seções); tela de Notificações do site com filtros à esquerda e cartões por dia | aguardando teste do Pedro |
+| 2026-11-03 | (versão escolhida pelo delivery) | Site: animações CSS passam a funcionar (iam em estilo solto e o react-native-web descartava; agora StyleSheet.create e a camada do computador separa a animação); Início entra com fade; linha do tempo já no lugar ao voltar à aba; bolinhas dos itens no Price Tracker/Encomendas e setas na Rotina | aguardando teste do Pedro |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
@@ -274,4 +274,5 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 - Antes de comparar versões, achar o commit realmente versionado como tal.
 - O CI reescreve a versão antes dos testes: teste que compara versão fixa quebra.
 - Emulador ≠ celular. Animação e tempo precisam do relato do dono.
+- No site, animationKeyframes só vale via StyleSheet.create e com transform em texto ('translateX(8px)'); em estilo solto o react-native-web ignora sem erro (03/11/2026: o brilho do esqueleto ficou parado por isso).
 - O site é o app compilado em public/web: mudança em SOFIA_APP/src só aparece no site depois de `npm run build:web` e com public/web no mesmo commit (03/11/2026: uma rodada subiu sem isso e o site não mudou).
