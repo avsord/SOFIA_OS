@@ -17,6 +17,17 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 ---
 
+## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
+
+O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
+
+- **Atualizado em:** 2026-11-03, no chat do claude.ai (antes da ida para o Claude Code).
+- **Pronto e no GitHub:** app com a cara do site (Início e Agenda do site no celular, criar pela linha do tempo indo para a Conversa com a barrinha "Criar · hoje às HH:MM", títulos padrão, + simples, Biblioteca/Notas com barra Área/Filtros, Perfil do celular em cartões, listas na Conversa).
+- **Compilação:** a #277 (commit "App com a cara do site") falhou nos testes do emulador (abertura logado e medição com dados pesados). Causa provável: código do site rodando no Android (`window.addEventListener` sem proteção) e o texto "com compromissos" que o teste procura. Correção montada no chat (`SUBIR_SOFIA_CORRECAO_277.bat`, commit "Corrige #277"); **conferir se subiu e se a compilação seguinte passou** (`gh run list --branch sofia-app-android`). Se falhar, ler `gh run view <id> --log-failed`.
+- **Não confirmado no aparelho:** toque/arrastar e segurar para criar na linha do tempo do celular; zoom da Agenda no celular.
+- **Fora desta rodada (decidido):** Rotina e Finanças no Início do celular ficaram na largura toda (no quadro estavam quadradas).
+- **Próximo passo:** garantir a compilação verde e o APK candidato; depois o Pedro testa no celular.
+
 ## 1. O dono e a forma de trabalhar
 
 - O dono (Pedro) não é desenvolvedor. Responder em português, com explicação
