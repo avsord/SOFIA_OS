@@ -272,7 +272,9 @@ const DAY_START = 7; // (legado) inicio fixo de antes
 /** 0.3.336 (Pedro): cada dia da linha vai das 05:00 a meia-noite; a janela de hoje acompanha o ritmo do dia - de manha
  * mostra o comeco, ao longo do dia vai andando com o "agora" (5 h antes dele) e a noite termina na meia-noite. */
 const DAY_FROM = 5, LEAD = 5;
-const homeOf = (d: number, span: number, nowH: number) => d === 0 ? Math.max(DAY_FROM, Math.min(24 - span, nowH - LEAD)) : d * 24 + DAY_FROM;
+// 0.3.337 (Pedro: "e 23h, se eu vou para o outro dia nao deveria ir para 00:01?"): o dia seguinte abre na meia-noite,
+// continuando de onde hoje termina; hoje de madrugada (antes das 05:00) a linha tambem comeca antes, para o "agora" aparecer
+const homeOf = (d: number, span: number, nowH: number) => d === 0 ? Math.max(0, Math.min(24 - span, Math.max(Math.min(DAY_FROM, nowH - 1), nowH - LEAD))) : d * 24;
 const nowHours = () => {const n = new Date(), z = new Date(n); z.setHours(0, 0, 0, 0); return (n.getTime() - z.getTime()) / 3600000;};
 const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) || ROTINA_TYPES[0]).color;
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
@@ -284,7 +286,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(homeOf(0, SPAN_FULL, nowHours())), target = useRef(homeOf(0, SPAN_FULL, nowHours())), raf = useRef<any>(null), dayRef = useRef(0), manualAt = useRef(0);
-  const clampStart = (v: number) => {const d = dayRef.current; return Math.max(d * 24 + DAY_FROM, Math.min(d * 24 + 24 - spanRef.current, v));}; // 0.3.336: fica dentro do dia mostrado (05:00 a meia-noite)
+  const clampStart = (v: number) => {const d = dayRef.current; return Math.max(d * 24, Math.min(d * 24 + 24 - spanRef.current, v));}; // 0.3.337: fica dentro do dia mostrado (00:00 a meia-noite)
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
   const tween = useRef({from: startRef.current, t0: 0, ms: 380, home: false});
@@ -327,7 +329,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     const el: any = box.current; if (!el || !el.addEventListener) return;
     const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return;
       if (e.ctrlKey || e.metaKey) {const r = (lineBox.current as any)?.getBoundingClientRect?.(); if (!r?.width) return; const fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), at = startRef.current + fx * spanRef.current;
-        const ns = Math.max(SPAN_MIN, Math.min(SPAN_FULL, spanRef.current * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); if (Math.abs(ns - spanRef.current) < 0.01) return; spanRef.current = ns; setSpanState(ns);
+        const ns = Math.max(SPAN_MIN, Math.min(SPAN_FULL, spanRef.current * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); if (Math.abs(ns - spanRef.current) < 0.01) return; manualAt.current = Date.now(); spanRef.current = ns; setSpanState(ns);
         const st = clampStart(at - fx * ns); if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} startRef.current = st; target.current = st; setStartRaw(st); setPin(''); setHover(''); return;}
       const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; manualAt.current = Date.now(); setPin(''); setHover(''); glide(target.current + d / 40 * spanRef.current / SPAN_FULL);};
     el.addEventListener('wheel', onWheel, {passive: false});
@@ -490,7 +492,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
-    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 46)) return null;
+    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 60)) return null;
       const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
