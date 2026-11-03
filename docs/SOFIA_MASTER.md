@@ -21,12 +21,14 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-03, no chat do claude.ai (antes da ida para o Claude Code).
-- **Pronto e no GitHub:** app com a cara do site (Início e Agenda do site no celular, criar pela linha do tempo indo para a Conversa com a barrinha "Criar · hoje às HH:MM", títulos padrão, + simples, Biblioteca/Notas com barra Área/Filtros, Perfil do celular em cartões, listas na Conversa).
-- **Compilação:** a #277 (commit "App com a cara do site") falhou nos testes do emulador (abertura logado e medição com dados pesados). Causa provável: código do site rodando no Android (`window.addEventListener` sem proteção) e o texto "com compromissos" que o teste procura. Correção montada no chat (`SUBIR_SOFIA_CORRECAO_277.bat`, commit "Corrige #277"); **conferir se subiu e se a compilação seguinte passou** (`gh run list --branch sofia-app-android`). Se falhar, ler `gh run view <id> --log-failed`.
+- **Atualizado em:** 2026-11-03 ~18:40 (horário de Brasília), no **Claude Code** (sessão na nuvem, repositório clonado; sem emulador Android aqui, sem KVM).
+- **O "Corrige #277" do chat nunca subiu** (o `.bat` não chegou a ser rodado). Refeito aqui direto no Git.
+- **Causa real da #277 (e das #274–276):** o teste do emulador `SOFIA_APP/tools/manual-apk-smoke.py` procurava "Olá, Teste." e "com compromissos", textos que o Início novo não tem mais (saudação "Bom dia/Boa tarde/Boa noite, Teste" com nome em itálico; no celular a Agenda do site no lugar do mini calendário). Teste atualizado mantendo a proteção: conta autenticada visível + agenda salva aparecendo ("Você tem N compromissos hoje", "Agenda · próximos" com itens ou o "com compromissos" antigo), esperando até 6 s.
+- **Segunda falha, antiga (desde ~#140, 12/10):** `fluency-heavy-smoke.py` "Actual Page draft lost across Activity hide/show; mode=old". O código do rascunho (`src/lib/page-editor.ts`) não mostra perda; os artefatos do CI não puderam ser baixados desta sessão. Acrescentei o diagnóstico `SOFIA_DRAFT_DIAG` no log (texto e foco do campo do título, o que está na tela) para a próxima falha mostrar a causa.
+- **Compilação:** ver `gh run list --branch sofia-app-android --workflow "Sofia Android 0.3.47 update"`; resultado registrado no fim desta seção quando terminar.
+- **Commits sem `[manual-apk]` também falham** em "Native checks - navigation/workspace" (boot-smoke da cópia QA) — não investigado nesta rodada.
 - **Não confirmado no aparelho:** toque/arrastar e segurar para criar na linha do tempo do celular; zoom da Agenda no celular.
-- **Fora desta rodada (decidido):** Rotina e Finanças no Início do celular ficaram na largura toda (no quadro estavam quadradas).
-- **Próximo passo:** garantir a compilação verde e o APK candidato; depois o Pedro testa no celular.
+- **Próximo passo:** se o teste pesado do rascunho falhar de novo, ler a linha `SOFIA_DRAFT_DIAG` no log (`gh run view <id> --log-failed | grep SOFIA_DRAFT_DIAG`) e corrigir a causa; depois o Pedro testa o candidato no celular.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -225,6 +227,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **CI Android vermelho desde a #118 (10/10):** smoke do Início corrigido em 03/11; falta o teste pesado "Page draft lost" (modo Antigo, desde ~#140) e os "Native checks" dos commits sem `[manual-apk]`.
+
 - **Site no computador (após 0.3.253):** fundação pronta (escala e rolagem). Próximo: seguir docs/WEB_DIAGNOSTICO.md — Finanças em 2 colunas e tabelas, Price Tracker e Tarefas em tabela, E-mails em 3 colunas, arrastar páginas com mouse, clique direito no lugar de segurar.
 
 - **Site 0.3.250 (computador):** dono conferir no navegador depois do deploy. Próxima fase pedida: listas virando tabelas com colunas/ordenação/filtros (Tarefas, Finanças, Price Tracker, E-mails, Encomendas), detalhes em side peek, menus de clique direito.
@@ -270,11 +274,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | docs | — | Projeto mais leve para o agente: diário saiu do MASTER (120 mil → 36 mil car.; só 5 últimas linhas ficam), 241 notas antigas de versão foram para docs/historico/app/, regra de leitura econômica no AGENTS | testes app 947 e servidor 408+84 ok |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: brilho do esqueleto em CSS (não trava ao abrir); Agenda do Início "hoje 14:30"; X da notificação após excluir; Início mais alto (folga 60); Price Tracker = loja principal no app e no Início; campo da Conversa cortado | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site recompilado (public/web): a rodada anterior subiu só o código e o site não mudou; Perfil do site em duas colunas (identidade + seções); tela de Notificações do site com filtros à esquerda e cartões por dia | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: animações CSS passam a funcionar (iam em estilo solto e o react-native-web descartava; agora StyleSheet.create e a camada do computador separa a animação); Início entra com fade; linha do tempo já no lugar ao voltar à aba; bolinhas dos itens no Price Tracker/Encomendas e setas na Rotina | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | App com a cara do site (aprovado no quadro): Início do celular = Início do site compacto (Seu dia + blocos, sem mini chat); Agenda do celular = Agenda do site (Ano/Mês/Dia com zoom, bolinhas no mês); segurar na linha do tempo leva à Conversa com a barrinha "Criar · hoje às HH:MM" e a seta de criação manual; títulos padrão (nome do app) em Listas, Encomendas, E-mails, Biblioteca, Notas; + simples; Biblioteca/Notas com barra Área/Filtros; Agenda do Início rola para os próximos dias; Conversa mostra listas como lista; segurar no Dia da Agenda cria no horário; Despesa/Receita pela barrinha já no dia; Perfil do celular em cartões | aguardando teste do Pedro |
+| 2026-11-03 | (versão escolhida pelo delivery) | Claude Code: corrige #277 — teste do emulador do Início atualizado para a saudação e a Agenda novas (mesma proteção); diagnóstico no log do teste do rascunho de Página | compilação em andamento |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

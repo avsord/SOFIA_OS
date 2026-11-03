@@ -125,6 +125,12 @@ def correctness(points,mode):
   adb('shell','input','text',addition);adb('shell','input','keyevent','BACK');time.sleep(.15)
   tap(points['Conversa']);time.sleep(.25);tap(points['Páginas']);time.sleep(.25)
   tree=xml();(OUT/(f'draft-{mode}-{cycle:02d}.xml')).write_text(tree)
+  if expected not in tree:
+   # 03/11/2026: diagnostico no log (os artefatos nem sempre podem ser baixados): o campo do titulo existe? o que tem nele?
+   nodes=list(ET.fromstring(tree).iter('node'))
+   title=[(n.get('text'),n.get('focused'),n.get('bounds')) for n in nodes if n.get('content-desc')=='Título da página' or 'Título da página' in (n.get('hint') or '')]
+   seen=[n.get('text') or n.get('content-desc') for n in nodes if (n.get('text') or n.get('content-desc'))][:40]
+   print('SOFIA_DRAFT_DIAG '+json.dumps({'mode':mode,'cycle':cycle,'expected':expected,'title_nodes':title,'visible':seen},ensure_ascii=False),flush=True)
   assert expected in tree,'Actual Page draft lost across Activity hide/show; mode='+mode+' cycle='+str(cycle)
   assert 'Algo deu errado nesta tela' not in tree and 'Vamos reabrir' not in tree,'Screen error while preserving Page draft'
  RESULT.setdefault('draft_cycles',{})[mode]=20

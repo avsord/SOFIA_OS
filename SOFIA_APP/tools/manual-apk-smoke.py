@@ -33,6 +33,22 @@ def cold(label):
          'icon_is_surface_view':surface.group(1)=='true' if surface else None}
 def capture(label):
  tree=xml();(out/(label+'.xml')).write_text(tree);(out/(label+'.png')).write_bytes(adb('exec-out','screencap','-p'));return tree
+# 03/11/2026: o Inicio atual saúda com "Bom dia/Boa tarde/Boa noite, <nome>" (nome em itálico, mesmo texto na árvore)
+# e no celular mostra a Agenda do site ("Agenda · próximos" e a frase do dia) no lugar do mini calendário
+# ("..., com compromissos"). StartupHome (só com conta salva) continua com "Olá, Teste.". A proteção é a mesma:
+# conta autenticada visível e registros da agenda salvos aparecendo na abertura.
+GREETING=re.compile(r'(Olá|Bom dia|Boa tarde|Boa noite), Teste')
+def home_authenticated(tree):return bool(GREETING.search(tree))
+def home_agenda_visible(tree):
+ if 'com compromissos' in tree or re.search(r'Você tem \d+ compromissos? hoje',tree):return True
+ return 'Agenda · próximos' in tree and 'Nenhum compromisso pela frente' not in tree
+def capture_home(label,need_agenda=True,wait=6.0):
+ end=time.monotonic()+wait
+ while True:
+  tree=capture(label)
+  if home_authenticated(tree) and (not need_agenda or home_agenda_visible(tree)):return tree
+  if time.monotonic()>=end:return tree
+  time.sleep(.5)
 def tap_label(tree,label):
  for n in ET.fromstring(tree).iter('node'):
   if n.attrib.get('text')==label or n.attrib.get('content-desc')==label:
@@ -129,7 +145,7 @@ try:
  result['candidate_icon_kinds']=[run['icon_kind'] for run in result['candidate_runs']]
  assert all(run['icon_is_image_view'] is True and run['icon_is_surface_view'] is False
             for run in result['candidate_runs']), 'Native system splash is not a static ImageView or view markers are missing'
- after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
+ after=capture_home('candidate');assert home_authenticated(after),'Production authenticated Home is not visible';assert home_agenda_visible(after),'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
@@ -214,7 +230,7 @@ try:
  result['react_guarded_taps']=menu_logs.count('nativeFirst=false')
  assert result['native_first_taps']>=12, 'Warmed tabs did not preserve native touch-down responsiveness'
  tap_label(xml(),'Início');time.sleep(.3)
- assert 'Olá, Teste.' in capture('after-menu-home')
+ assert home_authenticated(capture_home('after-menu-home',need_agenda=False)),'Authenticated Home not visible after rapid menu taps'
  tap_label(xml(),'Conversa');time.sleep(.3)
  assert 'FIM DA RESPOSTA QA' in capture('after-menu-chat')
  result['rapid_menu_sequence_tested']=True
