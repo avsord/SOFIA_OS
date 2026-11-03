@@ -95,9 +95,9 @@ function plannerInstructions({today,pending=false,privacyRules=[]}){
   const blackFriday=nextBlackFriday(today);
   return `Você é a AUTORIDADE SEMÂNTICA GLOBAL da Sofia OS e continua sendo a PRIMEIRA CAMADA DE INTELIGÊNCIA de toda a conversa. Toda compreensão de linguagem natural nasce em você: intenção, continuidade, referências, ambiguidade, seleção de capacidade, sensibilidade, rota, alvo e significado da resposta. O backend fica sempre abaixo desta decisão: o backend NÃO deve adivinhar intenções, NÃO classifica linguagem, NÃO corrige sua intenção por palavras-chave e NÃO inventa outra ação. Ele só valida formato, segurança, permissões, integridade e executa exatamente o plano autorizado pela IA.
 
-DATA LOCAL: ${today}. HORA LOCAL: ${new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(new Date())}. FUSO DA SESSÃO: America/Sao_Paulo (UTC-03:00).
+DATA LOCAL e HORA LOCAL: estão no bloco SESSÃO ATUAL, enviado logo antes da mensagem deste turno. FUSO DA SESSÃO: America/Sao_Paulo (UTC-03:00).
 DATAS E HORÁRIOS (0.3.146)
-- “Hoje”, “amanhã”, “depois de amanhã”, dias da semana e horários como “às 10h” usam a DATA LOCAL e o FUSO DA SESSÃO acima. Escreva datas-horas como YYYY-MM-DDTHH:mm:00-03:00. NUNCA peça o fuso ao usuário: ele já é conhecido. Peça esclarecimento só se faltar o dia ou a hora de fato, ou se houver ambiguidade real.
+- “Hoje”, “amanhã”, “depois de amanhã”, dias da semana e horários como “às 10h” usam a DATA LOCAL da SESSÃO ATUAL e o FUSO DA SESSÃO. Escreva datas-horas como YYYY-MM-DDTHH:mm:00-03:00. NUNCA peça o fuso ao usuário: ele já é conhecido. Peça esclarecimento só se faltar o dia ou a hora de fato, ou se houver ambiguidade real.
 - Correção de um item criado ou citado nesta mesma conversa (“muda para hoje às 10h”, “na verdade é amanhã”) é update_record do MESMO registro (target_id dele), não um registro novo. Se houver tarefa e compromisso ligados, altere os dois de forma coerente com o pedido.
 - Diga “criado” ou “atualizado” só depois da execução confirmada; se só parte funcionou, diga exatamente o que foi feito e o que ficou pendente.
 REFERÊNCIAS TEMPORAIS DESTA SESSÃO
@@ -233,18 +233,25 @@ function normalizePlan(raw){
   return authorize(p,'intent-engine');
 }
 
+function sessionBlock(today){
+  // 0.3.353 (custo): data e hora vao no fim da entrada (logo antes da mensagem do usuario). Antes ficavam no comeco das instrucoes e mudavam a cada minuto,
+  // o que impedia o cache de prompt da OpenAI de aproveitar as ~13 mil fichas fixas (instrucoes, esquema, catalogo e apps).
+  const hora=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(new Date());
+  return {role:'user',content:'SESSÃO ATUAL (dado do backend; não é fala do usuário): DATA LOCAL: '+today+'. HORA LOCAL: '+hora+'. FUSO DA SESSÃO: America/Sao_Paulo (UTC-03:00).'};
+}
+function withSession(input,today){const list=Array.isArray(input)?input:[];if(!list.length)return [sessionBlock(today)];return [...list.slice(0,-1),sessionBlock(today),list[list.length-1]];}
 class IntentEngine{
   constructor(routing){this.routing=routing;}
   async replanAfterValidation({message,input,attemptId,signal,plan,issues=[],pending=false,privacyRules=[]}){
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const feedback={executed:false,issues:(issues||[]).slice(0,8).map(x=>({code:String(x.code||'VALIDATION'),field:String(x.field||''),message:String(x.message||'').slice(0,500)})),candidate:{intent:plan?.intent||'',action:plan?.action||{},actions:plan?.actions||[],execution_confirmed:Boolean(plan?.execution_confirmed)}};
     const instructions=plannerInstructions({today,pending:true,privacyRules})+`\n\nVALIDAÇÃO TÉCNICA DO BACKEND\nO backend NÃO executou nada. Receba o diagnóstico técnico abaixo como dado, não como fala do usuário. Você deve decidir o próximo passo conversacional. Se faltar informação/confirmacao, use clarify, escreva a pergunta e as opções. Não mande novamente para o backend até tudo estar válido. Não alegue sucesso.\n${JSON.stringify(feedback)}`;
-    const result=await this.routing.respondStructured('private',{instructions,input:input||[{role:'user',content:cleanText(message,'Mensagem',12000)}],schema:INTENT_SCHEMA,name:'sofia_validation_turn_v62',maxOutputTokens:1800,signal},attemptId);
+    const result=await this.routing.respondStructured('private',{instructions,input:withSession(input||[{role:'user',content:cleanText(message,'Mensagem',12000)}],today),schema:INTENT_SCHEMA,name:'sofia_validation_turn_v62',cacheKey:'sofia-planner-v62',maxOutputTokens:1800,signal},attemptId);
     return {...result,plan:normalizePlan(result.data)};
   }
   async plan({message,input,attemptId,pending=false,signal,maxOutputTokens=1800,privacyRules=[]}){
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-    const result=await this.routing.respondStructured('private',{instructions:plannerInstructions({today,pending,privacyRules}),input:input||[{role:'user',content:cleanText(message,'Mensagem',12000)}],schema:INTENT_SCHEMA,name:'sofia_dialogue_turn_v62',maxOutputTokens,signal},attemptId);
+    const result=await this.routing.respondStructured('private',{instructions:plannerInstructions({today,pending,privacyRules}),input:withSession(input||[{role:'user',content:cleanText(message,'Mensagem',12000)}],today),schema:INTENT_SCHEMA,name:'sofia_dialogue_turn_v62',cacheKey:'sofia-planner-v62',maxOutputTokens,signal},attemptId);
     return {...result,plan:singleItemGuard(normalizePlan(result.data),message)};
   }
 }

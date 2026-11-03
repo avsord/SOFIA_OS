@@ -19,23 +19,31 @@ const INSTRUCTIONS=['Voce organiza uma conversa entre o Pedro e a assistente Sof
  'Use frases curtas (ate 12 palavras). Nao invente nada que nao esteja nas mensagens. Listas vazias quando nao houver.'].join(' ');
 function createConversationBoard({store,provider}){
  store.db.exec('CREATE TABLE IF NOT EXISTS conversation_board(conversation_id TEXT PRIMARY KEY,json TEXT NOT NULL,message_count INTEGER NOT NULL,updated_at TEXT NOT NULL) STRICT;');
- const running=new Set();
+ const running=new Set(),failed=new Map(); // 0.3.353: conversa -> {seq,at} da ultima tentativa que falhou
  function read(id){const r=store.db.prepare('SELECT json,updated_at FROM conversation_board WHERE conversation_id=?').get(id);if(!r)return {topics:[],updated_at:null};try{return {...JSON.parse(r.json),updated_at:r.updated_at};}catch{return {topics:[],updated_at:r.updated_at};}}
  async function update(id){
   if(!id||running.has(id)||!provider||typeof provider.structured!=='function')return read(id);
   const rows=store.messages(id,80).filter(m=>m.status!=='deleted'&&String(m.content||'').trim());
+  // 0.3.353 (custo e conserto): o marcador e a ULTIMA mensagem (sequencia), nao a quantidade lida. Antes era o tamanho
+  // da lista lida (no maximo 80): conversa com mais de 80 mensagens ficava sempre em 80 e o Quadro nunca mais mudava.
+  const seq=rows.length?Number(rows[rows.length-1].sequence)||rows.length:0;
   const old=store.db.prepare('SELECT message_count FROM conversation_board WHERE conversation_id=?').get(id);
-  if(!rows.length||old?.message_count===rows.length)return read(id);
+  if(!rows.length||old?.message_count===seq)return read(id);
+  // 0.3.353 (custo): tentativa que falhou para estas mesmas mensagens nao se repete por 30 min. Antes cada abertura da
+  // conversa e as 3 conferencias depois de cada mensagem refaziam a chamada inteira (ate 80 mensagens) a cada falha.
+  const miss=failed.get(id);if(miss&&miss.seq===seq&&Date.now()-miss.at<30*60e3)return read(id);
   running.add(id);
   try{
    const input=rows.map((m,i)=>'['+i+'] '+(m.role==='user'?'Pedro':'Sofia')+': '+String(m.content).replace(/!\[[^\]]*\]\([^)]*\)/g,'[imagem]').replace(/\s+/g,' ').slice(0,700)).join('\n');
-   const out=await provider.structured({instructions:INSTRUCTIONS,input,schema:SCHEMA,name:'conversation_board',maxOutputTokens:1800});
+   let out;try{out=await provider.structured({instructions:INSTRUCTIONS,input,schema:SCHEMA,name:'conversation_board',cacheKey:'sofia-board',maxOutputTokens:1800});}
+   catch(e){failed.set(id,{seq,at:Date.now()});throw e;}
+   failed.delete(id);
    const topics=(Array.isArray(out?.topics)?out.topics:[]).map(t=>{const at=rows[Math.max(0,Math.min(rows.length-1,Number(t.start)||0))];return {
     title:String(t.title||'Assunto').slice(0,60),started_at:at?.created_at||null,message_id:at?.id||null,
     decided:(t.decided||[]).map(String).slice(0,8),todo:(t.todo||[]).map(String).slice(0,8),open:(t.open||[]).map(o=>({title:String(o.title||''),detail:String(o.detail||'')})).slice(0,6),
     numbers:(t.numbers||[]).map(n=>({label:String(n.label||''),value:String(n.value||'')})).slice(0,8),refs:(t.refs||[]).map(String).slice(0,6)};}).filter(t=>t.message_id);
    const now=new Date().toISOString();
-   store.db.prepare('INSERT INTO conversation_board(conversation_id,json,message_count,updated_at) VALUES(?,?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET json=excluded.json,message_count=excluded.message_count,updated_at=excluded.updated_at').run(id,JSON.stringify({topics}),rows.length,now);
+   store.db.prepare('INSERT INTO conversation_board(conversation_id,json,message_count,updated_at) VALUES(?,?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET json=excluded.json,message_count=excluded.message_count,updated_at=excluded.updated_at').run(id,JSON.stringify({topics}),seq,now);
    // titulo da conversa = assunto (so troca o titulo automatico; um titulo escrito pela pessoa fica)
    const c=store.db.prepare('SELECT title FROM conversations WHERE id=? AND owner=?').get(id,OWNER);
    if(c&&topics.length&&/^(Conversa com a Sofia|Chat|Nova conversa)$/i.test(String(c.title||'').trim()))store.db.prepare('UPDATE conversations SET title=? WHERE id=? AND owner=?').run(topics[topics.length-1].title,id,OWNER);

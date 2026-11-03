@@ -32,11 +32,14 @@ function parseStructuredText(text){
 }
 function safeUsage(data) {
   const u=data?.usage;
-  return Number.isSafeInteger(u?.input_tokens) && u.input_tokens>=0 && Number.isSafeInteger(u?.output_tokens) && u.output_tokens>=0 ? {input_tokens:u.input_tokens, output_tokens:u.output_tokens} : null;
+  if(!(Number.isSafeInteger(u?.input_tokens) && u.input_tokens>=0 && Number.isSafeInteger(u?.output_tokens) && u.output_tokens>=0))return null;
+  // 0.3.353: quanto da entrada veio do cache de prompt (cobrado com desconto) - aparece no diagnostico de uso
+  const cached=Number(u?.input_tokens_details?.cached_tokens);
+  return Number.isSafeInteger(cached)&&cached>0?{input_tokens:u.input_tokens,output_tokens:u.output_tokens,cached_input_tokens:cached}:{input_tokens:u.input_tokens,output_tokens:u.output_tokens};
 }
 class OpenAIProvider {
   constructor(config, fetchImpl=null) { this.config=config; this.fetch=fetchImpl||httpsFetch; }
-  async respond({ instructions, input, maxOutputTokens, signal }) {
+  async respond({ instructions, input, maxOutputTokens, signal, cacheKey }) {
     const key=this.config.apiKey;
     if (!key) throw new AppError('NO_API_KEY','A chave não está carregada. Use o reparador de chave existente, sem colá-la no chat.',503);
     if (!/^sk-[A-Za-z0-9_-]{16,}$/.test(key)) throw new AppError('BAD_API_KEY_FORMAT','A chave carregada contém um formato inesperado. Nenhuma credencial foi enviada.',503);
@@ -46,7 +49,7 @@ class OpenAIProvider {
       response=await this.fetch(ENDPOINT, {
         method:'POST',redirect:'error',signal:signal?AbortSignal.any([signal,timeout]):timeout,
         headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',Accept:'application/json'},
-        body:JSON.stringify(Object.assign({model:this.config.model,instructions,input,max_output_tokens:maxOutputTokens,store:false},/^gpt-5\.6/i.test(this.config.model)?{reasoning:{effort:'none'}}:{}))
+        body:JSON.stringify(Object.assign({model:this.config.model,instructions,input,max_output_tokens:maxOutputTokens,store:false,prompt_cache_key:cacheKey||'sofia-text'},/^gpt-5\.6/i.test(this.config.model)?{reasoning:{effort:'none'}}:{}))
       });
     } catch (e) {
       if (signal?.aborted) throw new AppError('CANCELLED','A chamada foi interrompida. A mensagem continua salva.',503);
@@ -70,14 +73,14 @@ class OpenAIProvider {
     return {reply,usage,requestId,incomplete:data.status==='incomplete'};
   }
 
-  async structured({ instructions, input, schema, name='structured_output', maxOutputTokens, signal }) {
+  async structured({ instructions, input, schema, name='structured_output', maxOutputTokens, signal, cacheKey }) {
     const key=this.config.apiKey;
     if (!key) throw new AppError('NO_API_KEY','A chave não está carregada. Use o reparador de chave existente, sem colá-la no chat.',503);
     if (!/^sk-[A-Za-z0-9_-]{16,}$/.test(key)) throw new AppError('BAD_API_KEY_FORMAT','A chave carregada contém um formato inesperado. Nenhuma credencial foi enviada.',503);
     if(!schema||typeof schema!=='object')throw new AppError('BAD_SCHEMA','Esquema estruturado inválido.');
     let response;const timeout=AbortSignal.timeout(this.config.apiTimeoutMs);
     try{
-      response=await this.fetch(ENDPOINT,{method:'POST',redirect:'error',signal:signal?AbortSignal.any([signal,timeout]):timeout,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(Object.assign({model:this.config.model,instructions,input,max_output_tokens:maxOutputTokens,store:false,text:{format:{type:'json_schema',name,strict:true,schema}}},/^gpt-5\.6/i.test(this.config.model)?{reasoning:{effort:'none'}}:{}))});
+      response=await this.fetch(ENDPOINT,{method:'POST',redirect:'error',signal:signal?AbortSignal.any([signal,timeout]):timeout,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(Object.assign({model:this.config.model,instructions,input,max_output_tokens:maxOutputTokens,store:false,prompt_cache_key:cacheKey||('sofia-'+name),text:{format:{type:'json_schema',name,strict:true,schema}}},/^gpt-5\.6/i.test(this.config.model)?{reasoning:{effort:'none'}}:{}))});
     }catch(e){
       if(signal?.aborted)throw new AppError('CANCELLED','A chamada foi interrompida. A mensagem continua salva.',503);
       if(timeout.aborted)throw new AppError('API_TIMEOUT','A OpenAI não respondeu no prazo. Não repeti a chamada automaticamente; uma tentativa interrompida ainda pode ter custo.',504);
