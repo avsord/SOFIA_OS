@@ -3,7 +3,10 @@
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
+import {Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
+/** 03/11/2026: no Android o `window` existe (e o objeto global) mas nao tem addEventListener/innerWidth; o teste
+ * `!WEB` nao protegia e o Inicio do celular quebrava. Tudo que e so do navegador usa WEB. */
+const WEB = Platform.OS === 'web' && typeof document !== 'undefined';
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
 import {goalStats, type GoalNumbers} from '../components/GoalProgress';
 import {useTheme} from '../lib/theme';
@@ -76,7 +79,7 @@ export function briefLine(a: {today: DayRecord[]; tasks: Task[]; series: Monitor
  * devolve 1 - nada muda. So o Inicio do computador usa (Home.tsx). */
 const REF_W = 1912, REF_H = 904;
 export function homeZoom(w?: number, h?: number): number {
-  if (typeof window === 'undefined') return 1;
+  if (!WEB) return 1;
   const W = w ?? window.innerWidth, H = h ?? window.innerHeight;
   const target = fluidFactor(REF_W) * Math.min(W / REF_W, H / REF_H);
   return Math.max(1, Math.min(2, Math.round(target / uiScale() * 40) / 40));
@@ -174,7 +177,7 @@ export function HomeBrief(p: HomeBriefProps) {
   const onMove = (moves: Move[]) => {const marks = moves.filter(x => 'mark' in x.t), rest = moves.filter(x => !('mark' in x.t));
     if (marks.length) moveMarks(marks.map(x => ({id: (x.t as {mark: TimeMark}).mark.id, to: x.to}))); if (rest.length) p.onMove?.(rest);};
   const gearBox = useRef<View>(null); useClickOutside(gearBox, () => setGear(false), gear, '[data-testid="timeline-gear"]');
-  useEffect(() => {if (!gear || typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
+  useEffect(() => {if (!gear || !WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
   const timeMarks = useMemo(() => {
     const out: TimeMark[] = [], todayKey = new Date().toISOString().slice(0, 10), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
     for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
@@ -335,7 +338,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
-  useEffect(() => {if (typeof document === 'undefined') return; const back = () => {if (document.visibilityState === 'visible') {snapNext.current = true; tick(n => n + 1);}};
+  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState === 'visible') {snapNext.current = true; tick(n => n + 1);}};
     document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
@@ -369,7 +372,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
-  useEffect(() => {if (typeof window === 'undefined' || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
+  useEffect(() => {if (!WEB || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
   // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
@@ -385,11 +388,12 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // confirmacao depois de adicionar pelo mini editor ("Reuniao adicionada as 21:30 · Desfazer"), some em 6 s
   const [toast, setToast] = useState<{text: string; undo?: () => Promise<void>} | null>(null), toastT = useRef<any>(null);
   const showToast = (text: string, undo?: (() => Promise<void>) | void) => {setToast({text, undo: undo || undefined}); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 6000);};
-  const fxAt = (pageX: number) => {const el: any = lineBox.current; const r = el?.getBoundingClientRect?.(); return r && r.width ? Math.max(0, Math.min(1, (pageX - r.left) / r.width)) : null;};
+  const lineRect = useRef<{left: number; width: number} | null>(null);
+  const fxAt = (pageX: number) => {const el: any = lineBox.current; const r = WEB ? el?.getBoundingClientRect?.() : lineRect.current; return r && r.width && Number.isFinite(pageX) ? Math.max(0, Math.min(1, (pageX - r.left) / r.width)) : null;};
   const hourAt = (fx: number) => startRef.current + fx * SPAN;
   const snapDate = (fx: number) => new Date(Math.round((day0 + hourAt(fx) * 3600000) / 300000) * 300000);
   const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
-    const el: any = lineBox.current; if (!actions.onMove || !items.length || !el?.getBoundingClientRect || typeof window === 'undefined') return;
+    const el: any = lineBox.current; if (!actions.onMove || !items.length || !el?.getBoundingClientRect || !WEB) return;
     const ne = e?.nativeEvent || {}, sx = Number(ne.pageX ?? ne.clientX), rect = el.getBoundingClientRect(); if (!Number.isFinite(sx) || !rect.width) return;
     const grab = sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
     const fxOf = (x: number) => Math.max(0, Math.min(1, (x - grab - rect.left) / rect.width));
@@ -433,7 +437,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // mouse vai MESMO para longe (mais de 36 px da bolinha e fora da previa) - nao depende mais do "saiu de cima" do
   // navegador, que disparava sozinho quando a tela se redesenhava (dados chegando, Rotina atualizando, linha andando)
   const dotEls = useRef<Record<string, any>>({}), farT = useRef(false);
-  useEffect(() => {if (!hover || pin || typeof document === 'undefined') return;
+  useEffect(() => {if (!hover || pin || !WEB) return;
     const mv = (e: MouseEvent) => {const pv = document.querySelector('[data-testid="timeline-preview"]') as HTMLElement | null, dot = dotEls.current[hover];
       const inside = (r?: DOMRect | null, pad = 0) => !!r && e.clientX >= r.left - pad && e.clientX <= r.right + pad && e.clientY >= r.top - pad && e.clientY <= r.bottom + pad;
       const near = inside(pv?.getBoundingClientRect(), 6) || inside(dot?.getBoundingClientRect?.(), 30);
@@ -460,7 +464,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // 0.3.333 (aprovado): teclado com o mouse sobre a linha - setas andam entre os itens (abre a previa), Enter abre o item,
   // N adiciona agora (abre a Sofia no horario de agora), Esc fecha
   const overLine = useRef(false), kbIdx = useRef(-1);
-  useEffect(() => {if (typeof window === 'undefined') return;
+  useEffect(() => {if (!WEB) return;
     const k = (e: KeyboardEvent) => {if (!overLine.current || adding || dragRef.current) return; const t = e.target as any; if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
       const list = [...all].sort((a, b) => a.x - b.x).filter(q => q.x >= 0 && q.x <= 1);
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {if (!list.length) return; e.preventDefault(); kbIdx.current = Math.max(0, Math.min(list.length - 1, kbIdx.current < 0 ? (e.key === 'ArrowRight' ? 0 : list.length - 1) : kbIdx.current + (e.key === 'ArrowRight' ? 1 : -1))); setPin(list[kbIdx.current].key); setHover(list[kbIdx.current].key);}
@@ -469,7 +473,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
   return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF, userSelect: 'none', outlineStyle: 'none'} as any}>
-   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v);}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
+   <View ref={lineBox} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v); if (!WEB) (lineBox.current as any)?.measureInWindow?.((x: number, _y: number, w2: number) => {lineRect.current = {left: x, width: w2};});}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
     <View style={{position: 'absolute', left: 0, right: 0, top: 28 + OFF, height: 2, borderRadius: 1, backgroundColor: tint(c.accent, 0.45)}} />
     {/* 0.3.332: marcas de hora (maiores a cada 4 h) e o risco da troca de periodo (12:00 e 18:00) na propria linha */}
     {Array.from({length: Math.floor(SPAN) + 2}, (_, k) => Math.ceil(start) + k).map(h => {const x = (h - start) / SPAN; if (x <= 0 || x >= 1) return null; const hd = ((h % 24) + 24) % 24, div = hd === 6 || hd === 12 || hd === 18, major = hd % 4 === 3, ht = div ? 12 : major ? 14 : 8;
@@ -583,12 +587,12 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
   const [text, setText] = useState(''), [file, setFile] = useState<any>(null), [preview, setPreview] = useState(''), [msgs, setMsgs] = useState<ChatMsg[]>([]), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [listening, setListening] = useState(false);
   const [when, setWhen] = useState(at), fileIn = useRef<any>(null), rec = useRef<any>(null), scroller = useRef<any>(null);
   useClickOutside(box, onClose);
-  useEffect(() => {if (typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
+  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
   useEffect(() => () => {if (preview) URL.revokeObjectURL(preview); try {rec.current?.stop();} catch {/* sem microfone */}}, []);
   useEffect(() => {setTimeout(() => {const el = scroller.current as any; if (el?.scrollTo) el.scrollTo({y: 99999, animated: true});}, 30);}, [msgs.length, busy]);
   const hm = hhmm(when), dayTxt = (() => {const d = new Date(when), n = new Date(); return d.toDateString() === n.toDateString() ? 'hoje' : d.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'numeric'});})();
-  const pickFile = () => {if (typeof document === 'undefined') return; if (!fileIn.current) {const el = document.createElement('input'); el.type = 'file'; el.accept = 'image/*,application/pdf'; el.onchange = () => {const f = el.files?.[0]; if (f) {setFile(f); setPreview(f.type.startsWith('image/') ? URL.createObjectURL(f) : '');} el.value = '';}; fileIn.current = el;} fileIn.current.click();};
-  const SR: any = typeof window !== 'undefined' ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
+  const pickFile = () => {if (!WEB) return; if (!fileIn.current) {const el = document.createElement('input'); el.type = 'file'; el.accept = 'image/*,application/pdf'; el.onchange = () => {const f = el.files?.[0]; if (f) {setFile(f); setPreview(f.type.startsWith('image/') ? URL.createObjectURL(f) : '');} el.value = '';}; fileIn.current = el;} fileIn.current.click();};
+  const SR: any = WEB ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
   const mic = () => {if (!SR) return; if (listening) {try {rec.current?.stop();} catch {/* ja parou */} return;} const r = new SR(); r.lang = 'pt-BR'; r.interimResults = true; r.continuous = false; const base = text ? text + ' ' : '';
     r.onresult = (e: any) => {let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setText(base + t);}; r.onend = () => setListening(false); r.onerror = () => setListening(false); rec.current = r; setListening(true); try {r.start();} catch {setListening(false);}};
   const send = async (custom?: string, label?: string) => {const t = (custom ?? text).trim(); if (busy || (!t && !file)) return; const shown = label || t || (file ? 'Foto enviada' : ''), img = preview;
@@ -702,13 +706,13 @@ function MiniEditor({kind, at, setAt, sofia, shell, onBack, onMore, onSaved, onA
 /** Fecha ao clicar em qualquer lugar fora do elemento (inclusive na barra lateral, fora da area que rola). */
 function useClickOutside(ref: React.RefObject<View | null>, onOut: () => void, on = true, ignore = '') {
   const cb = useRef(onOut); cb.current = onOut;
-  useEffect(() => {if (!on || typeof document === 'undefined') return; const h = (e: PointerEvent) => {const el: any = ref.current, t: any = e.target; if (ignore && t?.closest?.(ignore)) return; if (el && el.contains && !el.contains(t)) cb.current();};
+  useEffect(() => {if (!on || !WEB) return; const h = (e: PointerEvent) => {const el: any = ref.current, t: any = e.target; if (ignore && t?.closest?.(ignore)) return; if (el && el.contains && !el.contains(t)) cb.current();};
     const t = setTimeout(() => document.addEventListener('pointerdown', h, true), 0); return () => {clearTimeout(t); document.removeEventListener('pointerdown', h, true);};}, [on]);
 }
 function AddMenu({fx, when, onPick, onClose}: {fx: number; when: string; onPick: (k: AddKind) => void; onClose: () => void}) {
   const c = useTheme(), box = useRef<View>(null);
   useClickOutside(box, onClose);
-  useEffect(() => {if (typeof window === 'undefined') return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
+  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
   const ITEMS: {id: AddKind; label: string; icon: IconName; color: string}[] = [{id: 'event', label: 'Compromisso', icon: 'calendar', color: '#8fb4ff'}, {id: 'task', label: 'Tarefa', icon: 'checklist', color: '#F5A0AE'}, {id: 'reminder', label: 'Lembrete', icon: 'bell', color: REMIND}, {id: 'routine', label: 'Rotina', icon: 'capsule', color: '#5FD3C6'}];
   return <>
     <View ref={box} testID="add-menu" accessibilityRole="menu" style={{position: 'absolute', left: `clamp(0px, calc(${fx * 100}% - 110px), calc(100% - 220px))` as any, top: 29 + 44 + 14, width: 220, zIndex: 12, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)'} as any}>
@@ -904,7 +908,8 @@ function Dot({reason}: {reason: string}) {
 const FADE_END = {maskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 26px), transparent)'};
 function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; card: any; upcoming: DayRecord[]; onOpen: (r: DayRecord) => void; onOpenAgenda: () => void}) {
   const c = useTheme(), list = upcoming; // 0.3.302: todos (rolagem invisivel)
-  return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
+  // 03/11/2026: o rotulo diz se ha compromissos (leitores de tela e o teste do celular, que confere a agenda salva na abertura)
+  return <View accessibilityLabel={list.length ? 'Agenda, com compromissos' : 'Agenda, sem compromissos'} style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <TileHead icon="calendar" color="#8fb4ff" name="Agenda · próximos" onOpen={onOpenAgenda} />
     {list.length ? <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, marginTop: 2, ...FADE_END} as any} showsVerticalScrollIndicator={false}>{/* rolagem invisivel para ver os outros (0.3.295) */}{list.map((r, i) => <Pressable key={r.id + i} onPress={() => onOpen(r)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 10, height: 31, borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: hovered ? c.input : 'transparent', borderRadius: 6})}>
       <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>

@@ -2,7 +2,7 @@
 // zoom de entrar e sair (a tela nova nasce do quadradinho clicado; ao voltar encolhe ate o lugar dela). Medidas em
 // px de computador: o arquivo passa so pelo fator da tela (metro: FLUID), nao pela conversao celular->computador.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Pressable, ScrollView, Text, View} from 'react-native';
+import {Animated, Easing, Platform, Pressable, ScrollView, Text, View} from 'react-native';
 import type {AgendaItem} from '../lib/types';
 import type {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -248,7 +248,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
     return () => node.removeEventListener('wheel', onWheel);
   });
   useEffect(() => {
-    if (!p.active || typeof window === 'undefined') return;
+    if (!p.active || Platform.OS !== 'web' || typeof document === 'undefined') return; // 03/11/2026: no Android o window existe sem addEventListener
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null; if (t && /input|textarea|select/i.test(t.tagName)) return;
       if (e.key === 'Escape') {if (level === 'day') go('month', p.selected); else if (level === 'month') go('year', p.selected);}

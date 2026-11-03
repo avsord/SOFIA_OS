@@ -25,3 +25,6 @@ Sempre que terminar uma rodada, e **imediatamente** se o Pedro disser que os cr�
 1. Atualize a seção **0. Passagem** do `docs/SOFIA_MASTER.md` (substitua o conteúdo, não acumule): data e hora, onde foi feito (Claude Code), o que ficou pronto, o que está pela metade (arquivo e o que falta), último commit/compilação e resultado, próximo passo exato.
 2. Atualize §9 (pendências) e §10 (diário), como manda o AGENTS.md.
 3. Faça commit e push disso, mesmo que o código esteja pela metade (nesse caso sem `[manual-apk]`, com a mensagem começando por `wip:` e numa branch `wip/<assunto>` se quebrar os testes).
+
+## Desenho aprovado das telas
+O desenho aprovado no chat em 03/11/2026 está em `docs/design/2026-11-03/` (abra `index.html`; regras e recusas em `README.md`). Ao implementar ou revisar telas, siga esse desenho e as recusas listadas. Onde o desenho conflitar com uma função que já existe, a função vale: adapte o desenho, nunca tire a função.
