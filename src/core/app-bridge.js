@@ -125,7 +125,10 @@ const REFS={account_id:{fin_tx:'fin_account',fin_card:'fin_account',mail_rule:'m
 // Dicionário NÃO limitado: todo tipo do catálogo entra, com nome e campos reais;
 // os APPS acima só acrescentam exemplos e padrões para os mais usados.
 const HIDDEN=new Set(['mail_hit','mail_account','file','user_page','purchase_group','purchase','approval','checkout','automation','plan_review']);
-const APP_KINDS=Object.keys(CATALOG).filter(k=>!HIDDEN.has(k));
+// 0.3.354 (Pedro aprovou): tipos dos apps que ele tirou (Projetos e rotina, Sonhos, Estudos/Cursos/Aulas) nao sao mais
+// descritos para a IA nem aceitos como entity_kind pela conversa. Os registros antigos continuam guardados.
+const RETIRED=new Set(['project','dream','course','lesson','study_progress']);
+const APP_KINDS=Object.keys(CATALOG).filter(k=>!HIDDEN.has(k)&&!RETIRED.has(k));
 const LEGACY_STATE={idea:'active',annotation:'active',project:'active',dream:'idea',course:'interest',recipe:'draft',film:'to_watch',music:'saved',video:'to_watch',reading:'interest'};
 const LEGACY_UI={course:'study',recipe:'library',film:'library',music:'library',video:'library',reading:'library',source:'library',asset:'library',shopping_item:'lists',list_item:'lists',commitment:'agenda',reminder:'agenda',routine:'capsules',contact:null};
 function fieldHint(f){const t=f.type==='select'?'select['+(f.options||[]).join('|')+']':f.type;return f.key+'='+(f.label||f.key)+' ('+t+')';}
@@ -337,4 +340,4 @@ function query(workspace,store,target,action={}){
  return null;
 }
 
-module.exports={financeCategory,installmentPlan,APPS,APP_KINDS,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};
+module.exports={financeCategory,installmentPlan,APPS,APP_KINDS,RETIRED,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};

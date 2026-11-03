@@ -5,7 +5,7 @@ const {authorize}=require('../core/semantic-authority');
 const ACTION_SCHEMA={
   type:'object',
   properties:{
-    entity_kind:{type:'string',enum:['','idea','annotation','project','dream','course','recipe','film','music','video','reading','purchase','purchase_group','user_page',...require('../core/app-bridge').APP_KINDS.filter(k=>!['idea','annotation','project','dream','course','recipe','film','music','video','reading'].includes(k))]},
+    entity_kind:{type:'string',enum:['','idea','annotation','recipe','film','music','video','reading','purchase','purchase_group','user_page',...require('../core/app-bridge').APP_KINDS.filter(k=>!['idea','annotation','project','dream','course','recipe','film','music','video','reading'].includes(k))]},
     memory_kind:{type:'string',enum:['','fact','decision','idea','preference','rule']},
     title:{type:'string'},content:{type:'string'},area:{type:'string'},state:{type:'string'},scope:{type:'string',enum:['','all','active','single','selected']},
     date:{type:'string'},time:{type:'string'},location:{type:'string'},list_name:{type:'string'},quantity:{type:'string'},parent_title:{type:'string'},

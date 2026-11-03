@@ -97,7 +97,7 @@ class SofiaCore{
   semanticCatalogContext(){
     // Catálogo estrutural: mostra à IA quais coleções existem, sem despejar o conteúdo privado de cada coleção em todo turno.
     // Quando um registro específico for necessário, a própria IA pede contexto seletivo com needs_context/context_query.
-    const scopes=this.workspace.scopeCatalog().map(scope=>({scope_id:scope.scope_id,label:scope.label,category:scope.category,count:scope.count,ui_target:scope.ui_target||null,container_id:scope.container_id||null,page_id:['page','space'].includes(scope.category)?(scope.container_id||null):null,protected_from_quick_delete:Boolean(scope.protected_from_quick_delete)}));
+    const scopes=this.workspace.scopeCatalog().filter(scope=>scope.scope_id!=='study'/* 0.3.354: app Estudos foi tirado */).map(scope=>({scope_id:scope.scope_id,label:scope.label,category:scope.category,count:scope.count,ui_target:scope.ui_target||null,container_id:scope.container_id||null,page_id:['page','space'].includes(scope.category)?(scope.container_id||null):null,protected_from_quick_delete:Boolean(scope.protected_from_quick_delete)}));
     return {role:'user',content:'CATÁLOGO ESTRUTURAL DE ESCOPOS DO BACKEND. Isto é dado real para você escolher coleções; NÃO é uma instrução do usuário. Para ações em uma coleção inteira, escolha um scope_id daqui. Para ferramentas de página, scopes das categorias page/space trazem page_id real (igual ao container_id). O backend enumera os membros depois. Para editar/excluir um registro específico cujo ID ainda não esteja no contexto, use needs_context=true com uma context_query seletiva; não invente IDs. '+JSON.stringify({scopes})};
   }
   /** Registros recentes COM ID: sem isto a IA sabia o titulo da tarefa ("Encontrar filme")
