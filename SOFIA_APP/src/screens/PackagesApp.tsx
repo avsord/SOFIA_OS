@@ -160,13 +160,15 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
   if (!ents) return <AppSkeleton label="Carregando encomendas…" />;
   return <InternalBackGesture enabled={active && !openId} onBack={onBack}>
     <View testID="packages-screen" style={{flex: 1}}>
-      <AppFrame sidebar={sidebar} mobileNav={mobileNav} tabsOnTop>
+      <AppFrame sidebar={sidebar} tabsOnTop>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1}}><Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Encomendas</Text><Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 2}}>{(() => { const out = lists.out[0] || lists.pickup[0], need = lists.needs[0], way = lists.way.filter(p => !p.delivered); if (!packs.length) return 'Nenhuma encomenda ainda. Cole um código de rastreio abaixo.'; if (need && need.needs === 'fee') return need.title + ' está parada esperando o imposto.'; if (out) return out.needs === 'pickup' ? out.title + ' está esperando você retirar.' : out.title + ' sai para entrega hoje.'; if (way.length) return way.length === 1 ? way[0].title + ' está a caminho: ' + way[0].status.charAt(0).toLowerCase() + way[0].status.slice(1) + '.' : way.length + ' encomendas a caminho; a mais recente é ' + way[0].title + '.'; return 'Nada a caminho. Tudo o que você pediu já chegou.'; })()}</Text></View>
             {desktop && quota ? <Text style={{color: c.muted, fontSize: 12, borderWidth: 1, borderColor: c.line, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6}}>{Math.max(0, quota.limit - quota.used)} de {quota.limit} rastreios grátis em {new Date().toLocaleDateString('pt-BR', {month: 'long'})}</Text> : null}
           </View>
+          {/* 03/11/2026 (desenho 32): no celular os filtros ficam EMBAIXO do titulo */}
+          {!desktop ? <View style={{marginHorizontal: -16, marginTop: 8}}>{mobileNav}</View> : null}
           {desktop ? <DeskTabs value={view} onChange={setView} options={(['all', 'needs', 'way', 'transit', 'out', 'pickup', 'done'] as const).map(k => ({value: k, label: TITLES[k], count: (k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length}))} /> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />

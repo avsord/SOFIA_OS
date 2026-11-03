@@ -126,7 +126,9 @@ export function useDesktopKeys(on:boolean,keys:DesktopKeys){
    const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
    if(mod&&k==='k'){e.preventDefault();keys.palette();return;}
    if(mod&&(k==='\\'||e.code==='Backslash')){e.preventDefault();keys.sidebar();return;}
-   if(e.altKey&&!mod&&/^[1-6]$/.test(e.key)){e.preventDefault();keys.tab(Number(e.key)-1);return;}
+   // 03/11/2026: Alt+numero digitando num campo e do teclado (Option+numero no Mac escreve caracteres); nao troca de aba
+   const typing=(()=>{const t=e.target as any;return !!t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||'')||t.isContentEditable);})();
+   if(e.altKey&&!mod&&!typing&&/^[1-6]$/.test(e.key)){e.preventDefault();keys.tab(Number(e.key)-1);return;}
    if(k==='escape')keys.escape();
   };
   document.addEventListener('keydown',handler);

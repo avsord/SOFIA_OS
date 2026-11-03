@@ -61,6 +61,8 @@ GREETING=re.compile(r'(Olá|Bom dia|Boa tarde|Boa noite), Teste')
 def home_authenticated(tree):return bool(GREETING.search(tree))
 def home_agenda_visible(tree):
  if 'com compromissos' in tree or re.search(r'Você tem \d+ compromissos? hoje',tree):return True
+ # a linha do tempo do Inicio mostra os compromissos salvos como "10:00 Consulta de hoje" (rotulo das bolinhas)
+ if re.search(r'content-desc="\d{2}:\d{2} [^"]*[A-Za-zÀ-ú]',tree):return True
  return 'Agenda · próximos' in tree and 'Nenhum compromisso pela frente' not in tree
 def capture_home(label,need_agenda=True,wait=6.0):
  end=time.monotonic()+wait

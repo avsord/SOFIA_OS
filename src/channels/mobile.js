@@ -207,7 +207,7 @@ function makeMobileApi(runtime, deps) {
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }
     // Capacidades e rotas /md que o app já chamava e o servidor não tinha.
-    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true, notifications: true, drive_files: runtime.google.configured() });
+    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, conversation_delete: true, mail_watch: true, mercado_livre_html: true, notifications: true, drive_files: runtime.google.configured() });
     // Desempenho: todas as leituras de preço numa resposta só (antes era um pedido por produto).
     if (p === '/api/mobile/md/monitors/observations' && m === 'GET') {
       const out = {};
@@ -380,6 +380,8 @@ function makeMobileApi(runtime, deps) {
       if (empty) return send({ conversation: store.conversation(empty.id) });
       return send({ conversation: store.createConversation(cleanText(b.title || 'Conversa com a Sofia', 'Título', 100), 'mobile') });
     }
+    // 03/11/2026: apagar varias conversas de uma vez (o app pedia e o servidor nao tinha)
+    if (p === '/api/mobile/md/conversations' && m === 'DELETE') { rate(session, 'delete', 10); const b = await bodyJson(req, 16384); if (!Array.isArray(b.ids) || !b.ids.length || b.ids.some(x => typeof x !== 'string' || x.length > 120)) fail('BAD_IDS', 'Lista de conversas inválida.'); return send(store.deleteConversations(b.ids)); }
     if (p === '/api/mobile/chat-history' && m === 'DELETE') { rate(session, 'delete', 10); return send(store.clearChatHistory()); }
     const boardMatch = p.match(/^\/api\/mobile\/conversations\/([\w-]+)\/board$/);
     if (boardMatch && m === 'GET') { const id = validId(boardMatch[1]); conversation(id); board.schedule(id); return send(board.read(id)); } // 0.3.268: abrir uma conversa antiga tambem organiza o quadro (so chama a IA se houver mensagem nova)

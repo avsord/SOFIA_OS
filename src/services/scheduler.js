@@ -19,7 +19,8 @@ function nextRepeat(e,stamp){
  const tag=(e.tags||[]).find(t=>String(t).startsWith('sofia-repeat-v1:'));if(!tag)return '';
  const freq=String(tag).split(':')[1];if(!['weekly','monthly','yearly'].includes(freq))return '';
  const base=new Date(e.data.remind_at);if(!Number.isFinite(base.getTime()))return '';
- const day=base.getUTCDate();let n=new Date(base.getTime()),i=0;
+ // 03/11/2026: o dia original fica guardado (repeat_day); antes, depois de um mes curto, o dia 31 virava 28 para sempre
+ const keep=Number(e.data.repeat_day),day=Number.isInteger(keep)&&keep>=1&&keep<=31?keep:base.getUTCDate();let n=new Date(base.getTime()),i=0;
  while(n.getTime()<=Date.parse(stamp)&&i++<600){
   if(freq==='weekly')n=new Date(n.getTime()+7*864e5);
   else{const y=n.getUTCFullYear()+(freq==='yearly'?1:0),m=n.getUTCMonth()+(freq==='monthly'?1:0),last=new Date(Date.UTC(y,m+1,0)).getUTCDate();n=new Date(Date.UTC(y,m,Math.min(day,last),base.getUTCHours(),base.getUTCMinutes(),0,0));}
@@ -43,7 +44,7 @@ class Scheduler{
     // proxima vez (semana, mes ou ano seguinte; dia 31 vira o ultimo dia do mes curto)
     // a proxima vez conta a partir do horario original (adiantada nao repete no mesmo dia); a marca usada sai
     const after=new Date(Math.max(Date.parse(stamp),Date.parse(e.data.remind_at))).toISOString(),next=nextRepeat(e,after),tags=(e.tags||[]).filter(t=>!String(t).startsWith('sofia-move-v1:'+new Date(e.data.remind_at).toISOString().slice(0,16)+'Z>')).filter(t=>{const m=/^sofia-skip-v1:(.+)$/.exec(String(t));return !m||!(Date.parse(m[1])<=Date.parse(at));}); /* 03/11/2026: marca "so desta vez" ja usada sai (eram ate 20 marcas e o lembrete deixava de salvar) */
-    if(next)this.w.save({...e,tags,revision:e.revision,data:{...e.data,remind_at:next}},e.id);
+    if(next)this.w.save({...e,tags,revision:e.revision,data:{...e.data,remind_at:next,...(String(tags.find(t=>String(t).startsWith('sofia-repeat-v1:'))||'').split(':')[1]==='weekly'?{}:{repeat_day:Number(e.data.repeat_day)||new Date(e.data.remind_at).getUTCDate()})}},e.id);
     else this.w.changeState(e.id,'done',e.revision);
   }catch(err){console.warn('[lembrete] nao reagendado:',e.id,String(err?.code||err?.message||err).slice(0,120));}} /* um lembrete com erro nao impede os outros */
  }finally{this.busy=false;this.controller=null;}}

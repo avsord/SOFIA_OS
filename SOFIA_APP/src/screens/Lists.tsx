@@ -397,10 +397,11 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!data) return <AppSkeleton label="Carregando listas…" />;
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={mobileNav} footer={desktop ? undefined : footer}>
+      <AppFrame tabsOnTop sidebar={sidebar} footer={desktop ? undefined : footer}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
           {header}
-          {desktop ? <NavTabs nav={mobileNav} /> : null}
+          {/* 03/11/2026 (desenho 31): no celular as listas ficam EMBAIXO do titulo (antes ficavam acima dele) */}
+          {desktop ? <NavTabs nav={mobileNav} /> : <View style={{marginHorizontal: -16, marginTop: 6}}>{mobileNav}</View>}
           {error ? <Text style={{color: c.danger, marginTop: 10}}>{error}</Text> : null}
           <View style={{marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />

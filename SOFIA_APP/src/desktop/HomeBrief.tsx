@@ -23,6 +23,7 @@ import {money as fmtMoney} from '../lib/monitoring';
 import type {HomeBriefData} from '../lib/home-brief';
 import type {Due} from '../lib/finance';
 import {todayISO} from '../lib/finance';
+import {sendDraft} from '../lib/draft-bus';
 import {capsuleDoses, capsuleDay} from '../lib/capsule-model';
 import {agendaPriority, isHoliday, HOLIDAY_COLOR} from '../lib/agenda-priority';
 import {useReducedMotion} from '../lib/motion';
@@ -68,7 +69,7 @@ export type HomeBriefProps = {
  * linha do tempo. Texto puro, para a saudacao. */
 export function briefLine(a: {today: DayRecord[]; tasks: Task[]; series: MonitorWidgetRow[] | null; packs: {title: string; step: number; needs: string; delivered: boolean}[]}): string {
   const now = Date.now(), items = a.today.filter(r => !isHoliday((r.original || {}) as any));
-  const important = a.tasks.filter(t => t.state !== 'done' && isImportant(t));
+  const important = a.tasks.filter(t => !['done', 'cancelled', 'archived'].includes(t.state) && isImportant(t));
   const next = items.filter(r => timed(r) && Date.parse(r.date) >= now - 5 * 60000).sort((x, y) => Date.parse(x.date) - Date.parse(y.date))[0];
   const n = items.length, k = important.length;
   let out = !n && !k ? 'Dia livre: nada marcado e nenhuma tarefa importante.' : (n > 5 ? 'Dia cheio: ' : 'Hoje: ') + [n ? (n === 1 ? '1 compromisso' : n + ' compromissos') : '', k ? (k === 1 ? '1 tarefa importante' : k + ' tarefas importantes') : ''].filter(Boolean).join(' e ') + '.';
@@ -168,7 +169,7 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
 export function HomeBrief(p: HomeBriefProps) {
   const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), [tl, setTl] = useTimelineSettings(), [gear, setGear] = useState(false);
   const rowH = useRowHeight(root, briefH);
-  const open = useMemo(() => p.tasks.filter(t => t.state !== 'done'), [p.tasks]);
+  const open = useMemo(() => p.tasks.filter(t => !['done', 'cancelled', 'archived'].includes(t.state)), [p.tasks]); // 03/11/2026: cancelada nao conta como aberta
   const important = open.filter(isImportant);
   const items = useMemo(() => p.today.filter(r => !isHoliday((r.original || {}) as any)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)), [p.today]);
   const upcoming = items.filter(r => timed(r) && Date.parse(r.date) >= now.getTime() - 5 * 60000);
@@ -256,7 +257,7 @@ export function HomeBrief(p: HomeBriefProps) {
         <PriceTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
         <PackagesTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       </View>
-      <FinanceTile style={{height: 176}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
+      <FinanceTile style={{height: 204}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
     </CompactCtx.Provider> : <>
     <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
@@ -575,7 +576,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       </View>
     </View> : null}
     {adding ? <View pointerEvents="none" style={{position: 'absolute', left: cx(adding.fx, 7, w), top: 29 + OFF - 7, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: c.surface, zIndex: 7}} /> : null}
-    {adding && actions.sofia ? <SofiaAdd lineW={wS || w} fx={adding.fx} at={adding.at} sofia={actions.sofia} onMore={k => {const at = adding.at; setAdding(null); actions.onAddAt?.(k, at);}} onSaved={(text, undo) => {setAdding(null); showToast(text, undo);}} onClose={() => setAdding(null)} />
+    {adding && actions.sofia ? <SofiaAdd lineW={wS || w} fx={adding.fx} at={adding.at} sofia={actions.sofia} onMore={(k, w) => {const at = w || adding.at; setAdding(null); actions.onAddAt?.(k, at);}} /* 03/11/2026: leva o horario ajustado no mini editor */ onSaved={(text, undo) => {setAdding(null); showToast(text, undo);}} onClose={() => setAdding(null)} />
      : adding && actions.onAddAt ? <AddMenu lw={w} fx={adding.fx} when={dragLabel(adding.fx)} onPick={k => {const at = adding.at; setAdding(null); actions.onAddAt!(k, at);}} onClose={() => setAdding(null)} /> : null}
     {toast ? <View testID="timeline-toast" style={{position: 'absolute', left: '50%' as any, top: 29 + OFF + 34, zIndex: 13, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, backgroundColor: c.bg, boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 14px 32px rgba(0,0,0,0.45)'} as any}>
       <Icon name="checkCircle" size={15} color="#5FD3A2" /><Text style={{fontSize: 13, color: c.text}}>{toast.text}</Text>
@@ -599,7 +600,7 @@ const TYPE_INFO: {id: AddKind | 'expense' | 'income'; label: string; color: stri
   {id: 'event', label: 'Compromisso', color: '#8fb4ff', icon: 'calendar', title: 'Novo compromisso'}, {id: 'task', label: 'Tarefa', color: '#F5A0AE', icon: 'checklist', title: 'Nova tarefa'},
   {id: 'reminder', label: 'Lembrete', color: '#7FD1E8', icon: 'bell', title: 'Novo lembrete'}, {id: 'routine', label: 'Rotina', color: '#5FD3C6', icon: 'capsule', title: 'Novo na Rotina'},
   {id: 'expense', label: 'Despesa', color: '#F08A8A', icon: 'trendDown', title: 'Nova despesa'}, {id: 'income', label: 'Receita', color: '#5FD3A2', icon: 'trendUp', title: 'Nova receita'}];
-function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: number; fx: number; at: Date; sofia: SofiaBridge; onMore: (k: AddKind) => void; onSaved: (text: string, undo?: (() => Promise<void>) | void) => void; onClose: () => void}) {
+function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: number; fx: number; at: Date; sofia: SofiaBridge; onMore: (k: AddKind, at?: Date) => void; onSaved: (text: string, undo?: (() => Promise<void>) | void) => void; onClose: () => void}) {
   const c = useTheme(), box = useRef<View>(null), [open, setOpen] = useState(false), [kind, setKind] = useState<(typeof TYPE_INFO)[number]['id'] | null>(null);
   const [text, setText] = useState(''), [file, setFile] = useState<any>(null), [preview, setPreview] = useState(''), [msgs, setMsgs] = useState<ChatMsg[]>([]), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [listening, setListening] = useState(false);
   const [when, setWhen] = useState(at), fileIn = useRef<any>(null), rec = useRef<any>(null), scroller = useRef<any>(null);
@@ -626,7 +627,7 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     <View style={{backgroundColor: c.bg, borderRadius: 22, overflow: 'clip', boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.55)'} as any}>{inner}</View>
   </View>;
   const avatar = (s = 36) => <View style={{width: s, height: s, borderRadius: s / 2, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px ' + tint(c.accent, 0.4)} as any}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: s >= 30 ? 14 : 11}}>S</Text><View style={{position: 'absolute', right: 0, bottom: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#5FD3A2', boxShadow: '0 0 0 2px ' + c.bg} as any} /></View>;
-  if (kind) return <MiniEditor kind={kind} at={when} setAt={setWhen} sofia={sofia} shell={shell} onBack={() => setKind(null)} onMore={k => onMore(k)} onSaved={onSaved} onAsk={async (q, label) => {setKind(null); setOpen(false); await send(q, label);}} />;
+  if (kind) return <MiniEditor kind={kind} at={when} setAt={setWhen} sofia={sofia} shell={shell} onBack={() => setKind(null)} onMore={k => onMore(k, when)} onSaved={onSaved} onAsk={async (q, label) => {setKind(null); setOpen(false); await send(q, label);}} />;
   const roundBtn = (icon: IconName, label: string, run: () => void, filled = false, red = false) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered, pressed}: any) => ({width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: red ? '#F57A8C' : filled ? c.accent : hovered ? c.input : 'transparent', transform: [{scale: pressed ? 0.95 : 1}]})}><Icon name={icon} size={15} color={filled || red ? c.onAccent : c.muted} /></Pressable>;
   return shell(<View style={{padding: 12}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
@@ -757,7 +758,7 @@ function PeriodIcon({kind}: {kind: string}) {
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {if (reduced) return; const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false}), {iterations: WEB ? -1 : 4}); /* 03/11/2026: no celular pulsa 4 vezes e para (economiza bateria; a tela fica parada) */ loop.start(); return () => loop.stop();}, [reduced]);
+  useEffect(() => {if (reduced || !WEB) return; /* 03/11/2026: no celular o "agora" fica parado - o pulso redesenhava a tela a cada quadro pelo JavaScript (bateria) e o Android nunca via a tela parada */ const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false})); loop.start(); return () => loop.stop();}, [reduced]);
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
     {/* aureola */}
@@ -1068,6 +1069,8 @@ function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {s
       {lo ? <Stat label={'Despesas de ' + new Date().toLocaleDateString('pt-BR', {month: 'long'})} value={money(lo.total)} sub={lo.cap > 0 ? Math.round(lo.total / lo.cap * 100) + '% de ' + money(lo.cap) : lo.count ? (lo.count === 1 ? '1 lançamento' : lo.count + ' lançamentos') + (lo.biggest && lo.count > 1 ? ' · maior: ' + lo.biggest.title : '') : 'Nenhuma despesa lançada'} pct={lo.cap > 0 ? lo.total / lo.cap * 100 : null} color={lo.cap > 0 ? (lo.total > lo.cap ? c.danger : lo.total >= lo.cap * 0.8 ? '#E8B04A' : '#88CFB8') : spendColor} /> : null}
       {g && goal ? <Stat label={goal.name || 'Meta'} value={money(goal.saved)} sub={Math.round(g.pct * 100) + '% de ' + money(goal.target)} pct={g.pct * 100} color="#b49ae6" ticks={goalTicks(goal.target)} /> : null}
     </View> : <Quiet text="Abra Finanças" sub="Para ver gastos e meta aqui." />}
+    {/* 03/11/2026 (desenho 01): "Lancar" abre o lancamento de despesa ja com a data de hoje (mesma funcao da Conversa) */}
+    {React.useContext(CompactCtx) ? <View style={{marginTop: 'auto'}}><Act label="Lançar" onPress={() => {sendDraft('financeNew', {kind: 'expense', date: todayISO()}); onOpen();}} /></View> : null}
   </View>;
 }
 /** Price Tracker: mostra um produto por vez; as setas passam para o proximo (0.3.293: sem trocar sozinho). */

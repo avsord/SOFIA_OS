@@ -88,7 +88,7 @@ type Command={id:string;label:string;group:string;icon?:IconName;emoji?:string;h
 function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>void;commands:Command[]}){
  const c=useTheme(),[query,setQuery]=useState(''),[index,setIndex]=useState(0),input=useRef<TextInput>(null);
  useEffect(()=>{if(visible){setQuery('');setIndex(0);setTimeout(()=>input.current?.focus(),30);}},[visible]);
- const results=useMemo(()=>(query.trim()?fuzzyFilter(commands,query,x=>x.label+' '+x.group):commands.filter(x=>x.group!=='Páginas').concat(commands.filter(x=>x.group==='Páginas').slice(0,8))).slice(0,40),[commands,query]);
+ const results=useMemo(()=>(query.trim()?fuzzyFilter(commands,query,x=>x.label+' '+x.group):commands.filter(x=>x.group!=='Páginas'&&x.group!=='Tarefas').concat(commands.filter(x=>x.group==='Tarefas').slice(0,8),commands.filter(x=>x.group==='Páginas').slice(0,8))).slice(0,40) /* 03/11/2026: sem busca, ate 8 tarefas - antes as tarefas enchiam a lista e as Paginas sumiam */,[commands,query]);
  useEffect(()=>setIndex(0),[query]);
  const run=(cmd?:Command)=>{if(!cmd)return;onClose();setTimeout(cmd.run,10);};
  let lastGroup='';

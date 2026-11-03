@@ -69,8 +69,8 @@ export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckU
      {show('conta')?<View style={card}><DeskHead title="Conta" desc="Seus dados de acesso à Sofia."/>
       <DeskRow title="Nome" desc="Aparece na saudação do Início."><View style={{flexDirection:'row',alignItems:'center',gap:8}}><TextInput value={name} onChangeText={setName} maxLength={80} accessibilityLabel="Nome do perfil" style={{width:240,height:34,paddingHorizontal:12,borderRadius:9,borderWidth:1,borderColor:c.line,backgroundColor:c.input,color:c.text,fontSize:13,outlineStyle:'none'} as any}/><DeskBtn label={saving?'Salvando…':'Salvar'} primary disabled={saving||!name.trim()||name.trim()===bootstrap.profile.name} onPress={()=>void save()}/></View></DeskRow>
       <DeskRow title="E-mail de login" desc={bootstrap.profile.email}/>
-      <DeskRow title="Foto do perfil" desc="Clique na foto à esquerda para escolher, enquadrar ou remover."/></View>:null}
-     {show('aparencia')?<View style={card}><DeskHead title="Aparência" desc="Vale para este computador."/>
+      <DeskRow title="Foto do perfil" desc={desktop?'Clique na foto à esquerda para escolher, enquadrar ou remover.':'Toque na foto lá em cima para escolher, enquadrar ou remover.'}/></View>:null}
+     {show('aparencia')?<View style={card}><DeskHead title="Aparência" desc={desktop?'Vale para este computador.':'Vale para este aparelho.'}/>
       <DeskRow title="Tema" desc="Pelo horário, igual ao sistema, claro ou escuro."><View style={{flexDirection:'row',padding:3,gap:2,borderRadius:10,backgroundColor:c.input}}>{themes.map(mode=><Pressable key={mode.id} accessibilityRole="button" accessibilityState={{selected:prefs.appearance===mode.id}} onPress={()=>void preference({...prefs,appearance:mode.id})} style={{height:28,paddingHorizontal:12,borderRadius:8,justifyContent:'center',backgroundColor:prefs.appearance===mode.id?c.surface:'transparent'}}><Text style={{fontSize:13,fontWeight:'600',color:prefs.appearance===mode.id?c.text:c.muted}}>{mode.label}</Text></Pressable>)}</View></DeskRow>
       {prefs.appearance==='schedule'?<View style={{borderTopWidth:1,borderColor:c.line,paddingVertical:12}}><ThemeScheduleSettings prefs={prefs} onSave={preference}/></View>:null}</View>:null}
      {show('conversa')?<View style={card}><DeskHead title="Conversa" desc="App e site usam o mesmo histórico."/>
@@ -80,9 +80,9 @@ export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckU
      {show('conexoes')?<><ConnectionsSettings api={api}/><GoogleCalendarSettings api={api}/><StoreConnections api={api}/></>:null}
      {show('armazenamento')?<StorageCard api={api}/>:null}
      {show('notificacoes')?<AgendaNotificationSettings/>:null}
-     {show('seguranca')?<View style={card}><DeskHead title="Segurança e sessão" desc="Você continua conectado até sair. A senha não fica salva neste computador."/>
+     {show('seguranca')?<View style={card}><DeskHead title="Segurança e sessão" desc={'Você continua conectado até sair. A senha não fica salva neste '+(desktop?'computador.':'aparelho.')}/>
       <DeskRow title="Senha" desc="Use pelo menos 12 caracteres."><DeskBtn label="Alterar senha" onPress={()=>{setError('');setPasswordModal(true);}}/></DeskRow>
-      <DeskRow title="Este computador" desc="Sai só daqui."><DeskBtn label="Sair" onPress={()=>{appAlert('Sair da Sofia?','Você precisará entrar novamente.',[{text:'Cancelar',style:'cancel'},{text:'Sair',onPress:()=>void onLogout()}]);}}/></DeskRow>
+      <DeskRow title={desktop?'Este computador':'Este aparelho'} desc="Sai só daqui."><DeskBtn label="Sair" onPress={()=>{appAlert('Sair da Sofia?','Você precisará entrar novamente.',[{text:'Cancelar',style:'cancel'},{text:'Sair',onPress:()=>void onLogout()}]);}}/></DeskRow>
       <DeskRow title="Todas as sessões" desc="Será preciso entrar de novo no site e em todos os celulares."><DeskBtn label="Encerrar todas" danger onPress={logoutAll}/></DeskRow></View>:null}
      {show('sobre')?<View style={card}><DeskHead title="Sobre"/>
       <DeskRow title="Versão" desc={'Sofia OS '+APP_VERSION+' · Servidor '+bootstrap.version}><Text onPress={versionTap} accessibilityLabel={'Versão instalada '+APP_VERSION} style={{fontSize:12,color:c.muted,fontVariant:['tabular-nums']}}>{APP_VERSION}</Text></DeskRow>

@@ -61,11 +61,18 @@ function openBackup(bytes,{key,passphrase}={}) {
  * banco: se o disco estiver cheio demais até para o SQLite abrir (ENOSPC
  * logo na inicialização), isto ainda consegue liberar espaço primeiro,
  * porque apagar arquivo nunca precisa de espaço livre. */
+/** 03/11/2026: cada publicacao no Railway cria um backup ao desligar; com varias por dia os 7 mais novos eram todos do
+ * mesmo dia e os de dias anteriores sumiam. Fica: os 7 mais novos + o mais novo de cada um dos ultimos 7 dias. */
+function backupsToRemove(names, keep = 7) {
+  const sorted = [...names].sort().reverse(), keepSet = new Set(sorted.slice(0, keep)), days = new Set();
+  for (const n of sorted) { const day = n.slice(6, 16); if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || days.has(day)) continue; if (days.size >= keep) break; days.add(day); keepSet.add(n); }
+  return sorted.filter(n => !keepSet.has(n));
+}
 function pruneBackupsSync(directory, keep = 7) {
   try {
     if (!fs.existsSync(directory)) return 0;
     const files = fs.readdirSync(directory).filter(n => /^sofia-.*\.sofia-backup$/.test(n)).sort().reverse();
-    const extra = files.slice(keep);
+    const extra = backupsToRemove(files, keep);
     for (const name of extra) { try { fs.unlinkSync(path.join(directory, name)); } catch { /* um arquivo preso não impede os outros */ } }
     return extra.length;
   } catch { return 0; }
@@ -84,7 +91,7 @@ class BackupService {
   daily() {if(!this.list().some(b=>b.name.startsWith('sofia-'+now().slice(0,10))))return this.tryCreate('daily');return null;}
   /** Cada backup é uma cópia inteira do banco, com fotos e áudios dentro:
    * sem isso, um por dia nunca apagado enche o disco sozinho, só com o tempo. */
-  prune(keep=7) {const extra=this.list().slice(keep);for(const b of extra){try{fs.unlinkSync(path.join(this.directory,b.name));}catch{/* um arquivo preso não impede os outros */}}return extra.length;}
+  prune(keep=7) {const extra=backupsToRemove(fs.readdirSync(this.directory).filter(n=>/^sofia-.*\.sofia-backup$/.test(n)),keep).map(name=>({name}));for(const b of extra){try{fs.unlinkSync(path.join(this.directory,b.name));}catch{/* um arquivo preso não impede os outros */}}return extra.length;}
   portable(passphrase) {return seal(this.snapshot(),{passphrase});}
   /** 0.3.182: registros que existiam nos backups recentes e foram apagados depois. Abre os backups
    * mais novos primeiro e devolve a versao mais recente de cada registro que nao existe mais. */
@@ -104,4 +111,4 @@ class BackupService {
     return [...out.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   }
 }
-module.exports={KeyStore,BackupService,seal,openBackup,pruneBackupsSync};
+module.exports={KeyStore,BackupService,seal,openBackup,pruneBackupsSync,backupsToRemove};

@@ -20,7 +20,7 @@ test('moldura: barra lateral recolhivel, arvore de paginas, caminho, busca Ctrl+
   const s=read('src/desktop/DesktopShell.tsx'),d=read('src/lib/desktop.ts');
   for(const id of ['desktop-sidebar','desktop-topbar','desktop-breadcrumb','desktop-search','desktop-sidebar-toggle','command-palette-input'])assert.ok(s.includes(id),id);
   assert.ok(s.includes('<NotificationBell onViewAll='));assert.ok(s.includes('function PageTree('));
-  assert.ok(d.includes("if(mod&&k==='k')")&&d.includes("e.code==='Backslash'")&&d.includes('e.altKey&&!mod&&/^[1-6]$/'));
+  assert.ok(d.includes("if(mod&&k==='k')")&&d.includes("e.code==='Backslash'")&&d.includes('e.altKey&&!mod&&!typing&&/^[1-6]$/'));
 });
 test('telas: Paginas abre pela barra lateral; Inicio em colunas; folhas viram janela central',()=>{
   const p=read('src/screens/Pages.tsx');assert.ok(p.includes('openPageKey=0,openPageId=')&&p.includes('pagesDirectory.set(displayPages)')&&p.includes('pagePath.set(trail)'));

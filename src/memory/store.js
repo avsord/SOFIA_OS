@@ -142,8 +142,17 @@ class Store {
       this.audit('message.deleted',m.id);return {ok:true,id:m.id,conversation_id:m.conversation_id};
     });
   }
+  /** 03/11/2026: apagar algumas conversas (o app ja tinha o botao; o servidor nao tinha a rota). Mesma limpeza do
+   * "Apagar historico", so para as conversas pedidas e do dono. */
+  deleteConversations(ids) {
+    const want=[...new Set((Array.isArray(ids)?ids:[]).map(String))].slice(0,200);
+    const conversations=want.map(id=>this.db.prepare("SELECT id FROM conversations WHERE id=? AND owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").get(id,OWNER)).filter(Boolean);
+    return this.purgeConversations(conversations,'chat.conversations.deleted');
+  }
   clearChatHistory() {
-    const conversations=this.db.prepare("SELECT id FROM conversations WHERE owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").all(OWNER);
+    return this.purgeConversations(this.db.prepare("SELECT id FROM conversations WHERE owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").all(OWNER),'chat.history.deleted');
+  }
+  purgeConversations(conversations, event) {
     return this.tx(()=>{
       let messages=0;
       for(const conv of conversations){
@@ -164,7 +173,7 @@ class Store {
         this.db.prepare("UPDATE messages SET content='',client_id=NULL,status='deleted',error_code=NULL,refs='[]' WHERE conversation_id=? AND owner=?").run(conv.id,OWNER);
         this.db.prepare("UPDATE conversations SET title='Conversa apagada',state='deleted',updated_at=? WHERE id=? AND owner=?").run(now(),conv.id,OWNER);
       }
-      this.audit('chat.history.deleted');return {ok:true,conversations:conversations.length,messages};
+      this.audit(event);return {ok:true,conversations:conversations.length,messages};
     });
   }
   privacyOf(type, entityId) { return entityId ? (this.db.prepare('SELECT privacy FROM annotations WHERE entity_type=? AND entity_id=?').get(type,entityId)?.privacy || null) : null; }
