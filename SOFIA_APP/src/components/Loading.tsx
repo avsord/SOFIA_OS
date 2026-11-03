@@ -40,21 +40,22 @@ export function useSkeletonDelay(): boolean {
 
 /** Linhas finas no lugar do conteúdo (como as linhas da tabela do Notion),
  * respirando de leve. Separadores entre elas, larguras variadas. */
-export function LoadingLines({rows = 3, separated = true}: {rows?: number; separated?: boolean}) {
-  const c = useTheme(), pulse = useRef(new Animated.Value(0.5)).current, show = useSkeletonDelay();
+export function LoadingLines({rows = 3, separated = true, immediate = false}: {rows?: number; separated?: boolean; immediate?: boolean}) {
+  // immediate (03/11/2026): dentro de um esqueleto que ja esta na tela (Inicio do site) as linhas nascem junto, sem o atraso de 300 ms que fazia elas surgirem depois ("stalo").
+  const c = useTheme(), pulse = useRef(new Animated.Value(0.5)).current, delayed = useSkeletonDelay(), show = immediate || delayed, web = Platform.OS === 'web';
   useEffect(() => {
-    if (!show) return;
+    if (!show || web) return; // no site a respiracao e CSS (abaixo): nao congela com o JavaScript ocupado
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(pulse, {toValue: 1, duration: 700, useNativeDriver: true}),
       Animated.timing(pulse, {toValue: 0.5, duration: 700, useNativeDriver: true}),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [pulse, show]);
+  }, [pulse, show, web]);
   const widths = ['78%', '64%', '72%', '56%', '68%', '60%'];
   if (!show) return <View style={{minHeight: rows * 47}} />;
   return (
-    <Animated.View style={{opacity: pulse}}>
+    <Animated.View style={web ? {animationKeyframes: {'0%': {opacity: 0.5}, '50%': {opacity: 1}, '100%': {opacity: 0.5}}, animationDuration: '1400ms', animationTimingFunction: 'linear', animationIterationCount: 'infinite'} as any : {opacity: pulse}}>
       {Array.from({length: rows}, (_, i) => (
         <View key={i} style={{paddingVertical: 18, borderBottomWidth: separated ? 1 : 0, borderColor: c.line}}>
           <View style={{height: 10, width: widths[i % widths.length] as any, borderRadius: 5, backgroundColor: c.line}} />
@@ -143,7 +144,15 @@ export function ShimmerBlock({width, height, radius = 6, style}: {width: number 
   const shine = c.bg === dark.bg ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.65)';
   return (
     <View style={[{width: width as any, height, borderRadius: radius, backgroundColor: c.line, overflow: 'hidden'}, style]}>
-      {x ? (
+      {x && Platform.OS === 'web' ? (
+        // 03/11/2026 (Pedro: "da um stalo no esqueleto e no shimmer" ao entrar no site): no navegador o Animated roda no
+        // JavaScript, que fica ocupado montando o site e congela o brilho. Aqui o brilho e animacao CSS (compositor do
+        // navegador): continua liso mesmo com o JavaScript ocupado. Mesmo desenho, mesma duracao, mesma curva.
+        <View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine, willChange: 'transform',
+          animationKeyframes: {'0%': {transform: [{translateX: -BAND}]}, '100%': {transform: [{translateX: TRAVEL}]}},
+          animationDuration: '1300ms', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite'} as any}
+        />
+      ) : x ? (
         <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine,
           transform: [{translateX: x.interpolate({inputRange: [0, 1], outputRange: [-BAND, TRAVEL]})}]}}
         />

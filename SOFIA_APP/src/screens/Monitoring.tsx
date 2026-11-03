@@ -31,7 +31,7 @@ import {collectorState, onCollector, runCollection, cancelCollection, loadProduc
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
   PRODUCT_COLORS, WINDOWS, DROP_CHOICES, INTERVALS, money, percent, since, storeName, hostOf, nextColor,
-  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, readerUrl, readerAgent, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
+  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, readerUrl, readerAgent, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf, primaryNow,
 } from '../lib/monitoring';
 import type {ProductSeries, Window, Candidate, StoreSeries} from '../lib/monitoring';
 import {appAlert} from '../lib/app-alert';
@@ -135,11 +135,11 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                         <View style={{flex: 1, gap: 3}}>
                           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                            <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{p.now ? money(p.now.price, p.currency) : '—'}</Text>
+                            <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{(() => { const n = primaryNow(p); return n ? money(n.price, p.currency) : '—'; })()}</Text>
                             <Delta value={p.change} />
                           </View>
                           <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>
-                            {p.now ? 'na ' + p.now.store.name : 'aguardando a primeira leitura'} · {p.stores.length} {p.stores.length === 1 ? 'loja' : 'lojas'}{p.monitor.state === 'paused' ? ' · pausado' : ''}
+                            {(() => { const n = primaryNow(p); return n ? 'na ' + n.store.name : 'aguardando a primeira leitura'; })()} · {p.stores.length} {p.stores.length === 1 ? 'loja' : 'lojas'}{p.monitor.state === 'paused' ? ' · pausado' : ''}
                           </Text>
                         </View>
                         <Spark product={p} />

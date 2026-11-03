@@ -259,11 +259,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | 0.3.351 (versão escolhida pelo delivery) | Adicionar pela linha: janelas alinhadas e ferramentas menores; item apagado sai da linha na hora; X das notificações; alça sem seleção | Pedro: (1) janelas de Despesa/Lembrete/etc. desalinhadas — a faixa de cor do topo ficava estreita pelos cantos arredondados (saiu; a cor fica no ícone e no botão) e o overflow hidden deixava o navegador rolar o… | site |
 | 2026-11-03 | 0.3.352 (versão escolhida pelo delivery) | Início do computador sem scroll: sempre cabe na janela | Pedro: "a página principal inicial tá com scroll, tem que ser sem scroll". Causa: as fileiras têm altura fixa (183, a do notebook 1912×904) e o contêiner usava minHeight + zoom que só crescia; janela mais baixa… | site |
 | 2026-11-03 | 0.3.353 (servidor) | Custo de IA — rodada 1 (sem mudar comportamento) | Pedro: "tá gastando muito token". Medido com a OpenAI substituída por uma falsa que registra cada pedido: cada mensagem custava ~18,6 mil fichas de entrada (planejamento ~16,3 mil = instruções 22,6 mil car. + APPS DA… | servidor |
 | 2026-11-03 | 0.3.354 (servidor) | Custo de IA — rodada 2: tipos de apps tirados saem da IA | Pedro aprovou: project, dream, course, lesson e study_progress (Projetos e rotina, Sonhos, Estudos/Cursos/Aulas) não são mais descritos no APPS DA SOFIA nem aceitos como entity_kind (RETIRED em app-bridge.js; enum do… | servidor |
 | 2026-11-03 | docs | — | Projeto mais leve para o agente: diário saiu do MASTER (120 mil → 36 mil car.; só 5 últimas linhas ficam), 241 notas antigas de versão foram para docs/historico/app/, regra de leitura econômica no AGENTS | testes app 947 e servidor 408+84 ok |
+| 2026-11-03 | (versão escolhida pelo delivery) | Site: brilho do esqueleto em CSS (não trava ao abrir); Agenda do Início "hoje 14:30"; X da notificação após excluir; Início mais alto (folga 60); Price Tracker = loja principal no app e no Início; campo da Conversa cortado | aguardando teste do Pedro |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

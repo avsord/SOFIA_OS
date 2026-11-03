@@ -8,5 +8,5 @@ export function HoverPressable({style, children, ...rest}: PressableProps) {
   const [hover, setHover] = useState(false);
   const st: any = typeof style === 'function' ? (s: any) => (style as any)({...s, hovered: hover}) : style;
   const ch: any = typeof children === 'function' ? (s: any) => (children as any)({...s, hovered: hover}) : children;
-  return <Pressable {...rest} {...({onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false)} as any)} style={st}>{ch}</Pressable>;
+  return <Pressable {...rest} {...({onMouseEnter: () => setHover(true), onMouseOver: () => { if (!hover) setHover(true); }, onMouseMove: () => { if (!hover) setHover(true); }, onMouseLeave: () => setHover(false)} as any)} style={st}>{ch}</Pressable>;
 }

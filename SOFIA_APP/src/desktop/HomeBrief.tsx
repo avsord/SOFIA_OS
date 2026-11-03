@@ -12,6 +12,7 @@ import {dpx} from '../lib/content-width';
 import type {Task} from '../lib/types';
 import type {DayRecord} from '../lib/dashboard';
 import type {MonitorWidgetRow} from '../lib/monitoring';
+import {money as fmtMoney} from '../lib/monitoring';
 import type {HomeBriefData} from '../lib/home-brief';
 import type {Due} from '../lib/finance';
 import {capsuleDoses, capsuleDay} from '../lib/capsule-model';
@@ -37,7 +38,7 @@ const LIME = '#C3DC82', IMPORTANT_RED = '#D94B57';
 const SOFT_FADE: [number, number][] = Array.from({length: 26}, (_, k) => {const t = k / 25; return [Math.round(t * 100), Math.max(0, Math.pow(1 - t, 1.15))];}); // 0.3.335 (Pedro): degrade bem longo, quase reto, sumindo aos poucos ate abaixo da linha
 const colorOf = (r: DayRecord, accent: string) => {const o: any = r.original || {}; return agendaPriority({data: {priority_level: o.data?.priority_level ?? o.priority_level, calendar_id: o.data?.calendar_id}} as any).color || accent;};
 /** hora (hoje) ou dia e hora (outros dias) */
-const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(), tm = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); const t = timed(r) ? hhmm(d) : ''; if (d.toDateString() === n.toDateString()) return t || 'hoje'; if (d.toDateString() === tm.toDateString()) return 'amanhã' + (t ? ' ' + t : ''); return d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) + (t ? ' ' + t : '');};
+const whenLabel = (r: DayRecord) => {const d = new Date(r.date), n = new Date(), tm = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); const t = timed(r) ? hhmm(d) : ''; if (d.toDateString() === n.toDateString()) return 'hoje' + (t ? ' ' + t : ''); if (d.toDateString() === tm.toDateString()) return 'amanhã' + (t ? ' ' + t : ''); return d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) + (t ? ' ' + t : '');};
 const timed = (r: DayRecord) => {if (/^\d{4}-\d{2}-\d{2}$/.test(r.date) || (r.original as any)?.data?.calendar_all_day) return false; const d = new Date(r.date); return !(d.getHours() === 0 && d.getMinutes() === 0); /* 0.3.295: 00:00 = sem hora (nao estica a linha do tempo) */};
 
 export type HomeBriefProps = {
@@ -1017,7 +1018,7 @@ function PriceTile({style, card, rows, onOpen}: {style: any; card: any; rows: Mo
       <Pressable accessibilityRole="button" accessibilityLabel="Próximo produto" hitSlop={7} onPress={() => go((i + 1) % list.length)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>›</Text></Pressable>
     </View> : null}
     {r ? <Animated.View style={{marginTop: 'auto', gap: 4, opacity: fade, transform: [{translateY: fade.interpolate({inputRange: [0, 1], outputRange: [6, 0]})}]} as any}>
-      <Big value={brl(r.price || 0)} unit={r.title} />
+      <Big value={fmtMoney(r.price || 0, r.currency || 'BRL')} unit={r.title} />
       <Line text={r.atLow ? 'Menor preço já visto' + (r.store ? ' · ' + r.store : '') : r.change ? (r.change < 0 ? 'Caiu ' : 'Subiu ') + Math.abs(r.change).toFixed(1).replace('.', ',') + '%' + (r.store ? ' · ' + r.store : '') : 'Estável' + (r.store ? ' · ' + r.store : '')} />
       <Act label="Ver o produto" onPress={onOpen} />
     </Animated.View> : <Quiet text="Nenhum produto" sub="Cole o link de um produto no Price Tracker." />}
@@ -1060,7 +1061,7 @@ export function HomeBriefSkeleton() {
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
     <ShimmerBlock width={110} height={14} radius={6} />
-    {wide ? <LoadingLines rows={3} /> : <View style={{marginTop: 'auto', gap: 8} as any}><ShimmerBlock width={70} height={22} radius={6} /><ShimmerBlock width={'80%'} height={11} radius={5} /><ShimmerBlock width={80} height={26} radius={8} /></View>}
+    {wide ? <LoadingLines rows={3} immediate /> : <View style={{marginTop: 'auto', gap: 8} as any}><ShimmerBlock width={70} height={22} radius={6} /><ShimmerBlock width={'80%'} height={11} radius={5} /><ShimmerBlock width={80} height={26} radius={8} /></View>}
   </View>;
   return <ShimmerGroup><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
