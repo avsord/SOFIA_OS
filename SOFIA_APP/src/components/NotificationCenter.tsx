@@ -279,3 +279,30 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
   </View>
  </Modal></>;
 }
+function DeskFilter({on,label,count,icon,color,onPress}:{on:boolean;label:string;count:number;icon:IconName;color?:string;onPress:()=>void}){const c=useTheme();return <Pressable accessibilityRole="tab" accessibilityState={{selected:on}} onPress={onPress} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:10,height:36,paddingHorizontal:12,borderRadius:9,backgroundColor:on?c.accentSoft:hovered?c.input:'transparent'})}>
+  <Icon name={icon} size={15} color={color||(on?c.accent:c.muted)}/><Text numberOfLines={1} style={{flex:1,fontSize:13,color:on?c.text:c.muted,fontWeight:on?'600':'500'}}>{label}</Text><Text style={{fontSize:12,color:c.muted,fontVariant:['tabular-nums']}}>{count}</Text></Pressable>;}
+function DeskPageBtn({label,onPress}:{label:string;onPress:()=>void}){const c=useTheme();return <Pressable accessibilityRole="button" onPress={onPress} style={({hovered}:any)=>({height:32,paddingHorizontal:14,borderRadius:9,borderWidth:1,borderColor:c.line,justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{fontSize:13,color:c.text,fontWeight:'600'}}>{label}</Text></Pressable>;}
+/** 03/11/2026 (Pedro: "arrumar a diagramacao da tela de todas as notificacoes... profissional e premium"; desenho aprovado
+ * no quadro): no computador a tela inteira tem os filtros numa coluna a esquerda (Todas / Nao lidas e cada area com a
+ * contagem) e a lista em cartoes por dia (Hoje, Ontem...). Cada linha e a mesma da janela do sino (DeskRow): acoes ao
+ * passar o mouse, Tomei/Em 30 min nas doses. O celular continua com a lista de antes. */
+export function DeskNotificationsPage(){const n=useNotifications(),c=useTheme(),[tab,setTab]=useState<'all'|'unread'>('all'),[area,setArea]=useState('all');
+ const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
+ const shown=n.items.filter(i=>(tab==='all'||i.state==='unread')&&(area==='all'||noticeArea(i)===area));
+ const groups=new Map<string,Notice[]>();for(const i of shown){const k=noticeDateGroup(i.created_at);if(!groups.has(k))groups.set(k,[]);groups.get(k)!.push(i);}
+ const read=n.items.filter(i=>i.state!=='unread');
+ const card={backgroundColor:c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,overflow:'hidden',boxShadow:'0 1px 2px rgba(0,0,0,0.18), 0 8px 20px rgba(0,0,0,0.12)'} as any;
+ return <View testID="desk-notifications-page" style={{flexDirection:'row',alignItems:'flex-start',gap:28,width:'100%',maxWidth:1100,alignSelf:'center'} as any}>
+  <View accessibilityRole="tablist" accessibilityLabel="Filtrar notificações" style={{width:220,gap:2}}>
+   <DeskFilter on={tab==='all'&&area==='all'} label="Todas" count={n.items.length} icon="bell" onPress={()=>{setTab('all');setArea('all');}}/>
+   <DeskFilter on={tab==='unread'&&area==='all'} label="Não lidas" count={n.unread} icon="check" onPress={()=>{setTab('unread');setArea('all');}}/>
+   {areas.length?<View style={{height:1,backgroundColor:c.line,marginVertical:8,marginHorizontal:4}}/>:null}
+   {areas.map(([a,cnt])=>{const st=AREA_STYLE[a]||AREA_STYLE.Outros;return <DeskFilter key={a} on={area===a} label={AREA_SHORT[a]||a} count={cnt} icon={((st as {glyph?:string}).glyph||'bell') as IconName} color={st.color} onPress={()=>setArea(area===a?'all':a)}/>;})}
+  </View>
+  <View style={{flex:1,minWidth:0,gap:14}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{flex:1,fontSize:13,color:c.muted}}>{n.unread?(n.unread===1?'1 não lida':n.unread+' não lidas')+' · ':''}{n.items.length===1?'1 no total':n.items.length+' no total'}</Text>{n.unread>0?<DeskPageBtn label="Ler todas" onPress={()=>void n.readAll()}/>:null}{read.length?<DeskPageBtn label="Limpar lidas" onPress={()=>{for(const i of read)void n.clear(i);}}/>:null}</View>
+   {n.error?<ErrorBanner text={n.error} onRetry={()=>void n.refresh()}/>:null}
+   {!shown.length?<View style={[card,{paddingVertical:40,alignItems:'center',gap:6}]}><Icon name="bell" size={22} color={c.muted}/><Text style={{color:c.text,fontWeight:'600'}}>{n.loading?'Carregando…':tab==='unread'?'Nada sem ler':'Tudo em dia'}</Text>{!n.loading?<Text style={{color:c.muted,fontSize:13}}>{tab==='unread'?'Você já viu tudo o que chegou.':'Sem notificações por aqui.'}</Text>:null}</View>:null}
+   {[...groups].map(([g,items])=><View key={g} style={card}><Text style={{color:c.muted,fontSize:12,fontWeight:'600',letterSpacing:.4,paddingHorizontal:18,paddingTop:14,paddingBottom:6}}>{g.toUpperCase()}</Text>{items.map((i,k)=><DeskRow key={i.id} item={i} first={k===0}/>)}</View>)}
+  </View>
+ </View>;}
