@@ -37,6 +37,7 @@ def capture(label):
 # e no celular mostra a Agenda do site ("Agenda · próximos" e a frase do dia) no lugar do mini calendário
 # ("..., com compromissos"). StartupHome (só com conta salva) continua com "Olá, Teste.". A proteção é a mesma:
 # conta autenticada visível e registros da agenda salvos aparecendo na abertura.
+# (A #278 parou antes, no teste do servidor tests/foto-leitura-203, instável por causa do Quadro em segundo plano; corrigido.)
 GREETING=re.compile(r'(Olá|Bom dia|Boa tarde|Boa noite), Teste')
 def home_authenticated(tree):return bool(GREETING.search(tree))
 def home_agenda_visible(tree):
