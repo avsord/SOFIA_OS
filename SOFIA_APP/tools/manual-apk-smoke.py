@@ -48,7 +48,11 @@ def capture_home(label,need_agenda=True,wait=6.0):
  while True:
   tree=capture(label)
   if home_authenticated(tree) and (not need_agenda or home_agenda_visible(tree)):return tree
-  if time.monotonic()>=end:return tree
+  if time.monotonic()>=end:
+   # diagnostico no log (os artefatos do CI nem sempre podem ser baixados): o que estava na tela quando falhou
+   seen=[n.attrib.get('text') or n.attrib.get('content-desc') for n in ET.fromstring(tree).iter('node') if (n.attrib.get('text') or n.attrib.get('content-desc'))][:60]
+   print('SOFIA_HOME_DIAG '+json.dumps({'label':label,'authenticated':home_authenticated(tree),'agenda':home_agenda_visible(tree),'visible':seen},ensure_ascii=False),flush=True)
+   return tree
   time.sleep(.5)
 def tap_label(tree,label):
  for n in ET.fromstring(tree).iter('node'):

@@ -113,6 +113,12 @@ def correctness(points,mode):
  # No network or deleting: verify the actual editor survives hide/show with a dirty draft.
  page=observe_page_list(mode,'correctness-'+mode,points);RESULT['correctness_mode']=mode
  assert not page['false_empty'],'False empty Page list with confirmed heavy cache; mode='+mode
+ if not page['content_visible']:
+  try:
+   t=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
+   seen=[n.get('text') or n.get('content-desc') for n in ET.fromstring(t).iter('node') if (n.get('text') or n.get('content-desc'))][:60]
+  except Exception as err:seen=['(sem arvore: '+str(err)[:120]+')']
+  print('SOFIA_PAGES_DIAG '+json.dumps({'mode':mode,'visible':seen},ensure_ascii=False),flush=True)
  assert page['content_visible'],'Heavy page list not visible within 8000ms; mode='+mode
  tree=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
  (OUT/'pages-heavy.xml').write_text(tree)
