@@ -233,6 +233,19 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **Lista do Pedro (WhatsApp 03–04/11, recebida 04/11 ~20h) — DEFEITOS:**
+  1. Mini chat da Sofia aberto na linha do tempo fica por baixo dos blocos (cortado).
+  2. Balão da linha do tempo corta nomes ("Fazer esquema de em…") — precisa ver o nome todo; balão de hover cobre o rótulo do item.
+  3. "Agora" da linha do tempo pula ao voltar para a aba (deve continuar andando em segundo plano).
+  4. Valor do Price Tracker no Início difere do valor dentro do app.
+  5. Criar algo pela Sofia demora a aparecer.
+  6. Site: perfil no canto inferior esquerdo da barra lateral — o Pedro não pediu (tirar).
+  7. Clicar numa bolinha da linha do tempo cria naquele horário.
+  8. Segurar na data cria compromisso/tarefa/lembrete (como antes).
+  9. Notas e Biblioteca: tirar tudo do filtro.
+  10. Editar tarefa (painel à direita): campos passam da borda; confirmação "Excluir tarefa" aparece atrás do painel.
+- **Lista do Pedro — NOVO (desenho antes, aprovação dele):** linha do tempo "microscópica" (entrar como num universo); painel de edição de eventos fixo à direita, didático e premium; "drive" na Sofia; colar/arrastar imagem no mini chat.
+
 - **Android R7 (04/11):** teste "R7 heavy data" falhando em 3/4 compilações (modo Antigo: 1–2 de 5 tentativas > 8 s até mostrar Páginas). Investigar antes do celular.
 - **Site — barra lateral estreita e cortada (print do Pedro 04/11 16:17):** causa não achada; pedir vídeo/print com F12.
 
