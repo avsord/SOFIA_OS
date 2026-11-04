@@ -41,6 +41,7 @@ import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff, revealWebVeil} from './src/lib/launch-handoff';
+import {wipeEncryptedStorage} from './src/lib/encrypted-storage';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
 import {isWeb,pathToRoute,routeTitle,routeToPath} from './src/lib/web-route';
 import {installWebPage} from './src/lib/web-page';
@@ -237,7 +238,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:!!auth);return()=>s.remove();},[tab,workspaceDepth,pagesDepth,auth]);
  const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
- const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{appAlert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)appAlert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
+ const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();await wipeEncryptedStorage().catch(()=>{});let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{appAlert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)appAlert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
  const profile=useCallback((p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev),[]);
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);

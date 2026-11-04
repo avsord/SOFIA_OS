@@ -34,13 +34,13 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
   useEffect(() => {
     if (!active) return;
     let alive = true;
+    let saved: any;
     void (async () => {
       try {
         // 0.3.293: guardado neste aparelho se houver; senao busca no servidor (antes o bloco ficava "Abra Financas")
-        let bundle = epoch ? null : await readCache(api);
-        if (!bundle) {const month = (() => {const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');})(); /* mes local */ bundle = await loadAll(api, financeWindow(month, 'home'));}
-        if (!alive) return;
-        if (!bundle) {setDues(null); return;}
+        // 04/11/2026 (Pedro: "os blocos ja tem que aparecer logo de primeira"): no site abre com o retrato guardado (criptografado)
+        // e atualiza com o servidor logo em seguida
+        const apply = (bundle: any) => {
         const data = toData(bundle.items || {}, bundle.carry || {});
         const today = todayISO();
         setDues(manualDues((data as any).txs || [], '', today, 7).filter(d => !d.paid && d.kind !== 'receber'));
@@ -51,7 +51,15 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
         try {setMoneyDues(upcoming((data as any).txs || [], (data as any).cards || [], today, 4).filter(x => !x.paid));} catch {setMoneyDues([]);}
         // a mesma meta que Financas mostra (papel "reserve"); antes vinha de outra leitura, que podia chegar tarde ou nao chegar
         try {const r = reserveOf((data as any).goals || []); if (r && Number(r.target) > 0) {const sp = moneySplit(r, (data as any).moves || [], (data as any).accounts, (data as any).txs, (data as any).cards, today.slice(0, 7)); setGoal({name: r.name || 'Sua meta', saved: sp.saved, target: Number(r.target), monthly: sp.planned || 0, deadline: String(r.entity?.data?.deadline || ''), today});} else setGoal(null);} catch {setGoal(null);}
-      } catch {if (alive) setDues(null);}
+        };
+        saved = epoch ? undefined : api.webPeek?.('finance-home');
+        if (saved && saved.items) apply(saved);
+        let bundle = epoch ? null : await readCache(api);
+        if (!bundle || saved) {const month = (() => {const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');})(); /* mes local */ bundle = await loadAll(api, financeWindow(month, 'home')) || bundle; if (bundle) api.webKeep?.('finance-home', bundle);}
+        if (!alive) return;
+        if (!bundle) {if (!saved) setDues(null); return;}
+        apply(bundle);
+      } catch {if (alive && !saved) setDues(null);}
     })();
     void (async () => {
       try {

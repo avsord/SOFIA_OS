@@ -31,11 +31,19 @@ export const startupPriority=(path:string)=>path==='/chat-sync/current'?0:
 const fresh=(path:string,at:number,now:number)=>at<=now+60000&&(chatRead(path)||now-at<MAX_AGE);
 // A separate, encrypted first-screen projection prevents years of chat/detail
 // history from being decrypted, transferred and parsed before Home can mount.
+// 04/11/2026 (Pedro: "os blocos do Inicio ja tem que aparecer logo de primeira"): no SITE o pacote da abertura tambem leva o
+// que os blocos do Inicio esperam (meses seguintes da Agenda, encomendas, e-mails, capsulas, rotina, monitor e avisos);
+// no Android nada muda (o pacote pequeno continua pequeno). Sem document = Android/testes.
+const WEB_SNAPSHOT=typeof document!=='undefined';
+const WEB_LAUNCH=/^\/workspace\/entities\?limit=100&kind=(?:package|mail_hit|capsule|routine|monitor)&q=&offset=0$/;
+function webLaunchRead(path:string){return WEB_SNAPSHOT&&(path.startsWith('/local/web/')||/^\/agenda\?month=\d{4}-\d{2}$/.test(path)||WEB_LAUNCH.test(path)||path==='/md/notifications?offset=0');}
 export function launchRead(path:string,now=Date.now()){
+ if(webLaunchRead(path))return true;
  const date=new Date(now),month=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
  return ['/tasks','/home','/md/dashboard','/workspace/catalog','/chat-sync/current','/agenda?month='+month,MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH,VALUES_MASK_PATH].includes(path);
 }
 export function cacheableRead(path:string){
+ if(WEB_SNAPSHOT&&(path==='/md/notifications?offset=0'||path.startsWith('/local/web/')))return true;
  if(chatRead(path))return true;
  if(['/bootstrap','/home','/tasks','/workspace/catalog','/workspace/integrations','/md/dashboard','/agenda','/chat-sync/current',MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH,VALUES_MASK_PATH].includes(path))return true;
  if(/^\/agenda\?month=\d{4}-\d{2}$/.test(path))return true;

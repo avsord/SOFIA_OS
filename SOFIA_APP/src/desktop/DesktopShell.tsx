@@ -39,9 +39,10 @@ function usePageDirectory(api:SofiaApi){
     const items:Entity[]=[];
     for(let offset=0;offset<3000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;}
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
+    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
-  if(!pagesDirectory.get())void load();
+  void load();
   const focus=()=>void load();
   if(typeof window!=='undefined')window.addEventListener('focus',focus);
   return()=>{live=false;if(typeof window!=='undefined')window.removeEventListener('focus',focus);};
@@ -126,6 +127,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
+ if(pagesDirectory.get()===null){const saved=api.webPeek?.<Entity[]>('pages');if(Array.isArray(saved))pagesDirectory.set(saved);} /* abre com a arvore guardada (criptografada) e confere com o servidor */
  const pages=useStore(pagesDirectory)??null;usePageDirectory(api);const pagesLate=useRef(pages===null);
  const path=useStore(pagePath),moduleTitle=useStore(appModuleTitle);
  const openPageId=tab==='pages'&&path.length?path[path.length-1].id:'';

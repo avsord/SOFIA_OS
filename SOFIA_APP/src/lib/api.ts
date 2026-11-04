@@ -112,6 +112,10 @@ export class SofiaApi {
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   /** Guarda um resumo calculado no app (ex.: widget da Início) no mesmo cache criptografado da abertura. */
   rememberLocal(path:string,value:unknown){this.snapshots.remember(path,value);}
+  /** 04/11/2026: no site, o que os blocos do Inicio mostram fica no pacote criptografado da abertura (abre ja pronto e atualiza por tras). */
+  webPeek<T>(name:string):T|undefined{return typeof document!=='undefined'?this.cached<T>('/local/web/'+name):undefined;}
+  webKeep(name:string,value:unknown){if(typeof document==='undefined')return;this.rememberLocal('/local/web/'+name,value);clearTimeout(this.webKeepTimer);this.webKeepTimer=setTimeout(()=>{void this.persistLaunchProjection().catch(()=>{});},1500);}
+  private webKeepTimer:any;
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
   preload(agenda:()=>Promise<unknown>){
