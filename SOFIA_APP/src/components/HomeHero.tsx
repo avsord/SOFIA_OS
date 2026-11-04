@@ -44,7 +44,7 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   useEffect(() => {if (!hasSummary) {setSumSettled(false); return;} const t = setTimeout(() => setSumSettled(true), 700); return () => clearTimeout(t);}, [hasSummary]);
   const rv = React.useMemo(() => reveal?.done ? {greet: null, scale: {transform: [{scale: 1 / reveal.big}]}, date: null, chars: null, summary: null} : reveal?.at ? {
     greet: introAnim(reveal.at, INTRO_T.greet, 600, {opacity: 0}, {opacity: 1}),
-    scale: introAnim(reveal.at, INTRO_T.move, 1300, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, MOVE_EASE),
+    scale: {...introAnim(reveal.at, INTRO_T.move, 1300, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, MOVE_EASE), willChange: 'transform'},
     date: introAnim(reveal.at, INTRO_T.date, 200, {opacity: 0}, {opacity: 1}),
     chars: Array.from(date).map((_, i) => introAnim(reveal.at, INTRO_T.date + i * 32, 40, {opacity: 0}, {opacity: 1}, 'linear')),
     summary: introAnim(reveal.at, INTRO_T.summary, 450, {opacity: 0}, {opacity: 1}),
