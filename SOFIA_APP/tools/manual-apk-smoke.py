@@ -227,11 +227,17 @@ try:
  x1,y1,x2,y2=map(int,re.findall(r'\d+',viewport.attrib['bounds']));x=(x1+x2)//2;top=y1+max(12,(y2-y1)//8);bottom=y2-max(12,(y2-y1)//8)
  result['pagination_swipe_bounds']=[x,top,x,bottom]
  older_visible=False
- for group in range(10):
+ # 03/11/2026: o semeador antigo (seed-060) grava "Mensagem/Resposta preservada" como HOJE 10:00 do emulador (UTC). Antes
+ # das 10h UTC elas ficam no futuro e viram as mais NOVAS; ai a mais antiga da conversa e o "Trecho 0" da resposta longa,
+ # que tambem so aparece carregando a pagina anterior (a janela inicial mostra o fim). Mais arrastos: a lista sobe
+ # devagar enquanto carrega paginas.
+ hour=int(adb('shell','date','-u','+%H').decode().strip() or '12');oldest=['Mensagem preservada','Resposta preservada'] if hour>=10 else ['Trecho 0 da resposta longa']
+ result['older_page_target']=oldest
+ for group in range(16):
   for _ in range(4):
    adb('shell','input','swipe',str(x),str(top),str(x),str(bottom),'350');time.sleep(.3)
   older_tree=xml();(out/('older-page-'+str(group)+'.xml')).write_text(older_tree)
-  if 'Mensagem preservada' in older_tree or 'Resposta preservada' in older_tree:older_visible=True;break
+  if any(t in older_tree for t in oldest):older_visible=True;break
  if not older_visible:
   seen=[n.attrib.get('text') or n.attrib.get('content-desc') for n in ET.fromstring(older_tree).iter('node') if (n.attrib.get('text') or n.attrib.get('content-desc'))][:50]
   print('SOFIA_OLDER_DIAG '+json.dumps({'visible':seen},ensure_ascii=False),flush=True)

@@ -121,13 +121,14 @@ export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: 
  * sem o custo de montar um Svg. Roda mesmo com "remover animacoes" ligado —
  * e sinal de carregamento, nao enfeite (pedido do dono). */
 const ShimmerContext = React.createContext<Animated.Value | null>(null);
-export function ShimmerGroup({children, duration = 1300}: {children: React.ReactNode; duration?: number}) {
+export function ShimmerGroup({children, duration = 1300, paused = false}: {children: React.ReactNode; duration?: number; paused?: boolean}) {
   const x = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (paused) return; // 03/11/2026: esqueleto fora da tela fica parado (o Android nao via a tela parada com o brilho rodando)
     const loop = Animated.loop(Animated.timing(x, {toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true}));
     loop.start();
     return () => loop.stop();
-  }, [x, duration]);
+  }, [x, duration, paused]);
   return <ShimmerContext.Provider value={x}>{children}</ShimmerContext.Provider>;
 }
 const BAND = 140, TRAVEL = 520;
