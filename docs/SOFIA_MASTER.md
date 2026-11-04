@@ -21,14 +21,14 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-03 ~20h (Brasília), no **Claude Code** (sessão na nuvem; sem emulador aqui — o emulador é o do GitHub Actions; os artefatos do Actions não baixam desta sessão, por isso os testes imprimem diagnósticos no log: `SOFIA_HOME_DIAG`, `SOFIA_DRAFT_DIAG`, `SOFIA_INSTALL_DIAG`, `SOFIA_DUMP_RETRY`).
-- **Feito:** revisão geral (app, site, servidor) + desenho de 03/11 (`docs/design/2026-11-03/`) em lotes `[manual-apk]` (3effb56 → e412687). Detalhe nas mensagens dos commits.
-- **Por que o CI estava vermelho desde 10/10 (corrigido):** (1) Início do celular quebrava (`window` sem `addEventListener`; guarda `WEB`); (2) o teste procurava textos que não existem mais ("Olá, Teste.", "com compromissos"); (3) `uiautomator dump` falhava calado ("could not get idle state") e o teste lia o arquivo ANTERIOR (por isso "via" o semeador) — agora a leitura é conferida e repetida; o "agora" da linha do tempo pulsava sem parar pelo JavaScript e no celular ficou parado; (4) "rascunho perdido" não era perda: o Voltar fechava a página antes do teclado abrir e o cursor fica onde o dedo toca — o teste agora compara o título antes/depois de esconder e mostrar a tela.
-- **Compilação (última: #289, commit e412687):** APK ok; **emulador principal (identidade ARM64 + abertura logado + conversa guardada) VERDE** desde a #285. **Teste pesado R7 ainda VERMELHO:** em toda execução exatamente 1 das 5 aberturas de Páginas no modo Antigo passa de 8 s (a leitura da tela não fica pronta); modo Novo sempre ok (6,5–7 s). Na #286 (2ª tentativa) as 10 aberturas passaram e o rascunho sobreviveu a 6 ciclos — o teste corrigido do rascunho ainda não rodou até o fim.
-- **Tentado e desfeito:** adiar o painel do Início enquanto outra aba está na tela (cd1cbbf) piorou (o esqueleto com brilho ficava na tela e nada lia); revertido em e412687.
-- **Servidor:** correções no código e nos testes (413 ok), **valem só depois de publicar no Railway** (não feito).
-- **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; abas Ano/Mês/Dia; segurar um dia no Mês; Recentes em Páginas; filtros de Notas/Biblioteca; barrinha "Criar" em cima do campo.
-- **Próximo passo:** descobrir o que deixa a tela das Páginas "ocupada" por mais de 8 s no modo Antigo (suspeita: esqueleto com brilho das Páginas/Início ainda na tela; testar uma variável por vez) — sem afrouxar o limite. Depois o Pedro testa o candidato; publicar só com "aprovado".
+- **Atualizado em:** 2026-11-04, no **Claude Code** (sessão na nuvem; o emulador é o do GitHub Actions; os artefatos do Actions não baixam desta sessão — o Pedro baixou e anexou os .zip, e foi isso que resolveu).
+- **COMPILAÇÃO VERDE:** #293 (run 41799073730) — APK, emulador principal e teste pesado R7, todos verdes, pela 1ª vez desde 10/10. APK candidato no artefato `Sofia-build-41799073730-1` (instalar o `Sofia-OS.apk` de dentro; os `QA-ONLY-…` são só do emulador). **Não publicado** — só com "aprovado".
+- **O que deixava vermelho (tudo corrigido):** (1) Início do celular quebrava (`window` sem `addEventListener`; guarda `WEB`); (2) testes procuravam textos antigos ("Olá, Teste.", "com compromissos"); (3) `uiautomator dump` falhava calado e o teste lia a tela ANTERIOR; o "agora" pulsava sem parar (no celular ficou parado); (4) rascunho de Página nunca se perdeu — o teste comparava errado; (5) Conversa: o semeador antigo grava as mensagens "preservadas" como HOJE 10:00 UTC, então antes das 10h UTC elas eram as mais novas (o teste agora sabe disso); (6) Páginas lentas no modo Antigo: o Início montava o painel pesado por trás — agora só monta com o Início na tela e o esqueleto fica parado fora dela (Páginas ~4 s).
+- **Feito na rodada (03–04/11):** revisão geral (app, site, servidor) + desenho de 03/11 — detalhe nas mensagens dos commits [manual-apk] de 3effb56 a a23f2ca+.
+- **Servidor:** correções no código e testes (413 ok), **só valem depois de publicar no Railway** (não feito).
+- **Commits sem `[manual-apk]`** ainda falham em "Native checks" (não investigado).
+- **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; abas Ano/Mês/Dia; segurar um dia no Mês; Recentes em Páginas; filtros de Notas/Biblioteca; barrinha "Criar" em cima do campo; Início ao voltar de outra aba logo depois de abrir.
+- **Próximo passo:** Pedro testa o APK da #293 no celular; com "aprovado", publicar. Depois: publicar o servidor no Railway (com backup antes) e os itens do desenho ainda não feitos (§9).
 
 ## 1. O dono e a forma de trabalhar
 
@@ -227,7 +227,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-- **CI Android (03/11):** emulador principal verde desde a #285; R7 pesado: 1 de 5 aberturas de Páginas no modo Antigo passa de 8 s em toda execução. Falta também: "Native checks" dos commits sem `[manual-apk]`.
+- **CI Android:** verde na #293 (04/11). Falta: "Native checks" dos commits sem `[manual-apk]`.
 - **Servidor a publicar no Railway:** restauração de backup, lembretes (só ativos, dia do mês, marcas usadas), Quadro apagado com a conversa, apagar conversas selecionadas, retenção de backups por dia. Antes: confirmar backup/volume.
 - **Desenho 03/11 ainda não feito:** Agenda Mês com lista do dia embaixo e faixa da semana no Dia; Tarefas com chips de prioridade (seletor mantido: os roteiros nativos tocam nele); Finanças com + no cabeçalho (o botão redondo continua); painéis da Biblioteca/Notas por cima com fundo escuro; botões 32 px em todos os cabeçalhos; Perfil do celular em lista compacta; arrastar itens na linha do tempo do celular; Rotina e Finanças quadradas (ficaram na largura toda: não cabem).
 - **Áudio pela barrinha "Criar":** a foto leva o horário; o áudio não (o servidor usa só a transcrição) — precisa de campo novo no servidor.
@@ -277,11 +277,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | (versão escolhida pelo delivery) | Site recompilado (public/web): a rodada anterior subiu só o código e o site não mudou; Perfil do site em duas colunas (identidade + seções); tela de Notificações do site com filtros à esquerda e cartões por dia | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Site: animações CSS passam a funcionar (iam em estilo solto e o react-native-web descartava; agora StyleSheet.create e a camada do computador separa a animação); Início entra com fade; linha do tempo já no lugar ao voltar à aba; bolinhas dos itens no Price Tracker/Encomendas e setas na Rotina | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | App com a cara do site (aprovado no quadro): Início do celular = Início do site compacto (Seu dia + blocos, sem mini chat); Agenda do celular = Agenda do site (Ano/Mês/Dia com zoom, bolinhas no mês); segurar na linha do tempo leva à Conversa com a barrinha "Criar · hoje às HH:MM" e a seta de criação manual; títulos padrão (nome do app) em Listas, Encomendas, E-mails, Biblioteca, Notas; + simples; Biblioteca/Notas com barra Área/Filtros; Agenda do Início rola para os próximos dias; Conversa mostra listas como lista; segurar no Dia da Agenda cria no horário; Despesa/Receita pela barrinha já no dia; Perfil do celular em cartões | aguardando teste do Pedro |
 | 2026-11-03 | (versão escolhida pelo delivery) | Claude Code: corrige #277 — teste do emulador do Início atualizado para a saudação e a Agenda novas (mesma proteção); diagnóstico no log do teste do rascunho de Página | compilação em andamento |
 | 2026-11-03 | (delivery) | Claude Code: revisão geral + desenho 03/11 em 4 lotes; Início do celular abre (WEB, calc→px, "agora" parado), linha do tempo arrasta, testes do emulador leem a tela de verdade; servidor: restauração, lembretes, apagar conversas | emulador principal verde (#285–#289); R7 vermelho: 1 de 5 aberturas de Páginas (modo Antigo) > 8 s |
+| 2026-11-04 | (delivery) | Claude Code: compilação Android verde (#293) pela 1ª vez desde 10/10 — teste da Conversa entende o "hoje 10:00" do semeador; Início só monta o painel pesado na tela (Páginas ~4 s) | verde: APK, emulador principal e R7 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
