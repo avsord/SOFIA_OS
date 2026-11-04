@@ -155,3 +155,4 @@ Cada rodada nova acrescenta UMA linha curta no fim (até ~300 caracteres): data 
 | 2026-11-04 | (delivery) | Claude Code: compilação Android verde (#293) pela 1ª vez desde 10/10 — teste da Conversa entende o "hoje 10:00" do semeador; Início só monta o painel pesado na tela (Páginas ~4 s) | verde: APK, emulador principal e R7 |
 | 2026-11-04 | (delivery) | Site: o Início antigo piscava ao abrir (largura ainda não medida); agora vai direto ao esqueleto do Início novo | #294 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: abertura do Início (saudação no centro que sobe, data digitada, fileiras de blocos em sequência, brilho oval), sem pulo/piscada; revelação não espera todos os dados | #318 verde (APK, emulador, R7) |
+| 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |

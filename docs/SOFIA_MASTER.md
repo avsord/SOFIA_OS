@@ -27,10 +27,11 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 - **COMPILAÇÃO VERDE:** #318 (run 41841758018), além de #293/#294; APK candidato mais novo no artefato `Sofia-build-41841758018-1`.
 - **O que deixava vermelho (tudo corrigido):** (1) Início do celular quebrava (`window` sem `addEventListener`; guarda `WEB`); (2) testes procuravam textos antigos ("Olá, Teste.", "com compromissos"); (3) `uiautomator dump` falhava calado e o teste lia a tela ANTERIOR; o "agora" pulsava sem parar (no celular ficou parado); (4) rascunho de Página nunca se perdeu — o teste comparava errado; (5) Conversa: o semeador antigo grava as mensagens "preservadas" como HOJE 10:00 UTC, então antes das 10h UTC elas eram as mais novas (o teste agora sabe disso); (6) Páginas lentas no modo Antigo: o Início montava o painel pesado por trás — agora só monta com o Início na tela e o esqueleto fica parado fora dela (Páginas ~4 s).
 - **Feito na rodada (03–04/11):** revisão geral (app, site, servidor) + desenho de 03/11 — detalhe nas mensagens dos commits [manual-apk] de 3effb56 a a23f2ca+.
-- **Servidor:** correções no código e testes (413 ok), **só valem depois de publicar no Railway** (não feito).
+- **Servidor e site:** o Railway publica sozinho a cada push em `sofia-app-android` (o site e as correções do servidor desta rodada já estão no ar).
 - **Commits sem `[manual-apk]`** ainda falham em "Native checks" (não investigado).
 - **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; abas Ano/Mês/Dia; segurar um dia no Mês; Recentes em Páginas; filtros de Notas/Biblioteca; barrinha "Criar" em cima do campo; Início ao voltar de outra aba logo depois de abrir.
-- **Próximo passo:** Pedro testa o APK da #293 no celular; com "aprovado", publicar. Depois: publicar o servidor no Railway (com backup antes) e os itens do desenho ainda não feitos (§9).
+- **Último (04/11, 2c33ca1):** a piscada no fim do esqueleto das duas fileiras de baixo foi corrigida: o mesmo esqueleto fica na tela e apaga por cima do conteúdo, em vez de ser recriado (o brilho recomeçava e piscava). Conferido quadro a quadro com a API lenta. Pendente do Pedro: nos prints dele a página parece mais larga que a janela (menu cortado à esquerda, "PS" à direita); pedi Ctrl+0 no Brave, o Console (F12) e um teste no Chrome/Edge.
+- **Próximo passo:** o Pedro confere a abertura do site e testa o APK mais novo no celular; com "aprovado", publicar no atualizador. Depois disso, os itens do desenho ainda não feitos (§9).
 
 ## 1. O dono e a forma de trabalhar
 
@@ -279,11 +280,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | (versão escolhida pelo delivery) | Claude Code: corrige #277 — teste do emulador do Início atualizado para a saudação e a Agenda novas (mesma proteção); diagnóstico no log do teste do rascunho de Página | compilação em andamento |
 | 2026-11-03 | (delivery) | Claude Code: revisão geral + desenho 03/11 em 4 lotes; Início do celular abre (WEB, calc→px, "agora" parado), linha do tempo arrasta, testes do emulador leem a tela de verdade; servidor: restauração, lembretes, apagar conversas | emulador principal verde (#285–#289); R7 vermelho: 1 de 5 aberturas de Páginas (modo Antigo) > 8 s |
 | 2026-11-04 | (delivery) | Claude Code: compilação Android verde (#293) pela 1ª vez desde 10/10 — teste da Conversa entende o "hoje 10:00" do semeador; Início só monta o painel pesado na tela (Páginas ~4 s) | verde: APK, emulador principal e R7 |
 | 2026-11-04 | (delivery) | Site: o Início antigo piscava ao abrir (largura ainda não medida); agora vai direto ao esqueleto do Início novo | #294 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: abertura do Início (saudação no centro que sobe, data digitada, fileiras de blocos em sequência, brilho oval), sem pulo/piscada; revelação não espera todos os dados | #318 verde (APK, emulador, R7) |
+| 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
