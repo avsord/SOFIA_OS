@@ -204,6 +204,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Conta conectada antes da 0.3.244: segue na pasta visível até tocar em Reconectar; a migração copia, confere o tamanho, troca a referência e só então manda o original para a lixeira. Arquivo que falha 3 vezes fica onde está e a pasta antiga não é apagada.
 - **Armazenamento** (Perfil → Configurações do aplicativo): espaço da conta como o Drive mostra, a Sofia separada do resto.
 - **Comprovantes** (fotos da conversa para Finanças) e **Áudios** da conversa se apagam sozinhos com mais de 7 dias (cada um com a sua chave, ligada por padrão); a despesa, a miniatura e a transcrição ficam. Arquivo apagado deixa a linha com `removed_at` e a rota responde 410 com o motivo.
+- 04/11/2026 (Pedro): abertura do site — véu na cor do fundo que abre no 1º quadro (1 s); a animação do Início já acontecendo por trás; Páginas da barra lateral prontas antes (pedidas no carregamento); blocos do Início no computador SEM esqueleto/shimmer, entrando com conteúdo fileira por fileira.
 
 ## 8. Regras que não se quebram
 
