@@ -15,7 +15,7 @@ import {monthKey} from './src/lib/agenda-cache';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet,Platform,useWindowDimensions} from 'react-native';
-import {isDesktopWidth, pagesDirectory} from './src/lib/desktop';
+import {isDesktopWidth} from './src/lib/desktop';
 import {SafeAreaProvider,SafeAreaView,initialWindowMetrics} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile,Notice} from './src/lib/types';
@@ -141,10 +141,9 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  // their first visit and warm independently without extending the splash.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
- // 04/11/2026 (Pedro: "as paginas e os icones ja tem que estar visiveis"; antes: "segurando muito"): no computador o veu da
- // abertura sai assim que a lista de Paginas da barra lateral chega (pedida antes de tudo), no maximo 0,6 s apos o 1o quadro
- useEffect(()=>{const go=()=>revealWebVeil(c.bg);if(!desktop||!auth||pagesDirectory.get()!==null){go();return;}
-  const off=pagesDirectory.subscribe(()=>{if(pagesDirectory.get()!==null)go();});const t=setTimeout(go,600);return()=>{off();clearTimeout(t);};},[]);
+ // 04/11/2026 (Pedro: "fica muito tempo so no fundo, adiantar tudo"): o veu da abertura do site sai no 1o quadro do app,
+ // sem esperar dados; a lista de Paginas (o 1o pedido do site) chega durante o fade e entra suave por baixo dele
+ useEffect(()=>{revealWebVeil(c.bg);},[]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;

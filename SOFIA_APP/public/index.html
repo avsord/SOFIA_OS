@@ -90,7 +90,7 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
          a montagem e some depressa quando o app esta pronto (launch-handoff.ts); se o app nao avisar, some sozinho em 8 s */
       #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; background: #F7F6FA; animation: sofia-veil-out 320ms ease-out 8s both; }
       @media (prefers-color-scheme: dark) { #sofia-veil { background: #121017; } }
-      #sofia-veil.out { animation: sofia-veil-open 1200ms cubic-bezier(0.4,0,0.2,1) 0s both; }
+      #sofia-veil.out { animation: sofia-veil-open 1000ms cubic-bezier(0.2,0,0.2,1) 0s both; }
       @keyframes sofia-veil-out { from { opacity: 1; } to { opacity: 0; } }
       @keyframes sofia-veil-open { from { opacity: 1; } to { opacity: 0; } }
       ::selection { background: rgba(114, 88, 232, 0.28); }
