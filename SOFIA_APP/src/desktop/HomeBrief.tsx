@@ -62,7 +62,7 @@ export type HomeBriefProps = {
   /** 03/11/2026: o mesmo Inicio do site no celular (aprovado no quadro): Seu dia, Agenda e os blocos em duas colunas. */
   compact?: boolean;
   /** celular: segurar num horario vazio leva para a Conversa com esse horario (03/11/2026) */
-  onAskAt?: (at: Date) => void;
+  onAskAt?: (at: Date) => void; rows?: Animated.Value;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -169,6 +169,9 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
 }
 
 export function HomeBrief(p: HomeBriefProps) {
+  // 04/11/2026 (Pedro: "os blocos aparecendo em hierarquia na horizontal"): na abertura do site cada linha inteira (Seu dia,
+  // depois a 2a fileira, depois a 3a) aparece com fade suave, uma em seguida da outra, guiadas por um so progresso (p.rows)
+  const rowIn = (i: number): any => p.rows ? {opacity: p.rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [0, 1], extrapolate: 'clamp'}), transform: [{translateY: p.rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [14, 0], extrapolate: 'clamp'})}]} : undefined;
   const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), [tl, setTl] = useTimelineSettings(), [gear, setGear] = useState(false);
   const rowH = useRowHeight(root, briefH);
   const open = useMemo(() => p.tasks.filter(t => !['done', 'cancelled', 'archived'].includes(t.state)), [p.tasks]); // 03/11/2026: cancelada nao conta como aberta
@@ -224,7 +227,7 @@ export function HomeBrief(p: HomeBriefProps) {
   // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
   // 04/11/2026: sem fade proprio aqui (comecava em 35% e piscava); a passagem suave e o esqueleto apagando por cima (Home.tsx)
   return <View ref={root} style={{gap: 12}}>
-    <View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
+    <Animated.View style={rowIn(0)}><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
@@ -246,7 +249,7 @@ export function HomeBrief(p: HomeBriefProps) {
         actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
       {/* 03/11/2026 (desenho 01): no celular, a dica de como criar pela linha */}
       {p.compact && p.onAskAt ? <Text style={{fontSize: 11, color: c.muted, paddingTop: 2, paddingHorizontal: 2}}>Segure num horário vazio para criar · arraste para ver outras horas</Text> : null}
-    </View>
+    </View></Animated.View>
     {p.compact ? <CompactCtx.Provider value={true}>
       {/* celular: os blocos de verdade do site, adaptados. Agenda, Rotina e Financas na largura toda (tem seletor/duas
           colunas de numeros); Tarefas, E-mails, Price Tracker e Encomendas em pares do mesmo tamanho. */}
@@ -262,17 +265,17 @@ export function HomeBrief(p: HomeBriefProps) {
       </View>
       <FinanceTile style={{height: 204}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
     </CompactCtx.Provider> : <>
-    <View style={{flexDirection: 'row', gap: 12}}>
+    <Animated.View style={rowIn(1)}>    <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
       <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
-    </View>
-    <View style={{flexDirection: 'row', gap: 12}}>
+    </View></Animated.View>
+    <Animated.View style={rowIn(2)}>    <View style={{flexDirection: 'row', gap: 12}}>
       <FinanceTile style={{flex: 2, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
       <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
       <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
-    </View>
+    </View></Animated.View>
     </>}
   </View>;
 }
