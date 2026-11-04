@@ -150,7 +150,11 @@ def correctness(points,mode):
  assert page['content_visible'],'Heavy page list not visible within 8000ms; mode='+mode
  tree=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
  (OUT/'pages-heavy.xml').write_text(tree)
- tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
+ # 03/11/2026: o rascunho do modo anterior continua guardado (certo) e o titulo vira "Pagina QA_R8_KEEP... 0000";
+ # acha a pagina 0000 pelo comeco e pelo fim do nome
+ qa0=[x for x in ET.fromstring(tree).iter('node') if re.match(r'Abrir página principal Página QA.* 0000$',x.get('content-desc') or x.get('text') or '')]
+ assert qa0,'Missing QA control Abrir página principal Página QA 0000'
+ b0=list(map(int,re.findall(r'\d+',qa0[-1].attrib['bounds'])));tap(((b0[0]+b0[2])//2,(b0[1]+b0[3])//2));time.sleep(.4);tree=xml()
  # 03/11/2026: a #285 mostrou que o rascunho NAO se perdia - o cursor fica onde o dedo toca e o teclado do emulador
  # sugere letras, entao "texto colado no fim" nao e o que se protege. Agora: le o titulo logo depois de digitar e exige
  # o MESMO titulo depois de esconder (Conversa) e mostrar (Paginas) a tela; e cada ciclo precisa mudar o titulo.

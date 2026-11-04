@@ -218,7 +218,11 @@ try:
  # of the display, where the previous test incorrectly began every swipe.
  scrolls=[n for n in ET.fromstring(conversation).iter('node') if n.get('scrollable')=='true' and n.get('class')=='android.widget.ScrollView']
  assert scrolls,'Missing conversation viewport'
- viewport=min(scrolls,key=lambda n:(lambda b:(b[2]-b[0])*(b[3]-b[1]))(list(map(int,re.findall(r'\d+',n.attrib['bounds'])))))
+ # 03/11/2026: prefere a area rolavel que contem a conversa (as mensagens QA); a menor area rolavel podia ser outra lista
+ def _texts(n):return ' '.join((x.get('text') or '')+' '+(x.get('content-desc') or '') for x in n.iter('node'))
+ chat_scrolls=[n for n in scrolls if 'QA' in _texts(n) or 'Mensagem' in _texts(n)]
+ viewport=min(chat_scrolls or scrolls,key=lambda n:(lambda b:(b[2]-b[0])*(b[3]-b[1]))(list(map(int,re.findall(r'\d+',n.attrib['bounds'])))))
+ print('SOFIA_CHAT_SCROLL_DIAG '+json.dumps({'scrolls':[n.attrib['bounds'] for n in scrolls],'chat_scrolls':[n.attrib['bounds'] for n in chat_scrolls],'chosen':viewport.attrib['bounds']}),flush=True)
  x1,y1,x2,y2=map(int,re.findall(r'\d+',viewport.attrib['bounds']));x=(x1+x2)//2;top=y1+max(12,(y2-y1)//8);bottom=y2-max(12,(y2-y1)//8)
  result['pagination_swipe_bounds']=[x,top,x,bottom]
  older_visible=False
@@ -227,6 +231,9 @@ try:
    adb('shell','input','swipe',str(x),str(top),str(x),str(bottom),'350');time.sleep(.3)
   older_tree=xml();(out/('older-page-'+str(group)+'.xml')).write_text(older_tree)
   if 'Mensagem preservada' in older_tree or 'Resposta preservada' in older_tree:older_visible=True;break
+ if not older_visible:
+  seen=[n.attrib.get('text') or n.attrib.get('content-desc') for n in ET.fromstring(older_tree).iter('node') if (n.attrib.get('text') or n.attrib.get('content-desc'))][:50]
+  print('SOFIA_OLDER_DIAG '+json.dumps({'visible':seen},ensure_ascii=False),flush=True)
  capture('older-page-final');assert older_visible,'Scrolling did not automatically restore the previous local page'
  capture('older-page-by-scroll');result['automatic_local_pagination_tested']=True
  result['saved_conversation_preserved']=True
