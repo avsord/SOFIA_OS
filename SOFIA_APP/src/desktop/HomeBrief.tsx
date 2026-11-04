@@ -1138,7 +1138,9 @@ function MailTile({style, card, data, onOpen}: {style: any; card: any; data: Hom
 
 /** 0.3.295: esqueleto no MESMO desenho do Inicio novo (cartao Seu dia + duas fileiras de blocos, mesmas alturas):
  * quando os dados chegam, so o conteudo aparece - nada muda de lugar nem de tamanho. */
-export function HomeBriefSkeleton({compact = false, paused = false}: {compact?: boolean; paused?: boolean} = {}) {
+export function HomeBriefSkeleton({compact = false, paused = false, rows}: {compact?: boolean; paused?: boolean; rows?: Animated.Value} = {}) {
+  // 04/11/2026: na abertura do site o esqueleto tambem entra fileira por fileira (mesma regra dos blocos prontos)
+  const rowIn = (i: number): any => rows ? {opacity: rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [0, 1], extrapolate: 'clamp'}), transform: [{translateY: rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [14, 0], extrapolate: 'clamp'})}]} : undefined;
   const c = useTheme(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), rowH = useRowHeight(root, briefH);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
@@ -1148,7 +1150,7 @@ export function HomeBriefSkeleton({compact = false, paused = false}: {compact?: 
   return <ShimmerGroup paused={paused}><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
         pronto - cabecalho de 30 (com o dia no meio e o placar), 26 de espaco e a linha de 100 com o traco na mesma altura */}
-    <View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
+    <Animated.View style={rowIn(0)}><View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
       <View style={{height: 30, flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <ShimmerBlock width={24} height={24} radius={8} /><ShimmerBlock width={70} height={14} radius={6} />
         <View style={{flex: 1, alignItems: 'center'}}><ShimmerBlock width={150} height={14} radius={6} /></View>
@@ -1158,13 +1160,13 @@ export function HomeBriefSkeleton({compact = false, paused = false}: {compact?: 
         <View style={{position: 'absolute', left: 0, right: 0, top: 72}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
         <View style={{position: 'absolute', left: 0, right: 0, top: 86, flexDirection: 'row', justifyContent: 'space-between'}}>{[0, 1, 2, 3, 4, 5].map(k => <ShimmerBlock key={k} width={34} height={10} radius={4} />)}</View>
       </View>
-    </View>
+    </View></Animated.View>
     {compact ? <>
       <View style={[card, {height: 176, gap: 10}]}><ShimmerBlock width={130} height={14} radius={6} /><LoadingLines rows={3} immediate /></View>
       <View style={{flexDirection: 'row', gap: 10}}><View style={[card, {flex: 1, height: HALF_H}]} /><View style={[card, {flex: 1, height: HALF_H}]} /></View>
     </> : <>
-    <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</View>
-    <View style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</View>
+    <Animated.View style={[{flexDirection: 'row', gap: 12}, rowIn(1)]}>{tile(2, true)}{tile(1)}{tile(1)}</Animated.View>
+    <Animated.View style={[{flexDirection: 'row', gap: 12}, rowIn(2)]}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</Animated.View>
     </>}
   </View></ShimmerGroup>;
 }
