@@ -67,7 +67,9 @@ export const GOAL_HIDDEN_KEY='sofia.home.goal.hidden.v1';
 export function withFixedWidgets(order:string[],goalHidden=false):string[]{return goalHidden||order.includes('goal')?order:['goal',...order];}
 /** 03/11/2026 (Pedro: "subir um pouco tudo da tela do inicio"): folga embaixo do Inicio no computador (antes 28). Entra no encaixe sem scroll. */
 /** 03/11/2026: entrada suave do Inicio no computador (fade + 8 px). StyleSheet.create: o site so anima por ele. */
-const HOME_ENTER=StyleSheet.create({fit:{animationKeyframes:{'0%':{opacity:0,transform:'translateY(8px)'},'100%':{opacity:1,transform:'translateY(0px)'}},animationDuration:'520ms',animationDelay:'80ms',animationTimingFunction:'cubic-bezier(0.22,0.8,0.24,1)',animationFillMode:'both'} as any});
+/* 04/11/2026 (Pedro: "depois de carregar da uma leve subida"): a entrada do Inicio comecava 8 px abaixo e subia; agora so
+   aparece, sem mover (o esqueleto ja fica no mesmo lugar do conteudo) */
+const HOME_ENTER=StyleSheet.create({fit:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'520ms',animationDelay:'80ms',animationTimingFunction:'cubic-bezier(0.22,0.8,0.24,1)',animationFillMode:'both'} as any});
 const DESK_HOME_BOTTOM=60;
 export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask,homeTopKey=0,homeTopSmooth=false}:{homeTopKey?:number;homeTopSmooth?:boolean;onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
  const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
