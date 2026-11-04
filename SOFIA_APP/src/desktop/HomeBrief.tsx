@@ -222,7 +222,7 @@ export function HomeBrief(p: HomeBriefProps) {
   if (low.length) actions.push({label: 'Ver ' + (low.length === 1 ? 'o ' + low[0].title : 'os produtos'), run: p.onOpenMonitoring});
 
   // 0.3.332/0.3.335: placar do dia mostrado na linha (hoje, amanha...) - tarefas do dia e doses da Rotina do dia
-  const [viewDay, setViewDay] = useState(0), dayNav = useRef<{go: (d: number) => void} | null>(null);
+  const [viewDay, setViewDay] = useState(0), dayNav = useRef<{go: (d: number) => void; add?: () => void} | null>(null);
   const shownDay = useMemo(() => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + viewDay); return d;}, [viewDay]);
   const score = useMemo(() => {const key = shownDay.toDateString(); let done = 0, total = 0;
     for (const r of timelineItems) if (r.isTask && new Date(r.date).toDateString() === key) {total++; if ((r.original as any)?.state === 'done') done++;}
@@ -234,7 +234,7 @@ export function HomeBrief(p: HomeBriefProps) {
   // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
   // 04/11/2026: sem fade proprio aqui (comecava em 35% e piscava); a passagem suave e o esqueleto apagando por cima (Home.tsx)
   return <View ref={root} style={{gap: 12}}>
-    <RowIn i={0} at={p.revealAt}><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
+    <RowIn i={0} at={p.revealAt} style={{zIndex: 10, position: 'relative'}} /* 04/11/2026 (print do Pedro): a conversa rapida e as previas da linha do tempo ficavam por baixo das fileiras de baixo */><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
@@ -242,7 +242,7 @@ export function HomeBrief(p: HomeBriefProps) {
         {/* 0.3.335: dia no meio do cabecalho, com setas para o dia anterior/seguinte (clicar no dia volta para hoje) */}
         <View testID="day-nav" style={{position: 'absolute', left: '50%' as any, top: 0, bottom: 0, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 4} as any}>
           <Pressable testID="day-prev" accessibilityRole="button" accessibilityLabel="Dia anterior" disabled={viewDay <= 0} onPress={() => dayNav.current?.go(viewDay - 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay <= 0 ? 0.3 : 1, backgroundColor: hovered && viewDay > 0 ? c.input : 'transparent', transform: [{rotate: '180deg'}]})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
-          <Pressable testID="day-label" accessibilityRole="button" accessibilityLabel="Voltar para hoje" onPress={() => dayNav.current?.go(0)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}>
+          <Pressable testID="day-label" accessibilityRole="button" accessibilityLabel="Voltar para hoje (segure para criar)" onPress={() => dayNav.current?.go(0)} onLongPress={() => dayNav.current?.add?.()} delayLongPress={420} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}>
             <Text style={{fontSize: 14, fontWeight: '600', color: viewDay === 0 ? c.accent : c.text}}>{dayWord}</Text>{p.compact ? null : <Text style={{fontSize: 13, color: c.muted}}>{dayDate}</Text>}</Pressable>
           <Pressable testID="day-next" accessibilityRole="button" accessibilityLabel="Próximo dia" disabled={viewDay >= 2} onPress={() => dayNav.current?.go(viewDay + 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay >= 2 ? 0.3 : 1, backgroundColor: hovered && viewDay < 2 ? c.input : 'transparent'})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
         </View>
@@ -329,7 +329,7 @@ const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) |
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
-function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions; nav?: React.MutableRefObject<{go: (d: number) => void} | null>; onDay?: (d: number) => void}) {
+function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions; nav?: React.MutableRefObject<{go: (d: number) => void; add?: () => void} | null>; onDay?: (d: number) => void}) {
   const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(() => homeOf(0, SPAN_FULL, nowHours())), box = useRef<View>(null), lineBox = useRef<View>(null);
   // 0.3.333 (aprovado por foto): Ctrl + rodinha aproxima a linha (ate 4 h na tela) e afasta de volta ate o dia inteiro (16 h)
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
@@ -369,7 +369,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
-  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState === 'visible') {snapNext.current = true; tick(n => n + 1);}};
+  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState === 'visible') tick(n => n + 1);}; /* 04/11/2026 (Pedro: "o agora pula"): ao voltar a aba a linha desliza ate a hora certa, sem salto */
     document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
@@ -377,10 +377,12 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const viewDay = Math.max(0, Math.min(2, Math.floor((start + SPAN / 2) / 24))); dayRef.current = viewDay;
   useEffect(() => {onDay?.(viewDay);}, [viewDay]);
   const goDay = (d: number) => {const dd = Math.max(0, Math.min(2, d)); dayRef.current = dd; manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
-  if (nav) nav.current = {go: goDay};
+  // 04/11/2026 (Pedro: "segurar na data tambem cria compromisso, tarefa ou lembrete"): abre o mesmo criador do clique na linha
+  const addHere = () => {if (!(actions.sofia || actions.onAddAt)) return; const now = new Date(), fx = dayRef.current === 0 ? Math.max(0.02, Math.min(0.98, pos(now))) : 0.5; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: dayRef.current === 0 ? new Date(Math.ceil(now.getTime() / 300000) * 300000) : snapDate(fx)});};
+  if (nav) nav.current = {go: goDay, add: addHere};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
-  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current || gap > 0.25) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, 900);}, [day0, Math.floor(Date.now() / 30000)]);
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, gap > 0.25 ? 1400 : 900);}, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -518,7 +520,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {[24, 48].map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {actions.onAddAt ? <Pressable testID="timeline-add-area" dataSet={{noveil: "1"}} accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
-        if (near) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});}}
+        if (near && !WEB) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} /* 04/11/2026 (Pedro): no computador, clicar numa bolinha cria naquele horario (a previa abre passando o mouse) */ const fx2 = near && WEB ? near.x : fx; setPin(''); setHover(''); setGuide(null); setAdding({fx: fx2, at: snapDate(fx2)});}}
       onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
       {...({onMouseMove: (e: any) => {if (dragRef.current || adding) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx);
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
@@ -793,14 +795,14 @@ function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
  * ao passar o mouse na linha aparecem concluir e editar. Setinha aponta para a bolinha. Mantem arrastar pelo horario (⠿). */
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
-  const W = single ? 300 : 300, /* 0.3.347 (Pedro): janelas bem menores */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
+  const W = single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
   const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
   const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
   const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
   const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
   const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
     return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
-  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 48, width: W, zIndex: 8} as any}>
+  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 92, width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item) */>
     <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
     <View style={{position: 'absolute', left: caret - 6, bottom: -6, width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
@@ -833,7 +835,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       <View style={{width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: color, opacity: done ? 0.4 : 1}} />
       {check ? <Pressable accessibilityRole="checkbox" accessibilityState={{checked: !!done}} accessibilityLabel={(done ? 'Reabrir ' : 'Concluir ') + title} onPress={check} hitSlop={6} style={{width: 24, height: 24, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{({hovered: h}: any) => <View style={{width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: done || h ? color : tint(color, 0.7), backgroundColor: done ? color : h ? tint(color, 0.18) : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{done || h ? <Icon name="check" size={12} color={done ? c.bg : color} /> : null}</View>}</Pressable> : chip(icon, color)} {/* 0.3.345 (Pedro): tarefa tem a bolinha de tique - vazia, ao passar o mouse mostra o tique; feita fica cheia com o tique */}
       <View style={{flex: 1, minWidth: 0}}>
-        <Text numberOfLines={1} style={{fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
+        <Text numberOfLines={2} {...({title} as any)} style={{fontSize: 13, fontWeight: '600', color: done ? c.muted : c.text, textDecorationLine: done ? 'line-through' : 'none'}}>{title}</Text>
         {meta ? <Text numberOfLines={1} style={{fontSize: 11, color: c.muted, marginTop: 1}}>{meta.split(' · ').map((part, n) => <Text key={n} style={{color: part === 'Importante' ? IMPORTANT_RED : c.muted}}>{(n ? ' · ' : '') + part}</Text>)}</Text> : null}
       </View>
       {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}

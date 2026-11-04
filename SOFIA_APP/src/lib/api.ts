@@ -146,6 +146,8 @@ export class SofiaApi {
       await this.hydrate();
       if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();}
       const result=await this.fetchRequest<T>(path,body,method,timeout);
+      // 04/11/2026: leituras feitas DURANTE a escrita (ex.: conversa que cria uma tarefa) eram reaproveitadas depois com dado velho
+      if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();}
       if(method==='DELETE'){
         // Fence reads begun during the write too. Failed deletes never get here.
         this.cacheGeneration++;this.startupReads.invalidate();
@@ -259,8 +261,8 @@ export class SofiaApi {
   async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
   async clearChatHistory() {const result=await this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forgetChat();await this.snapshots.flush();return result;}
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
-  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);await this.snapshots.flush();systemChanged(this);return result; }
-  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);await this.snapshots.flush();systemChanged(this);return result; }
+  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);agendaChanged(this);systemChanged(this);await this.snapshots.flush();return result; /* 04/11/2026 (Pedro: "criar com a Sofia demora a aparecer"): avisa as telas antes de gravar o cache (a gravacao continua antes de responder) */ }
+  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);agendaChanged(this);systemChanged(this);await this.snapshots.flush();return result; /* 04/11/2026 (Pedro: "criar com a Sofia demora a aparecer"): avisa as telas antes de gravar o cache (a gravacao continua antes de responder) */ }
   home() { return this.request<HomeData>('/home'); }
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
   allNotifications(offset=0) { return this.md.notices(offset); }

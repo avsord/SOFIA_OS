@@ -233,17 +233,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-- **Lista do Pedro (WhatsApp 03–04/11, recebida 04/11 ~20h) — DEFEITOS:**
-  1. Mini chat da Sofia aberto na linha do tempo fica por baixo dos blocos (cortado).
-  2. Balão da linha do tempo corta nomes ("Fazer esquema de em…") — precisa ver o nome todo; balão de hover cobre o rótulo do item.
-  3. "Agora" da linha do tempo pula ao voltar para a aba (deve continuar andando em segundo plano).
-  4. Valor do Price Tracker no Início difere do valor dentro do app.
-  5. Criar algo pela Sofia demora a aparecer.
-  6. Site: perfil no canto inferior esquerdo da barra lateral — o Pedro não pediu (tirar).
-  7. Clicar numa bolinha da linha do tempo cria naquele horário.
-  8. Segurar na data cria compromisso/tarefa/lembrete (como antes).
-  9. Notas e Biblioteca: tirar tudo do filtro.
-  10. Editar tarefa (painel à direita): campos passam da borda; confirmação "Excluir tarefa" aparece atrás do painel.
+- **Lista do Pedro (WhatsApp 03–04/11) — DEFEITOS:** corrigidos em 04/11 à noite: mini chat por baixo das fileiras (fileira 1 com zIndex), nomes do balão (380 px, 2 linhas, balão acima dos rótulos), "agora" desliza ao voltar à aba, clicar numa bolinha cria naquele horário (no computador; prévia no passar do mouse), segurar a data abre o criador, criar pela Sofia atualiza na hora (leituras não reaproveitam dado velho após escrita; agenda relê), painel Editar (largura em % da janela, sem passar da borda) e confirmação por cima do painel. **Falta confirmar com o Pedro:** Price Tracker (corrigido só o selo "menor preço"; o Início mostra a loja principal e o detalhe a mais barata — qual ele quer?), perfil no canto inferior esquerdo (não existe no código atual; já saiu antes) e "tirar tudo do filtro" de Notas/Biblioteca (a rodada de 03/11 já deixou só áreas — ver se ainda falta algo).
 - **Lista do Pedro — NOVO (desenho antes, aprovação dele):** linha do tempo "microscópica" (entrar como num universo); painel de edição de eventos fixo à direita, didático e premium; "drive" na Sofia; colar/arrastar imagem no mini chat.
 
 - **Android R7 (04/11):** teste "R7 heavy data" falhando em 3/4 compilações (modo Antigo: 1–2 de 5 tentativas > 8 s até mostrar Páginas). Investigar antes do celular.
@@ -299,11 +289,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site (pedido do Pedro sobre a versão aprovada): brilho oval mais cedo (1,35 s na linha do tempo, era 2,04 s); fade da cor de abertura 0,8 s (era 1 s); a cor de abertura agora é a do tema do app (sem clarão claro com o site escuro à noite) | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site: versão aprovada v2 guardada (branch aprovado/site-abertura-2026-11-04-v2 = 5dca69f). Versão de TESTE em /inicio?teste=1 (INTRO_TEST em HomeHero.tsx): escala 1,08 (era 1,6), subida 2 s mais suave (era 1,3 s), fileiras logo ao abrir (0,48 s, 0,11 s entre elas). Site normal inalterado | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): escala 1,04 (era 1,08), subida 2,4 s com curva mais suave (era 2 s), conteúdo percorre 55% da distância (desce menos), fileiras 0,6 s cada (era 0,44 s). Site normal inalterado | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): subida bem leve — conteúdo percorre 18% da distância original (era 55%), mesma duração 2,4 s. Site normal inalterado | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): descida 10% da distância (era 18%); escala do Boa tarde com duração própria de 3,2 s e curva mais suave; a subida começa 0,5 s antes de a tela abrir. Site normal inalterado | filmado; testes ok |
+| 2026-11-04 | (delivery) | Lista do Pedro: mini chat por baixo das fileiras, nomes cortados no balão, agora pulando, clicar na bolinha cria, segurar a data cria, criação pela Sofia demora, painel Editar passando da borda + confirmação atrás, selo "menor preço" do Price Tracker | 1536/1920 px: painel cabe, confirmação por cima; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

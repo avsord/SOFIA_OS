@@ -450,7 +450,7 @@ export function primaryNow(p: ProductSeries): {price: number; store: Store; chan
 }
 export function widgetRows(list: ProductSeries[]): MonitorWidgetRow[] {
   return [...list].sort((a, b) => Number(b.atLow) - Number(a.atLow) || (b.lastAt ?? 0) - (a.lastAt ?? 0)).map(p => { const n = primaryNow(p); return {
-    id: p.monitor.id, title: String(p.monitor.title || ''), color: p.color, currency: p.currency, atLow: p.atLow, lastAt: p.lastAt,
+    id: p.monitor.id, title: String(p.monitor.title || ''), color: p.color, currency: p.currency, atLow: p.atLow && !!n && !!p.low && n.price <= p.low.price /* 04/11/2026 (Pedro: valor do Inicio diferente do app): "menor preco" so se o preco MOSTRADO e o menor */, lastAt: p.lastAt,
     price: n ? n.price : null, store: n ? n.store.name : null, change: n ? n.change : null}; });
 }
 /** Aceita só o formato atual (cache de versão antiga ou corrompido vira "sem cache"). */

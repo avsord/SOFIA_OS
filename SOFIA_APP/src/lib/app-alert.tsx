@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Alert,Modal,Pressable,Text,View} from 'react-native';
+import {Alert,Modal,Pressable,Text,View,Platform} from 'react-native';
 import {useTheme} from './theme';
 import {contentArea} from './desktop';
 
@@ -25,6 +25,9 @@ export function AppAlertHost(){
  const label=(b:AppAlertButton,color:string)=><Text numberOfLines={2} style={{color,fontWeight:'600',fontSize:16,textAlign:'center'}}>{b.text||'OK'}</Text>;
  const action=(b:AppAlertButton,i:number,fill:boolean,grow:boolean)=>{const danger=b.style==='destructive';
   return <Pressable key={'a'+i} accessibilityRole="button" onPress={()=>close(b)} style={({pressed})=>({flex:grow?1:undefined,minHeight:48,paddingHorizontal:14,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:fill?(danger?c.danger:c.accent):c.accentSoft,opacity:pressed?0.8:1})}>{label(b,fill?'#fff':danger?c.danger:c.accent)}</Pressable>;};
+ // 04/11/2026 (print do Pedro: "Excluir tarefa" atras do painel lateral): no site a janela e criada so ao abrir, ficando por cima
+ // das janelas ja abertas (criada no inicio do app, ela ficava sempre embaixo das que abriram depois)
+ if(Platform.OS==='web'&&!open)return null;
  return <Modal visible={!!open} transparent animationType="fade" statusBarTranslucent onRequestClose={()=>close(cancel)}>
   {/* 0.3.328: no computador o aviso fica no meio do conteudo, sem cobrir a barra lateral */}<Pressable accessibilityLabel="Fechar" onPress={()=>close(cancel)} style={{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:24,...(open&&contentArea()?{paddingLeft:contentArea()!.left+24}:null)}}>
    <Pressable accessibilityRole="alert" onPress={()=>undefined} style={{width:'100%',maxWidth:400,backgroundColor:c.surface,borderRadius:26,paddingHorizontal:22,paddingTop:22,paddingBottom:18,gap:8,borderWidth:1,borderColor:c.line,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
