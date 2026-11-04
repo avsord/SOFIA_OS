@@ -168,6 +168,9 @@ export class SofiaApi {
   }
   private async fetchOnce<T>(path:string,body:unknown,method:string,timeout:number,signal?:AbortSignal):Promise<T>{
     if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
+    // 04/11/2026: no site, public/early.js ja pediu esta leitura enquanto o codigo baixava (lista de Paginas da barra lateral)
+    const early=method==='GET'&&typeof window!=='undefined'?(window as any).__sofiaEarly?.[path]:undefined;
+    if(early){delete (window as any).__sofiaEarly[path];const data=await early;if(data)return data as T;}
     await this.networkGate;
     if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
     const generation=this.cacheGeneration,controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
