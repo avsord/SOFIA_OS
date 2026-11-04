@@ -16,7 +16,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
 export function greetingFor(now = new Date()) { const h = now.getHours(); return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 const CHIPS = ['O que tenho hoje?', 'Lançar uma despesa', 'Criar lembrete', 'Quanto já guardei?', 'Resumo da semana'];
-export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false, reveal}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean; reveal?: {date: Animated.Value; summary: Animated.Value; grow?: Animated.AnimatedInterpolation<number>} | null}) {
+export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false, reveal}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean; reveal?: {date: Animated.Value; summary: Animated.Value; grow?: Animated.AnimatedInterpolation<number>; greet?: Animated.Value} | null}) {
   const c = useTheme(), [text, setText] = useState(''), [busy, setBusy] = useState(false), [answer, setAnswer] = useState<{q: string; a: string; error?: boolean} | null>(null), input = useRef<TextInput>(null);
   async function ask(raw: string) {
     const q = raw.trim(); if (!q || busy) return;
@@ -31,6 +31,8 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   // 04/11/2026 (Pedro: "QUARTA-FEIRA, 4 DE NOVEMBRO pode aparecer digitando"): na abertura do site a data e digitada
   // letra a letra quando chega a vez dela; o resto do texto fica reservado (transparente) para nada mudar de lugar
   const [typed, setTyped] = useState(reveal ? 0 : date.length);
+  // 04/11/2026 (Pedro: "um suave fade inicial no Bom dia com um scale suave tambem"): entra de 92% a 100% junto com o fade, tambem pela letra
+  const heroSize = reveal?.grow ? (reveal.greet ? Animated.multiply(reveal.grow, reveal.greet.interpolate({inputRange: [0, 1], outputRange: [0.92, 1]})) : reveal.grow) : null;
   useEffect(() => {
     const v = reveal?.date;
     if (!v) {setTyped(date.length); return;}
@@ -55,7 +57,7 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
     {reveal?.grow ? <View style={{height: 52, alignItems: 'center', justifyContent: 'center'}}>
       {/* 04/11/2026 (Pedro: "o Bom dia esta com qualidade ruim quando amplo e da uma flikada quando fica bom"): o tamanho
           grande e o da LETRA (nitido em todo quadro), nao uma ampliacao da imagem; a caixa tem a altura final, nada empurra */}
-      <Animated.Text accessibilityRole="header" style={[{color: c.text, fontSize: Animated.multiply(reveal.grow, 40), lineHeight: Animated.multiply(reveal.grow, 52), fontWeight: '600', letterSpacing: -0.5, textAlign: 'center', whiteSpace: 'nowrap'} as any, STAGGER.date]}>{greetingFor()}, <Animated.Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: Animated.multiply(reveal.grow, 46)} as any]}>{first}</Animated.Text></Animated.Text>
+      <Animated.Text accessibilityRole="header" style={{color: c.text, fontSize: Animated.multiply(heroSize!, 40), lineHeight: Animated.multiply(heroSize!, 52), fontWeight: '600', letterSpacing: -0.5, textAlign: 'center', whiteSpace: 'nowrap', opacity: reveal.greet || 1} as any}>{greetingFor()}, <Animated.Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: Animated.multiply(heroSize!, 46)} as any]}>{first}</Animated.Text></Animated.Text>
     </View> : <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? STAGGER.greet : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>}
     {/* o resumo chega com os dados: a key faz ele aparecer suave quando o texto chega (o espaco ja esta reservado) */}
     <Animated.View style={reveal ? {opacity: reveal.summary} : undefined}><Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide && !reveal ? STAGGER.summary : null]}>{subtitle || '\u00a0'}</Text></Animated.View>
