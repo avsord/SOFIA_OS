@@ -178,10 +178,9 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // cabe na janela. O zoom do Inicio (homeZ) so cresce; aqui ele tambem DIMINUI o necessario quando o conteudo e mais
  // alto que a janela (janela baixa, frase da Sofia em duas linhas, aviso). Mede o conteudo em pixels sem zoom e
  // so desce enquanto a janela e a mesma (nao oscila: frase que quebra e desquebra); outra janela recomeca do zero.
- const winKey=winW+'x'+winH,[fit,setFit]=useState<{key:string;z:number}|null>(()=>{try{const v=JSON.parse(localStorage.getItem(FIT_KEY)||'null');return v&&typeof v.key==='string'&&Number.isFinite(v.z)?v:null;}catch{return null;}});
- // 04/11/2026 (Pedro: "pulo no Boa tarde no final"): o encaixe so diminuia depois que os dados chegavam e a pagina inteira
- // encolhia de uma vez no fim da abertura; agora este navegador lembra o encaixe desta janela e a abertura ja comeca nele
- useEffect(()=>{if(fit)try{localStorage.setItem(FIT_KEY,JSON.stringify(fit));}catch{/* modo privado */}},[fit]);
+ const winKey=winW+'x'+winH,[fit,setFit]=useState<{key:string;z:number}|null>(null);
+ // 04/11/2026: o encaixe guardado no navegador (rodada anterior) so diminuia e deixou o Inicio pequeno; desfeito e apagado
+ useEffect(()=>{try{localStorage.removeItem(FIT_KEY);}catch{/* modo privado */}},[]);
  const fitZ=fit&&fit.key===winKey?Math.min(homeZ,fit.z):homeZ;
  useLayoutEffect(()=>{
   if(Platform.OS!=='web'||typeof document==='undefined'||!desktop||homeWidth<980)return;

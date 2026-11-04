@@ -281,11 +281,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site: cópia criptografada do Início no navegador (encrypted-storage.web.ts: AES-GCM, chave não exportável no IndexedDB, apagada ao sair da conta); blocos, avisos, cápsulas, resumo financeiro e Páginas abrem do guardado e atualizam por trás | API +1,5 s: blocos 0,36 s, saudação para 1,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: fileiras do Início ainda mais cedo (0,70 s na linha do tempo, 0,18 s entre elas): o Seu dia aparece enquanto a tela clareia e as 3 estão completas em ~0,9 s | filmado com API +1,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: pulo no Boa tarde no fim — o encaixe na janela (zoom do Início) só encolhia quando os dados chegavam e a página inteira mudava de tamanho de uma vez; agora o navegador lembra o encaixe da janela e a abertura já começa nele | janela 1280×720: antes 1→0,795 de uma vez, agora fixo; testes ok |
 | 2026-11-04 | (delivery) | Site: estralo no fim da subida — ao parar, o navegador tirava a saudação e os blocos da camada da animação e redesenhava o texto encaixado no pixel (~1 px); agora ficam na mesma camada (will-change) | filmado em PNG: sem mudança após o último movimento; texto nítido; testes ok |
 | 2026-11-04 | (delivery) | Site: página inteira deslocada para a esquerda (menu lateral cortado; print do Pedro) — o navegador rolava a raiz de lado ao focar algo fora da borda, mesmo com overflow hidden; agora html/body/#root com overflow: clip | simulado: antes deslocava 568 px, agora 0; testes ok |
+| 2026-11-04 | (delivery) | Site: desfeito o encaixe guardado no navegador (só diminuía e deixou o Boa tarde pequeno — regressão minha); valor antigo apagado ao abrir. Pulo no fim ainda aberto: aguardando vídeo do Pedro | testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
