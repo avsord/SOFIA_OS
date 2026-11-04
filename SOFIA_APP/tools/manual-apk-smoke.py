@@ -29,7 +29,8 @@ def xml():
   out=subprocess.run(['adb','shell','uiautomator','dump','/sdcard/manual-startup.xml'],capture_output=True,text=True,timeout=60)
   got=subprocess.run(['adb','shell','cat','/sdcard/manual-startup.xml'],capture_output=True,timeout=30).stdout.decode(errors='replace')
   if got.strip().startswith('<?xml'):return got
-  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True);time.sleep(1)
+  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True)
+  subprocess.run(['adb','shell','pkill','-f','uiautomator'],capture_output=True,timeout=20);time.sleep(1) # dump preso no emulador
  raise AssertionError('UI dump failed (screen never idle?)')
 def cold(label):
  adb('shell','am','force-stop',pkg);adb('logcat','-c')

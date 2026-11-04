@@ -28,7 +28,8 @@ def xml():
   out=subprocess.run(['adb','shell','uiautomator','dump','/sdcard/r7.xml'],capture_output=True,text=True,timeout=60)
   got=subprocess.run(['adb','shell','cat','/sdcard/r7.xml'],capture_output=True,text=True,timeout=30).stdout
   if got.strip().startswith('<?xml'):return got
-  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True);time.sleep(1)
+  print('SOFIA_DUMP_RETRY '+json.dumps({'attempt':attempt,'out':(out.stdout+out.stderr).strip()[-200:]}),flush=True)
+  subprocess.run(['adb','shell','pkill','-f','uiautomator'],capture_output=True,timeout=20);time.sleep(1) # dump preso no emulador
  raise AssertionError('UI dump failed (screen never idle?)')
 def point(tree,label):
  found=[x for x in ET.fromstring(tree).iter('node') if x.get('text')==label or x.get('content-desc')==label]
@@ -105,6 +106,10 @@ _probe=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(_probe)
 _geom_spec=importlib.util.spec_from_file_location('ui_geometry',Path(__file__).with_name('ui-probes.py'))
 _geom=importlib.util.module_from_spec(_geom_spec);_geom_spec.loader.exec_module(_geom)
 
+def kill_uiautomator():
+ # 03/11/2026: quando um dump estoura o tempo, o adb daqui morre mas o uiautomator no emulador continua rodando e o dump
+ # seguinte fica preso esperando por ele (sempre 1 abertura de Paginas com 0 leituras). Encerra o que ficou preso.
+ subprocess.run(['adb','shell','pkill','-f','uiautomator'],capture_output=True,timeout=20)
 def xml_bounded(remaining):
  before=time.monotonic()
  try:
@@ -114,9 +119,11 @@ def xml_bounded(remaining):
   got=subprocess.run(['adb','shell','cat','/sdcard/r71.xml'],capture_output=True,timeout=rest).stdout.decode(errors='replace')
   return got if got.strip().startswith('<?xml') else '<?xml version="1.0"?><hierarchy rotation="0"></hierarchy>' # dump falhou: tela vazia, a medicao tenta de novo
  except subprocess.TimeoutExpired as error:
+  kill_uiautomator()
   raise TimeoutError('UIAutomator exceeded remaining observation window') from error
 
 def observe_page_list(mode,trial,points):
+ kill_uiautomator()
  started=time.monotonic();tap(points['Páginas'])
  def snapshot(label,tree,observed):
   (OUT/(str(trial)+'-pages-'+label+'.xml')).write_text(tree)
