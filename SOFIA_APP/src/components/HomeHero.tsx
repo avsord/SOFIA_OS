@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
 import type {SofiaApi} from '../lib/api';
@@ -32,6 +32,19 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   // letra a letra quando chega a vez dela; o resto do texto fica reservado (transparente) para nada mudar de lugar
   const [typed, setTyped] = useState(reveal ? 0 : date.length);
   // 04/11/2026 (Pedro: "um suave fade inicial no Bom dia com um scale suave tambem"): entra de 92% a 100% junto com o fade, tambem pela letra
+  // 04/11/2026 (Pedro: "escrever Bom dia, digitando; Pedro com fade; fade inicial no grupo todo"): na abertura do site a
+  // saudacao e digitada letra a letra e o nome aparece com fade em seguida; o texto inteiro ja ocupa o lugar desde o
+  // inicio (o que falta fica transparente), entao nada se mexe enquanto digita
+  const hello = greetingFor() + ', ';
+  const [helloN, setHelloN] = useState(reveal?.scale ? 0 : hello.length);
+  const nameIn = useRef(new Animated.Value(reveal?.scale ? 0 : 1)).current;
+  const introGreet = !!reveal?.scale;
+  useEffect(() => {
+    if (!introGreet) {setHelloN(hello.length); nameIn.setValue(1); return;}
+    let n = 0; setHelloN(0); nameIn.setValue(0);
+    let t: any = setTimeout(function step() {n++; setHelloN(n); if (n < hello.length) t = setTimeout(step, 48); else Animated.timing(nameIn, {toValue: 1, duration: 450, easing: Easing.out(Easing.quad), useNativeDriver: false}).start();}, 160);
+    return () => clearTimeout(t);
+  }, [introGreet]);
   const heroSize = reveal?.grow ? (reveal.greet ? Animated.multiply(reveal.grow, reveal.greet.interpolate({inputRange: [0, 1], outputRange: [0.92, 1]})) : reveal.grow) : null;
   useEffect(() => {
     const v = reveal?.date;
@@ -59,7 +72,7 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
           grande e o da LETRA (nitido em todo quadro), nao uma ampliacao da imagem; a caixa tem a altura final, nada empurra */}
       {/* 04/11/2026 (Pedro: "no comeco do zoom out ele craquela em pixels"): mudar o tamanho da LETRA a cada quadro reencaixa
           o texto nos pixels; agora a saudacao e desenhada ja GRANDE (nitida) e encolhe inteira (escala <= 1 nao borra) */}
-      <Animated.Text accessibilityRole="header" style={{color: c.text, fontSize: (reveal.big || 1) * 40, lineHeight: 52 * (reveal.big || 1), fontWeight: '600', letterSpacing: -0.5 * (reveal.big || 1), textAlign: 'center', whiteSpace: 'nowrap', opacity: reveal.greet || 1, WebkitFontSmoothing: 'antialiased', transform: [{scale: reveal.scale}]} as any}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: (reveal.big || 1) * 46}]}>{first}</Text></Animated.Text>
+      <Animated.Text accessibilityRole="header" style={{color: c.text, fontSize: (reveal.big || 1) * 40, lineHeight: 52 * (reveal.big || 1), fontWeight: '600', letterSpacing: -0.5 * (reveal.big || 1), textAlign: 'center', whiteSpace: 'nowrap', opacity: reveal.greet || 1, WebkitFontSmoothing: 'antialiased', transform: [{scale: reveal.scale}]} as any}>{hello.slice(0, helloN)}{helloN < hello.length ? <Text style={{color: 'transparent'}}>{hello.slice(helloN)}</Text> : null}<Animated.Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: (reveal.big || 1) * 46, opacity: nameIn} as any]}>{first}</Animated.Text></Animated.Text>
     </View> : <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? STAGGER.greet : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>}
     {/* o resumo chega com os dados: a key faz ele aparecer suave quando o texto chega (o espaco ja esta reservado) */}
     <Animated.View style={reveal ? {opacity: reveal.summary} : undefined}><Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide && !reveal ? STAGGER.summary : null]}>{subtitle || '\u00a0'}</Text></Animated.View>
