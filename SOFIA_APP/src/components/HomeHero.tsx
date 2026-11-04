@@ -1,10 +1,14 @@
 import React, {useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
 import type {SofiaApi} from '../lib/api';
 import {errorText} from '../lib/chat-model';
 import {Icon} from './Icon';
+/** 04/11/2026 (Pedro: "hierarquia da ordem do que aparece: quarta-feira, bom dia Pedro, resumo, blocos"): no site cada
+ * linha do topo aparece em seguida da anterior, so com opacidade (sem mover). Os blocos vem depois (Home.tsx). */
+const fadeIn = (delay: number) => ({animationKeyframes: {'0%': {opacity: 0}, '100%': {opacity: 1}}, animationDuration: '420ms', animationDelay: delay + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any);
+const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary: fadeIn(260)});
 /** 0.3.265 (Inicio, desenho aprovado pelo Pedro): saudacao centralizada com o nome em italico de destaque, uma frase que
  * nasce do dia de verdade e a barra da Sofia (mini chat) com atalhos. A resposta aparece num cartao curto logo abaixo;
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
@@ -31,9 +35,10 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   </View>;
   if (minimal) return <View testID="home-hero" style={{alignItems: 'center', paddingTop: 44, paddingBottom: 26, paddingHorizontal: 40, gap: 6}}>
     {/* 0.3.295: respiro em cima (o texto nao encosta no teto) e a frase da Sofia logo abaixo da saudacao */}
-    <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}}>{date}</Text>
-    <Text accessibilityRole="header" style={{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
-    <Text numberOfLines={2} style={{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any}>{subtitle || '\u00a0'}</Text>
+    <Text style={[{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}, wide ? STAGGER.date : null]}>{date}</Text>
+    <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? STAGGER.greet : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
+    {/* o resumo chega com os dados: a key faz ele aparecer suave quando o texto chega (o espaco ja esta reservado) */}
+    <Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide ? STAGGER.summary : null]}>{subtitle || '\u00a0'}</Text>
   </View>;
   return <View testID="home-hero" style={{alignItems: wide ? 'center' : 'stretch', paddingTop: wide ? 46 : 6, paddingBottom: wide ? 30 : 18, paddingHorizontal: wide ? 0 : 20, gap: wide ? 6 : 4}}>
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: wide ? 'center' : 'left'}}>{date}</Text>
