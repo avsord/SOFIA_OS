@@ -83,7 +83,10 @@ body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
     <style id="expo-reset">
       html, body { height: 100%; }
-      body { overflow: hidden; margin: 0; background: #F7F6FA; }
+      body { overflow: hidden; overflow: clip; margin: 0; background: #F7F6FA; }
+      /* 04/11/2026 (print do Pedro: menu lateral cortado e a pagina inteira deslocada ~135 px para a esquerda): com "hidden" o
+         navegador ainda rola a raiz de lado ao focar algo que passa da borda; "clip" nao deixa a raiz rolar de jeito nenhum */
+      html, #root { overflow: clip; }
       @media (prefers-color-scheme: dark) { body { background: #121017; } }
       #root { display: flex; height: 100%; flex: 1; }
       /* 04/11/2026 (Pedro: "quando abre o site, um fade rapido de toda a tela com a cor do site"): veu na cor do fundo que cobre
