@@ -17,7 +17,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 /** 04/11/2026 (Pedro: "ainda esta flikando, analisa toda a animacao"): a abertura do site roda inteira em CSS, numa linha do
  * tempo unica que comeca quando a saudacao aparece (at). Animacao em JavaScript para quando a pagina esta ocupada montando
  * os dados (era o engasgo e a piscada); a do navegador continua. Montado atrasado, o atraso negativo poe cada parte no ponto certo. */
-export const INTRO_T = {greet: 0, move: 640, date: 990, summary: 1140, rows: 1000, glow: 2040};
+export const INTRO_T = {greet: 0, move: 640, date: 990, summary: 1140, rows: 700, glow: 2040};
 export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
   return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
 }
