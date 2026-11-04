@@ -21,7 +21,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 // ?teste=1 no endereco (Pedro: "zoom out mais lento e suave, quase nada de escala, e os blocos aparecem rapidamente")
 export const INTRO_TEST = typeof location !== 'undefined' && /[?&]teste=1(?:&|$)/.test(location.search || '');
 export const INTRO = INTRO_TEST
-  ? {scale: 1.04, moveMs: 2400, ease: 'cubic-bezier(0.4,0,0.08,1)', rowGap: 110, rowMs: 600, travel: 0.55}
+  ? {scale: 1.04, moveMs: 2400, ease: 'cubic-bezier(0.4,0,0.08,1)', rowGap: 110, rowMs: 600, travel: 0.18}
   : {scale: 1.6, moveMs: 1300, ease: 'cubic-bezier(0.33,0,0.15,1)', rowGap: 180, rowMs: 520, travel: 1};
 export const INTRO_T = INTRO_TEST
   ? {greet: 0, move: 640, date: 990, summary: 1140, rows: 480, glow: 1500}
