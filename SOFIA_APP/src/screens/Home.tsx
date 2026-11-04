@@ -272,7 +272,9 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{if(!greeted&&introUsed.current){const f=setTimeout(()=>setGreeted(true),2600);return()=>clearTimeout(f);}},[greeted]); /* seguranca: revela mesmo se o aviso do nome nao vier */
  // 04/11/2026 (Pedro: "fica muito tempo parado no Bom dia"): a cortina NAO espera todos os dados; abre logo apos o fade.
  // Sem os dados ainda, os blocos entram como esqueleto e trocam pelo conteudo com a passagem suave (esqueleto apagando por cima)
- useEffect(()=>{if(!introUsed.current||!greeted||revealed.current)return;revealed.current=true;const early=!deskShown;earlyReveal.current=early;const hold=40; /* 04/11/2026: revela assim que o "Pedro" termina (e os dados chegaram) */ /* a saudacao e a cortina: abre assim que o zoom inicial termina e os dados chegaram */ /* fica pouco no centro antes de subir */Animated.parallel([
+ useEffect(()=>{if(!introUsed.current||!greeted||revealed.current)return;revealed.current=true;const early=!deskShown;earlyReveal.current=early;const hold=40; /* 04/11/2026: revela assim que o "Pedro" termina (e os dados chegaram) */ /* a saudacao e a cortina: abre assim que o zoom inicial termina e os dados chegaram */ /* fica pouco no centro antes de subir *//* 04/11/2026 (Pedro mandou foto: Seu dia meio apagado e as fileiras nao vieram): Animated.parallel para TODAS se uma
+  e interrompida; cada uma roda sozinha e, por seguranca, tudo vai ao estado final em 4 s */
+  [
   Animated.timing(intro,{toValue:0,duration:1300,delay:hold,easing:Easing.bezier(0.33,0,0.15,1),useNativeDriver:false}),
   Animated.timing(dateIn,{toValue:1,duration:200,delay:hold+350,easing:Easing.out(Easing.quad),useNativeDriver:false}),
   Animated.timing(summaryIn,{toValue:1,duration:450,delay:hold+500,easing:Easing.out(Easing.quad),useNativeDriver:false}),
@@ -280,7 +282,9 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
   // as fileiras entram uma depois da outra (Seu dia, 2a, 3a), cada uma inteira com fade suave
   Animated.timing(rowsIn,{toValue:1,duration:1200,delay:hold+600, /* o conteudo ja entra enquanto a saudacao sobe */easing:Easing.linear,useNativeDriver:false}),
   // com tudo na tela, a faixa reta vira o brilho oval devagar
-  Animated.timing(glowOval,{toValue:1,duration:1200,delay:hold+1400,easing:Easing.inOut(Easing.quad),useNativeDriver:false})]).start();},[greeted]);
+  Animated.timing(glowOval,{toValue:1,duration:1200,delay:hold+1400,easing:Easing.inOut(Easing.quad),useNativeDriver:false})].forEach(a=>a.start());
+  const done=setTimeout(()=>{for(const [v,to] of [[intro,0],[dateIn,1],[summaryIn,1],[blocksIn,1],[rowsIn,1],[glowOval,1]] as [Animated.Value,number][]){if((v as any)._value!==to)v.setValue(to);}},hold+4000);
+  return()=>clearTimeout(done);},[greeted]);
  // 04/11/2026 (Pedro: "quando entro em uma pagina e volto, da uma flikada no degrade oval"): ao voltar ao Inicio o brilho
  // reaparece com fade curto (o navegador redesenha a camada grande; sem o fade ele surgia de uma vez e piscava)
  useEffect(()=>{const back=active&&!wasActive.current;wasActive.current=active;if(!back||!wideHome)return;glowBack.setValue(0);Animated.timing(glowBack,{toValue:1,duration:350,easing:Easing.out(Easing.quad),useNativeDriver:false}).start();},[active]);

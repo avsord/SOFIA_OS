@@ -171,7 +171,9 @@ def correctness(points,mode):
   return None
  prev=title_of(tree)
  for cycle in range(20):
-  tap(point(tree,'Título da página'));assert keyboard_shown(),'Keyboard did not open on the Page title; mode='+mode+' cycle='+str(cycle)
+  tap(point(tree,'Título da página'))
+  if not keyboard_shown():tap(point(xml(),'Título da página')) # 04/11/2026: o 1o toque pode chegar antes do editor terminar de abrir
+  assert keyboard_shown(),'Keyboard did not open on the Page title; mode='+mode+' cycle='+str(cycle)
   adb('shell','input','keyevent','KEYCODE_MOVE_END')
   adb('shell','input','text','_R8_KEEP' if cycle==0 else str(cycle%10));adb('shell','input','keyevent','BACK');time.sleep(.15)
   typed=title_of(xml())
