@@ -38,8 +38,7 @@ import {TASK_PRIORITIES,taskPriority} from '../lib/task-filters';
 import {Sheet} from '../components/Sheet';
 import {TaskPriority} from '../components/TaskPriority';
 import {SortableWidgets} from '../components/SortableWidgets';
-import React,{startTransition,useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
-import {isVeilOut,subscribeVeil} from '../lib/launch-handoff';
+import React,{startTransition,useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Alert,Animated,AppState,Easing,Platform,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View,TextInput,useWindowDimensions} from 'react-native';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -267,14 +266,14 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // 04/11/2026 (Pedro: "Bom dia, Pedro centralizado; depois que tudo carregar ele sobe puxando tudo"): no site a saudacao
  // abre no CENTRO da tela; quando os dados chegam ela sobe para o lugar dela (curva longa e suave) e os blocos vem atras,
  // subindo e aparecendo. Mede a posicao final antes de pintar (useLayoutEffect) para nao aparecer no lugar e pular.
- const veilOut=useSyncExternalStore(subscribeVeil,isVeilOut,isVeilOut),homeMountAt=useRef(Date.now());
+ const homeMountAt=useRef(Date.now());
  const heroRef=useRef<any>(null),introUsed=useRef(false),[introT,setIntroT]=useState(0),[introDy,setIntroDy]=useState(0),glowBack=useRef(new Animated.Value(1)).current,wasActive=useRef(active),deskAt=useRef(0),[introDone,setIntroDone]=useState(false);const revealAt=introT?introT+INTRO_T.rows:0;
  // 04/11/2026: terminada a abertura (ou saindo do Inicio no meio dela) tudo fica parado no lugar final, sem animacao: ao voltar
  // de outra aba o navegador reiniciaria as animacoes CSS e a abertura inteira se repetia
  useEffect(()=>{if(!introT||introDone)return;if(!active){setIntroDone(true);return;}const t=setTimeout(()=>setIntroDone(true),Math.max(0,introT+INTRO_T.glow+1400-Date.now()));return()=>clearTimeout(t);},[introT,introDone,active]);if(deskShown&&!deskAt.current)deskAt.current=Date.now();
  const introCss=useMemo(()=>introT&&introDy&&!introDone?{move:introAnim(introT,INTRO_T.move,1300,{transform:'translateY('+introDy+'px)'},{transform:'translateY(0px)'},'cubic-bezier(0.33,0,0.15,1)'),band:introAnim(introT,INTRO_T.glow,1200,{opacity:1},{opacity:0},'ease-in-out'),oval:introAnim(introT,INTRO_T.glow,1200,{opacity:0},{opacity:1},'ease-in-out')}:null,[introT,introDy,introDone]);
- useLayoutEffect(()=>{if(Platform.OS!=='web'||!wideHome||!veilOut||Date.now()-homeMountAt.current>4000||introUsed.current)return; /* 04/11/2026: comeca quando o veu da abertura do site sai (a saudacao aparece junto com a tela) */const el:any=heroRef.current;const r=(el?.querySelector?.('[role="heading"]')||el)?.getBoundingClientRect?.(); /* centra a SAUDACAO (data e resumo ainda escondidos) */if(!r||!r.height||typeof window==='undefined')return;
-  const z=fitZ||1;const dy=(window.innerHeight/2-(r.top+r.height/2))/z; /* a saudacao cresce pela letra, no proprio lugar */if(dy<24)return;introUsed.current=true;setIntroDy(dy);setIntroT(Date.now()); },[wideHome,veilOut]);
+ useLayoutEffect(()=>{if(Platform.OS!=='web'||!wideHome||Date.now()-homeMountAt.current>4000||introUsed.current)return; /* 04/11/2026 (Pedro: "a animacao inicial ja pode estar iniciando antes"): comeca assim que o Inicio e desenhado, mesmo por baixo do veu da abertura */const el:any=heroRef.current;const r=(el?.querySelector?.('[role="heading"]')||el)?.getBoundingClientRect?.(); /* centra a SAUDACAO (data e resumo ainda escondidos) */if(!r||!r.height||typeof window==='undefined')return;
+  const z=fitZ||1;const dy=(window.innerHeight/2-(r.top+r.height/2))/z; /* a saudacao cresce pela letra, no proprio lugar */if(dy<24)return;introUsed.current=true;setIntroDy(dy);setIntroT(Date.now()); },[wideHome]);
  // 04/11/2026: a ordem da abertura (saudacao, subida, data digitada, resumo, fileiras, brilho oval) e a linha do tempo INTRO_T, toda em CSS
  // 04/11/2026 (Pedro: "quando entro em uma pagina e volto, da uma flikada no degrade oval"): ao voltar ao Inicio o brilho
  // reaparece com fade curto (o navegador redesenha a camada grande; sem o fade ele surgia de uma vez e piscava)

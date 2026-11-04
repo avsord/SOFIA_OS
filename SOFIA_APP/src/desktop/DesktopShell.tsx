@@ -5,7 +5,7 @@ import {PALETTE} from '../lib/palette';
 import type {Task} from '../lib/types';
 // (ver lib/desktop.ts). Barra lateral fixa e recolhivel, barra de cima com caminho, busca e avisos,
 // busca global (Ctrl+K) e atalhos de teclado. As telas sao as mesmas do celular.
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon,type IconName} from '../components/Icon';
@@ -31,7 +31,8 @@ type Props={
 const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
 function usePageDirectory(api:SofiaApi){
  const pages=useStore(pagesDirectory);
- useEffect(()=>{
+ // layout effect: o pedido das Paginas sai ANTES dos pedidos do Inicio (efeitos comuns dos filhos rodam primeiro)
+ useLayoutEffect(()=>{
   let live=true;
   async function load(){
    try{
