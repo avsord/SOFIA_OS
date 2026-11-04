@@ -22,7 +22,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
 - **Atualizado em:** 2026-11-04 ~19:30 (Brasília), no **Claude Code** (nuvem). Railway publica sozinho cada push em `sofia-app-android`.
-- **ABERTURA DO SITE APROVADA pelo Pedro ("agora ta certo, grava essa versão") — commit `adc82a6`, marca Git `site-abertura-aprovada-2026-11-04`.** Não mexer na abertura sem nova aprovação; para voltar a ela: `git checkout site-abertura-aprovada-2026-11-04 -- SOFIA_APP/src SOFIA_APP/public`.
+- **ABERTURA DO SITE APROVADA pelo Pedro ("agora ta certo, grava essa versão") — commit `adc82a6`, branch `aprovado/site-abertura-2026-11-04` (tags são recusadas pelo proxy da sessão).** Não mexer na abertura sem nova aprovação; para voltar a ela: `git checkout origin/aprovado/site-abertura-2026-11-04 -- SOFIA_APP/src SOFIA_APP/public`.
   - Véu na cor do fundo (`#sofia-veil` em public/index.html, `revealWebVeil` em launch-handoff.ts) sai no 1º quadro do app, fade de 1 s.
   - Linha do tempo única em CSS (`INTRO_T` em HomeHero.tsx, adiantada `INTRO_LEAD`=640 ms em Home.tsx): saudação já subindo quando a tela abre; data digitada; resumo; fileiras de blocos (0,70 s, 0,18 s entre elas) que sobem junto; brilho reto→oval.
   - Sem esqueleto/shimmer nos blocos do Início no computador (espaço reservado invisível). Esqueleto só na lista de Páginas da barra lateral, se ela não chegar.
