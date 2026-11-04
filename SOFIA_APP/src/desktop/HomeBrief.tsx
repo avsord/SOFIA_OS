@@ -1134,14 +1134,14 @@ function MailTile({style, card, data, onOpen}: {style: any; card: any; data: Hom
 
 /** 0.3.295: esqueleto no MESMO desenho do Inicio novo (cartao Seu dia + duas fileiras de blocos, mesmas alturas):
  * quando os dados chegam, so o conteudo aparece - nada muda de lugar nem de tamanho. */
-export function HomeBriefSkeleton({compact = false}: {compact?: boolean} = {}) {
+export function HomeBriefSkeleton({compact = false, paused = false}: {compact?: boolean; paused?: boolean} = {}) {
   const c = useTheme(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), rowH = useRowHeight(root, briefH);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
     <ShimmerBlock width={110} height={14} radius={6} />
     {wide ? <LoadingLines rows={3} immediate /> : <View style={{marginTop: 'auto', gap: 8} as any}><ShimmerBlock width={70} height={22} radius={6} /><ShimmerBlock width={'80%'} height={11} radius={5} /><ShimmerBlock width={80} height={26} radius={8} /></View>}
   </View>;
-  return <ShimmerGroup><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
+  return <ShimmerGroup paused={paused}><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
         pronto - cabecalho de 30 (com o dia no meio e o placar), 26 de espaco e a linha de 100 com o traco na mesma altura */}
     <View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
