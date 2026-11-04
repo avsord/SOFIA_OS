@@ -174,7 +174,7 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
 // 04/11/2026 (Pedro: "o esqueleto entra intercalado, mas o conteudo aparece os 3 de uma vez"): com `out`, a fileira do
 // esqueleto apaga na sua vez (mesmo intervalo da entrada) enquanto a fileira de conteudo de baixo entra
 function RowIn({i, at, out, style, children}: {i: number; at?: number; out?: number; style?: any; children: React.ReactNode}) {
-  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * 290 + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '650ms', animationDelay: Math.round(at + i * 290 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
+  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * 220 + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '520ms', animationDelay: Math.round(at + i * 220 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
   return <View style={[style, anim]}>{children}</View>;
 }
 export function HomeBrief(p: HomeBriefProps) {

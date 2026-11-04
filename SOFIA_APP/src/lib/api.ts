@@ -38,6 +38,13 @@ export type BoardTopic = {title: string; started_at: string | null; message_id: 
 export type BoardData = {topics: BoardTopic[]; updated_at: string | null};
 export type LoginCodeNeeded = {need_code: true; challenge: string; sent_to: string};
 const WEB_TRUST_KEY = 'sofia.web.trust.v1';
+/** 04/11/2026 (Pedro: "quando o texto parar, os 3 blocos ja tem que estar carregados"): no site, anota SO os enderecos
+ * (nunca os dados) das leituras feitas ate os blocos do Inicio aparecerem; na proxima abertura public/assets/early.js
+ * pede todas de uma vez enquanto o codigo do site ainda baixa (antes eram 3 ondas, uma depois da outra). */
+const EARLY_PATHS_KEY = 'sofia.early.paths.v1';
+let earlyPaths: Set<string> | null = typeof document !== 'undefined' ? new Set() : null;
+function noteEarlyPath(path: string) { if (earlyPaths && earlyPaths.size < 40 && !/[?&]q=[^&]/.test(path) && !path.startsWith('/auth')) earlyPaths.add(path); }
+export function saveEarlyPaths() { if (!earlyPaths) return; const list = [...earlyPaths]; earlyPaths = null; try { if (list.length) localStorage.setItem(EARLY_PATHS_KEY, JSON.stringify(list)); } catch { /* modo privado */ } }
 // sem importar react-native aqui (os testes carregam este arquivo sozinho): no site existe document
 const isWebRuntime = () => typeof document !== 'undefined';
 export const SITE = rawBase;
@@ -168,7 +175,8 @@ export class SofiaApi {
   }
   private async fetchOnce<T>(path:string,body:unknown,method:string,timeout:number,signal?:AbortSignal):Promise<T>{
     if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
-    // 04/11/2026: no site, public/early.js ja pediu esta leitura enquanto o codigo baixava (lista de Paginas da barra lateral)
+    // 04/11/2026: no site, public/assets/early.js ja pediu esta leitura enquanto o codigo baixava
+    if(method==='GET')noteEarlyPath(path);
     const early=method==='GET'&&typeof window!=='undefined'?(window as any).__sofiaEarly?.[path]:undefined;
     if(early){delete (window as any).__sofiaEarly[path];const data=await early;if(data)return data as T;}
     await this.networkGate;
