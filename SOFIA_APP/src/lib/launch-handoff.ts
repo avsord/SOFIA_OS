@@ -18,5 +18,5 @@ export function revealWebVeil(bg?: string){
  if(Platform.OS!=='web'||typeof document==='undefined'||veilOut)return;
  const veil=document.getElementById('sofia-veil');veilOut=true;veilSubs.forEach(f=>f());if(!veil)return;
  if(bg)veil.style.background=bg;
- requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),800);});
+ requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),1300);});
 }

@@ -142,9 +142,9 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  // 04/11/2026 (Pedro: "as paginas ali do lado ja tem que estar carregadas, sem esqueleto e shimmer"): no computador o veu
- // espera a lista de Paginas da barra lateral (no maximo 0,9 s); a tela aparece ja com ela
+ // espera a lista de Paginas da barra lateral (no maximo 0,25 s; Pedro: "segurando muito no inicio"); a tela aparece ja com ela
  useEffect(()=>{if(!launchReady)return;const go=()=>revealWebVeil(c.bg);if(!desktop||!auth||pagesDirectory.get()!==null){go();return;}
-  const off=pagesDirectory.subscribe(()=>{if(pagesDirectory.get()!==null)go();});const t=setTimeout(go,900);return()=>{off();clearTimeout(t);};},[launchReady]);
+  const off=pagesDirectory.subscribe(()=>{if(pagesDirectory.get()!==null)go();});const t=setTimeout(go,250);return()=>{off();clearTimeout(t);};},[launchReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;

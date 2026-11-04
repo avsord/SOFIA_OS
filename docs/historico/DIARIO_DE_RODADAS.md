@@ -158,3 +158,4 @@ Cada rodada nova acrescenta UMA linha curta no fim (até ~300 caracteres): data 
 | 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |
 | 2026-11-04 | (delivery) | Site: abertura do Início toda em CSS (não trava quando a página monta os dados); resumo aparece assim que chega, com fade; ao voltar ao Início nada se repete | filmado com CPU 4× mais lenta, sem saltos; testes ok |
 | 2026-11-04 | (delivery) | Site: abre com a tela inteira saindo da cor do fundo (0,7 s); a tela só aparece com a lista de Páginas da barra lateral pronta (espera até 0,9 s), sem esqueleto/shimmer nela; o "Boa tarde" começa junto | filmado; testes ok |
+| 2026-11-04 | (delivery) | Site: véu da abertura espera no máximo 0,25 s pelas Páginas (antes 0,9 s, "segurando muito") e sai em 1,2 s (antes 0,7 s, "muito rápido") | medido local; testes ok |

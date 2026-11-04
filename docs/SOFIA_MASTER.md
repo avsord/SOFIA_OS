@@ -30,7 +30,7 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 - **Servidor e site:** o Railway publica sozinho a cada push em `sofia-app-android` (o site e as correções do servidor desta rodada já estão no ar).
 - **Commits sem `[manual-apk]`** ainda falham em "Native checks" (não investigado).
 - **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; abas Ano/Mês/Dia; segurar um dia no Mês; Recentes em Páginas; filtros de Notas/Biblioteca; barrinha "Criar" em cima do campo; Início ao voltar de outra aba logo depois de abrir.
-- **Último (04/11, tarde):** a abertura do Início no site roda inteira em CSS numa linha do tempo única (`INTRO_T` em `HomeHero.tsx`): saudação, subida, data digitada letra a letra, resumo, fileiras e brilho oval. Antes era JavaScript e travava quando a página montava os dados (engasgo do "dia cheio", piscada do "Boa tarde"). Terminada a abertura (ou saindo do Início) tudo fica parado no lugar final, senão voltar de outra aba repetia a abertura. O esqueleto das fileiras apaga por cima do conteúdo sem ser recriado. Conferido filmando com o processador 4× mais lento e a API atrasada. Abertura do site: véu na cor do fundo (`#sofia-veil` em public/index.html, `revealWebVeil` em launch-handoff.ts) que espera a lista de Páginas da barra lateral. No site não há cópia local das páginas (o snapshot criptografado só existe no Android; não gravar títulos sem proteção no navegador). Pendente do Pedro: a página parecia mais larga que a janela nos prints (Ctrl+0 / Chrome).
+- **Último (04/11, tarde):** a abertura do Início no site roda inteira em CSS numa linha do tempo única (`INTRO_T` em `HomeHero.tsx`): saudação, subida, data digitada letra a letra, resumo, fileiras e brilho oval. Antes era JavaScript e travava quando a página montava os dados (engasgo do "dia cheio", piscada do "Boa tarde"). Terminada a abertura (ou saindo do Início) tudo fica parado no lugar final, senão voltar de outra aba repetia a abertura. O esqueleto das fileiras apaga por cima do conteúdo sem ser recriado. Conferido filmando com o processador 4× mais lento e a API atrasada. Abertura do site: véu na cor do fundo (`#sofia-veil` em public/index.html, `revealWebVeil` em launch-handoff.ts) que espera a lista de Páginas da barra lateral no máximo 0,25 s e sai em 1,2 s (ajustado pelo Pedro). No site não há cópia local das páginas (o snapshot criptografado só existe no Android; não gravar títulos sem proteção no navegador). Pendente do Pedro: a página parecia mais larga que a janela nos prints (Ctrl+0 / Chrome).
 - **Próximo passo:** o Pedro confere a abertura do site e testa o APK mais novo no celular; com "aprovado", publicar no atualizador. Depois disso, os itens do desenho ainda não feitos (§9).
 
 ## 1. O dono e a forma de trabalhar
@@ -280,11 +280,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site: o Início antigo piscava ao abrir (largura ainda não medida); agora vai direto ao esqueleto do Início novo | #294 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: abertura do Início (saudação no centro que sobe, data digitada, fileiras de blocos em sequência, brilho oval), sem pulo/piscada; revelação não espera todos os dados | #318 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |
 | 2026-11-04 | (delivery) | Site: abertura do Início toda em CSS (não trava quando a página monta os dados); resumo aparece assim que chega, com fade; ao voltar ao Início nada se repete | filmado com CPU 4× mais lenta, sem saltos; testes ok |
 | 2026-11-04 | (delivery) | Site: abre com a tela inteira saindo da cor do fundo (0,7 s); a tela só aparece com a lista de Páginas da barra lateral pronta (espera até 0,9 s), sem esqueleto/shimmer nela; o "Boa tarde" começa junto | filmado; testes ok |
+| 2026-11-04 | (delivery) | Site: véu da abertura espera no máximo 0,25 s pelas Páginas (antes 0,9 s, "segurando muito") e sai em 1,2 s (antes 0,7 s, "muito rápido") | medido local; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
