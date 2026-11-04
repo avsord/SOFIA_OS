@@ -1,5 +1,5 @@
 import React, {useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Animated, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
 import type {SofiaApi} from '../lib/api';
@@ -14,7 +14,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
 export function greetingFor(now = new Date()) { const h = now.getHours(); return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 const CHIPS = ['O que tenho hoje?', 'Lançar uma despesa', 'Criar lembrete', 'Quanto já guardei?', 'Resumo da semana'];
-export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean}) {
+export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false, reveal}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean; reveal?: {date: Animated.Value; summary: Animated.Value} | null}) {
   const c = useTheme(), [text, setText] = useState(''), [busy, setBusy] = useState(false), [answer, setAnswer] = useState<{q: string; a: string; error?: boolean} | null>(null), input = useRef<TextInput>(null);
   async function ask(raw: string) {
     const q = raw.trim(); if (!q || busy) return;
@@ -35,10 +35,12 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   </View>;
   if (minimal) return <View testID="home-hero" style={{alignItems: 'center', paddingTop: 44, paddingBottom: 26, paddingHorizontal: 40, gap: 6}}>
     {/* 0.3.295: respiro em cima (o texto nao encosta no teto) e a frase da Sofia logo abaixo da saudacao */}
-    <Text style={[{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}, wide ? STAGGER.date : null]}>{date}</Text>
-    <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? STAGGER.greet : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
+    {/* 04/11/2026 (Pedro: "primeiro Bom dia Pedro, a data so depois que subir, depois o resumo, depois os blocos"): com
+        reveal (abertura do site) a data e o resumo ficam escondidos e quem os mostra e o Inicio, em ordem, apos a subida */}
+    <Animated.View style={reveal ? {opacity: reveal.date} : undefined}><Text style={[{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}, wide && !reveal ? STAGGER.date : null]}>{date}</Text></Animated.View>
+    <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? (reveal ? STAGGER.date : STAGGER.greet) : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>
     {/* o resumo chega com os dados: a key faz ele aparecer suave quando o texto chega (o espaco ja esta reservado) */}
-    <Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide ? STAGGER.summary : null]}>{subtitle || '\u00a0'}</Text>
+    <Animated.View style={reveal ? {opacity: reveal.summary} : undefined}><Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide && !reveal ? STAGGER.summary : null]}>{subtitle || '\u00a0'}</Text></Animated.View>
   </View>;
   return <View testID="home-hero" style={{alignItems: wide ? 'center' : 'stretch', paddingTop: wide ? 46 : 6, paddingBottom: wide ? 30 : 18, paddingHorizontal: wide ? 0 : 20, gap: wide ? 6 : 4}}>
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: wide ? 'center' : 'left'}}>{date}</Text>
