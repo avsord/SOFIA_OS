@@ -17,6 +17,6 @@ export function subscribeVeil(f:()=>void){veilSubs.add(f);return()=>{veilSubs.de
 export function revealWebVeil(bg?: string){
  if(Platform.OS!=='web'||typeof document==='undefined'||veilOut)return;
  const veil=document.getElementById('sofia-veil');veilOut=true;veilSubs.forEach(f=>f());if(!veil)return;
- if(bg)veil.style.background=bg;
- requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),1100);});
+ if(bg){veil.style.background=bg;try{localStorage.setItem('sofia.veil.bg',bg);}catch{/* modo privado */}} /* a proxima abertura ja cobre com a cor do tema do app (assets/early.js) */
+ requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),900);});
 }

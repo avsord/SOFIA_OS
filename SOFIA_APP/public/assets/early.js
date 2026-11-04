@@ -2,6 +2,8 @@
  * lista de Paginas da barra lateral e as leituras dos blocos do Inicio enquanto o codigo do site ainda baixa. O app (api.ts) usa esta resposta em vez de pedir de novo; se ela
  * falhar ou o login tiver vencido, o app pede do jeito normal. So no computador e com sessao salva neste navegador. */
 (function(){try{
+ // a cor que cobre a tela na abertura e a do tema do app da ultima vez (escuro a noite), nao a do Windows: sem clarao
+ try{var bg=localStorage.getItem('sofia.veil.bg');if(bg&&/^#[0-9a-fA-F]{3,8}$/.test(bg)){var v=document.getElementById('sofia-veil');if(v)v.style.background=bg;document.documentElement.style.background=bg;document.body.style.background=bg;}}catch(e){}
  if(window.innerWidth<900)return;
  var a=JSON.parse(localStorage.getItem('sofia.secure.sofia.native.session.v1')||'null');
  if(!a||typeof a.token!=='string')return;

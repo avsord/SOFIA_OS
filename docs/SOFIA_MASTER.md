@@ -23,8 +23,8 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 
 - **Atualizado em:** 2026-11-04 ~19:30 (Brasília), no **Claude Code** (nuvem). Railway publica sozinho cada push em `sofia-app-android`.
 - **ABERTURA DO SITE APROVADA pelo Pedro ("agora ta certo, grava essa versão") — commit `adc82a6`, branch `aprovado/site-abertura-2026-11-04` (tags são recusadas pelo proxy da sessão).** Não mexer na abertura sem nova aprovação; para voltar a ela: `git checkout origin/aprovado/site-abertura-2026-11-04 -- SOFIA_APP/src SOFIA_APP/public`.
-  - Véu na cor do fundo (`#sofia-veil` em public/index.html, `revealWebVeil` em launch-handoff.ts) sai no 1º quadro do app, fade de 1 s.
-  - Linha do tempo única em CSS (`INTRO_T` em HomeHero.tsx, adiantada `INTRO_LEAD`=640 ms em Home.tsx): saudação já subindo quando a tela abre; data digitada; resumo; fileiras de blocos (0,70 s, 0,18 s entre elas) que sobem junto; brilho reto→oval.
+  - Véu na cor do tema do app (`#sofia-veil` em public/index.html; `revealWebVeil` guarda a cor e `early.js` a aplica na abertura seguinte) sai no 1º quadro do app, fade de 0,8 s (ajuste do Pedro após aprovar).
+  - Linha do tempo única em CSS (`INTRO_T` em HomeHero.tsx, adiantada `INTRO_LEAD`=640 ms em Home.tsx): saudação já subindo quando a tela abre; data digitada; resumo; fileiras de blocos (0,70 s, 0,18 s entre elas) que sobem junto; brilho reto→oval começando em 1,35 s (ajuste do Pedro após aprovar).
   - Sem esqueleto/shimmer nos blocos do Início no computador (espaço reservado invisível). Esqueleto só na lista de Páginas da barra lateral, se ela não chegar.
   - Cópia criptografada do Início no navegador (`encrypted-storage.web.ts`, AES-GCM, chave não exportável no IndexedDB; apagada ao sair da conta) + `public/assets/early.js` pede as leituras do Início no carregamento do HTML.
   - Raiz da página com `overflow: clip` (o navegador deslocava a página de lado ao focar algo fora da borda).
@@ -285,11 +285,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site: fileiras do Início ainda mais cedo (0,70 s na linha do tempo, 0,18 s entre elas): o Seu dia aparece enquanto a tela clareia e as 3 estão completas em ~0,9 s | filmado com API +1,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: pulo no Boa tarde no fim — o encaixe na janela (zoom do Início) só encolhia quando os dados chegavam e a página inteira mudava de tamanho de uma vez; agora o navegador lembra o encaixe da janela e a abertura já começa nele | janela 1280×720: antes 1→0,795 de uma vez, agora fixo; testes ok |
 | 2026-11-04 | (delivery) | Site: estralo no fim da subida — ao parar, o navegador tirava a saudação e os blocos da camada da animação e redesenhava o texto encaixado no pixel (~1 px); agora ficam na mesma camada (will-change) | filmado em PNG: sem mudança após o último movimento; texto nítido; testes ok |
 | 2026-11-04 | (delivery) | Site: página inteira deslocada para a esquerda (menu lateral cortado; print do Pedro) — o navegador rolava a raiz de lado ao focar algo fora da borda, mesmo com overflow hidden; agora html/body/#root com overflow: clip | simulado: antes deslocava 568 px, agora 0; testes ok |
 | 2026-11-04 | (delivery) | Site: desfeito o encaixe guardado no navegador (só diminuía e deixou o Boa tarde pequeno — regressão minha); valor antigo apagado ao abrir. Pulo no fim ainda aberto: aguardando vídeo do Pedro | testes ok |
+| 2026-11-04 | (delivery) | Site (pedido do Pedro sobre a versão aprovada): brilho oval mais cedo (1,35 s na linha do tempo, era 2,04 s); fade da cor de abertura 0,8 s (era 1 s); a cor de abertura agora é a do tema do app (sem clarão claro com o site escuro à noite) | filmado; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
