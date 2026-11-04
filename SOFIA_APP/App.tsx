@@ -15,7 +15,7 @@ import {monthKey} from './src/lib/agenda-cache';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet,Platform,useWindowDimensions} from 'react-native';
-import {isDesktopWidth} from './src/lib/desktop';
+import {isDesktopWidth, pagesDirectory} from './src/lib/desktop';
 import {SafeAreaProvider,SafeAreaView,initialWindowMetrics} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile,Notice} from './src/lib/types';
@@ -40,7 +40,7 @@ import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,
 import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
-import {finishLaunchHandoff} from './src/lib/launch-handoff';
+import {finishLaunchHandoff, revealWebVeil} from './src/lib/launch-handoff';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
 import {isWeb,pathToRoute,routeTitle,routeToPath} from './src/lib/web-route';
 import {installWebPage} from './src/lib/web-page';
@@ -141,6 +141,10 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  // their first visit and warm independently without extending the splash.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
+ // 04/11/2026 (Pedro: "as paginas ali do lado ja tem que estar carregadas, sem esqueleto e shimmer"): no computador o veu
+ // espera a lista de Paginas da barra lateral (no maximo 0,9 s); a tela aparece ja com ela
+ useEffect(()=>{if(!launchReady)return;const go=()=>revealWebVeil(c.bg);if(!desktop||!auth||pagesDirectory.get()!==null){go();return;}
+  const off=pagesDirectory.subscribe(()=>{if(pagesDirectory.get()!==null)go();});const t=setTimeout(go,900);return()=>{off();clearTimeout(t);};},[launchReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;

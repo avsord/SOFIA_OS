@@ -6,7 +6,7 @@ import type {Task} from '../lib/types';
 // (ver lib/desktop.ts). Barra lateral fixa e recolhivel, barra de cima com caminho, busca e avisos,
 // busca global (Ctrl+K) e atalhos de teclado. As telas sao as mesmas do celular.
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Modal,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon,type IconName} from '../components/Icon';
 import {NotificationBell} from '../components/NotificationCenter';
@@ -28,6 +28,7 @@ type Props={
 };
 
 /** Le as paginas para a arvore da barra lateral sem esperar a aba Paginas abrir. */
+const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
 function usePageDirectory(api:SofiaApi){
  const pages=useStore(pagesDirectory);
  useEffect(()=>{
@@ -124,7 +125,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
- const pages=useStore(pagesDirectory)??null;usePageDirectory(api);
+ const pages=useStore(pagesDirectory)??null;usePageDirectory(api);const pagesLate=useRef(pages===null);
  const path=useStore(pagePath),moduleTitle=useStore(appModuleTitle);
  const openPageId=tab==='pages'&&path.length?path[path.length-1].id:'';
  useDesktopCss(true,c);
@@ -158,7 +159,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)}/>)}</Section>
      <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={onCreatePage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
-      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View>:pages.length?<PageTree pages={pages} openId={openPageId} onOpen={onOpenPage}/>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
+      {pages===null?null /* 04/11/2026 (Pedro: sem esqueleto nem shimmer aqui): a lista entra com fade quando chega */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}
    </ScrollView>

@@ -86,6 +86,12 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
       body { overflow: hidden; margin: 0; background: #F7F6FA; }
       @media (prefers-color-scheme: dark) { body { background: #121017; } }
       #root { display: flex; height: 100%; flex: 1; }
+      /* 04/11/2026 (Pedro: "quando abre o site, um fade rapido de toda a tela com a cor do site"): veu na cor do fundo que cobre
+         a montagem e some depressa quando o app esta pronto (launch-handoff.ts); se o app nao avisar, some sozinho em 8 s */
+      #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; background: #F7F6FA; animation: sofia-veil-out 320ms ease-out 8s both; }
+      @media (prefers-color-scheme: dark) { #sofia-veil { background: #121017; } }
+      #sofia-veil.out { animation: sofia-veil-out 700ms cubic-bezier(0.33,0,0.2,1) 0s both; }
+      @keyframes sofia-veil-out { from { opacity: 1; } to { opacity: 0; } }
       ::selection { background: rgba(114, 88, 232, 0.28); }
       /* 0.3.267: sem contorno de clique em nenhum elemento do site */
       *:focus, *:focus-visible { outline: none !important; }
@@ -95,6 +101,7 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
   <body>
     <noscript>Para usar a Sofia OS, ative o JavaScript no seu navegador.</noscript>
     <div id="root"></div>
-  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-d17260880f9fe5670362c31393bbe8af.js" defer></script><script src="/_expo/static/js/web/index-6b4aa50182e7cc29a6d0f49977d6261e.js" defer></script>
+    <div id="sofia-veil"></div>
+  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-4009af6e83c02c32ad82496d60009b49.js" defer></script><script src="/_expo/static/js/web/index-386a86e7808424cecfe371f22bd53402.js" defer></script>
 </body>
 </html>
