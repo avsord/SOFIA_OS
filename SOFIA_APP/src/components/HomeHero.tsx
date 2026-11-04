@@ -14,9 +14,17 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 /** 0.3.265 (Inicio, desenho aprovado pelo Pedro): saudacao centralizada com o nome em italico de destaque, uma frase que
  * nasce do dia de verdade e a barra da Sofia (mini chat) com atalhos. A resposta aparece num cartao curto logo abaixo;
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
+/** 04/11/2026 (Pedro: "ainda esta flikando, analisa toda a animacao"): a abertura do site roda inteira em CSS, numa linha do
+ * tempo unica que comeca quando a saudacao aparece (at). Animacao em JavaScript para quando a pagina esta ocupada montando
+ * os dados (era o engasgo e a piscada); a do navegador continua. Montado atrasado, o atraso negativo poe cada parte no ponto certo. */
+export const INTRO_T = {greet: 0, move: 640, date: 990, summary: 1140, rows: 1240, glow: 2040};
+export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
+  return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
+}
+const MOVE_EASE = 'cubic-bezier(0.33,0,0.15,1)';
 export function greetingFor(now = new Date()) { const h = now.getHours(); return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 const CHIPS = ['O que tenho hoje?', 'Lançar uma despesa', 'Criar lembrete', 'Quanto já guardei?', 'Resumo da semana'];
-export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false, reveal}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean; reveal?: {date: Animated.Value; summary: Animated.Value; grow?: Animated.AnimatedInterpolation<number>; greet?: Animated.Value; scale?: any; big?: number; onGreeted?: () => void} | null}) {
+export function HomeHero({api, first, subtitle, wide, onContinue, minimal = false, reveal}: {api: SofiaApi; first: string; subtitle: string; wide: boolean; onContinue: () => void; minimal?: boolean; reveal?: {at: number; big: number; done?: boolean} | null}) {
   const c = useTheme(), [text, setText] = useState(''), [busy, setBusy] = useState(false), [answer, setAnswer] = useState<{q: string; a: string; error?: boolean} | null>(null), input = useRef<TextInput>(null);
   async function ask(raw: string) {
     const q = raw.trim(); if (!q || busy) return;
@@ -30,19 +38,17 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   const date = new Date().toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}).toUpperCase();
   // 04/11/2026 (Pedro: "QUARTA-FEIRA, 4 DE NOVEMBRO pode aparecer digitando"): na abertura do site a data e digitada
   // letra a letra quando chega a vez dela; o resto do texto fica reservado (transparente) para nada mudar de lugar
-  const [typed, setTyped] = useState(reveal ? 0 : date.length);
-  // 04/11/2026 (Pedro: "um suave fade inicial no Bom dia com um scale suave tambem"): entra de 92% a 100% junto com o fade, tambem pela letra
   const hello = greetingFor() + ', ';
-  const heroSize = reveal?.grow ? (reveal.greet ? Animated.multiply(reveal.grow, reveal.greet.interpolate({inputRange: [0, 1], outputRange: [0.92, 1]})) : reveal.grow) : null;
-  useEffect(() => {
-    const v = reveal?.date;
-    if (!v) {setTyped(date.length); return;}
-    let timer: any = null, started = (v as any)._value > 0;
-    if (!started) setTyped(0);
-    const id = v.addListener(({value}) => {if (started || value <= 0) return; started = true; let n = 0;
-      timer = setInterval(() => {n++; setTyped(n); if (n >= date.length) clearInterval(timer);}, 32);});
-    return () => {v.removeListener(id); if (timer) clearInterval(timer);};
-  }, [reveal?.date, date]);
+  // a frase apareceu e terminou o fade: tira a animacao (senao ela se repete ao voltar de outra aba)
+  const hasSummary = !!subtitle.trim(), [sumSettled, setSumSettled] = useState(false);
+  useEffect(() => {if (!hasSummary) {setSumSettled(false); return;} const t = setTimeout(() => setSumSettled(true), 700); return () => clearTimeout(t);}, [hasSummary]);
+  const rv = React.useMemo(() => reveal?.done ? {greet: null, scale: {transform: [{scale: 1 / reveal.big}]}, date: null, chars: null, summary: null} : reveal?.at ? {
+    greet: introAnim(reveal.at, INTRO_T.greet, 600, {opacity: 0}, {opacity: 1}),
+    scale: introAnim(reveal.at, INTRO_T.move, 1300, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, MOVE_EASE),
+    date: introAnim(reveal.at, INTRO_T.date, 200, {opacity: 0}, {opacity: 1}),
+    chars: Array.from(date).map((_, i) => introAnim(reveal.at, INTRO_T.date + i * 32, 40, {opacity: 0}, {opacity: 1}, 'linear')),
+    summary: introAnim(reveal.at, INTRO_T.summary, 450, {opacity: 0}, {opacity: 1}),
+  } : null, [reveal?.at, reveal?.big, reveal?.done, date]);
   // 0.3.294 (Pedro): no computador o Inicio fica so com a data e a saudacao (sem a conversa rapida), para o resumo caber numa tela
   // 03/11/2026 (Pedro): no celular a saudacao tambem fica sem a conversa rapida, alinhada a esquerda como no app
   if (minimal && !wide) return <View testID="home-hero" style={{alignItems: 'flex-start', paddingTop: 6, paddingBottom: 14, paddingHorizontal: 20, gap: 4}}>
@@ -54,16 +60,16 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
     {/* 0.3.295: respiro em cima (o texto nao encosta no teto) e a frase da Sofia logo abaixo da saudacao */}
     {/* 04/11/2026 (Pedro: "primeiro Bom dia Pedro, a data so depois que subir, depois o resumo, depois os blocos"): com
         reveal (abertura do site) a data e o resumo ficam escondidos e quem os mostra e o Inicio, em ordem, apos a subida */}
-    <Animated.View style={reveal ? {opacity: reveal.date} : undefined}><Text style={[{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}, wide && !reveal ? STAGGER.date : null]}>{date.slice(0, typed)}{typed < date.length ? <Text style={{color: 'transparent'}}>{date.slice(typed)}</Text> : null}</Text></Animated.View>
-    {reveal?.scale ? <View style={{height: 52, alignItems: 'center', justifyContent: 'center'}}>
+    <View style={rv ? rv.date : undefined}><Text style={[{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center'}, wide && !rv ? STAGGER.date : null]}>{rv?.chars ? Array.from(date).map((ch, i) => <Text key={i} style={rv.chars![i]}>{ch}</Text>) : date}</Text></View>
+    {rv && reveal ? <View style={[{height: 52, alignItems: 'center', justifyContent: 'center'}, rv.greet]}>
       {/* 04/11/2026 (Pedro: "o Bom dia esta com qualidade ruim quando amplo e da uma flikada quando fica bom"): o tamanho
           grande e o da LETRA (nitido em todo quadro), nao uma ampliacao da imagem; a caixa tem a altura final, nada empurra */}
       {/* 04/11/2026 (Pedro: "no comeco do zoom out ele craquela em pixels"): mudar o tamanho da LETRA a cada quadro reencaixa
           o texto nos pixels; agora a saudacao e desenhada ja GRANDE (nitida) e encolhe inteira (escala <= 1 nao borra) */}
-      <Animated.Text accessibilityRole="header" style={{color: c.text, fontSize: (reveal.big || 1) * 40, lineHeight: 52 * (reveal.big || 1), fontWeight: '600', letterSpacing: -0.5 * (reveal.big || 1), textAlign: 'center', whiteSpace: 'nowrap', opacity: reveal.greet || 1, WebkitFontSmoothing: 'antialiased', transform: [{scale: reveal.scale}]} as any}>{hello}<Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: (reveal.big || 1) * 46}]}>{first}</Text></Animated.Text>
+      <Text accessibilityRole="header" style={[{color: c.text, fontSize: (reveal.big || 1) * 40, lineHeight: 52 * (reveal.big || 1), fontWeight: '600', letterSpacing: -0.5 * (reveal.big || 1), textAlign: 'center', whiteSpace: 'nowrap', WebkitFontSmoothing: 'antialiased'} as any, rv.scale]}>{hello}<Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: (reveal.big || 1) * 46}]}>{first}</Text></Text>
     </View> : <Text accessibilityRole="header" style={[{color: c.text, fontSize: 40, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center'}, wide ? STAGGER.greet : null]}>{greetingFor()}, <Text style={[DISPLAY_ITALIC, {color: c.accent, fontSize: wide ? 46 : 32}]}>{first}</Text></Text>}
     {/* o resumo chega com os dados: a key faz ele aparecer suave quando o texto chega (o espaco ja esta reservado) */}
-    <Animated.View style={reveal ? {opacity: reveal.summary} : undefined}><Text key={subtitle ? 'resumo' : 'vazio'} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide ? (reveal ? STAGGER.date : STAGGER.summary) : null]}>{subtitle || '\u00a0'}</Text></Animated.View>
+    <View style={rv ? rv.summary : undefined}><Text key={subtitle.trim() ? 'resumo' : 'vazio' /* 04/11/2026: o espaco de reserva ('\u00a0') contava como frase e a troca nunca refazia o fade */} numberOfLines={2} style={[{color: c.muted, fontSize: 16, lineHeight: 24, minHeight: 48, textAlign: 'center', maxWidth: 760, marginTop: 4, textWrap: 'balance'} as any, wide && !sumSettled ? (rv ? STAGGER.date : STAGGER.summary) : null]}>{subtitle || '\u00a0'}</Text></View>
   </View>;
   return <View testID="home-hero" style={{alignItems: wide ? 'center' : 'stretch', paddingTop: wide ? 46 : 6, paddingBottom: wide ? 30 : 18, paddingHorizontal: wide ? 0 : 20, gap: wide ? 6 : 4}}>
     <Text style={{color: c.accent, fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: wide ? 'center' : 'left'}}>{date}</Text>

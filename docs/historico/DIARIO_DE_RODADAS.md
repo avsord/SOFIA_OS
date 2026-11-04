@@ -156,3 +156,4 @@ Cada rodada nova acrescenta UMA linha curta no fim (até ~300 caracteres): data 
 | 2026-11-04 | (delivery) | Site: o Início antigo piscava ao abrir (largura ainda não medida); agora vai direto ao esqueleto do Início novo | #294 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: abertura do Início (saudação no centro que sobe, data digitada, fileiras de blocos em sequência, brilho oval), sem pulo/piscada; revelação não espera todos os dados | #318 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |
+| 2026-11-04 | (delivery) | Site: abertura do Início toda em CSS (não trava quando a página monta os dados); resumo aparece assim que chega, com fade; ao voltar ao Início nada se repete | filmado com CPU 4× mais lenta, sem saltos; testes ok |

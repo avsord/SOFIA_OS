@@ -30,7 +30,7 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 - **Servidor e site:** o Railway publica sozinho a cada push em `sofia-app-android` (o site e as correções do servidor desta rodada já estão no ar).
 - **Commits sem `[manual-apk]`** ainda falham em "Native checks" (não investigado).
 - **Não confirmado no aparelho:** arrastar a linha do tempo com o dedo; segurar para criar; menu Adicionar com X; abas Ano/Mês/Dia; segurar um dia no Mês; Recentes em Páginas; filtros de Notas/Biblioteca; barrinha "Criar" em cima do campo; Início ao voltar de outra aba logo depois de abrir.
-- **Último (04/11, 2c33ca1):** a piscada no fim do esqueleto das duas fileiras de baixo foi corrigida: o mesmo esqueleto fica na tela e apaga por cima do conteúdo, em vez de ser recriado (o brilho recomeçava e piscava). Conferido quadro a quadro com a API lenta. Pendente do Pedro: nos prints dele a página parece mais larga que a janela (menu cortado à esquerda, "PS" à direita); pedi Ctrl+0 no Brave, o Console (F12) e um teste no Chrome/Edge.
+- **Último (04/11, tarde):** a abertura do Início no site roda inteira em CSS numa linha do tempo única (`INTRO_T` em `HomeHero.tsx`): saudação, subida, data digitada letra a letra, resumo, fileiras e brilho oval. Antes era JavaScript e travava quando a página montava os dados (engasgo do "dia cheio", piscada do "Boa tarde"). Terminada a abertura (ou saindo do Início) tudo fica parado no lugar final, senão voltar de outra aba repetia a abertura. O esqueleto das fileiras apaga por cima do conteúdo sem ser recriado. Conferido filmando com o processador 4× mais lento e a API atrasada. Pendente do Pedro: a página parecia mais larga que a janela nos prints (Ctrl+0 / Chrome).
 - **Próximo passo:** o Pedro confere a abertura do site e testa o APK mais novo no celular; com "aprovado", publicar no atualizador. Depois disso, os itens do desenho ainda não feitos (§9).
 
 ## 1. O dono e a forma de trabalhar
@@ -280,11 +280,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-03 | (delivery) | Claude Code: revisão geral + desenho 03/11 em 4 lotes; Início do celular abre (WEB, calc→px, "agora" parado), linha do tempo arrasta, testes do emulador leem a tela de verdade; servidor: restauração, lembretes, apagar conversas | emulador principal verde (#285–#289); R7 vermelho: 1 de 5 aberturas de Páginas (modo Antigo) > 8 s |
 | 2026-11-04 | (delivery) | Claude Code: compilação Android verde (#293) pela 1ª vez desde 10/10 — teste da Conversa entende o "hoje 10:00" do semeador; Início só monta o painel pesado na tela (Páginas ~4 s) | verde: APK, emulador principal e R7 |
 | 2026-11-04 | (delivery) | Site: o Início antigo piscava ao abrir (largura ainda não medida); agora vai direto ao esqueleto do Início novo | #294 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: abertura do Início (saudação no centro que sobe, data digitada, fileiras de blocos em sequência, brilho oval), sem pulo/piscada; revelação não espera todos os dados | #318 verde (APK, emulador, R7) |
 | 2026-11-04 | (delivery) | Site: piscada no fim do esqueleto das 2 fileiras de baixo — o mesmo esqueleto agora apaga por cima do conteúdo, sem ser recriado | conferido quadro a quadro; CI de 2c33ca1 |
+| 2026-11-04 | (delivery) | Site: abertura do Início toda em CSS (não trava quando a página monta os dados); resumo aparece assim que chega, com fade; ao voltar ao Início nada se repete | filmado com CPU 4× mais lenta, sem saltos; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
