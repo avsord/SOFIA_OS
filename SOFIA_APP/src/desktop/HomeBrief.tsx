@@ -171,8 +171,10 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
 /** 04/11/2026 (Pedro: fileiras em hierarquia; e a foto com a entrada travada no meio): a entrada de cada fileira e uma
  * animacao do proprio navegador (roda mesmo com a pagina ocupada montando os dados) e guarda a HORA em que deveria
  * entrar - montada atrasada, ela ja aparece no ponto certo (atraso negativo), sem recomecar nem ficar parada. */
-function RowIn({i, at, style, children}: {i: number; at?: number; style?: any; children: React.ReactNode}) {
-  const anim = useMemo(() => at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '650ms', animationDelay: Math.round(at + i * 290 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at]);
+// 04/11/2026 (Pedro: "o esqueleto entra intercalado, mas o conteudo aparece os 3 de uma vez"): com `out`, a fileira do
+// esqueleto apaga na sua vez (mesmo intervalo da entrada) enquanto a fileira de conteudo de baixo entra
+function RowIn({i, at, out, style, children}: {i: number; at?: number; out?: number; style?: any; children: React.ReactNode}) {
+  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * 290 + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '650ms', animationDelay: Math.round(at + i * 290 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
   return <View style={[style, anim]}>{children}</View>;
 }
 export function HomeBrief(p: HomeBriefProps) {
@@ -1142,8 +1144,8 @@ function MailTile({style, card, data, onOpen}: {style: any; card: any; data: Hom
 
 /** 0.3.295: esqueleto no MESMO desenho do Inicio novo (cartao Seu dia + duas fileiras de blocos, mesmas alturas):
  * quando os dados chegam, so o conteudo aparece - nada muda de lugar nem de tamanho. */
-export function HomeBriefSkeleton({compact = false, paused = false, revealAt}: {compact?: boolean; paused?: boolean; revealAt?: number} = {}) {
-  const p = {revealAt};
+export function HomeBriefSkeleton({compact = false, paused = false, revealAt, outAt}: {compact?: boolean; paused?: boolean; revealAt?: number; outAt?: number} = {}) {
+  const p = {revealAt, outAt};
   const c = useTheme(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), rowH = useRowHeight(root, briefH);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
@@ -1153,7 +1155,7 @@ export function HomeBriefSkeleton({compact = false, paused = false, revealAt}: {
   return <ShimmerGroup paused={paused}><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
         pronto - cabecalho de 30 (com o dia no meio e o placar), 26 de espaco e a linha de 100 com o traco na mesma altura */}
-    <RowIn i={0} at={p.revealAt}><View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
+    <RowIn i={0} at={p.revealAt} out={p.outAt}><View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
       <View style={{height: 30, flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <ShimmerBlock width={24} height={24} radius={8} /><ShimmerBlock width={70} height={14} radius={6} />
         <View style={{flex: 1, alignItems: 'center'}}><ShimmerBlock width={150} height={14} radius={6} /></View>
@@ -1168,8 +1170,8 @@ export function HomeBriefSkeleton({compact = false, paused = false, revealAt}: {
       <View style={[card, {height: 176, gap: 10}]}><ShimmerBlock width={130} height={14} radius={6} /><LoadingLines rows={3} immediate /></View>
       <View style={{flexDirection: 'row', gap: 10}}><View style={[card, {flex: 1, height: HALF_H}]} /><View style={[card, {flex: 1, height: HALF_H}]} /></View>
     </> : <>
-    <RowIn i={1} at={p.revealAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</RowIn>
-    <RowIn i={2} at={p.revealAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</RowIn>
+    <RowIn i={1} at={p.revealAt} out={p.outAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</RowIn>
+    <RowIn i={2} at={p.revealAt} out={p.outAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</RowIn>
     </>}
   </View></ShimmerGroup>;
 }
