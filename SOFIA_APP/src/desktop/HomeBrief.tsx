@@ -62,7 +62,7 @@ export type HomeBriefProps = {
   /** 03/11/2026: o mesmo Inicio do site no celular (aprovado no quadro): Seu dia, Agenda e os blocos em duas colunas. */
   compact?: boolean;
   /** celular: segurar num horario vazio leva para a Conversa com esse horario (03/11/2026) */
-  onAskAt?: (at: Date) => void; rows?: Animated.Value;
+  onAskAt?: (at: Date) => void; revealAt?: number;
 };
 
 /** 0.3.295: a frase da Sofia sobe para o topo (embaixo de "Boa noite, Pedro"); o cartao Seu dia fica com atalhos e a
@@ -168,10 +168,14 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
   </View>;
 }
 
+/** 04/11/2026 (Pedro: fileiras em hierarquia; e a foto com a entrada travada no meio): a entrada de cada fileira e uma
+ * animacao do proprio navegador (roda mesmo com a pagina ocupada montando os dados) e guarda a HORA em que deveria
+ * entrar - montada atrasada, ela ja aparece no ponto certo (atraso negativo), sem recomecar nem ficar parada. */
+function RowIn({i, at, style, children}: {i: number; at?: number; style?: any; children: React.ReactNode}) {
+  const anim = useMemo(() => at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '650ms', animationDelay: Math.round(at + i * 290 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at]);
+  return <View style={[style, anim]}>{children}</View>;
+}
 export function HomeBrief(p: HomeBriefProps) {
-  // 04/11/2026 (Pedro: "os blocos aparecendo em hierarquia na horizontal"): na abertura do site cada linha inteira (Seu dia,
-  // depois a 2a fileira, depois a 3a) aparece com fade suave, uma em seguida da outra, guiadas por um so progresso (p.rows)
-  const rowIn = (i: number): any => p.rows ? {opacity: p.rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [0, 1], extrapolate: 'clamp'}), transform: [{translateY: p.rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [14, 0], extrapolate: 'clamp'})}]} : undefined;
   const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), [tl, setTl] = useTimelineSettings(), [gear, setGear] = useState(false);
   const rowH = useRowHeight(root, briefH);
   const open = useMemo(() => p.tasks.filter(t => !['done', 'cancelled', 'archived'].includes(t.state)), [p.tasks]); // 03/11/2026: cancelada nao conta como aberta
@@ -227,7 +231,7 @@ export function HomeBrief(p: HomeBriefProps) {
   // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
   // 04/11/2026: sem fade proprio aqui (comecava em 35% e piscava); a passagem suave e o esqueleto apagando por cima (Home.tsx)
   return <View ref={root} style={{gap: 12}}>
-    <Animated.View style={rowIn(0)}><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
+    <RowIn i={0} at={p.revealAt}><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <View style={{width: 24, height: 24, borderRadius: 8, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 12}}>S</Text></View>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Seu dia</Text>
@@ -249,7 +253,7 @@ export function HomeBrief(p: HomeBriefProps) {
         actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, sofia: p.sofia}} />
       {/* 03/11/2026 (desenho 01): no celular, a dica de como criar pela linha */}
       {p.compact && p.onAskAt ? <Text style={{fontSize: 11, color: c.muted, paddingTop: 2, paddingHorizontal: 2}}>Segure num horário vazio para criar · arraste para ver outras horas</Text> : null}
-    </View></Animated.View>
+    </View></RowIn>
     {p.compact ? <CompactCtx.Provider value={true}>
       {/* celular: os blocos de verdade do site, adaptados. Agenda, Rotina e Financas na largura toda (tem seletor/duas
           colunas de numeros); Tarefas, E-mails, Price Tracker e Encomendas em pares do mesmo tamanho. */}
@@ -265,17 +269,17 @@ export function HomeBrief(p: HomeBriefProps) {
       </View>
       <FinanceTile style={{height: 204}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
     </CompactCtx.Provider> : <>
-    <Animated.View style={rowIn(1)}>    <View style={{flexDirection: 'row', gap: 12}}>
+    <RowIn i={1} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
       <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
       <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
-    </View></Animated.View>
-    <Animated.View style={rowIn(2)}>    <View style={{flexDirection: 'row', gap: 12}}>
+    </View></RowIn>
+    <RowIn i={2} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
       <FinanceTile style={{flex: 2, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
       <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
       <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
       <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
-    </View></Animated.View>
+    </View></RowIn>
     </>}
   </View>;
 }
@@ -1138,9 +1142,8 @@ function MailTile({style, card, data, onOpen}: {style: any; card: any; data: Hom
 
 /** 0.3.295: esqueleto no MESMO desenho do Inicio novo (cartao Seu dia + duas fileiras de blocos, mesmas alturas):
  * quando os dados chegam, so o conteudo aparece - nada muda de lugar nem de tamanho. */
-export function HomeBriefSkeleton({compact = false, paused = false, rows}: {compact?: boolean; paused?: boolean; rows?: Animated.Value} = {}) {
-  // 04/11/2026: na abertura do site o esqueleto tambem entra fileira por fileira (mesma regra dos blocos prontos)
-  const rowIn = (i: number): any => rows ? {opacity: rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [0, 1], extrapolate: 'clamp'}), transform: [{translateY: rows.interpolate({inputRange: [i * 0.24, i * 0.24 + 0.52], outputRange: [14, 0], extrapolate: 'clamp'})}]} : undefined;
+export function HomeBriefSkeleton({compact = false, paused = false, revealAt}: {compact?: boolean; paused?: boolean; revealAt?: number} = {}) {
+  const p = {revealAt};
   const c = useTheme(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), rowH = useRowHeight(root, briefH);
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, paddingVertical: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   const tile = (flex: number, wide = false) => <View style={[card, {flex, height: rowH, gap: 10}]}>
@@ -1150,7 +1153,7 @@ export function HomeBriefSkeleton({compact = false, paused = false, rows}: {comp
   return <ShimmerGroup paused={paused}><View ref={root} testID="home-desk-skeleton" style={{gap: 12}}>
     {/* 0.3.350 (Pedro: "ao atualizar, o esqueleto e o pronto nao tem a mesma medida - da uma flicada"): mesma estrutura do Seu dia
         pronto - cabecalho de 30 (com o dia no meio e o placar), 26 de espaco e a linha de 100 com o traco na mesma altura */}
-    <Animated.View style={rowIn(0)}><View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
+    <RowIn i={0} at={p.revealAt}><View style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, overflow: 'visible'}}>
       <View style={{height: 30, flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <ShimmerBlock width={24} height={24} radius={8} /><ShimmerBlock width={70} height={14} radius={6} />
         <View style={{flex: 1, alignItems: 'center'}}><ShimmerBlock width={150} height={14} radius={6} /></View>
@@ -1160,13 +1163,13 @@ export function HomeBriefSkeleton({compact = false, paused = false, rows}: {comp
         <View style={{position: 'absolute', left: 0, right: 0, top: 72}}><ShimmerBlock width={'100%'} height={2} radius={1} /></View>
         <View style={{position: 'absolute', left: 0, right: 0, top: 86, flexDirection: 'row', justifyContent: 'space-between'}}>{[0, 1, 2, 3, 4, 5].map(k => <ShimmerBlock key={k} width={34} height={10} radius={4} />)}</View>
       </View>
-    </View></Animated.View>
+    </View></RowIn>
     {compact ? <>
       <View style={[card, {height: 176, gap: 10}]}><ShimmerBlock width={130} height={14} radius={6} /><LoadingLines rows={3} immediate /></View>
       <View style={{flexDirection: 'row', gap: 10}}><View style={[card, {flex: 1, height: HALF_H}]} /><View style={[card, {flex: 1, height: HALF_H}]} /></View>
     </> : <>
-    <Animated.View style={[{flexDirection: 'row', gap: 12}, rowIn(1)]}>{tile(2, true)}{tile(1)}{tile(1)}</Animated.View>
-    <Animated.View style={[{flexDirection: 'row', gap: 12}, rowIn(2)]}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</Animated.View>
+    <RowIn i={1} at={p.revealAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}</RowIn>
+    <RowIn i={2} at={p.revealAt} style={{flexDirection: 'row', gap: 12}}>{tile(2, true)}{tile(1)}{tile(1)}{tile(1)}</RowIn>
     </>}
   </View></ShimmerGroup>;
 }
