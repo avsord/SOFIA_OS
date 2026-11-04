@@ -12,7 +12,7 @@ import {useHomeBriefData} from '../lib/home-brief';
 import {dpx} from '../lib/content-width';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
-import {HomeHero, INTRO_T, introAnim} from '../components/HomeHero';
+import {HomeHero, INTRO, INTRO_T, introAnim} from '../components/HomeHero';
 import {DaySummaryCard,DeskTasksCard,DeskCapsulesCard,daySentence,HomeDeskSkeleton} from '../desktop/HomeDeskCards';
 import {useNotifications} from '../components/NotificationCenter';
 import {rightClick} from '../lib/web-page';
@@ -70,7 +70,7 @@ export function withFixedWidgets(order:string[],goalHidden=false):string[]{retur
 /* 04/11/2026 (Pedro: "depois de carregar da uma leve subida"): a entrada do Inicio comecava 8 px abaixo e subia; agora so
    aparece, sem mover (o esqueleto ja fica no mesmo lugar do conteudo) */
 /** 04/11/2026 (Pedro: "Bom dia comecando bem maior no centro, com um zoom out suave"): tamanho inicial da saudacao */
-const INTRO_SCALE=1.6,INTRO_LEAD=640; /* = INTRO_T.move: quando a tela abre, a saudacao ja esta subindo (Pedro: "abre com o boa tarde parado") */
+const INTRO_SCALE=INTRO.scale,INTRO_LEAD=640; /* = INTRO_T.move: quando a tela abre, a saudacao ja esta subindo (Pedro: "abre com o boa tarde parado") */
 const HOME_ENTER=StyleSheet.create({blocks:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'480ms',animationDelay:'390ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any,out:{animationKeyframes:{'0%':{opacity:1},'100%':{opacity:0}},animationDuration:'320ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any,fit:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'520ms',animationDelay:'80ms',animationTimingFunction:'cubic-bezier(0.22,0.8,0.24,1)',animationFillMode:'both'} as any});
 const DESK_HOME_BOTTOM=60,FIT_KEY='sofia.home.fit.v1';
 export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask,homeTopKey=0,homeTopSmooth=false}:{homeTopKey?:number;homeTopSmooth?:boolean;onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
@@ -277,7 +277,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{if(introT&&!introDone&&!active)setIntroDone(true);},[introT,introDone,active]);if(deskShown&&!deskAt.current)deskAt.current=Date.now();
  // dados chegaram depois da hora das fileiras: elas entram (uma a uma) a partir de quando chegaram
  const swapAt=deskShown&&(!introUsed.current||deskAt.current>=revealAt)?deskAt.current:undefined;
- const introCss=useMemo(()=>introT&&introDy&&!introDone?{move:{...introAnim(introT,INTRO_T.move,1300,{transform:'translateY('+introDy+'px)'},{transform:'translateY(0px)'},'cubic-bezier(0.33,0,0.15,1)'),willChange:'transform'} /* fica na mesma camada depois de parar: sem redesenhar o texto no fim (Pedro: "estralo no final") */,band:introAnim(introT,INTRO_T.glow,1200,{opacity:1},{opacity:0},'ease-in-out'),oval:introAnim(introT,INTRO_T.glow,1200,{opacity:0},{opacity:1},'ease-in-out')}:null,[introT,introDy,introDone]);
+ const introCss=useMemo(()=>introT&&introDy&&!introDone?{move:{...introAnim(introT,INTRO_T.move,INTRO.moveMs,{transform:'translateY('+introDy+'px)'},{transform:'translateY(0px)'},INTRO.ease),willChange:'transform'} /* fica na mesma camada depois de parar: sem redesenhar o texto no fim (Pedro: "estralo no final") */,band:introAnim(introT,INTRO_T.glow,1200,{opacity:1},{opacity:0},'ease-in-out'),oval:introAnim(introT,INTRO_T.glow,1200,{opacity:0},{opacity:1},'ease-in-out')}:null,[introT,introDy,introDone]);
  useLayoutEffect(()=>{if(Platform.OS!=='web'||!wideHome||Date.now()-homeMountAt.current>4000||introUsed.current)return; /* 04/11/2026 (Pedro: "a animacao inicial ja pode estar iniciando antes"): comeca assim que o Inicio e desenhado, mesmo por baixo do veu da abertura */const el:any=heroRef.current;const r=(el?.querySelector?.('[role="heading"]')||el)?.getBoundingClientRect?.(); /* centra a SAUDACAO (data e resumo ainda escondidos) */if(!r||!r.height||typeof window==='undefined')return;
   const z=fitZ||1;const dy=(window.innerHeight/2-(r.top+r.height/2))/z; /* a saudacao cresce pela letra, no proprio lugar */if(dy<24)return;introUsed.current=true;setIntroDy(dy);setIntroT(Date.now()-INTRO_LEAD); /* 04/11/2026 (Pedro: "a animacao ja tem que estar acontecendo por tras do fade quando ele abre"): a linha do tempo comeca adiantada */ },[wideHome]);
  // 04/11/2026: a ordem da abertura (saudacao, subida, data digitada, resumo, fileiras, brilho oval) e a linha do tempo INTRO_T, toda em CSS

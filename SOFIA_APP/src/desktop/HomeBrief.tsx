@@ -2,6 +2,7 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
+import {INTRO} from '../components/HomeHero';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
 /** 03/11/2026: no Android o `window` existe (e o objeto global) mas nao tem addEventListener/innerWidth; o teste
@@ -174,7 +175,7 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
 // 04/11/2026 (Pedro: "o esqueleto entra intercalado, mas o conteudo aparece os 3 de uma vez"): com `out`, a fileira do
 // esqueleto apaga na sua vez (mesmo intervalo da entrada) enquanto a fileira de conteudo de baixo entra
 function RowIn({i, at, out, style, children}: {i: number; at?: number; out?: number; style?: any; children: React.ReactNode}) {
-  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * 180 + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: '520ms', animationDelay: Math.round(at + i * 180 - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
+  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * INTRO.rowGap + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(14px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: INTRO.rowMs + 'ms', animationDelay: Math.round(at + i * INTRO.rowGap - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
   return <View style={[style, anim]}>{children}</View>;
 }
 export function HomeBrief(p: HomeBriefProps) {
