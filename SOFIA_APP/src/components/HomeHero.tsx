@@ -21,10 +21,10 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 // ?teste=1 no endereco (Pedro: "zoom out mais lento e suave, quase nada de escala, e os blocos aparecem rapidamente")
 export const INTRO_TEST = typeof location !== 'undefined' && /[?&]teste=1(?:&|$)/.test(location.search || '');
 export const INTRO = INTRO_TEST
-  ? {scale: 1.04, moveMs: 2400, ease: 'cubic-bezier(0.4,0,0.08,1)', rowGap: 110, rowMs: 600, travel: 0.18}
-  : {scale: 1.6, moveMs: 1300, ease: 'cubic-bezier(0.33,0,0.15,1)', rowGap: 180, rowMs: 520, travel: 1};
+  ? {scale: 1.04, moveMs: 2400, scaleMs: 3200, ease: 'cubic-bezier(0.4,0,0.08,1)', scaleEase: 'cubic-bezier(0.25,0.1,0.1,1)', rowGap: 110, rowMs: 600, travel: 0.1}
+  : {scale: 1.6, moveMs: 1300, scaleMs: 1300, ease: 'cubic-bezier(0.33,0,0.15,1)', scaleEase: 'cubic-bezier(0.33,0,0.15,1)', rowGap: 180, rowMs: 520, travel: 1};
 export const INTRO_T = INTRO_TEST
-  ? {greet: 0, move: 640, date: 990, summary: 1140, rows: 480, glow: 1500}
+  ? {greet: 0, move: 140, date: 990, summary: 1140, rows: 480, glow: 1500} /* move 140: a subida comeca 0,5 s antes de a tela abrir */
   : {greet: 0, move: 640, date: 990, summary: 1140, rows: 700, glow: 1350};
 export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
   return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
@@ -52,7 +52,7 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   useEffect(() => {if (!hasSummary) {setSumSettled(false); return;} const t = setTimeout(() => setSumSettled(true), 700); return () => clearTimeout(t);}, [hasSummary]);
   const rv = React.useMemo(() => reveal?.done ? {greet: null, scale: {transform: [{scale: 1 / reveal.big}]}, date: null, chars: null, summary: null} : reveal?.at ? {
     greet: introAnim(reveal.at, INTRO_T.greet, 600, {opacity: 0}, {opacity: 1}),
-    scale: {...introAnim(reveal.at, INTRO_T.move, INTRO.moveMs, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, MOVE_EASE), willChange: 'transform'},
+    scale: {...introAnim(reveal.at, INTRO_T.move, INTRO.scaleMs, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, INTRO.scaleEase), willChange: 'transform'},
     date: introAnim(reveal.at, INTRO_T.date, 200, {opacity: 0}, {opacity: 1}),
     chars: Array.from(date).map((_, i) => introAnim(reveal.at, INTRO_T.date + i * 32, 40, {opacity: 0}, {opacity: 1}, 'linear')),
     summary: introAnim(reveal.at, INTRO_T.summary, 450, {opacity: 0}, {opacity: 1}),

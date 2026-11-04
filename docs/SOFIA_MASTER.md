@@ -29,7 +29,7 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
   - Cópia criptografada do Início no navegador (`encrypted-storage.web.ts`, AES-GCM, chave não exportável no IndexedDB; apagada ao sair da conta) + `public/assets/early.js` pede as leituras do Início no carregamento do HTML.
   - Raiz da página com `overflow: clip` (o navegador deslocava a página de lado ao focar algo fora da borda).
   - Desfeito: encaixe (zoom) guardado no navegador — só diminuía e deixou o "Boa tarde" pequeno.
-- **Versão aprovada v2 (com os ajustes do brilho e do fade):** branch `aprovado/site-abertura-2026-11-04-v2` (5dca69f). **Em teste:** `/inicio?teste=1` liga `INTRO_TEST` (HomeHero.tsx): escala 1,04, subida 2,4 s, conteúdo sobe só 18% da distância (`travel`), blocos logo ao abrir (0,6 s cada). Se o Pedro aprovar, trocar os valores padrão de `INTRO`/`INTRO_T` pelos do teste e remover o interruptor.
+- **Versão aprovada v2 (com os ajustes do brilho e do fade):** branch `aprovado/site-abertura-2026-11-04-v2` (5dca69f). **Em teste:** `/inicio?teste=1` liga `INTRO_TEST` (HomeHero.tsx): escala 1,04, subida 2,4 s, conteúdo sobe só 10% da distância (`travel`), escala com 3,2 s próprios (`scaleMs`), subida começando 0,5 s antes de a tela abrir, blocos logo ao abrir (0,6 s cada). Se o Pedro aprovar, trocar os valores padrão de `INTRO`/`INTRO_T` pelos do teste e remover o interruptor.
 - **Em aberto (site):** barra lateral às vezes estreita (~126 px) com o conteúdo largo dentro, cortado (print do Pedro 16:17) — causa não achada; não reproduz aqui em 1763/1410/1175 px. Pulo no fim da abertura: Pedro aprovou a versão atual; se voltar, pedir vídeo (consigo analisar quadro a quadro com ffmpeg).
 - **Android:** APKs gerados, mas o teste "R7 heavy data" falhou em 3 de 4 compilações da tarde (0bc5e50, d6966d8, f79294e; 774405b passou): 1–2 tentativas do modo Antigo passam de 8 s para mostrar Páginas (as outras 3,6–4,4 s, igual às verdes). As mudanças da tarde só rodam no site, mas a frequência pede investigação antes de testar no celular. Nada publicado no atualizador.
 - **Lição da tarde:** ~20 ajustes publicados direto no site, testados só em condições de laboratório, trouxeram regressões que o Pedro achou. Combinado: versão em endereço de teste + vídeo nas condições dele (tela 1763 px, dados no volume dele, rede lenta) antes de publicar.
@@ -286,11 +286,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site: desfeito o encaixe guardado no navegador (só diminuía e deixou o Boa tarde pequeno — regressão minha); valor antigo apagado ao abrir. Pulo no fim ainda aberto: aguardando vídeo do Pedro | testes ok |
 | 2026-11-04 | (delivery) | Site (pedido do Pedro sobre a versão aprovada): brilho oval mais cedo (1,35 s na linha do tempo, era 2,04 s); fade da cor de abertura 0,8 s (era 1 s); a cor de abertura agora é a do tema do app (sem clarão claro com o site escuro à noite) | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site: versão aprovada v2 guardada (branch aprovado/site-abertura-2026-11-04-v2 = 5dca69f). Versão de TESTE em /inicio?teste=1 (INTRO_TEST em HomeHero.tsx): escala 1,08 (era 1,6), subida 2 s mais suave (era 1,3 s), fileiras logo ao abrir (0,48 s, 0,11 s entre elas). Site normal inalterado | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): escala 1,04 (era 1,08), subida 2,4 s com curva mais suave (era 2 s), conteúdo percorre 55% da distância (desce menos), fileiras 0,6 s cada (era 0,44 s). Site normal inalterado | filmado; testes ok |
 | 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): subida bem leve — conteúdo percorre 18% da distância original (era 55%), mesma duração 2,4 s. Site normal inalterado | filmado; testes ok |
+| 2026-11-04 | (delivery) | Site, versão de TESTE (/inicio?teste=1): descida 10% da distância (era 18%); escala do Boa tarde com duração própria de 3,2 s e curva mais suave; a subida começa 0,5 s antes de a tela abrir. Site normal inalterado | filmado; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
