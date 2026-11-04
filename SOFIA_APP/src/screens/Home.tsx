@@ -72,7 +72,7 @@ export function withFixedWidgets(order:string[],goalHidden=false):string[]{retur
 /** 04/11/2026 (Pedro: "Bom dia comecando bem maior no centro, com um zoom out suave"): tamanho inicial da saudacao */
 const INTRO_SCALE=1.6,INTRO_LEAD=640; /* = INTRO_T.move: quando a tela abre, a saudacao ja esta subindo (Pedro: "abre com o boa tarde parado") */
 const HOME_ENTER=StyleSheet.create({blocks:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'480ms',animationDelay:'390ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any,out:{animationKeyframes:{'0%':{opacity:1},'100%':{opacity:0}},animationDuration:'320ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any,fit:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'520ms',animationDelay:'80ms',animationTimingFunction:'cubic-bezier(0.22,0.8,0.24,1)',animationFillMode:'both'} as any});
-const DESK_HOME_BOTTOM=60;
+const DESK_HOME_BOTTOM=60,FIT_KEY='sofia.home.fit.v1';
 export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask,homeTopKey=0,homeTopSmooth=false}:{homeTopKey?:number;homeTopSmooth?:boolean;onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
  const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
  // Catalog metadata is optional on launch. Keep cached areas synchronously,
@@ -178,7 +178,10 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // cabe na janela. O zoom do Inicio (homeZ) so cresce; aqui ele tambem DIMINUI o necessario quando o conteudo e mais
  // alto que a janela (janela baixa, frase da Sofia em duas linhas, aviso). Mede o conteudo em pixels sem zoom e
  // so desce enquanto a janela e a mesma (nao oscila: frase que quebra e desquebra); outra janela recomeca do zero.
- const winKey=winW+'x'+winH,[fit,setFit]=useState<{key:string;z:number}|null>(null);
+ const winKey=winW+'x'+winH,[fit,setFit]=useState<{key:string;z:number}|null>(()=>{try{const v=JSON.parse(localStorage.getItem(FIT_KEY)||'null');return v&&typeof v.key==='string'&&Number.isFinite(v.z)?v:null;}catch{return null;}});
+ // 04/11/2026 (Pedro: "pulo no Boa tarde no final"): o encaixe so diminuia depois que os dados chegavam e a pagina inteira
+ // encolhia de uma vez no fim da abertura; agora este navegador lembra o encaixe desta janela e a abertura ja comeca nele
+ useEffect(()=>{if(fit)try{localStorage.setItem(FIT_KEY,JSON.stringify(fit));}catch{/* modo privado */}},[fit]);
  const fitZ=fit&&fit.key===winKey?Math.min(homeZ,fit.z):homeZ;
  useLayoutEffect(()=>{
   if(Platform.OS!=='web'||typeof document==='undefined'||!desktop||homeWidth<980)return;

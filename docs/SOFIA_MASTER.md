@@ -281,11 +281,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Site: troca do esqueleto pelo conteúdo fileira por fileira (mesmo intervalo da entrada, 0,29 s), em vez das 3 de uma vez | filmado com dados atrasados: fileiras em 5,65/5,85/6,2 s; testes ok |
 | 2026-11-04 | (delivery) | Site: blocos do Início sem esqueleto/shimmer no computador; espaço deles reservado invisível (sem isso a saudação descia e a abertura não acontecia com servidor lento); as 3 fileiras entram com conteúdo, uma a uma, quando os dados chegam | filmado com API rápida e +2,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: blocos prontos quando a saudação para — leituras do Início pedidas todas no carregamento do HTML (early.js lê os endereços anotados na abertura anterior; antes 3 ondas), fileiras mais cedo (1,0 s) e juntas (0,22 s), e os blocos sobem junto com a saudação | rede +0,3 s/CPU 2×: blocos 0,63 s, saudação para 1,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: cópia criptografada do Início no navegador (encrypted-storage.web.ts: AES-GCM, chave não exportável no IndexedDB, apagada ao sair da conta); blocos, avisos, cápsulas, resumo financeiro e Páginas abrem do guardado e atualizam por trás | API +1,5 s: blocos 0,36 s, saudação para 1,5 s; testes ok |
 | 2026-11-04 | (delivery) | Site: fileiras do Início ainda mais cedo (0,70 s na linha do tempo, 0,18 s entre elas): o Seu dia aparece enquanto a tela clareia e as 3 estão completas em ~0,9 s | filmado com API +1,5 s; testes ok |
+| 2026-11-04 | (delivery) | Site: pulo no Boa tarde no fim — o encaixe na janela (zoom do Início) só encolhia quando os dados chegavam e a página inteira mudava de tamanho de uma vez; agora o navegador lembra o encaixe da janela e a abertura já começa nele | janela 1280×720: antes 1→0,795 de uma vez, agora fixo; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
