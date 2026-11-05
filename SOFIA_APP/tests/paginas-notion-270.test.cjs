@@ -168,3 +168,9 @@ test('Colar imagem copiada: na janela da capa (Ctrl+V e botão) e no texto da p�
  assert.ok(r.includes('props.onPasteImage(f);return;')&&r.includes('onDrop:(e:any)=>'));
  assert.ok(pg.includes('onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)}')&&pg.includes('<PageAttachmentImage api={api}'));
 });
+
+test('Título da página com a altura do texto (sem cortar e sem barrinha de rolagem)',()=>{
+ const pg=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');
+ assert.ok(pg.includes("t.style.overflow='hidden';")&&pg.includes('titleRef.current=n;'));
+ assert.ok(pg.includes('d?.fonts?.ready?.then('),'mede de novo quando a fonte do site chega');
+});

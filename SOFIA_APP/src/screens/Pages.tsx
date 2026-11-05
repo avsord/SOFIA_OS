@@ -159,7 +159,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 0.3.267: editor no estilo Notion no computador (web): Enter divide, Backspace junta, setas entre blocos, menu "/",
  // atalhos markdown e colar várias linhas. No celular o teclado continua como antes.
  const webKeys=Platform.OS==='web';
- const appearanceAnchor=useRef<{x:number;y:number}|null>(null),rowHover=useHoverKey(),headHover=useHoverHold();
+ const titleRef=useRef<any>(null),appearanceAnchor=useRef<{x:number;y:number}|null>(null),rowHover=useHoverKey(),headHover=useHoverHold();
  // botões da capa: o hover da capa não conta quando o mouse está em cima deles; o estado é controlado à mão
  const [coverHover,setCoverHoverRaw]=useState(false),coverHoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const coverHoverOn=()=>{if(coverHoverTimer.current)clearTimeout(coverHoverTimer.current);coverHoverTimer.current=null;setCoverHoverRaw(true);};
@@ -179,7 +179,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // blocos e cortando parágrafos maiores). Só recalcula quando o texto ou a largura mudam.
  const [, setResizeTick]=useState(0);
  useEffect(()=>{if(!webKeys)return;const w=globalThis as any;const on=()=>setResizeTick(v=>v+1);w.addEventListener?.('resize',on);return()=>w.removeEventListener?.('resize',on);},[webKeys]);
- useLayoutEffect(()=>{if(!webKeys)return;for(const ref of inputRefs.current.values()){const n=ref as unknown as HTMLTextAreaElement&{__size?:string};if(!n?.style||n.tagName!=='TEXTAREA')continue;
+ // a fonte do site pode chegar depois: mede de novo titulo e linhas quando ela termina de carregar
+ useEffect(()=>{if(!webKeys)return;const d=(globalThis as any).document;void d?.fonts?.ready?.then(()=>{const t=titleRef.current;if(t)t.__size='';for(const r of inputRefs.current.values())(r as any).__size='';setResizeTick(v=>v+1);});},[webKeys,selectedId]);
+ useLayoutEffect(()=>{if(!webKeys)return;
+  // 05/11/2026 (Pedro: titulo cortado com barrinha de rolagem): o titulo tambem tem a altura do texto, sem rolagem propria
+  {const t=titleRef.current as HTMLTextAreaElement&{__size?:string}|null;if(t?.style&&t.tagName==='TEXTAREA'){t.style.overflow='hidden';const key=t.value+'|'+t.clientWidth+'|'+getComputedStyle(t).fontSize;if(t.__size!==key){t.__size=key;t.style.height='0px';t.style.height=t.scrollHeight+'px';}}}
+  for(const ref of inputRefs.current.values()){const n=ref as unknown as HTMLTextAreaElement&{__size?:string};if(!n?.style||n.tagName!=='TEXTAREA')continue;
   if(n.dataset?.pageBlock==='collapsed'){n.__size='';n.style.height='0px';continue;}const key=n.value+'|'+n.clientWidth;if(n.__size===key)continue;n.__size=key;n.style.height='0px';n.style.height=n.scrollHeight+'px';}});
  const currentBlocks=()=>(selectedId&&store.get(selectedId)?.draft.blocks)||[];
  const domInput=(id:string)=>inputRefs.current.get(id) as unknown as (HTMLTextAreaElement&{setSelectionRange?:(a:number,b:number)=>void})|undefined;
@@ -514,7 +519,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
   const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
-  const titleInput=<TextInput scrollEnabled={false} editable={!preview} autoFocus={desktop&&!preview&&draft.title==='Sem título'&&emptyBody} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
+  const titleInput=<TextInput ref={preview?undefined:(n:any)=>{titleRef.current=n;}} scrollEnabled={false} editable={!preview} autoFocus={desktop&&!preview&&draft.title==='Sem título'&&emptyBody} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
   return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
    <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
     {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
