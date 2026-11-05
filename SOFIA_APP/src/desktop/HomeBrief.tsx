@@ -376,7 +376,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
-  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState === 'visible') tick(n => n + 1);}; /* 04/11/2026 (Pedro: "o agora pula"): ao voltar a aba a linha desliza ate a hora certa, sem salto */
+  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState !== 'visible') return; /* 05/11/2026 (Pedro: "tem que rodar em segundo plano"): o navegador pausa a aba escondida; ao voltar, a linha e o agora ja vao direto para a hora certa no mesmo instante (sem deslizar a partir de onde parou) */ if (dayRef.current === 0 && !dragRef.current) {const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.0005) jump(h);} tick(n => n + 1);};
     document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
