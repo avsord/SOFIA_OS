@@ -29,7 +29,7 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
   - Cópia criptografada do Início no navegador (`encrypted-storage.web.ts`, AES-GCM, chave não exportável no IndexedDB; apagada ao sair da conta) + `public/assets/early.js` pede as leituras do Início no carregamento do HTML.
   - Raiz da página com `overflow: clip` (o navegador deslocava a página de lado ao focar algo fora da borda).
   - Desfeito: encaixe (zoom) guardado no navegador — só diminuía e deixou o "Boa tarde" pequeno.
-- **ABERTURA ATUAL (05/11, aprovada pelo Pedro no endereço de teste e promovida à principal):** quase sem escala (104%→100% em 3,2 s), subida leve (10% da distância, 2,4 s) começando 0,5 s antes de a tela abrir, fileiras logo ao abrir (`INTRO`/`INTRO_T` em HomeHero.tsx; interruptor ?teste=1 removido). Guardada na branch `aprovado/site-abertura-2026-11-05`. Versões anteriores: `aprovado/site-abertura-2026-11-04` e `-v2`.
+- **ABERTURA ATUAL (05/11, aprovada pelo Pedro no endereço de teste e promovida à principal):** quase sem escala (104%→100% em 3,2 s), subida leve (10% da distância, 2,4 s) começando 0,5 s antes de a tela abrir, fileiras logo ao abrir; data em fade junto com a saudação (sem digitar) e resumo em fade de 0,9 s (`INTRO`/`INTRO_T` em HomeHero.tsx). Guardada na branch `aprovado/site-abertura-2026-11-05`. Versões anteriores: `aprovado/site-abertura-2026-11-04` e `-v2`.
 - **Em aberto (site):** barra lateral às vezes estreita (~126 px) com o conteúdo largo dentro, cortado (print do Pedro 16:17) — causa não achada; não reproduz aqui em 1763/1410/1175 px. Pulo no fim da abertura: Pedro aprovou a versão atual; se voltar, pedir vídeo (consigo analisar quadro a quadro com ffmpeg).
 - **Android:** APKs gerados, mas o teste "R7 heavy data" falhou em 3 de 4 compilações da tarde (0bc5e50, d6966d8, f79294e; 774405b passou): 1–2 tentativas do modo Antigo passam de 8 s para mostrar Páginas (as outras 3,6–4,4 s, igual às verdes). As mudanças da tarde só rodam no site, mas a frequência pede investigação antes de testar no celular. Nada publicado no atualizador.
 - **Lição da tarde:** ~20 ajustes publicados direto no site, testados só em condições de laboratório, trouxeram regressões que o Pedro achou. Combinado: versão em endereço de teste + vídeo nas condições dele (tela 1763 px, dados no volume dele, rede lenta) antes de publicar.
@@ -289,11 +289,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-04 | (delivery) | Lista do Pedro: mini chat por baixo das fileiras, nomes cortados no balão, agora pulando, clicar na bolinha cria, segurar a data cria, criação pela Sofia demora, painel Editar passando da borda + confirmação atrás, selo "menor preço" do Price Tracker | 1536/1920 px: painel cabe, confirmação por cima; testes ok |
 | 2026-11-05 | (delivery) | Abertura do teste (?teste=1) promovida à principal e interruptor removido; Price Tracker mostra o menor preço real entre as lojas em todo lugar (Início, lista e detalhe) | filmado; testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo do Início (computador): o lápis do balão abre um mini editor no próprio balão — nome, horário, Importante, Salvar (Enter), Cancelar (Esc), "Mais opções" abre o editor completo | testado no navegador: nome e horário salvos e refletidos na linha; testes ok |
 | 2026-11-05 | (delivery) | Mini editor da linha do tempo: + descrição, nível de importância (Importante/Média/Baixa/Sem), data e horário por seletor; vale para tarefas, compromissos e lembretes; doses da Rotina/cápsulas com editor próprio (horário só desta vez + Tomei); abre para baixo da linha | testado: nome, descrição e prioridade salvos (API); testes ok |
 | 2026-11-05 | (delivery) | Clique fora fecha: balão e mini editor da linha do tempo, conversa rápida, menu de criar e painéis suspensos (Áreas/Ordem/Filtros de Notas e Biblioteca); notificações e engrenagem já fechavam | testado no navegador; testes ok |
+| 2026-11-05 | (delivery) | Abertura: data sem digitar, em fade de 0,7 s quase junto da saudação; resumo ("Dia cheio…") mais cedo (0,70 s na linha do tempo, era 1,14 s) e fade mais longo (0,9 s, era 0,45 s) | filmado; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

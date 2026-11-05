@@ -21,7 +21,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 // aprovado/site-abertura-2026-11-04-v2): quase sem escala (104% -> 100%, 3,2 s proprios), subida leve (10% da distancia, 2,4 s)
 // comecando 0,5 s antes de a tela abrir, e as fileiras logo ao abrir
 export const INTRO = {scale: 1.04, moveMs: 2400, scaleMs: 3200, ease: 'cubic-bezier(0.4,0,0.08,1)', scaleEase: 'cubic-bezier(0.25,0.1,0.1,1)', rowGap: 110, rowMs: 600, travel: 0.1};
-export const INTRO_T = {greet: 0, move: 140, date: 990, summary: 1140, rows: 480, glow: 1500};
+export const INTRO_T = {greet: 0, move: 140, date: 120, summary: 700, rows: 480, glow: 1500}; /* 05/11 (Pedro): data em fade quase junto da saudacao; resumo mais cedo */
 export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
   return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
 }
@@ -49,9 +49,9 @@ export function HomeHero({api, first, subtitle, wide, onContinue, minimal = fals
   const rv = React.useMemo(() => reveal?.done ? {greet: null, scale: {transform: [{scale: 1 / reveal.big}]}, date: null, chars: null, summary: null} : reveal?.at ? {
     greet: introAnim(reveal.at, INTRO_T.greet, 600, {opacity: 0}, {opacity: 1}),
     scale: {...introAnim(reveal.at, INTRO_T.move, INTRO.scaleMs, {transform: 'scale(1)'}, {transform: 'scale(' + (1 / reveal.big) + ')'}, INTRO.scaleEase), willChange: 'transform'},
-    date: introAnim(reveal.at, INTRO_T.date, 200, {opacity: 0}, {opacity: 1}),
-    chars: Array.from(date).map((_, i) => introAnim(reveal.at, INTRO_T.date + i * 32, 40, {opacity: 0}, {opacity: 1}, 'linear')),
-    summary: introAnim(reveal.at, INTRO_T.summary, 450, {opacity: 0}, {opacity: 1}),
+    date: introAnim(reveal.at, INTRO_T.date, 700, {opacity: 0}, {opacity: 1}), /* 05/11 (Pedro): sem digitar, so fade */
+    chars: null,
+    summary: introAnim(reveal.at, INTRO_T.summary, 900, {opacity: 0}, {opacity: 1}), /* fade mais longo e suave */
   } : null, [reveal?.at, reveal?.big, reveal?.done, date]);
   // 0.3.294 (Pedro): no computador o Inicio fica so com a data e a saudacao (sem a conversa rapida), para o resumo caber numa tela
   // 03/11/2026 (Pedro): no celular a saudacao tambem fica sem a conversa rapida, alinhada a esquerda como no app
