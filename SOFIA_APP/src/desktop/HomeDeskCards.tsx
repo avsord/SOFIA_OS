@@ -62,7 +62,7 @@ export function DeskTasksCard({todo, ready, areaLabel, priorityLabel, onArea, on
       <Text style={{color: c.muted, fontSize: 12, marginLeft: 2}}>{todo.length}</Text>
     </View>
     <TextInput accessibilityLabel="Buscar tarefa no Início" value={query} onChangeText={onQuery} placeholder="Buscar tarefa" placeholderTextColor={c.muted} style={{color: c.text, backgroundColor: c.input, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, outlineStyle: 'none'} as any} />
-    <View onLayout={e => setListH(e.nativeEvent.layout.height)} style={{flex: 1, minHeight: ROW * 4, overflow: 'hidden'}}>
+    <View onLayout={e => {const h = e.nativeEvent.layout.height; if (h > 0) setListH(h);}} style={{flex: 1, minHeight: ROW * 4, overflow: 'hidden'}}>
       <View style={{position: 'absolute', top: 0, left: 0, right: 0}}>
         {!ready ? <Text style={{color: c.muted, fontSize: 13, paddingVertical: 12}}>Sincronizando tarefas…</Text> : !todo.length ? <Text style={{color: c.muted, fontSize: 13, paddingVertical: 12}}>{query ? 'Nenhuma tarefa com essa busca.' : 'Tudo em dia por aqui.'}</Text> : todo.slice(0, fit).map((t, i) => <View key={t.id} style={{flexDirection: 'row', alignItems: 'center', gap: 12, height: ROW, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
           <Pressable disabled={busy} accessibilityRole="checkbox" accessibilityLabel={'Concluir ' + t.title} accessibilityState={{checked: t.state === 'done'}} onPress={() => onToggle(t)} style={{width: 28, height: 28, alignItems: 'center', justifyContent: 'center'}}><View style={{width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: c.muted}} /></Pressable>

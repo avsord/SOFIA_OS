@@ -174,3 +174,10 @@ test('Título da página com a altura do texto (sem cortar e sem barrinha de rol
  assert.ok(pg.includes("t.style.overflow='hidden';")&&pg.includes('titleRef.current=n;'));
  assert.ok(pg.includes('d?.fonts?.ready?.then('),'mede de novo quando a fonte do site chega');
 });
+
+test('RAIZ do Início "achatando": telas de fora ficam invisíveis com o tamanho real (nada mede 0)',()=>{
+ const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopPages.tsx'),'utf8');
+ assert.ok(d.includes("...(hidden?{visibility:'hidden',zIndex:0}:{zIndex:1})")&&d.includes("pointerEvents={hidden?'none':'auto'}"));
+ assert.ok(!d.includes("display:on?'flex':'none'"),'não esconde mais com display:none (que media tudo como 0)');
+ assert.ok(fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeDeskCards.tsx'),'utf8').includes('if (h > 0) setListH(h);'));
+});

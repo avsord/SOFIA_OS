@@ -214,6 +214,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 8. Regras que não se quebram
 
+- Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
+
 - Preservar assinatura, package `com.avsord.sofiaapp`, versionCode crescente,
   prefixo `sofia-android-v`, login, histórico, SQLite e Railway. Instalação por
   cima; nunca limpar dados.
@@ -297,11 +299,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Capa: botões no canto de baixo por cima do cabeçalho, reposicionar abre sozinho depois de enviar, sem piscar ao trocar de página (capa da memória no 1º quadro, tamanho guardado, capas recentes baixadas antes, foto reduzida a 2000 px ao enviar) | medido: capa em ~10 ms ao trocar com rede lenta; testes ok |
 | 2026-11-05 | (delivery) | Capa no site nasce na posição escolhida (img com object-position; antes aparecia centralizada e pulava); arrastar página na lateral: terço de cima/baixo = acima/abaixo com linha de destino, meio = dentro | quadros gravados: troca de página sem quadro intermediário; testes ok |
 | 2026-11-05 | (delivery) | Início: bloco "Agenda · próximos" mostra a partir de amanhã (o de hoje fica na linha do tempo), dia inteiro pela data | testado no navegador; testes ok |
 | 2026-11-05 | (delivery) | Colar imagem copiada: na janela da capa (Ctrl+V ou "Colar imagem copiada") e no texto da página (vira bloco de imagem; arrastar arquivo também); imagem do bloco no site baixada com a sessão | testado no navegador (colar simulado); testes ok |
 | 2026-11-05 | (delivery) | Título da página cortado com barrinha de rolagem (tela grande/fonte chegando depois): título com a altura do texto, sem rolagem, medido de novo quando a fonte carrega | medido em 1300 e 2560 px; testes ok |
+| 2026-11-05 | (delivery) | RAIZ do Início "achatando" ao voltar: telas de fora eram escondidas com display:none e tudo dentro media 0 (remendado peça a peça desde 0.3.291); agora ficam invisíveis com o tamanho real (visibility hidden, sem clique). Nota: título e linhas com a altura do texto (fim do espaço enorme) | medido: Início escondido mantém tamanho, volta em 1 quadro; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

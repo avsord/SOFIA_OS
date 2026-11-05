@@ -14,7 +14,13 @@ export function DesktopPages({activeTab,maxWidth,children}:{activeTab:Tab;maxWid
   {React.Children.map(children,(child,index)=>{const id=TAB_ORDER[index],on=id===activeTab,max=maxWidth(id),shown=seen.current.has(id);
    // 0.3.253: a tela ocupa a regiao inteira (a rolagem e a barra ficam na borda); so o conteudo se centraliza na largura de leitura
    const body=<ContentWidth.Provider value={max}><View style={{flex:1,width:'100%'}}>{child}</View></ContentWidth.Provider>;
-   return <View key={id} testID={'desktop-page-'+id} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:on?'flex':'none'}} accessibilityElementsHidden={!on} importantForAccessibility={on?'auto':'no-hide-descendants'}>
+   // 05/11/2026 (Pedro: "pela milesima vez volto pro Inicio e o conteudo da uma achatada e volta"): RAIZ - a tela que sai
+   // era escondida com display:none e o navegador passa a medir TUDO dentro dela como 0. Cada medida guardada (altura do
+   // Inicio, listas dos blocos, encaixe...) voltava achatada e so se corrigia no quadro seguinte. Remendado peca por peca
+   // (0.3.291, briefH, homeViewH). Agora a tela de fora fica invisivel MAS com o tamanho real (visibility hidden): nada mede
+   // 0, nada recalcula ao voltar. Sem clique/foco (pointerEvents none, aria-hidden) e atras da tela atual.
+   const hidden=!on;
+   return <View key={id} testID={'desktop-page-'+id} pointerEvents={hidden?'none':'auto'} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:shown?'flex':'none',...(hidden?{visibility:'hidden',zIndex:0}:{zIndex:1}) as any}} accessibilityElementsHidden={hidden} importantForAccessibility={on?'auto':'no-hide-descendants'} {...({'aria-hidden':hidden?true:undefined,'data-active':on?'1':'0'} as any)}>
     <Activity mode={shown?'visible':'hidden'}>{body}</Activity>
    </View>;})}
  </View>;
