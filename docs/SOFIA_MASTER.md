@@ -290,11 +290,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Linha do tempo: ao voltar para a aba, a linha e o "agora" vão direto para a hora certa no mesmo instante (antes deslizavam a partir de onde pararam) — o navegador pausa a aba escondida | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: X ao lado do lápis em tudo (tarefa: "Tirar da linha do tempo" ou "Excluir tarefa"; compromisso/lembrete: excluir; conta/encomenda/dose: tirar só da linha, neste computador); mover é definitivo (sem voltar ao horário combinado na virada do dia); brilho da abertura sem escurecer no meio da troca faixa→oval | testado: tarefa saiu da linha e ficou em Tarefas (API); testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um item de um grupo (pela alça do balão) deixa a bolinha centrada sob o mouse (antes ficava deslocada pela distância até a alça) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um grupo — ao soltar, todos os itens já aparecem juntos no lugar novo enquanto cada um é gravado (antes o grupo se separava e depois se juntava) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: "+ Adicionar às HH:MM" no balão abre o criador naquele horário; brilho da abertura volta a trocar faixa→oval ao mesmo tempo (curvas complementares, sem escurecer e sem as duas acesas) — o oval final não mudou (medido contra a versão de 04/11) | testado: + abre o criador; testes ok |
+| 2026-11-05 | (delivery) | Brilho da abertura: troca faixa→oval volta a ser simultânea como antes, agora em 2,2 s com fim bem lento; oval ~25% menos intenso | testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
