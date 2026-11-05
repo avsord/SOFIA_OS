@@ -623,7 +623,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       <Icon name="checkCircle" size={15} color="#5FD3A2" /><Text style={{fontSize: 13, color: c.text}}>{toast.text}</Text>
       {toast.undo ? <Pressable accessibilityRole="button" onPress={() => {const u = toast.undo; setToast(null); void u?.();}}><Text style={{fontSize: 13, fontWeight: '600', color: c.accent}}>Desfazer</Text></Pressable> : null}
     </View> : null}
-    {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onPin={() => setPin(shown.key)} onGrab={actions.onMove && WEB /* 03/11/2026: arrastar so existe no navegador; no celular a alca nao aparece */ ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
+    {shown && !drag?.live && !adding ? <PreviewCard point={shown} width={wS || w} pinned={pin === shown.key} actions={actions} desc={desc} onEnter={() => enter(shown.key)} onLeave={leave} onClose={() => {setPin(''); setHover('');}} onPin={() => setPin(shown.key)} onAddHere={actions.sofia || actions.onAddAt ? () => {const fx = shown.x; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: snapDate(fx)});} : undefined} onGrab={actions.onMove && WEB /* 03/11/2026: arrastar so existe no navegador; no celular a alca nao aparece */ ? (e, t, color) => beginDrag(e, 'g' + shown.key + ('rec' in t ? t.rec.id + t.rec.date : 'dose' in t ? t.dose.planId + t.dose.time : t.mark.id), [{t, at: 'rec' in t ? new Date(t.rec.date) : 'dose' in t ? (shown.marks.find(x => x.dose === t.dose)?.at || new Date()) : t.mark.at}], shown.x, color) : undefined} /> : null}
    </View>
     {side ? <Pressable testID="timeline-today" accessibilityRole="button" accessibilityLabel="Voltar para o início do dia" onPress={() => goDay(0)}
       style={({hovered}: any) => ({position: 'absolute', top: 42 + OFF + 7 - 12, [side]: 0, /* 0.3.348 (Pedro): o "agora" fica na linha das horas, alinhado no meio dela */ opacity: ease, pointerEvents: ease > 0.5 ? 'auto' : 'none', height: 24, paddingHorizontal: 11, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: hovered ? c.danger : tint('#F5A0AE', 0.18), zIndex: 3} as any)}>
@@ -862,7 +862,7 @@ function QuickDose({m, color, action, onAction, onSave, onCancel, onMore}: {m: T
     </View>
   </View>;
 }
-function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onPin, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onPin?: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
+function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onPin, onAddHere, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onPin?: () => void; onAddHere?: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const [quick, setQuick] = useState<DayRecord | null>(null), [quickMark, setQuickMark] = useState<TimeMark | null>(null);
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
   const W = quick || quickMark ? 380 : single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
@@ -905,6 +905,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       <View style={{height: 1, backgroundColor: c.line, marginHorizontal: -12, marginTop: 0}} />
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
         <Pressable accessibilityRole="button" onPress={() => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 10, borderRadius: 8, backgroundColor: hovered ? c.line : c.input, transform: [{scale: pressed ? 0.97 : 1}]})}><Icon name="edit" size={12} color={c.text} /><Text style={{fontSize: 12, fontWeight: '600', color: c.text}}>Editar</Text></Pressable>
+        {onAddHere ? <Pressable accessibilityRole="button" accessibilityLabel="Adicionar neste horário" onPress={onAddHere} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name="plus" size={13} color={c.accent} /></Pressable> : null}
         {askRemove ? <Pressable accessibilityRole="button" accessibilityLabel={'Remover ' + r.title} onPress={() => askRemove(r)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name="close" size={13} color={c.muted} /></Pressable> : null}
         {onGrab ? null : null}
       </View>
@@ -928,6 +929,10 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
         : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
     </>}</HoverPressable>;
   const many = total > 1;
+  // 05/11/2026 (Pedro: "no balao, um + para adicionar naquele horario")
+  const addLine = <Pressable accessibilityRole="button" accessibilityLabel="Adicionar neste horário" onPress={onAddHere} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 4, marginTop: 2, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
+    <View style={{width: 22, height: 22, borderRadius: 7, backgroundColor: tint(c.accent, 0.16), alignItems: 'center', justifyContent: 'center'}}><Icon name="plus" size={13} color={c.accent} /></View>
+    <Text style={{fontSize: 12, color: c.accent}}>Adicionar às {firstAt ? hhmm(firstAt) : hhmm(new Date())}</Text></Pressable>;
   return shell(<View style={{paddingVertical: 6}}>
     {many ? <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2}}>
       <Text style={{fontSize: 14, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums']}}>{firstAt ? hhmm(firstAt) : ''}</Text><Text style={{fontSize: 12, color: c.muted}}>{total} itens</Text>
@@ -939,6 +944,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: m.done && m.kind === 'routine',
       action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: m.kind === 'routine' && m.dose && actions.onMove ? () => {onPin?.(); setQuickMark(m);} : actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, onRemove: askHide ? () => askHide(m) : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 16, paddingVertical: 6}}>+{extra} mais</Text> : null}
+    {onAddHere ? addLine : null}
   </View>, !many && point.marks[0]?.kind === 'routine' ? markColor(point.marks[0], c.danger) : undefined);
 }
 
