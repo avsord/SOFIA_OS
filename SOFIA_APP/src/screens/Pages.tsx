@@ -31,7 +31,7 @@ import {mergeRemotePages} from '../lib/page-sync';
 import {entryBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {openContextMenu} from '../components/ContextMenu';
-import {PageCover,PageAppearance,PAGE_COVERS,coverPosition} from '../components/PageAppearance';
+import {PageCover,PageAppearance,PAGE_COVERS,coverPosition,prefetchPageCover} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
 import {comparePageOrder} from '../lib/page-order';
@@ -413,7 +413,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function removePage(){if(entry)confirmDeletePage(entry.base);}
  // 0.3.267 (computador): subpágina como linha do texto (ícone + título sublinhado), como no Notion; prévia ao passar o mouse
  const [peek,setPeek]=useState<{id:string;x:number;y:number}|null>(null),peekTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
- function peekIn(id:string,e:any){if(!desktop)return;const t=e?.currentTarget;let r:any=null;try{r=t?.getBoundingClientRect?.();}catch{}if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=setTimeout(()=>setPeek({id,x:r?r.left:0,y:r?r.bottom+6:0}),420);}
+ function peekIn(id:string,e:any){if(!desktop)return;prefetchPageCover(api,byId.get(id)?.data);const t=e?.currentTarget;let r:any=null;try{r=t?.getBoundingClientRect?.();}catch{}if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=setTimeout(()=>setPeek({id,x:r?r.left:0,y:r?r.bottom+6:0}),420);}
  function peekOut(){if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=null;setPeek(null);}
  function pageLinkView(page:Entity,key:string,b?:PageBlock){
   const icon=String(page.data?.icon||'');
@@ -556,6 +556,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
       </View>:null}</View>:null}
   </PageDocumentScroll>;
  }
+  // 05/11/2026: capas das paginas recentes ja baixadas antes de abrir (trocar de pagina sem esperar a capa)
+  useEffect(()=>{if(Platform.OS!=='web'||!desktop)return;const list=[...displayPages].filter(p=>p.data?.cover_type==='attachment'&&p.data?.cover_attachment_id).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,12);
+   const timers=list.map((p,i)=>setTimeout(()=>prefetchPageCover(api,p.data),600+i*350));return()=>timers.forEach(clearTimeout);},[displayPages,desktop,api]);
   const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
  const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}

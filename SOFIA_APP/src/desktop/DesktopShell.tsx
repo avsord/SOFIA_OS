@@ -18,6 +18,7 @@ import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
 import {systemChanged,subscribeSystemChanged} from '../lib/system-events';
 import {useHoverHold} from '../lib/hover-hold';
+import {prefetchPageCover} from '../lib/page-cover-prefetch';
 import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
@@ -56,9 +57,9 @@ function usePageDirectory(api:SofiaApi){
  return pages;
 }
 
-function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onToggle,expanded,hasChildren,hint,testID,menu,onAdd,drop,dragRef,dimmed}:{icon?:IconName;emoji?:string;label:string;selected?:boolean;onPress:()=>void;depth?:number;collapsed?:boolean;trailing?:string;onToggle?:()=>void;expanded?:boolean;hasChildren?:boolean;hint?:string;testID?:string;menu?:()=>MenuItem[];onAdd?:()=>void;drop?:'before'|'after'|'inside'|null;dragRef?:(node:any)=>void;dimmed?:boolean}){
+function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onToggle,expanded,hasChildren,hint,testID,menu,onAdd,drop,dragRef,dimmed,onHover}:{icon?:IconName;emoji?:string;label:string;selected?:boolean;onPress:()=>void;depth?:number;collapsed?:boolean;trailing?:string;onToggle?:()=>void;expanded?:boolean;hasChildren?:boolean;hint?:string;testID?:string;menu?:()=>MenuItem[];onAdd?:()=>void;drop?:'before'|'after'|'inside'|null;dragRef?:(node:any)=>void;dimmed?:boolean;onHover?:()=>void}){
  const c=useTheme(),hold=useHoverHold(),hover=hold.on;
- return <Pressable ref={dragRef as any} testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress} onHoverIn={hold.enter} onHoverOut={hold.leave} {...(menu?contextMenu(menu):{})}
+ return <Pressable ref={dragRef as any} testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress} onHoverIn={()=>{hold.enter();onHover?.();}} onHoverOut={hold.leave} {...(menu?contextMenu(menu):{})}
   style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:32,paddingLeft:collapsed?0:8+depth*14,paddingRight:8,justifyContent:collapsed?'center':'flex-start',marginHorizontal:8,borderRadius:8,backgroundColor:drop==='inside'?c.accent+'40':selected?c.accentSoft:hovered?c.line+'80':'transparent',opacity:dimmed?0.45:1,borderTopWidth:2,borderBottomWidth:2,borderTopColor:drop==='before'?c.accent:'transparent',borderBottomColor:drop==='after'?c.accent:'transparent'})}>
   {onToggle?<Pressable accessibilityRole="button" accessibilityLabel={(expanded?'Recolher ':'Abrir ')+label} onPress={onToggle} hitSlop={6} style={{width:16,height:16,alignItems:'center',justifyContent:'center',opacity:hasChildren?1:0.35}}><View style={{...({transitionProperty:'transform',transitionDuration:'160ms',transitionTimingFunction:'ease-out'} as any),transform:[{rotate:expanded?'90deg':'0deg'}]}}><Icon name="chevron" size={13} color={c.muted}/></View></Pressable>:null}
   {emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{emoji}</Text>:icon?<Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>:null}
@@ -114,7 +115,7 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
-  rows.push(<Row key={p.id} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>{if(!justDragged.current)onOpen(p.id);}} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:null} dimmed={drag?.id===p.id}/>);
+  rows.push(<Row key={p.id} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>{if(!justDragged.current)onOpen(p.id);}} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:null} dimmed={drag?.id===p.id}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);

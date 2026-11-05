@@ -140,3 +140,12 @@ test('Capa: botões no canto de baixo por cima do cabeçalho e reposicionar abre
  assert.ok(pg.includes("testID=\"page-cover-tools\" style={{position:'absolute',right:16,top:250-12-30,zIndex:30,"));
  assert.ok(pg.includes("if(desktop&&patch.cover_type==='attachment'&&patch.cover_attachment_id)setTimeout(startCoverMove,0);"));
 });
+
+test('Capa ao trocar de página: aparece na hora (memória), tamanho guardado, baixada antes e reduzida ao enviar',()=>{
+ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');const a=read('src/components/PageAppearance.tsx'),pre=read('src/lib/page-cover-prefetch.ts');
+ assert.ok(a.includes('useState(()=>preview||peekCover(attachment))'),'capa já baixada no primeiro quadro');
+ assert.ok(a.includes('useState<{w:number;h:number}|null>(()=>IMAGE_SIZES.get(uri)||null)'));
+ assert.ok(pre.includes('export function prefetchPageCover(')&&read('src/screens/Pages.tsx').includes('prefetchPageCover(api,p.data)'));
+ assert.ok(read('src/desktop/DesktopShell.tsx').includes("from '../lib/page-cover-prefetch'"),'barra lateral não carrega a janela de capa');
+ assert.ok(a.includes('const scale=Math.min(1,2000/Math.max(1,bmp.width));'),'foto reduzida a 2000 px ao enviar');
+});

@@ -13,6 +13,8 @@ import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
 import {cachedPageCover} from '../lib/page-cover-cache';
+import {IMAGE_SIZES,peekCover,prefetchPageCover} from '../lib/page-cover-prefetch';
+export {prefetchPageCover};
 import {MotionModal} from './MotionModal';
 import {useDesktop} from '../lib/desktop';
 export const PAGE_COVERS=[
@@ -35,18 +37,28 @@ const EMOJI_WORDS:[string,string][]=[
  ['🎵','musica nota'],['🎶','musica trilha'],['🎧','fone musica'],['🎤','microfone'],['🎸','guitarra'],['🎮','jogo game'],['🏋️','academia treino'],['🧘','meditar yoga'],['⚽','futebol'],['🏆','trofeu vitoria'],['🎓','formatura estudo curso'],['👶','bebe'],['🐶','cachorro'],['🐱','gato'],
  ['🔗','link'],['🔎','busca lupa'],['🔐','cadeado senha'],['🔒','cadeado'],['✅','feito check'],['☑️','checkbox'],['❌','erro x'],['⚠️','aviso'],['❓','pergunta'],['💬','conversa chat'],['📣','anuncio'],['🧩','quebra cabeca'],['🎲','dado'],['💎','diamante'],['🪄','magica'],['🥷','ninja'],['🧏','pessoa'],['👤','pessoa perfil'],['👥','pessoas equipe'],['🏷️','etiqueta preco'],['🎉','festa'],['🌍','mundo terra']];
 const fold=(v:string)=>v.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+/** Site: capa grande (fotos de 4000 px, varios MB) vira JPEG de ate 2000 px de largura antes de enviar. GIF fica como esta. */
+async function shrinkCover(file:Blob):Promise<Blob>{
+ try{const g=globalThis as any;if(!g.createImageBitmap||!g.document||/gif/i.test(file.type))return file;const bmp=await g.createImageBitmap(file);
+  const scale=Math.min(1,2000/Math.max(1,bmp.width));if(scale>=1&&file.size<1.5*1024*1024){bmp.close?.();return file;}
+  const canvas=g.document.createElement('canvas');canvas.width=Math.round(bmp.width*scale);canvas.height=Math.round(bmp.height*scale);canvas.getContext('2d').drawImage(bmp,0,0,canvas.width,canvas.height);bmp.close?.();
+  const out:Blob|null=await new Promise(ok=>canvas.toBlob((b:Blob|null)=>ok(b),'image/jpeg',0.86));return out&&out.size<file.size?out:file;}catch{return file;}
+}
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 /** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */
 // 0.3.268: a previa local da capa so vale no aparelho que enviou (caminho file:// do celular nao abre no site e vice-versa);
 // fora dele a capa vem do servidor, a mesma em todos.
 const localPreview=(uri:string)=>Platform.OS==='web'?(/^(data:|blob:|https?:)/.test(uri)?uri:''):(/^(file:|content:)/.test(uri)?uri:'');
 export function coverPosition(data:Record<string,any>):number{const raw=data?.cover_position,n=Number(raw);return raw!==''&&raw!=null&&Number.isFinite(n)?Math.max(0,Math.min(100,n)):50;}
+// 05/11/2026 (Pedro: "quando saio de uma pagina pra outra a capa da uma flicada e demora pra carregar"): a capa ja
+// baixada aparece no mesmo quadro (antes comecava vazia e mostrava o carregando), o tamanho da imagem fica guardado
+// (sem redesenhar depois de medir) e as capas das paginas recentes sao baixadas antes de abrir.
 /** Desenha a imagem cobrindo a capa e deslocada pela posicao. No modo reposicionar, arrastar move a imagem. */
 function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
- const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(null),[pos,setPos]=useState(position);
+ const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(()=>IMAGE_SIZES.get(uri)||null),[pos,setPos]=useState(position);
  const live=useRef({pos:position,start:position,extra:0,editing:repositioning,onPosition});
  useEffect(()=>{if(!repositioning)setPos(position);live.current.pos=position;},[position,repositioning]);
- useEffect(()=>{let alive=true;setImg(null);Image.getSize(uri,(w,h)=>{if(alive&&w>0&&h>0)setImg({w,h});},()=>{});return()=>{alive=false;};},[uri]);
+ useEffect(()=>{let alive=true;const known=IMAGE_SIZES.get(uri);if(known){setImg(known);return;}setImg(null);Image.getSize(uri,(w,h)=>{if(alive&&w>0&&h>0){IMAGE_SIZES.set(uri,{w,h});setImg({w,h});}},()=>{});return()=>{alive=false;};},[uri]);
  const scale=img&&box.w>0&&box.h>0?Math.max(box.w/img.w,box.h/img.h):0;
  const width=img?img.w*scale:0,height=img?img.h*scale:0,extra=Math.max(0,height-box.h);
  live.current.extra=extra;live.current.editing=repositioning;live.current.onPosition=onPosition;
@@ -65,10 +77,10 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
 }
 export function PageCover({data,api,repositioning=false,onPosition}:{data:Record<string,any>;api:SofiaApi;repositioning?:boolean;onPosition?:(n:number)=>void}){
  const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=localPreview(String(data.cover_local_uri||'')),gradientId='cover'+React.useId().replace(/[^a-zA-Z0-9]/g,'');
- const [uri,setUri]=useState(preview),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
+ const [uri,setUri]=useState(()=>preview||peekCover(attachment)),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  const retry=useRef<()=>void>(()=>{});
  useEffect(()=>{
-  let live=true,count=0;setFailed(false);setAttempt(0);setUri(preview);
+  let live=true,count=0;setFailed(false);setAttempt(0);const ready=preview||peekCover(attachment);setUri(ready);
   async function load(force=false){
    if(!attachment)return;
    count++;setAttempt(count);
@@ -76,7 +88,7 @@ export function PageCover({data,api,repositioning=false,onPosition}:{data:Record
    catch{if(live)setFailed(true);}
   }
   retry.current=()=>{setFailed(false);void load(true);};
-  if(attachment&&!preview)void load(false);
+  if(attachment&&!ready)void load(false);
   return()=>{live=false;retry.current=()=>{};};
  },[attachment,preview,api]);
  if(data.cover_type==='attachment'&&attachment){
@@ -104,7 +116,8 @@ export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:
    // 0.3.267: o arquivo é lido direto (antes fetch do link blob:, que a política de segurança do site bloqueia: "Failed to fetch")
    const file:Blob|undefined=(asset as any).file;
    if(file){if(file.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
-    const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(file);});base64=data.slice(data.indexOf(',')+1);}
+    const small=await shrinkCover(file);
+    const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(small);});base64=data.slice(data.indexOf(',')+1);}
    else throw new Error('Não foi possível ler a imagem escolhida. Tente de novo.');
    if(base64.length*0.75>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
   }else{
