@@ -289,11 +289,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Clique fora fecha: balão e mini editor da linha do tempo, conversa rápida, menu de criar e painéis suspensos (Áreas/Ordem/Filtros de Notas e Biblioteca); notificações e engrenagem já fechavam | testado no navegador; testes ok |
 | 2026-11-05 | (delivery) | Abertura: data sem digitar, em fade de 0,7 s quase junto da saudação; resumo ("Dia cheio…") mais cedo (0,70 s na linha do tempo, era 1,14 s) e fade mais longo (0,9 s, era 0,45 s) | filmado; testes ok |
 | 2026-11-05 | (delivery) | Abertura mais leve, quase imperceptível: subida 5% da distância (era 10%), escala 102% (era 104%), blocos sobem 6 px (era 14 px); brilho oval logo ao abrir (0,56 s na linha do tempo, era 1,5 s) | filmado; testes ok |
 | 2026-11-05 | (delivery) | Abertura com menos movimento ainda: subida 2% da distância, escala 101%, blocos sobem 3 px (quase só fade) | testes ok |
 | 2026-11-05 | (delivery) | Abertura com bem menos movimento: subida 0,8% da distância, escala 100,5%, blocos sobem 1 px (praticamente só fade) | testes ok |
+| 2026-11-05 | (delivery) | Linha do tempo: número da bolinha agrupada e o "+N" do rótulo contam só itens em aberto (tarefa concluída não conta); o rótulo mostra o primeiro em aberto | testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

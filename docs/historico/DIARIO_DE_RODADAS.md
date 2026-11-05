@@ -189,3 +189,4 @@ Cada rodada nova acrescenta UMA linha curta no fim (até ~300 caracteres): data 
 | 2026-11-05 | (delivery) | Abertura mais leve, quase imperceptível: subida 5% da distância (era 10%), escala 102% (era 104%), blocos sobem 6 px (era 14 px); brilho oval logo ao abrir (0,56 s na linha do tempo, era 1,5 s) | filmado; testes ok |
 | 2026-11-05 | (delivery) | Abertura com menos movimento ainda: subida 2% da distância, escala 101%, blocos sobem 3 px (quase só fade) | testes ok |
 | 2026-11-05 | (delivery) | Abertura com bem menos movimento: subida 0,8% da distância, escala 100,5%, blocos sobem 1 px (praticamente só fade) | testes ok |
+| 2026-11-05 | (delivery) | Linha do tempo: número da bolinha agrupada e o "+N" do rótulo contam só itens em aberto (tarefa concluída não conta); o rótulo mostra o primeiro em aberto | testes ok |

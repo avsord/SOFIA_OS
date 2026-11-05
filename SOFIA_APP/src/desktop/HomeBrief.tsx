@@ -43,6 +43,9 @@ const isImportant = (t: Task) => t.priority_level === 'important';
 const isOut = (x: {step: number; needs: string; delivered: boolean}) => !x.delivered && x.step === 2 && x.needs !== 'pickup';
 /** cor do item na Agenda (tarefa usa a prioridade da tarefa; compromisso a do evento; feriado verde) */
 /** 0.3.332: urgencia do item (importante 3 > media 2 > leve 1 > sem 0) - o mais urgente manda no miolo da bolinha agrupada */
+// 05/11/2026 (Pedro: "quando for ticado precisa aparecer como 2 e nao como 3"): o que ja foi concluido nao conta no numero da bolinha
+const isDoneRec = (r: DayRecord) => !!r.isTask && (r.original as any)?.state === 'done';
+const openRecs = (recs: DayRecord[]) => {const o = recs.filter(x => !isDoneRec(x)); return o.length ? o : recs;};
 const urgOf = (r: DayRecord) => {const o: any = r.original || {}; const v = o.data?.priority_level ?? o.priority_level; return v === 'important' ? 3 : v === 'medium' ? 2 : v === 'light' ? 1 : 0;};
 const LIME = '#C3DC82', IMPORTANT_RED = '#D94B57';
 /** 0.3.335 (Pedro: "naturaliza mais o degrade"): curva suave para o fundo dos periodos - nasce devagar em cima (sem borda),
@@ -485,11 +488,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const near = inside(pv?.getBoundingClientRect(), 6) || inside(dot?.getBoundingClientRect?.(), 30);
       if (near) {clearTimeout(hide.current); farT.current = false;} else if (!farT.current) {farT.current = true; clearTimeout(hide.current); hide.current = setTimeout(() => {farT.current = false; setHover(''); setNearKey('');}, 140);}};
     document.addEventListener('mousemove', mv); return () => document.removeEventListener('mousemove', mv);}, [hover, pin]);
-  const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string; imp?: boolean; sub?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = p.recs[0], isNext = !!next && p.recs.includes(next);
+  const tagOf = (p: Point): {text: string; more?: number; color: string; strong?: boolean; bg?: string; imp?: boolean; sub?: string} => {const m = p.marks[0]; if (m) return {text: m.title + ' · ' + m.sub, color: markColor(m, c.danger), strong: true}; const r = openRecs(p.recs)[0], isNext = !!next && p.recs.includes(next);
     // 0.3.321 (revisao - Reconhecer): bolinha com varios itens mostra o primeiro e quantos mais ("09:00 Cafe +3"), nao so "4 itens"
-    const imp = p.recs.length > 1 && urgOf(r) === 3, mins = isNext ? Math.round((new Date(r.date).getTime() - Date.now()) / 60000) : -1;
+    const imp = openRecs(p.recs).length > 1 && urgOf(r) === 3, mins = isNext ? Math.round((new Date(r.date).getTime() - Date.now()) / 60000) : -1;
     const inTxt = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';
-    return {text: hhmm(new Date(r.date)) + ' ' + r.title, more: p.recs.length - 1, color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined, imp, sub: inTxt};};
+    return {text: hhmm(new Date(r.date)) + ' ' + r.title, more: openRecs(p.recs).length - 1, color: p.recs.length === 1 && r.kind === 'reminder' ? REMIND : isNext ? c.text : c.muted, strong: isNext, bg: isNext ? tint(c.accent, 0.14) : undefined, imp, sub: inTxt};};
   // 0.3.318 (Pedro): o "agora" fica na altura da linha, colado na borda para onde ele leva ("‹ agora" na esquerda,
   // "agora ›" na direita); a linha encolhe daquele lado (deslizando) para o botao nao cobrir a marca da ponta
   // 0.3.319: o espaco do botao abre e fecha JUNTO com o movimento da linha (sai da distancia ate 07:00), sem transicao
@@ -572,7 +575,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
           return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
             style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, ...(WEB ? {backgroundImage: ring} : {backgroundColor: tint(cols[0], 0.45)}), boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
-            <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{p.recs.length}</Text></View>
+            <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{openRecs(p.recs).length}</Text></View>
           </Pressable>;}
         const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
