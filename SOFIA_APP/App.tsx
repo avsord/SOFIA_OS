@@ -43,7 +43,7 @@ import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff, revealWebVeil} from './src/lib/launch-handoff';
 import {wipeEncryptedStorage} from './src/lib/encrypted-storage';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
-import {isWeb,pathToRoute,routeTitle,routeToPath} from './src/lib/web-route';
+import {isWeb,pathToRoute,routeTitle,routeToPath,pageIdFromPath} from './src/lib/web-route';
 import {installWebPage} from './src/lib/web-page';
 import {ContextMenuHost} from './src/components/ContextMenu';
 import {UnreadTitle} from './src/components/UnreadTitle';
@@ -200,10 +200,13 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  // 0.3.260 (fase 2): endereco por tela no site (F5, voltar do navegador, favoritos) e titulo da aba por tela.
  const [appsModule,setAppsModule]=useState(''),routeReady=useRef(false),routeFromPop=useRef(false),lastPush=useRef({path:'',at:0}),initialPath=useRef('');
  useEffect(()=>{if(!isWeb())return;const r=pathToRoute(window.location.pathname);
-  if(r){initialPath.current=routeToPath(r);if(r.tab!=='home')navigate(r.tab);if(r.tab==='apps'&&r.module)setTimeout(()=>openModule(r.module),0);}
+  if(r){initialPath.current=routeToPath(r);if(r.tab!=='home')navigate(r.tab);if(r.tab==='apps'&&r.module)setTimeout(()=>openModule(r.module),0);
+   // 0.3.267: /paginas/<id> abre aquela página (link copiado, F5)
+   const pid=pageIdFromPath(window.location.pathname);if(pid)setTimeout(()=>setPageTarget(v=>({n:v.n+1,id:pid})),0);}
   routeReady.current=true;
   const onPop=()=>{const p=pathToRoute(window.location.pathname)||{tab:'home' as Tab,module:''};routeFromPop.current=true;
-   if(p.tab==='apps'&&p.module)openModule(p.module);else{navigate(p.tab);if(p.tab==='apps')setWorkspaceReset(v=>v+1);}};
+   if(p.tab==='apps'&&p.module)openModule(p.module);else{navigate(p.tab);if(p.tab==='apps')setWorkspaceReset(v=>v+1);}
+   const pid=pageIdFromPath(window.location.pathname);if(pid)setPageTarget(v=>({n:v.n+1,id:pid}));};
   window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[]);

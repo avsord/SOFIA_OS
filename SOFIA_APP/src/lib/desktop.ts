@@ -73,6 +73,11 @@ export const pagesDirectory=store<Entity[]|null>(null);
 export const pagePath=store<{id:string;title:string}[]>([]);
 /** Modulo aberto em Apps (para o breadcrumb). */
 export const appModuleTitle=store<string>('');
+/** 0.3.267: páginas favoritas (estrela no topo da página, seção Favoritos na barra lateral). Guardado no navegador. */
+const FAV_KEY='sofia.desktop.favorite-pages';
+function readFavorites():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(FAV_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}
+export const favoritePages=store<string[]>(readFavorites());
+export function toggleFavoritePage(id:string){const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}
 export function samePages(a:Entity[]|null,b:Entity[]):boolean{
  if(!a||a.length!==b.length)return false;

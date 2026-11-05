@@ -116,3 +116,16 @@ export function listNumber(blocks:readonly PageBlock[],index:number):number{let 
 export function neighbourText(blocks:readonly PageBlock[],id:string,dir:1|-1):string|null{
  let i=blocks.findIndex(b=>b.id===id)+dir;while(i>=0&&i<blocks.length){if(TEXT_BLOCKS.has(blocks[i].type))return blocks[i].id;i+=dir;}return null;
 }
+
+/** Resposta da Sofia (markdown simples) vira blocos da página: "# " títulos, "- " listas, "[ ] " tarefas, "> " citação. */
+export function blocksFromMarkdown(text:string):PageBlock[]{
+ const out:PageBlock[]=[];let code:string[]|null=null;
+ for(const raw of String(text||'').replace(/\r\n?/g,'\n').split('\n')){
+  if(/^```/.test(raw.trim())){if(code){out.push({...newBlock('code'),text:code.join('\n')});code=null;}else code=[];continue;}
+  if(code){code.push(raw);continue;}
+  if(!raw.trim())continue;if(/^-{3,}$/.test(raw.trim())){out.push(newBlock('divider'));continue;}
+  const p=parseLine(raw.replace(/\*\*(.+?)\*\*/g,'$1'));out.push({...newBlock(p.type),text:p.text,...(p.checked?{checked:true}:{})});
+ }
+ if(code)out.push({...newBlock('code'),text:code.join('\n')});
+ return out;
+}

@@ -19,9 +19,10 @@ import {errorText} from '../lib/chat-model';
 import {PageEditorStore,newBlock,expandedIds,toggleExpanded} from '../lib/page-editor';
 import type {PageBlock,PageDraft} from '../lib/page-editor';
 import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
-import {TEXT_BLOCKS,splitBlock,backspaceAtStart,deleteAtEnd,markdownShortcut,slashMatches,slashStart,applySlash,pastedLines,listNumber,neighbourText} from '../lib/page-block-keys';
+import {blocksFromMarkdown,TEXT_BLOCKS,splitBlock,backspaceAtStart,deleteAtEnd,markdownShortcut,slashMatches,slashStart,applySlash,pastedLines,listNumber,neighbourText} from '../lib/page-block-keys';
 import type {Caret} from '../lib/page-block-keys';
 import {flushNow} from '../lib/flush-sync';
+import {PageRichInput,textToHtml} from '../components/PageRichInput';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
 import {PageRefreshGuard} from '../lib/page-gesture';
@@ -41,7 +42,8 @@ import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
-import {pagePath,pagesDirectory,samePages,tap,useDesktop} from '../lib/desktop';
+import {favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
+import {pageUrlPath} from '../lib/web-route';
 import {ContentWidth} from '../lib/content-width';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
@@ -155,6 +157,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // atalhos markdown e colar várias linhas. No celular o teclado continua como antes.
  const webKeys=Platform.OS==='web';
  const appearanceAnchor=useRef<{x:number;y:number}|null>(null);
+ // 0.3.267 (computador): topo da página como no Notion (Editada…, copiar link, favorito) e "↑ Topo" no centro em páginas longas
+ const favorites=useStore(favoritePages),[showTop,setShowTop]=useState(false),showTopRef=useRef(false),docScroll=useRef<ScrollView>(null),[flash,setFlash]=useState('');
+ useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path!==next)w.history?.replaceState?.(w.history.state,'',next);}catch{/* sem endereço */}},[selectedId,active]);
+ useEffect(()=>{showTopRef.current=false;setShowTop(false);},[selectedId]);
+ function editedLabel(at:string){const d=new Date(at);if(Number.isNaN(d.getTime()))return '';const now=new Date(),same=d.toDateString()===now.toDateString();return 'Editada '+(same?'hoje às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})}));}
+ function copyPageLink(id:string){try{const w=globalThis as any;void w.navigator?.clipboard?.writeText?.(w.location.origin+pageUrlPath(id));setFlash('Link copiado');setTimeout(()=>setFlash(''),1600);}catch{/* sem área de transferência */}}
  function openAppearance(kind:'icon'|'cover',e?:any){const ne=e?.nativeEvent,t=e?.currentTarget;let at:{x:number;y:number}|null=null;
   try{const r=t?.getBoundingClientRect?.();if(r)at={x:r.left,y:r.bottom};}catch{}if(!at&&ne&&typeof ne.pageX==='number')at={x:ne.pageX,y:ne.pageY};appearanceAnchor.current=at;setAppearance(kind);}
  const [slash,setSlash]=useState<{id:string;start:number;caret:number;active:number}|null>(null),[blockMenu,setBlockMenu]=useState<string|null>(null),slashScroll=useRef<ScrollView>(null);
@@ -172,7 +180,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // a mudança é renderizada na hora (flushNow) para o foco já estar no bloco certo antes da próxima tecla
  function applyCaret(r:Caret|null){if(!r||!selectedId)return false;const blocks=r.blocks;flushNow(()=>{edit(d=>({...d,blocks}));setSlash(null);setFocus(r.focus);});placeCaret(r.focus,r.caret);return true;}
  function chooseSlash(b:PageBlock,type:string){const sl=slash;setSlash(null);if(!sl||sl.id!==b.id||!entry)return;
-  if(type==='subpage'){const text=String(b.text||'');updateBlock(b,{text:text.slice(0,sl.start)+text.slice(sl.caret),html:''});void create(entry.base);return;}
+  if(type==='subpage'){void createSubpageHere(b,sl);return;}
   applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,type));}
  function insertWithSlash(b:PageBlock){const blocks=currentBlocks(),i=blocks.findIndex(x=>x.id===b.id);if(i<0)return;const empty=b.type==='text'&&!String(b.text||'').trim();
   const target=empty?b:{...newBlock(),text:'/'};const next=blocks.slice();if(empty)next[i]={...b,text:'/',html:''};else next.splice(i+1,0,target);
@@ -227,6 +235,90 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  useEffect(()=>{setPicked(new Set());},[selectedId]);
  // menu do ⋮⋮ fecha com Esc ou clique fora
  useEffect(()=>{if(!webKeys||!blockMenu)return;const d=(globalThis as any).document;if(!d)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();setBlockMenu(null);}};const down=(e:MouseEvent)=>{const t=e.target as HTMLElement;if(!t?.closest?.('[data-testid="page-block-menu"],[data-testid^="page-block-gutter"]'))setBlockMenu(null);};d.addEventListener('keydown',key,true);d.addEventListener('mousedown',down,true);return()=>{d.removeEventListener('keydown',key,true);d.removeEventListener('mousedown',down,true);};},[webKeys,blockMenu]);
+ // 0.3.267 (computador): espaço numa linha vazia chama a Sofia (como a IA do Notion); a resposta entra como blocos
+ const [ai,setAi]=useState<{id:string;busy:boolean;error:string;quote?:string}|null>(null),[aiText,setAiText]=useState('');
+ function pageAsText(){const blocks=currentBlocks();return blocksText(blocks.map((_,i)=>i)).slice(0,4000);}
+ async function askSofia(prompt:string,atId:string,quote=''){
+  const q=prompt.trim();if(!q||!entry)return;const title=entry.draft.title||'Sem título';setAi({id:atId,busy:true,error:'',quote});
+  try{const chat=await api.ensureChat();const id=chat.conversation?.id||'';
+   const message='Estou escrevendo na página "'+title+'" do Sofia OS. '+q+(quote?'\n\nTrecho selecionado:\n'+quote:'')+'\n\nConteúdo atual da página:\n'+(pageAsText()||'(vazia)')+'\n\nResponda só com o texto para colocar na página, em markdown simples (# títulos, - listas), sem comentários antes ou depois.';
+   const r=await api.chat({conversation_id:id,message,client_message_id:'pagina-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)});
+   const made=blocksFromMarkdown(String(r.reply||''));if(!made.length)throw new Error('A Sofia não devolveu texto.');
+   edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===atId);if(i<0)return {...d,blocks:[...blocks,...made]};const here=blocks[i];
+    if(here.type==='text'&&!String(here.text||'').trim())blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);return {...d,blocks};});
+   setAi(null);setAiText('');if(selectedId)void store.flush(selectedId);
+  }catch(e){setAi(a=>a?{...a,busy:false,error:errorText(e)}:a);}
+ }
+ function aiBox(b:PageBlock){
+  if(!ai||ai.id!==b.id)return null;
+  return <View testID="page-ai-box" style={{marginTop:4,marginBottom:6,borderRadius:8,borderWidth:1,borderColor:c.accent+'80',backgroundColor:c.surface,paddingHorizontal:12,paddingVertical:8,gap:6,shadowColor:'#000',shadowOpacity:0.2,shadowRadius:12,shadowOffset:{width:0,height:4}}}>
+   {ai.quote?<Text numberOfLines={2} style={{color:c.muted,fontSize:12,fontStyle:'italic'}}>“{ai.quote}”</Text>:null}
+   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+    <Icon name="sofia" size={16} color={c.accent}/>
+    {ai.busy?<><Spinner size={14} stroke={1.6}/><Text style={{color:c.muted,fontSize:14}}>A Sofia está escrevendo…</Text></>
+     :<TextInput autoFocus value={aiText} onChangeText={setAiText} placeholder="Peça à Sofia para escrever, resumir, listar ideias…" placeholderTextColor={c.muted} accessibilityLabel="Pedir à Sofia"
+      onKeyPress={(e:any)=>{if(e.nativeEvent?.key==='Escape'){e.preventDefault?.();setAi(null);setAiText('');placeCaret(b.id,0);}}} onSubmitEditing={()=>void askSofia(aiText,b.id,ai.quote||'')} blurOnSubmit={false}
+      style={{flex:1,color:c.text,fontSize:14,paddingVertical:4,outlineStyle:'none'} as any}/>}
+   </View>
+   {ai.error?<Text style={{color:c.danger,fontSize:12}}>{ai.error}</Text>:null}
+   {!ai.busy?<Text style={{color:c.muted,fontSize:11}}>Enter envia · Esc fecha</Text>:null}
+  </View>;
+ }
+ // 0.3.267 (computador): barra que aparece ao selecionar texto, como no Notion (print do Pedro)
+ const [bar,setBar]=useState<{id:string;x:number;y:number;text:string}|null>(null),[barMenu,setBarMenu]=useState<'type'|'color'|'link'|null>(null),[linkUrl,setLinkUrl]=useState('');
+ const barRange=useRef<any>(null),barRef=useRef<any>(null);
+ useEffect(()=>{if(!webKeys||!active)return;const d=(globalThis as any).document;if(!d)return;
+  const on=()=>{const sel=d.getSelection();if(barMenu==='link'&&barRef.current?.contains?.(d.activeElement))return;
+   if(!sel||sel.isCollapsed||!sel.rangeCount){setBar(null);setBarMenu(null);return;}const host=(sel.anchorNode?.nodeType===1?sel.anchorNode:sel.anchorNode?.parentElement)?.closest?.('[data-testid^="page-rich-"]');
+   if(!host||!host.contains(sel.focusNode)){setBar(null);return;}const r=sel.getRangeAt(0).getBoundingClientRect();barRange.current=sel.getRangeAt(0).cloneRange();
+   setBar({id:String(host.getAttribute('data-testid')).replace('page-rich-',''),x:r.left+r.width/2,y:r.top,text:sel.toString()});};
+  d.addEventListener('selectionchange',on);return()=>d.removeEventListener('selectionchange',on);},[webKeys,active,barMenu]);
+ function keepSelection(node:any){barRef.current=node;if(!node||node.__keep)return;node.__keep=true;node.addEventListener('mousedown',(e:MouseEvent)=>{const t=e.target as HTMLElement;if(t?.tagName!=='INPUT')e.preventDefault();});}
+ function restoreBarRange(){const d=(globalThis as any).document,r=barRange.current;if(!d||!r)return;const sel=d.getSelection();sel.removeAllRanges();sel.addRange(r);}
+ function fmt(cmd:string,value?:string){const d=(globalThis as any).document;if(!d)return;restoreBarRange();if(cmd==='foreColor'||cmd==='hiliteColor')d.execCommand('styleWithCSS',false,true);
+  if(cmd==='code'){const t=d.getSelection()?.toString()||'';if(t)d.execCommand('insertHTML',false,'<code>'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</code>');}
+  else if(cmd==='clear'){d.execCommand('removeFormat');d.execCommand('unlink');}else d.execCommand(cmd,false,value);
+  const sel=d.getSelection();if(sel?.rangeCount)barRange.current=sel.getRangeAt(0).cloneRange();setBarMenu(null);}
+ const COLORS:[string,string,string][]=[['Padrão','',''],['Cinza','#9B9A97','rgba(155,154,151,.22)'],['Marrom','#BA856F','rgba(186,133,111,.22)'],['Laranja','#E5873A','rgba(229,135,58,.22)'],['Amarelo','#DFAB01','rgba(223,171,1,.22)'],['Verde','#4DAB9A','rgba(77,171,154,.22)'],['Azul','#529CCA','rgba(82,156,202,.22)'],['Roxo','#9A6DD7','rgba(154,109,215,.22)'],['Rosa','#E255A1','rgba(226,85,161,.22)'],['Vermelho','#FF7369','rgba(255,115,105,.22)']];
+ const SKILLS:[string,string][]=[['Melhorar escrita','Reescreva o trecho selecionado melhorando a escrita, no mesmo tom.'],['Revisão','Revise ortografia e gramática do trecho selecionado e devolva o texto corrigido.'],['Explicar','Explique o trecho selecionado de forma simples e curta.'],['Reformatar','Reorganize o trecho selecionado em tópicos claros.']];
+ function richBar(){
+  if(!bar||!desktop)return null;const b=currentBlocks().find(x=>x.id===bar.id);if(!b)return null;const vw=typeof window!=='undefined'?window.innerWidth:1200;
+  const W=300,left=Math.max(12,Math.min(bar.x-W/2,vw-W-12)),top=Math.max(64,bar.y-8);
+  const tool=(label:string,run:()=>void,child:React.ReactNode,on=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered}:any)=>({minWidth:30,height:30,paddingHorizontal:6,borderRadius:6,alignItems:'center',justifyContent:'center',backgroundColor:hovered||on?c.input:'transparent'})}>{child}</Pressable>;
+  const typeLabel=(slashMatches('').find(x=>x.type===b.type)?.label)||'Texto';
+  return <View ref={keepSelection} testID="page-format-bar" style={{position:'fixed' as any,left,top,width:W,transform:[{translateY:-8},{translateY:'-100%' as any}],zIndex:9500,borderRadius:12,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,padding:6,shadowColor:'#000',shadowOpacity:0.32,shadowRadius:22,shadowOffset:{width:0,height:10},gap:4}}>
+   <Pressable accessibilityRole="button" accessibilityLabel="Transformar em" onPress={()=>setBarMenu(m=>m==='type'?null:'type')} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:32,paddingHorizontal:8,borderRadius:6,backgroundColor:hovered||barMenu==='type'?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,fontWeight:'600',width:16}}>T</Text><Text style={{flex:1,color:c.text,fontSize:13}}>{typeLabel==='Texto'?'Texto normal':typeLabel}</Text><Text style={{color:c.muted,fontSize:13}}>›</Text></Pressable>
+   {barMenu==='type'?<View style={{borderTopWidth:1,borderBottomWidth:1,borderColor:c.line,paddingVertical:4}}>{slashMatches('').filter(x=>TEXT_BLOCKS.has(x.type)).map(x=><Pressable key={x.type} onPress={()=>{updateBlock(b,{type:x.type});setBarMenu(null);}} style={({hovered}:any)=>({flexDirection:'row',gap:8,paddingHorizontal:8,paddingVertical:5,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{width:22,color:c.muted,fontSize:12,fontWeight:'600'}}>{x.icon}</Text><Text style={{color:c.text,fontSize:13}}>{x.label}</Text></Pressable>)}</View>:null}
+   <View style={{height:1,backgroundColor:c.line}}/>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:2}}>
+    {tool('Cor',()=>setBarMenu(m=>m==='color'?null:'color'),<View style={{width:20,height:20,borderRadius:4,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.text,fontSize:12,fontWeight:'700'}}>A</Text></View>,barMenu==='color')}
+    {tool('Negrito (Ctrl+B)',()=>fmt('bold'),<Text style={{color:c.text,fontSize:14,fontWeight:'700'}}>B</Text>)}
+    {tool('Itálico (Ctrl+I)',()=>fmt('italic'),<Text style={{color:c.text,fontSize:14,fontStyle:'italic'}}>I</Text>)}
+    {tool('Sublinhado (Ctrl+U)',()=>fmt('underline'),<Text style={{color:c.text,fontSize:14,textDecorationLine:'underline'}}>U</Text>)}
+    {tool('Tachado (Ctrl+Shift+S)',()=>fmt('strikeThrough'),<Text style={{color:c.text,fontSize:14,textDecorationLine:'line-through'}}>S</Text>)}
+    {tool('Código (Ctrl+E)',()=>fmt('code'),<Text style={{color:c.text,fontSize:12}}>{'</>'}</Text>)}
+    {tool('Link (Ctrl+K)',()=>{setLinkUrl('');setBarMenu(m=>m==='link'?null:'link');},<Icon name="link" size={16} color={c.text}/>,barMenu==='link')}
+    {tool('Limpar formatação',()=>fmt('clear'),<Text style={{color:c.text,fontSize:12}}>T<Text style={{fontSize:10}}>x</Text></Text>)}
+   </View>
+   {barMenu==='color'?<View style={{borderTopWidth:1,borderColor:c.line,paddingTop:6,gap:4}}>
+    <Text style={{color:c.muted,fontSize:11,paddingHorizontal:6}}>Cor do texto</Text>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:2}}>{COLORS.map(([name,fg])=><Pressable key={'f'+name} accessibilityLabel={'Texto '+name} onPress={()=>fmt('foreColor',fg||c.text)} style={({hovered}:any)=>({width:26,height:26,borderRadius:6,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:fg||c.text,fontSize:13,fontWeight:'600'}}>A</Text></Pressable>)}</View>
+    <Text style={{color:c.muted,fontSize:11,paddingHorizontal:6}}>Fundo</Text>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:2}}>{COLORS.map(([name,,bg])=><Pressable key={'b'+name} accessibilityLabel={'Fundo '+name} onPress={()=>fmt('hiliteColor',bg||'transparent')} style={{width:26,height:26,borderRadius:6,borderWidth:1,borderColor:c.line,backgroundColor:bg||'transparent'}}/>)}</View>
+   </View>:null}
+   {barMenu==='link'?<View style={{flexDirection:'row',gap:6,alignItems:'center',borderTopWidth:1,borderColor:c.line,paddingTop:6}}>
+    <TextInput autoFocus value={linkUrl} onChangeText={setLinkUrl} placeholder="Cole o link (https://…)" placeholderTextColor={c.muted} accessibilityLabel="Endereço do link" onSubmitEditing={()=>{const u=linkUrl.trim();if(/^(https?:\/\/|mailto:)/i.test(u))fmt('createLink',u);else if(u)fmt('createLink','https://'+u);}} style={{flex:1,height:30,borderRadius:6,borderWidth:1,borderColor:c.line,backgroundColor:c.input,color:c.text,paddingHorizontal:8,fontSize:13}}/>
+   </View>:null}
+   <View style={{height:1,backgroundColor:c.line}}/>
+   <Text style={{color:c.muted,fontSize:11,paddingHorizontal:8,paddingTop:2}}>Sofia</Text>
+   {SKILLS.map(([label,prompt])=><Pressable key={label} accessibilityRole="button" onPress={()=>{const quote=bar.text;setBar(null);void askSofia(prompt,b.id,quote);}} style={({hovered}:any)=>({paddingHorizontal:8,paddingVertical:6,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
+   <Pressable accessibilityRole="button" onPress={()=>{const quote=bar.text;setBar(null);setAiText('');setAi({id:b.id,busy:false,error:'',quote});}} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:8,paddingVertical:6,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Icon name="sofia" size={15} color={c.accent}/><Text style={{color:c.text,fontSize:13}}>Editar com a Sofia</Text></Pressable>
+  </View>;
+ }
+ const htmlOfBlock=(x:PageBlock)=>x.html?String(x.html):textToHtml(String(x.text||''));
+ // juntar linhas com Backspace leva a formatação das duas
+ function keepHtmlOnMerge(blocks:PageBlock[],r:Caret,id:string):Caret{const i=blocks.findIndex(x=>x.id===id),cur=blocks[i],prev=blocks[i-1];
+  if(!cur||!prev||r.focus!==prev.id||!(cur.html||prev.html))return r;const j=r.blocks.findIndex(x=>x.id===prev.id);if(j>=0)r.blocks[j]={...r.blocks[j],html:htmlOfBlock(prev)+htmlOfBlock(cur)};return r;}
  function onBlockKey(e:any,b:PageBlock){
   if(!webKeys)return;const ne=e.nativeEvent||{},key=String(ne.key||''),node=e.target as HTMLTextAreaElement,text=String(node?.value??b.text??''),start=node?.selectionStart??text.length,end=node?.selectionEnd??start;
   if(slash&&slash.id===b.id){const items=slashMatches(text.slice(slash.start+1,start));
@@ -234,23 +326,26 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if((key==='Enter'||key==='Tab')&&items.length){e.preventDefault();chooseSlash(b,items[Math.min(slash.active,items.length-1)].type);return;}
    if(key==='Escape'){e.preventDefault();setSlash(null);return;}}
   if(key==='Escape'){e.preventDefault();const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0)enterPick(i);return;}
+  if(key===' '&&!text&&b.type==='text'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey){e.preventDefault();setSlash(null);setAiText('');setAi({id:b.id,busy:false,error:''});return;}
   if(ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&((key==='ArrowUp'&&start===0&&end===0)||(key==='ArrowDown'&&start===text.length&&end===text.length))){const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0){e.preventDefault();enterPick(i,Math.max(0,Math.min(currentBlocks().length-1,i+(key==='ArrowDown'?1:-1))));}return;}
-  if(key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&b.type!=='code'){e.preventDefault();applyCaret(splitBlock(currentBlocks(),b.id,start,end));return;}
-  if(key==='Backspace'&&start===0&&end===0){const r=backspaceAtStart(currentBlocks(),b.id);if(r){e.preventDefault();applyCaret(r);}return;}
-  if(key==='Delete'&&start===text.length&&end===text.length){const r=deleteAtEnd(currentBlocks(),b.id);if(r){e.preventDefault();applyCaret(r);}return;}
+  if(key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&b.type!=='code'){e.preventDefault();const r=splitBlock(currentBlocks(),b.id,start,end);const halves=b.html&&r?(node as any)?.__splitHtml?.(start,end):null;
+   if(r&&halves){const i=r.blocks.findIndex(x=>x.id===b.id),nx=r.blocks[i+1];if(i>=0&&r.focus!==b.id&&nx){r.blocks[i]={...r.blocks[i],html:r.blocks[i].text?halves[0]:''};r.blocks[i+1]={...nx,html:nx.text?halves[1]:''};}}
+   applyCaret(r);return;}
+  if(key==='Backspace'&&start===0&&end===0){const blocks=currentBlocks(),r=backspaceAtStart(blocks,b.id);if(r){e.preventDefault();applyCaret(keepHtmlOnMerge(blocks,r,b.id));}return;}
+  if(key==='Delete'&&start===text.length&&end===text.length){const blocks=currentBlocks(),r=deleteAtEnd(blocks,b.id);if(r){e.preventDefault();const i=blocks.findIndex(x=>x.id===b.id),nx=blocks[i+1];if(nx&&(b.html||nx.html)){const j=r.blocks.findIndex(x=>x.id===b.id);if(j>=0)r.blocks[j]={...r.blocks[j],html:htmlOfBlock(b)+htmlOfBlock(nx)};}applyCaret(r);}return;}
   if(ne.shiftKey||ne.altKey||ne.ctrlKey||ne.metaKey||start!==end)return;
   const line=parseFloat(String((globalThis as any).getComputedStyle?.(node)?.lineHeight||''))||24,oneLine=!node||node.scrollHeight<=line*1.6;
   const up=key==='ArrowUp'&&(start===0||oneLine&&!text.slice(0,start).includes('\n')),down=key==='ArrowDown'&&(start===text.length||oneLine&&!text.slice(start).includes('\n'));
   const left=key==='ArrowLeft'&&start===0,right=key==='ArrowRight'&&start===text.length;
   if(up||down||left||right){const target=neighbourText(currentBlocks(),b.id,up||left?-1:1);if(!target)return;e.preventDefault();setFocus(target);placeCaret(target,up||left?'end':0);}
  }
- function onBlockText(b:PageBlock,text:string){
+ function onBlockText(b:PageBlock,text:string,html=''){
   const before=String(b.text||'');
   if(webKeys){const md=markdownShortcut(b.type,before,text);
    if(md){if(md.type==='divider'){const blocks=currentBlocks().slice(),i=blocks.findIndex(x=>x.id===b.id),after=newBlock();if(i>=0){blocks.splice(i,1,{...b,type:'divider',text:'',html:''},after);applyCaret({blocks,focus:after.id,caret:0});}return;}
     applyCaret({blocks:currentBlocks().map(x=>x.id===b.id?{...x,type:md.type,text:md.text,html:''}:x),focus:b.id,caret:0});return;}
    if(applyCaret(pastedLines(currentBlocks(),b.id,before,text)))return;}
-  updateBlock(b,{text,html:''},'text:'+b.id);
+  updateBlock(b,{text,html},'text:'+b.id);
   if(!webKeys)return;const caret=domInput(b.id)?.selectionStart??text.length;
   if(slash&&slash.id===b.id){const at=slashStart(text,caret);if(at!==slash.start||!slashMatches(text.slice(at+1,caret)).length&&/\s$/.test(text.slice(0,caret)))setSlash(null);else setSlash({...slash,caret,active:0});return;}
   if(text.length===before.length+1&&text.charAt(caret-1)==='/'&&slashStart(text,caret)===caret-1)setSlash({id:b.id,start:caret-1,caret,active:0});
@@ -305,7 +400,52 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
  function removePage(){if(entry)confirmDeletePage(entry.base);}
+ // 0.3.267 (computador): subpágina como linha do texto (ícone + título sublinhado), como no Notion; prévia ao passar o mouse
+ const [peek,setPeek]=useState<{id:string;x:number;y:number}|null>(null),peekTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ function peekIn(id:string,e:any){if(!desktop)return;const t=e?.currentTarget;let r:any=null;try{r=t?.getBoundingClientRect?.();}catch{}if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=setTimeout(()=>setPeek({id,x:r?r.left:0,y:r?r.bottom+6:0}),420);}
+ function peekOut(){if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=null;setPeek(null);}
+ function pageLinkView(page:Entity,key:string,b?:PageBlock){
+  const icon=String(page.data?.icon||'');
+  return <Pressable key={key} testID={'page-link-'+page.id} accessibilityRole="link" accessibilityLabel={'Abrir '+(page.title||'Sem título')} onPress={()=>{peekOut();open(page);}} onHoverIn={e=>peekIn(page.id,e)} onHoverOut={peekOut}
+   style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,alignSelf:'flex-start',paddingVertical:4,paddingHorizontal:2,borderRadius:4,backgroundColor:hovered?c.input:'transparent'})}>
+   {icon?<Text style={{fontSize:18,lineHeight:24}}>{icon}</Text>:<Icon name="note" size={18} color={c.muted}/>}
+   <Text style={{color:c.text,fontSize:16,lineHeight:24,fontWeight:'600',textDecorationLine:'underline',textDecorationColor:c.muted+'80'} as any}>{page.title||'Sem título'}</Text>
+  </Pressable>;
+ }
+ function peekCard(){
+  if(!peek||!desktop)return null;const page=byId.get(peek.id);if(!page)return null;let blocks:PageBlock[]=[];try{const raw=JSON.parse(String(page.data?.blocks_json||'[]'));if(Array.isArray(raw))blocks=raw;}catch{}
+  const lines=blocks.filter(x=>String(x.text||'').trim()&&TEXT_BLOCKS.has(x.type)).slice(0,5),kids=(children.get(page.id)||[]).slice(0,4);
+  const parent=byId.get(String(page.data?.parent_id||''));const vw=typeof window!=='undefined'?window.innerWidth:1200,vh=typeof window!=='undefined'?window.innerHeight:800;
+  const left=Math.max(12,Math.min(peek.x,vw-292)),top=peek.y+220>vh?Math.max(12,peek.y-250):peek.y;
+  return <View pointerEvents="none" testID="page-peek" style={{position:'fixed' as any,left,top,width:280,zIndex:9000,borderRadius:10,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,overflow:'hidden',shadowColor:'#000',shadowOpacity:0.3,shadowRadius:20,shadowOffset:{width:0,height:8}}}>
+   <View style={{padding:14,gap:4}}>
+    {page.data?.icon?<Text style={{fontSize:28}}>{String(page.data.icon)}</Text>:<Icon name="note" size={24} color={c.muted}/>}
+    {parent?<Text numberOfLines={1} style={{color:c.muted,fontSize:10,fontWeight:'600',letterSpacing:0.6}}>{(parent.title||'Sem título').toLocaleUpperCase('pt-BR')}</Text>:null}
+    <Text numberOfLines={2} style={{color:c.text,fontSize:14,fontWeight:'600'}}>{page.title||'Sem título'}</Text>
+   </View>
+   <View style={{marginHorizontal:12,marginBottom:12,borderRadius:6,backgroundColor:c.bg,padding:10,gap:3,minHeight:56}}>
+    {kids.map(k=><Text key={k.id} numberOfLines={1} style={{color:c.text,fontSize:11,textDecorationLine:'underline'}}>{(k.data?.icon?String(k.data.icon)+' ':'')+(k.title||'Sem título')}</Text>)}
+    {lines.map(x=><Text key={x.id} numberOfLines={1} style={{color:x.type.startsWith('heading')?c.text:c.muted,fontSize:11,fontWeight:x.type.startsWith('heading')?'600':'400'}}>{(x.type==='bullet'?'• ':'')+String(x.text)}</Text>)}
+    {!kids.length&&!lines.length?<Text style={{color:c.muted,fontSize:11,fontStyle:'italic'}}>Página vazia</Text>:null}
+   </View>
+  </View>;
+ }
+ async function createSubpageHere(b:PageBlock,sl:{start:number;caret:number}){
+  if(!entry)return;const parent=entry.base,text=String(b.text||''),rest=text.slice(0,sl.start)+text.slice(sl.caret);mutationEpoch.current++;
+  try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent.id,node_type:'page',blocks_json:'[]'}});
+   const link={...newBlock('page_link'),text:'',data:{page_id:saved.id}};
+   store.edit(parent.id,d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===b.id);if(i<0)return {...d,blocks:[...blocks,link]};if(rest.trim()){blocks[i]={...blocks[i],text:rest,html:''};blocks.splice(i+1,0,link);}else blocks.splice(i,1,link);return {...d,blocks};});
+   await store.flush(parent.id);if(!mounted.current)return;mutationEpoch.current++;setPages(old=>[...old,saved]);open(saved);
+  }catch(e){setError(errorText(e));}
+ }
  function blockView(b:PageBlock,i:number,preview=false,bodyGuide=showBodyGuide,blockFocus=focus){
+  if(b.type==='page_link'){const target=byId.get(String(b.data?.page_id||''));if(!target)return <View key={b.id}/>;
+   return <View key={b.id} testID={'page-block-'+b.id} style={{position:'relative'}}>{pageLinkView(target,b.id,b)}
+    {desktop&&!preview?<Pressable accessible={false} style={{position:'absolute',left:-48,top:4,width:44,height:26}}>{({hovered}:any)=><View style={{flexDirection:'row',justifyContent:'flex-end',opacity:hovered?1:0}}><Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={{width:20,height:26,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable></View>}</Pressable>:null}
+    {desktop&&!preview&&blockMenu===b.id?<View testID="page-block-menu" style={{position:'absolute',top:32,left:-48,width:200,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,zIndex:60}}>
+     {([['Mover para cima',()=>moveBlock(b.id,-1)],['Mover para baixo',()=>moveBlock(b.id,1)],['Tirar o link daqui',()=>removeBlock(b.id)]] as const).map(([label,fn])=><Pressable key={label} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);fn();}} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:8,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
+    </View>:null}
+   </View>;}
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{paddingVertical:14,borderRadius:6,backgroundColor:focus===b.id?c.accentSoft:'transparent'}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
   if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
@@ -323,9 +463,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </View>:null}
    {b.type==='todo'&&desktop?<Pressable accessibilityRole="checkbox" accessibilityLabel="Concluir tarefa" accessibilityState={{checked:!!b.checked}} onPress={()=>updateBlock(b,{checked:!b.checked})} style={{width:18,height:18,marginTop:(lineH-18)/2+4,borderRadius:4,borderWidth:1.5,borderColor:b.checked?c.accent:c.muted,backgroundColor:b.checked?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{b.checked?<Icon name="check" size={12} color={c.onAccent}/>:null}</Pressable>
    :b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
-   <TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
-    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
-    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
+   {webKeys&&b.type!=='code'?<PageRichInput ref={(node:any)=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} testID={'page-rich-'+b.id} editable={!preview} accessibilityLabel={'Conteúdo do bloco '+(i+1)}
+    value={b.text||''} html={b.html||''} placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderColor={placeholderColor}
+    onChange={(text:string,html:string)=>onBlockText(b,text,html)} onKeyPress={preview?undefined:(e:any)=>onBlockKey(e,b)} onFocus={()=>setFocus(b.id)}
+    onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}}
+    onPasteText={(pasted:string,a:number,z:number)=>{if(!pasted.includes('\n'))return false;const before=String(b.text||'');return applyCaret(pastedLines(currentBlocks(),b.id,before,before.slice(0,a)+pasted+before.slice(z)));}}
+    style={{flex:1,minHeight:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
+   :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
+    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
+    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>}
+   {aiBox(b)?<View style={{position:'absolute',top:lineH+6,left:0,right:0,zIndex:60}}>{aiBox(b)}</View>:null}
    {slashOpen?<View testID="page-slash-menu" style={{position:'absolute',top:lineH+12,left:prefix||b.type==='todo'?24:0,width:310,maxHeight:360,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,shadowColor:'#000',shadowOpacity:0.28,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12}}>
     <ScrollView ref={slashScroll} keyboardShouldPersistTaps="always">
      <Text style={{color:c.muted,fontSize:11,fontWeight:'500',paddingHorizontal:8,paddingTop:4,paddingBottom:6}}>{slash&&slash.caret>slash.start+1?'Resultados':'Blocos'}</Text>
@@ -350,7 +497,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
   const titleInput=<TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
-  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
+  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
    <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
     {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
      // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
@@ -385,10 +532,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {titleInput}
     </>}
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
+    {/* subpáginas que ainda não estão no texto aparecem no topo, como links (Notion) */}
+    {desktop&&subpages.length?<View testID="page-subpage-links" style={{marginBottom:4,gap:2}}>{subpages.filter(sp=>!draft.blocks.some(x=>x.type==='page_link'&&String(x.data?.page_id||'')===sp.id)).map(sp=>pageLinkView(sp,'sub-'+sp.id))}</View>:null}
     <View testID={preview?undefined:"page-blocks"} style={{gap:2,position:'relative'}}>{draft.blocks.map((block,index)=><View key={block.id} style={{borderRadius:4,backgroundColor:!preview&&picked.has(block.id)?c.accentSoft:'transparent',opacity:dragging===block.id?0.4:1,zIndex:(slash?.id===block.id||blockMenu===block.id)?50:0}}>{blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus)}</View>)}
      {!preview&&drop?<View pointerEvents="none" testID="page-drop-line" style={{position:'absolute',left:0,right:0,top:drop.y-2,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null}</View>
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
-    {subpages.length?<View style={{marginTop:2}}>
+    {desktop?<Pressable accessibilityLabel="Continuar escrevendo no fim" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:150,cursor:'text'} as any}/>:null}
+    {!desktop&&subpages.length?<View style={{marginTop:2}}>
       <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={preview?undefined:changePageInteraction} onDragChange={preview?undefined:setPageDragging} compact/>
     </View>:null}
    </View>
@@ -441,6 +591,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    {desktop?null:<IconButton name="back" label="Voltar" size={34} onPress={back}/>}
    <View style={{flex:1,minWidth:0,paddingHorizontal:5}}>{desktop?null:<Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text>}<Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:desktop?12:10,marginTop:desktop?0:3}}>{status}</Text></View>
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
+    {desktop?<>
+     <Text testID="page-edited" numberOfLines={1} style={{color:c.muted,fontSize:12,marginRight:6}}>{flash||(selected.updated_at?editedLabel(String(selected.updated_at)):'')}</Text>
+     <IconButton name="link" label="Copiar link da página" size={34} onPress={()=>copyPageLink(selected.id)}/>
+     <Pressable testID="page-favorite" accessibilityRole="button" accessibilityLabel={favorites.includes(selected.id)?'Tirar dos favoritos':'Adicionar aos favoritos'} onPress={()=>toggleFavoritePage(selected.id)} style={({hovered}:any)=>({width:34,height:34,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Icon name="star" size={18} color={favorites.includes(selected.id)?'#E9B949':c.muted} weight={favorites.includes(selected.id)?'fill':undefined}/></Pressable>
+    </>:null}
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
     <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
     <IconButton name="more" label="Opções da página" size={34} onPress={()=>{if(!desktop){setPageMenu(true);return;}
@@ -462,6 +617,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </Sheet>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
   {documentContent(selected,draft)}
+  {peekCard()}
+  {richBar()}
+  {desktop&&showTop?<View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom:28,alignItems:'center',zIndex:30}}><Pressable testID="page-back-to-top" accessibilityRole="button" accessibilityLabel="Voltar ao topo" onPress={()=>docScroll.current?.scrollTo({y:0,animated:true})} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:14,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface,shadowColor:'#000',shadowOpacity:0.25,shadowRadius:12,shadowOffset:{width:0,height:4}})}><Text style={{color:c.text,fontSize:13}}>↑ Topo</Text></Pressable></View>:null}
   <KeyboardToolbar visible={keyboardVisible&&!!focus&&focus!=='title'} testID="page-format-toolbar"><View style={{backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line}}><ScrollView onScroll={noteFluencyMovement} scrollEventThrottle={100} horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false}>    <View style={{flexDirection:'row',alignItems:'center',flexWrap:'nowrap',gap:4,paddingVertical:8}}>
      <IconButton name="plus" label="Adicionar bloco" size={34} onPress={addBlock}/>
      {([['text','Texto'],['heading2','Título'],['bullet','Lista'],['todo','Tarefa'],['divider','Divisor']] as const).map(([type,label])=><Pressable key={type} accessibilityRole="button" onPress={()=>formatBlock(type)} style={{paddingHorizontal:9,paddingVertical:9,borderRadius:8,backgroundColor:c.input}}><Text style={{fontSize:11,color:c.muted}}>{label}</Text></Pressable>)}
@@ -477,7 +635,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
 }
 
 /** Preserve each page's viewport, and keep preview/editor native text metrics identical. */
-function PageDocumentScroll({pageId,preview,enabled,initialY,onScrollY,children}:{pageId:string;preview:boolean;enabled:boolean;initialY:number;onScrollY:(y:number)=>void;children:React.ReactNode}){
+function PageDocumentScroll({pageId,preview,enabled,initialY,onScrollY,children,scrollRef}:{pageId:string;preview:boolean;enabled:boolean;initialY:number;onScrollY:(y:number)=>void;children:React.ReactNode;scrollRef?:React.RefObject<ScrollView|null>}){
  const initialOffset=useRef({x:0,y:initialY}).current;
- return <ScrollView testID={(preview?'page-preview-':'page-document-')+pageId} scrollEnabled={!preview&&enabled} contentOffset={initialOffset} onScroll={preview?undefined:e=>{noteFluencyMovement();onScrollY(e.nativeEvent.contentOffset.y);}} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>{children}</ScrollView>;
+ return <ScrollView ref={scrollRef} testID={(preview?'page-preview-':'page-document-')+pageId} scrollEnabled={!preview&&enabled} contentOffset={initialOffset} onScroll={preview?undefined:e=>{noteFluencyMovement();onScrollY(e.nativeEvent.contentOffset.y);}} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>{children}</ScrollView>;
 }

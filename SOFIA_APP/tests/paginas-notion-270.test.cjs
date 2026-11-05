@@ -84,3 +84,29 @@ test('Barra lateral: ⋯ e + nas páginas, como no Notion',()=>{
  const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
  assert.ok(d.includes('menu={menuFor(p)} onAdd={()=>void newChild(p)}'));assert.ok(d.includes("{label:'Duplicar',icon:'copy'"));
 });
+
+test('Prints do Pedro: subpágina como link no texto com prévia, espaço → Sofia, topo com Editada/link/favorito',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');
+ assert.ok(src.includes("if(b.type==='page_link'){const target=byId.get(String(b.data?.page_id||''));"),'subpágina como linha do texto');
+ assert.ok(src.includes('testID="page-peek"'),'prévia ao passar o mouse');
+ assert.ok(src.includes("const link={...newBlock('page_link'),text:'',data:{page_id:saved.id}};"),'"/Subpágina" cria o link no lugar');
+ assert.ok(src.includes("setAi({id:b.id,busy:false,error:''});return;}"),'espaço numa linha vazia chama a Sofia');
+ assert.ok(src.includes('testID="page-edited"')&&src.includes('label="Copiar link da página"')&&src.includes('testID="page-favorite"'));
+ assert.ok(src.includes('testID="page-back-to-top"'),'botão Topo no centro');
+ const route=fs.readFileSync(path.join(__dirname,'..','src/lib/web-route.ts'),'utf8');assert.ok(route.includes("'/paginas/' + id"));
+});
+test('Barra de formatação ao selecionar texto e texto rico só no site',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');
+ assert.ok(src.includes('testID="page-format-bar"'));for(const t of ['Negrito (Ctrl+B)','Itálico (Ctrl+I)','Sublinhado (Ctrl+U)','Tachado (Ctrl+Shift+S)','Melhorar escrita','Revisão','Explicar','Reformatar','Editar com a Sofia'])assert.ok(src.includes(t),t);
+ assert.ok(src.includes("{webKeys&&b.type!=='code'?<PageRichInput"),'celular continua no TextInput');
+ const rich=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');
+ assert.ok(rich.includes("const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);"),'HTML só com marcas de texto');
+ assert.ok(rich.includes("if(/^(https?:|mailto:)/i.test(href))"),'links só http/https/mailto');
+ const stub=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.tsx'),'utf8');assert.ok(stub.includes('return null;'));
+ const md=K.blocksFromMarkdown('# Ideias\n- um\n- dois\n\ntexto');assert.deepEqual(J(md.map(b=>b.type+':'+b.text)),['heading1:Ideias','bullet:um','bullet:dois','text:texto']);
+});
+test('Barra lateral: arrastar página, favoritos e próximos eventos',()=>{
+ const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
+ assert.ok(d.includes('testID="sidebar-drag-ghost"')&&d.includes("kind:f<0.28?'before':f>0.72?'after':'inside'"));
+ assert.ok(d.includes('<Section title="Favoritos">')&&d.includes('<Section title="Próximos eventos">'));
+});

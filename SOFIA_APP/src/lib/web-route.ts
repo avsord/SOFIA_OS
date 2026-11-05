@@ -9,7 +9,7 @@ export type Route = {tab: Tab; module: string};
 export const isWeb = () => typeof window !== 'undefined' && typeof document !== 'undefined' && !!window.history;
 export function routeToPath(r: Route): string { const base = TAB_PATH[r.tab] || '/inicio'; return r.tab === 'apps' && r.module && MODULE_SLUG[r.module] ? base + '/' + MODULE_SLUG[r.module] : base; }
 export function pathToRoute(path: string): Route | null {
-  const m = /^\/([a-z]+)(?:\/([a-z0-9-]+))?\/?$/.exec(path || '');
+  const m = /^\/([a-z]+)(?:\/([A-Za-z0-9_-]+))?\/?$/.exec(path || '');
   if (!m) return null;
   const tab = (Object.keys(TAB_PATH) as Tab[]).find(t => TAB_PATH[t] === '/' + m[1]);
   if (!tab) return null;
@@ -19,3 +19,6 @@ export function pathToRoute(path: string): Route | null {
   return {tab, module};
 }
 export function routeTitle(r: Route, unread = 0): string { const name = r.tab === 'apps' && r.module ? MODULE_TITLE[r.module] || 'Apps' : TAB_TITLE[r.tab]; return (unread > 0 ? '(' + Math.min(unread, 99) + ') ' : '') + name + ' · Sofia'; }
+/** 0.3.267: endereço de cada página (/paginas/<id>) para copiar link, F5 e voltar do navegador. */
+export function pageIdFromPath(path: string): string { const m = /^\/paginas\/([A-Za-z0-9_-]{6,})\/?$/.exec(path || ''); return m ? m[1] : ''; }
+export function pageUrlPath(id: string): string { return id ? '/paginas/' + id : '/paginas'; }
