@@ -1083,3 +1083,141 @@
 .page-inline-toolbar .inline-tool{min-width:30px!important;height:30px!important;border-radius:5px!important;color:var(--text)!important;font-size:13px!important}
 .page-inline-toolbar .inline-tool:hover{background:color-mix(in srgb,var(--text) 8%,transparent)!important}
 .page-inline-toolbar .inline-type-select{background:transparent!important;color:var(--text)!important;font-size:13px!important;border-right:1px solid var(--line)!important;border-radius:0!important;margin-right:3px!important}
+
+
+/* v144 — barra lateral: lista de páginas rola junto com a barra (sem caixa de 180px), ⋯ por página, seta sobre o ícone e arrastar páginas. */
+.mode-user #userPagesNav{max-height:none!important;overflow:visible!important;flex:none!important}
+.mode-user #userPagesNav .space-tree-more{
+  position:absolute!important;
+  z-index:4!important;
+  top:50%!important;
+  right:32px!important;
+  transform:translateY(-50%)!important;
+  display:grid!important;
+  place-items:center!important;
+  width:26px!important;
+  min-width:26px!important;
+  height:28px!important;
+  min-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:color-mix(in srgb,var(--bg) 90%,transparent)!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  font-size:16px!important;
+  letter-spacing:1px!important;
+  opacity:0!important;
+}
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-more,
+.mode-user #userPagesNav .space-tree-controls:focus-within .space-tree-more{opacity:1!important}
+.mode-user #userPagesNav .space-tree-more:hover,
+.mode-user #userPagesNav .space-tree-more[aria-expanded="true"]{background:color-mix(in srgb,var(--text) 9%,var(--bg))!important;color:var(--text)!important}
+/* A seta de expandir fica sobre o ícone (como no Notion), liberando a direita para ⋯ e +. */
+.mode-user #userPagesNav .space-tree-expander{
+  right:auto!important;
+  left:calc(var(--page-depth,0) * 14px + 11px)!important;
+  width:26px!important;
+  min-width:26px!important;
+  background:transparent!important;
+}
+.mode-user #userPagesNav .space-tree-controls:has(.space-tree-expander:not(:disabled)):hover .space-tree-page-icon,
+.mode-user #userPagesNav .space-tree-controls:has(.space-tree-expander:not(:disabled)):focus-within .space-tree-page-icon{opacity:0!important}
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-button>.nav-label{padding-right:52px!important}
+.mode-user #userPagesNav .space-tree-node.is-dragging{opacity:.45}
+.mode-user #userPagesNav .space-tree-node.sidebar-drop-target .space-tree-button,
+.mode-user #particularMenuToggle.sidebar-drop-target{background:color-mix(in srgb,var(--accent) 22%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 60%,transparent)!important;border-radius:12px!important}
+.sidebar-rename-input{
+  width:calc(100% - 8px)!important;
+  height:36px!important;
+  margin:2px 4px!important;
+  padding:6px 10px!important;
+  border:1px solid color-mix(in srgb,var(--accent) 60%,transparent)!important;
+  border-radius:8px!important;
+  background:var(--panel)!important;
+  color:var(--text)!important;
+  font-size:14px!important;
+}
+
+/* Menus flutuantes (⋯ da barra lateral). */
+.sidebar-page-menu{
+  position:fixed;
+  z-index:120;
+  width:220px;
+  padding:6px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  box-shadow:0 16px 48px #0000004d;
+}
+:root .sidebar-page-menu .sidebar-page-menu-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  margin:0;
+  padding:7px 8px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--text);
+  font-size:13px;
+  text-align:left;
+  box-shadow:none;
+}
+:root .sidebar-page-menu .sidebar-page-menu-item:hover,
+:root .sidebar-page-menu .sidebar-page-menu-item:focus-visible{background:color-mix(in srgb,var(--text) 8%,transparent);outline:none;box-shadow:none}
+.sidebar-page-menu-icon{display:inline-grid;place-items:center;width:18px;color:var(--muted);font-size:13px}
+.sidebar-page-menu-meta{margin:6px 8px 2px;padding-top:7px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}
+
+/* Topo da página: "Salvo · Editada …" à esquerda dos botões. */
+#tab-userpage > .user-page-header > #userPageFloatingActions .page-top-meta{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-right:6px;
+  padding:0 6px;
+  color:var(--muted);
+  font-size:12px;
+  white-space:nowrap;
+}
+#tab-userpage > .user-page-header > #userPageFloatingActions .page-top-meta .page-save-state{display:inline!important;margin:0!important;font-size:12px!important;color:var(--muted)!important}
+#tab-userpage > .user-page-header > #userPageFloatingActions .page-top-meta .page-save-state:empty{display:none!important}
+#tab-userpage > .user-page-header > #userPageFloatingActions .page-top-meta .page-save-state:not(:empty)+.page-edited-at:not(:empty)::before{content:'·';margin-right:8px}
+#tab-userpage:has(.notion-page-cover) .page-top-meta{color:#3a3550!important;text-shadow:0 1px 0 #ffffff55}
+#tab-userpage:has(.notion-page-cover) .page-top-meta .page-save-state{color:#3a3550!important}
+@media(max-width:760px){#tab-userpage > .user-page-header > #userPageFloatingActions .page-top-meta .page-edited-at{display:none}}
+
+/* Prévia de página ao passar o mouse. */
+.page-preview-card{
+  position:fixed;
+  z-index:110;
+  width:300px;
+  overflow:hidden;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  box-shadow:0 16px 48px #0000004d;
+  color:var(--text);
+  pointer-events:none;
+  animation:page-preview-in .12s ease-out;
+}
+@keyframes page-preview-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.page-preview-card{animation:none}}
+.page-preview-cover{height:56px;background-size:cover;background-position:center}
+.page-preview-head{display:grid;gap:3px;padding:12px 14px 6px}
+.page-preview-icon{font-size:26px;line-height:1}
+.page-preview-cover+.page-preview-head .page-preview-icon{margin-top:-24px}
+.page-preview-path{color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-preview-title{font-size:14px;font-weight:600}
+.page-preview-body{max-height:130px;overflow:hidden;padding:4px 14px 14px;-webkit-mask-image:linear-gradient(#000 75%,transparent)}
+.page-preview-body p{margin:0 0 4px;color:var(--muted);font-size:12px;line-height:1.45}
+.page-preview-body .preview-heading1,.page-preview-body .preview-heading2,.page-preview-body .preview-heading3{color:var(--text);font-weight:600}
+.page-preview-body .preview-bullet::before{content:'• '}
+.page-preview-empty{font-style:italic}
+
+/* Seleção de blocos. */
+#userPageBody .notion-editor>.notion-block.block-selected,
+#userPageBody .notion-editor>.notion-block.block-selected:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)!important;border-radius:4px!important}
+.block-select-box{position:fixed;z-index:80;pointer-events:none;background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:3px}
