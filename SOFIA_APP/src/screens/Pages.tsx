@@ -513,10 +513,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
      :desktop?(hasCover?<Pressable accessible={false} onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} style={StyleSheet.absoluteFill}>{()=><>
       <PageCover data={draft.appearance} api={api}/>
-      {!preview&&!coverMove?<View style={{position:'absolute',right:16,bottom:56,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:coverHover?1:0}}>
-       <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
-       {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
-      </View>:null}</>}</Pressable>:null)
+</>}</Pressable>:null)
      :<Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={StyleSheet.absoluteFill}>
      {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
     </Pressable>}
@@ -552,6 +549,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
       <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={preview?undefined:changePageInteraction} onDragChange={preview?undefined:setPageDragging} compact/>
     </View>:null}
    </View>
+  {/* 05/11/2026: botões da capa no canto de baixo (como no Notion), desenhados por último para ficar por cima do cabeçalho */}
+    {desktop&&hasCover?<View pointerEvents="box-none" style={{position:'absolute',top:0,left:0,right:0}}>{!preview&&!coverMove?<View testID="page-cover-tools" style={{position:'absolute',right:16,top:250-12-30,zIndex:30,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:coverHover?1:0}}>
+       <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
+       {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
+      </View>:null}</View>:null}
   </PageDocumentScroll>;
  }
   const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
@@ -648,7 +650,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
     </View>
 </ScrollView></View></KeyboardToolbar>
-  <Presence>{appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} anchor={appearanceAnchor.current} current={draft.appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}</Presence>
+  <Presence>{appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} anchor={appearanceAnchor.current} current={draft.appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);
+   /* 05/11/2026 (Pedro): logo depois de subir a imagem já abre o reposicionar */if(desktop&&patch.cover_type==='attachment'&&patch.cover_attachment_id)setTimeout(startCoverMove,0);}}/>:null}</Presence>
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <KeyboardViewport>{editor}</KeyboardViewport>
