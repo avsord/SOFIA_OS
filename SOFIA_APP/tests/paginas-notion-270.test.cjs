@@ -107,7 +107,7 @@ test('Barra de formatação ao selecionar texto e texto rico só no site',()=>{
 });
 test('Barra lateral: arrastar página, favoritos e próximos eventos',()=>{
  const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
- assert.ok(d.includes('testID="sidebar-drag-ghost"')&&d.includes("kind:f<0.28?'before':f>0.72?'after':'inside'"));
+ assert.ok(d.includes('testID="sidebar-drag-ghost"')&&d.includes("kind:f<0.34?'before':f>0.66?'after':'inside'"));
  assert.ok(d.includes('<Section title="Favoritos">')&&d.includes('<Section title="Próximos eventos">'));
 });
 
@@ -148,4 +148,10 @@ test('Capa ao trocar de página: aparece na hora (memória), tamanho guardado, b
  assert.ok(pre.includes('export function prefetchPageCover(')&&read('src/screens/Pages.tsx').includes('prefetchPageCover(api,p.data)'));
  assert.ok(read('src/desktop/DesktopShell.tsx').includes("from '../lib/page-cover-prefetch'"),'barra lateral não carrega a janela de capa');
  assert.ok(a.includes('const scale=Math.min(1,2000/Math.max(1,bmp.width));'),'foto reduzida a 2000 px ao enviar');
+});
+
+test('Capa nasce na posição escolhida (sem pular do centro) e arrastar na lateral põe acima/abaixo com linha',()=>{
+ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+ assert.ok(read('src/components/PageAppearance.tsx').includes("objectFit:'cover',objectPosition:'50% '+position+'%'"));
+ const d=read('src/desktop/DesktopShell.tsx');assert.ok(d.includes('testID="sidebar-drop-line"')&&d.includes("kind:f<0.34?'before':f>0.66?'after':'inside'"));
 });

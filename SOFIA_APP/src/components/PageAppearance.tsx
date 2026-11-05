@@ -71,6 +71,10 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
   onPanResponderRelease:()=>{live.current.onPosition?.(Math.round(live.current.pos*10)/10);},
   onPanResponderTerminate:()=>{live.current.onPosition?.(Math.round(live.current.pos*10)/10);},
  })).current;
+ // 05/11/2026 (Pedro: "ao clicar na pagina a capa flica, aparece uma imagem por tras"): no site a capa era desenhada
+ // primeiro centralizada e, depois de medir a imagem, pulava para a posicao escolhida. Fora do reposicionar ela agora e
+ // um <img> com object-fit/object-position: ja nasce no lugar certo, sem medir.
+ if(Platform.OS==='web'&&!repositioning)return <View testID="page-cover-image" style={StyleSheet.absoluteFill}>{React.createElement('img',{src:uri,alt:'',draggable:false,decoding:'sync',onError,style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'}})}</View>;
  return <View testID="page-cover-image" style={StyleSheet.absoluteFill} {...(repositioning?pan.panHandlers:{})} onLayout={e=>{const {width:w,height:h}=e.nativeEvent.layout;if(Math.abs(w-box.w)>.5||Math.abs(h-box.h)>.5)setBox({w,h});}}>
   {scale?<Image source={{uri}} onError={onError} style={{position:'absolute',width,height,left:-(width-box.w)/2,top:-extra*(repositioning?pos:position)/100}}/>:<Image source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={onError}/>}
  </View>;

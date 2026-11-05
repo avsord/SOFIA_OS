@@ -8,4 +8,4 @@ export const IMAGE_SIZES=new Map<string,{w:number;h:number}>();
 export function peekCover(id:string):string{if(!id)return '';try{const d=pageCoverDestination(id) as any;return d?.exists&&d.uri?String(d.uri):'';}catch{return '';}}
 const prefetching=new Set<string>();
 export function prefetchPageCover(api:SofiaApi,data:Record<string,any>|undefined){const id=String(data?.cover_attachment_id||'');if(data?.cover_type!=='attachment'||!id||prefetching.has(id)||peekCover(id))return;prefetching.add(id);
- void cachedPageCover(api.attachmentSource(id),id,false,0).then(uri=>{if(Platform.OS==='web'&&uri)Image.getSize(uri,(w,h)=>{if(w>0&&h>0)IMAGE_SIZES.set(uri,{w,h});},()=>{});}).catch(()=>{}).finally(()=>prefetching.delete(id));}
+ void cachedPageCover(api.attachmentSource(id),id,false,0).then(uri=>{if(Platform.OS==='web'&&uri){try{const pic=new (globalThis as any).Image();pic.src=uri;void pic.decode?.().catch(()=>{});}catch{/* sem decode */}}if(Platform.OS==='web'&&uri)Image.getSize(uri,(w,h)=>{if(w>0&&h>0)IMAGE_SIZES.set(uri,{w,h});},()=>{});}).catch(()=>{}).finally(()=>prefetching.delete(id));}
