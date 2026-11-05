@@ -43,8 +43,10 @@ test('055 new Home appointment sends selected priority and shared area without o
  assert.ok(src.includes('creatable value={area}'));
  assert.ok(src.includes('GoogleCalendarProperty'));
 });
-test('055 backend catalog already includes persisted task and commitment areas',()=>{
+// 05/11/2026 (Pedro: "essas areas tem que ser criadas pelo proprio usuario"): a lista deixou de juntar as areas escritas
+// nos registros (a IA inventava nomes); o catalogo devolve so as areas criadas pela pessoa.
+test('055/05-11 backend catalog returns only the areas the person created',()=>{
  const backend=read('../src/core/api45.js');
- assert.ok(backend.includes('SELECT area FROM tasks'));
- assert.ok(backend.includes('SELECT area FROM entities'));
+ assert.ok(backend.includes("return send({catalog:CATALOG,areas:store.userAreas()});"));
+ assert.ok(!backend.includes('SELECT area FROM tasks'));
 });

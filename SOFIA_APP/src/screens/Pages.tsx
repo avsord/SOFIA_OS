@@ -43,7 +43,7 @@ import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
-import {favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
+import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
 import {pageUrlPath} from '../lib/web-route';
 import {ContentWidth} from '../lib/content-width';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
@@ -145,7 +145,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // da pagina aberta vai para a barra de cima. No celular nada disso roda.
  useEffect(()=>{if(Platform.OS==='web'&&loaded&&!samePages(pagesDirectory.get(),displayPages))pagesDirectory.set(displayPages);},[displayPages,loaded]);
  const handledOpen=useRef(0);
- useEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;const page=byId.get(openPageId);if(!page)return;handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
+ useLayoutEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;let page=byId.get(openPageId);
+  if(!page){const fresh=createdPage.get();if(fresh&&fresh.id===openPageId){page=fresh;setPages(old=>old.some(x=>x.id===fresh.id)?old:[...old,fresh]);createdPage.set(null);}}
+  if(!page)return;handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
  const handledCreate=useRef(0);
  useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}if(desktop)void create();else setCreateParent(null);},[createPageKey,ready]);
  useEffect(()=>{if(Platform.OS!=='web')return;const trail:{id:string;title:string}[]=[];let cur=selectedId?byId.get(selectedId):undefined;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&trail.length<40){seen.add(cur.id);trail.unshift({id:cur.id,title:cur.title||'Sem título'});cur=byId.get(String(cur.data?.parent_id||''));}const prev=pagePath.get();if(prev.length!==trail.length||prev.some((x,i)=>x.id!==trail[i].id||x.title!==trail[i].title))pagePath.set(trail);},[selectedId,byId]);

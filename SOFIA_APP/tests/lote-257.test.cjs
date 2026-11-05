@@ -32,7 +32,7 @@ test('0.3.257: E-mails - Entrar com Google por conta e seletor salvo',()=>{
 });
 
 test('0.3.257: Area sem nomes de fabrica - so as criadas, sempre com criar nova',()=>{
-  const api=read('../src/core/api45.js');assert.ok(!api.includes('...AREAS,')&&api.includes("const internal=new Set(['Assets','Geral'"));
+  const api=read('../src/core/api45.js');assert.ok(!api.includes('...AREAS,')&&api.includes("areas:store.userAreas()")); // 05/11/2026: so as areas criadas pela pessoa
   assert.ok(read('src/screens/Workspace.tsx').includes('<Choice label="Área" creatable value={area}'));
   assert.ok(!read('src/components/HomeCommitmentEditor.tsx').includes("['Pessoal',...areas]")&&!read('src/components/HomeTaskDetails.tsx').includes("new Set(['Pessoal',...areas])"));
 });

@@ -22,7 +22,7 @@ import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,appModuleTitle,favoritePages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,appModuleTitle,createdPage,favoritePages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -87,7 +87,7 @@ function readExpanded():Set<string>{try{return new Set(JSON.parse(localStorage.g
 function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi}){
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
  const newChild=async(parent:Entity)=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent.id,node_type:'page',blocks_json:'[]'}});
-  setExpanded(prev=>{const n=new Set(prev);n.add(parent.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});onOpen(saved.id);}catch(e){appAlert('Não foi possível criar a subpágina',e instanceof Error?e.message:String(e));}};
+  setExpanded(prev=>{const n=new Set(prev);n.add(parent.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});createdPage.set(saved);onOpen(saved.id);}catch(e){appAlert('Não foi possível criar a subpágina',e instanceof Error?e.message:String(e));}};
  const duplicate=async(p:Entity)=>{try{await api.saveEntity({kind:'user_page',title:((p.title||'Sem título')+' (cópia)').slice(0,240),content:p.content||'',area:p.area||'Pessoal',privacy:p.privacy||'private',state:'active',tags:p.tags||[],data:{...p.data}});}catch(e){appAlert('Não foi possível duplicar',e instanceof Error?e.message:String(e));}};
  const remove=(p:Entity)=>appAlert('Excluir página?','Excluir “'+(p.title||'Sem título')+'” e suas subpáginas também?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void api.deleteEntity(p.id).catch(e=>appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e)));}}]);
  // arrastar página na barra: meio da linha = dentro; borda de cima/baixo = antes/depois (como no Notion)
@@ -186,7 +186,8 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
  if(pagesDirectory.get()===null){const saved=api.webPeek?.<Entity[]>('pages');if(Array.isArray(saved))pagesDirectory.set(saved);} /* abre com a arvore guardada (criptografada) e confere com o servidor */
- const pages=useStore(pagesDirectory)??null,favorites=useStore(favoritePages);usePageDirectory(api);const pagesLate=useRef(pages===null);
+ const pages=useStore(pagesDirectory)??null,favorites=useStore(favoritePages);
+ const createRootPage=async()=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:'',node_type:'space',blocks_json:'[]'}});createdPage.set(saved);onOpenPage(saved.id);}catch{onCreatePage();}};usePageDirectory(api);const pagesLate=useRef(pages===null);
  const path=useStore(pagePath),moduleTitle=useStore(appModuleTitle);
  const openPageId=tab==='pages'&&path.length?path[path.length-1].id:'';
  useDesktopCss(true,c);
@@ -196,7 +197,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   ...TAB_ORDER.map((t,i)=>({id:'tab:'+t,label:TAB_LABELS[t].label,group:'Menus',icon:TAB_LABELS[t].icon,hint:'Alt+'+(i+1),run:()=>onNavigate(t)})),
   {id:'tab:notifications',label:'Notificações',group:'Menus',icon:'bell',run:()=>onNavigate('notifications')},
   ...APP_SHORTCUTS.map(a=>({id:'app:'+a.id,label:a.title,group:'Apps',icon:a.icon,run:()=>onOpenModule(a.id)})),
-  {id:'action:new-page',label:'Nova página',group:'Ações',icon:'plus',run:onCreatePage},
+  {id:'action:new-page',label:'Nova página',group:'Ações',icon:'plus',run:()=>void createRootPage()},
   // 0.3.269: "adicionar" no Ctrl+K abre a janela de adicionar da Biblioteca
   {id:'action:library-add',label:'Adicionar à Biblioteca',group:'Ações',icon:'book',hint:'N',run:()=>{(globalThis as any).__sofiaLibraryAdd=true;onOpenModule('library');setTimeout(()=>{try{window.dispatchEvent(new CustomEvent('sofia:library-add'));(globalThis as any).__sofiaLibraryAdd=false;}catch{/* navegador antigo */}},350);}},
   {id:'action:sidebar',label:collapsed?'Mostrar barra lateral':'Recolher barra lateral',group:'Ações',icon:'sidebar',hint:'Ctrl+\\',run:()=>setCollapsed(!collapsed)},
@@ -222,7 +223,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}
      <UpcomingEvents api={api} onOpen={()=>onNavigate('agenda')}/>
      {favorites.length&&pages?<Section title="Favoritos">{favorites.map(id=>pages.find(p=>p.id===id)).filter(Boolean).map(p=><Row key={'fav-'+p!.id} testID={'sidebar-fav-'+p!.id} emoji={isEmoji(p!.data?.icon)?String(p!.data?.icon):undefined} icon={isEmoji(p!.data?.icon)?undefined:'star'} label={p!.title||'Sem título'} selected={openPageId===p!.id} onPress={()=>onOpenPage(p!.id)}/>)}</Section>:null}
-     <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={onCreatePage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
+     <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={createRootPage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
       {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}

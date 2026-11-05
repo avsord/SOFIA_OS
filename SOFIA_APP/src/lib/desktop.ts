@@ -73,6 +73,9 @@ export const pagesDirectory=store<Entity[]|null>(null);
 export const pagePath=store<{id:string;title:string}[]>([]);
 /** Modulo aberto em Apps (para o breadcrumb). */
 export const appModuleTitle=store<string>('');
+/** 05/11/2026 (Pedro: criar pela lateral passava por outra tela): a lateral cria a pagina antes de trocar de tela e
+ * deixa ela aqui; o Pages abre direto, sem esperar a lista recarregar. */
+export const createdPage=store<Entity|null>(null);
 /** 0.3.267: páginas favoritas (estrela no topo da página, seção Favoritos na barra lateral). Guardado no navegador. */
 const FAV_KEY='sofia.desktop.favorite-pages';
 function readFavorites():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(FAV_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}

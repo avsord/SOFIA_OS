@@ -126,3 +126,11 @@ test('Prints de 05/11 à noite: botões que sumiam, linha do tempo, Agenda, + mi
  const ed=read('src/screens/workspace/EntityEditor.tsx');assert.ok(ed.includes("!(isAppointment&&f.key==='calendar_all_day')"),'"Dia inteiro" não aparece duas vezes');
  for(const f of ['src/screens/Reminders.tsx','src/screens/Packages.tsx','src/components/NotificationCenter.tsx','src/screens/Notes.tsx'])assert.ok(!/area: *'(Lembretes|Encomendas|Notas)'/.test(read(f)),f+' não cria área com nome pronto');
 });
+
+test('Voltar ao Início sem pulo, página criada pela lateral abre direto e o ponto criado pela Sofia aparece na hora',()=>{
+ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');const home=read('src/screens/Home.tsx'),shell=read('src/desktop/DesktopShell.tsx'),pg=read('src/screens/Pages.tsx');
+ assert.ok(home.includes('if(h>0&&Math.abs(h-homeViewH)>1)setHomeViewH(h);'),'altura 0 de quando o Início está escondido não é guardada');
+ assert.ok(shell.includes('createdPage.set(saved);onOpenPage(saved.id);')&&shell.includes('createdPage.set(saved);onOpen(saved.id);'),'lateral cria antes de trocar de tela');
+ assert.ok(pg.includes('const fresh=createdPage.get();if(fresh&&fresh.id===openPageId)')&&pg.includes('useLayoutEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey'),'abre antes de desenhar a lista');
+ assert.ok(home.includes('adoptCreated((result as any)?.items);'),'o que a Sofia criou entra na linha do tempo com a resposta');
+});

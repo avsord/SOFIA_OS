@@ -5,7 +5,7 @@ test('pagina: + e lixeira viram um ⋯; desfazer/refazer continuam a vista',()=>
   const s=read('src/screens/Pages.tsx');
   // 0.3.267: no celular o ⋯ abre o painel de baixo; no computador, o menu pequeno junto do botão (mesmas opções)
   assert.ok(s.includes('<IconButton name="more" label="Opções da página" size={34} onPress={()=>{if(!desktop){setPageMenu(true);return;}'));
-  assert.ok(s.includes("openContextMenu(vw-236,92,[{label:'Nova subpágina ou template'"));
+  assert.ok(s.includes("openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)}"),'computador: cria a subpágina direto');
   assert.ok(!s.includes('<IconButton name="trash" label="Excluir página" size={34} onPress={removePage}/>'),'lixeira saiu do topo');
   assert.ok(s.includes('<IconButton name="undo" label="Desfazer"')&&s.includes('<IconButton name="redo" label="Refazer"'));
   for(const t of ['Nova subpágina ou template','Ícone','Remover bloco selecionado','Excluir página'])assert.ok(s.includes(t),t+' no ⋯');
