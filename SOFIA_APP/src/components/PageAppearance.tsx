@@ -14,6 +14,7 @@ import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
 import {cachedPageCover} from '../lib/page-cover-cache';
 import {MotionModal} from './MotionModal';
+import {useDesktop} from '../lib/desktop';
 export const PAGE_COVERS=[
  ['Lavanda','linear-gradient(135deg,#d9d2ff,#b8aaff)'],['Areia','linear-gradient(135deg,#efe9df,#d8cfc2)'],
  ['Azul','linear-gradient(135deg,#b9d7ff,#7da8ea)'],['Verde','linear-gradient(135deg,#cde8d8,#8fc9aa)'],
@@ -22,6 +23,18 @@ export const PAGE_COVERS=[
 ];
 const EMOJIS='😀 😊 😎 🤔 🤖 ❤️ 💜 💙 💚 💡 🔥 ✨ ⭐ 🌙 🌈 🌱 🌿 🌊 🧪 🧠 🎯 🧭 🚀 🚲 🏠 💼 🛠️ ⚙️ 💻 📱 📷 🎥 🎬 🎨 ✏️ 📝 📌 📅 ⏰ 📚 📖 📁 📂 📦 📊 💰 🛒 🎁 💊 ☕ 🎵 🎧 🎮 🏋️ 🧘 🏆 🎓 🔗 🔎 🔐 ✅ ⚠️ 💬 🧩 💎'.split(' ');
 const SYMBOLS='♡ ♥ ☆ ★ ○ ● ◉ ◇ ◆ □ ■ △ ▲ ✓ ✔ ✕ × + − ≡ ∞ ⌂ ⌘ ⏱ ⚑ ⚙ ⚡ ☀ ☾ ☁ ☰ ▦ ⊞ ⊕ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ✎ ✦ ✧ ❖ ☑ ☐ ♫ ♪ ✉ ☎ ⌚ ⚖ ◐ ◑'.split(' ');
+// 0.3.267 (computador): emojis com palavras para a busca do seletor de ícone, como no Notion
+const EMOJI_WORDS:[string,string][]=[
+ ['😀','sorriso feliz rosto'],['😊','feliz sorriso'],['😂','rir risada'],['😍','amor apaixonado'],['😎','legal oculos'],['🤔','pensar duvida'],['😴','sono dormir'],['🥳','festa comemorar'],['🤖','robo ia'],['👻','fantasma'],
+ ['❤️','coracao amor vermelho'],['🧡','coracao laranja'],['💛','coracao amarelo'],['💚','coracao verde'],['💙','coracao azul'],['💜','coracao roxo'],['🖤','coracao preto'],['🤍','coracao branco'],
+ ['💡','ideia lampada'],['🔥','fogo'],['✨','brilho estrelas'],['⭐','estrela'],['🌟','estrela brilho'],['⚡','raio energia'],['☀️','sol'],['🌙','lua noite'],['☁️','nuvem'],['🌈','arco iris'],['🌱','planta broto'],['🌿','folha planta'],['🌵','cacto'],['🌲','arvore'],['🌊','mar onda'],['🌸','flor'],
+ ['🧪','teste ciencia'],['🧠','cerebro mente estudo'],['🎯','alvo meta objetivo'],['🧭','bussola direcao'],['🗺️','mapa viagem'],['🚀','foguete lancamento projeto'],['✈️','aviao viagem'],['🚗','carro'],['🚲','bicicleta bike'],['🏠','casa lar'],['🏢','empresa predio trabalho'],
+ ['💼','trabalho maleta'],['🧰','ferramentas caixa'],['🛠️','ferramentas'],['⚙️','configuracao engrenagem'],['💻','computador notebook'],['📱','celular'],['📷','camera foto'],['🎥','video filmar'],['🎬','filme cinema roteiro'],['🎞️','filme'],['🎨','arte pintura design'],['✏️','lapis escrever'],['📝','nota anotar'],['📌','fixar alfinete'],['📍','local'],
+ ['📅','calendario agenda'],['🗓️','calendario'],['⏰','alarme hora'],['⌛','tempo ampulheta'],['📚','livros estudo'],['📖','livro leitura'],['🔖','marcador'],['📁','pasta'],['📂','pasta aberta'],['🗂️','arquivos'],['📦','caixa pacote encomenda'],['🧾','recibo nota'],['📊','grafico'],['📈','crescimento grafico'],['📉','queda grafico'],
+ ['💰','dinheiro'],['💳','cartao'],['🛒','carrinho compras mercado'],['🛍️','compras sacola'],['🎁','presente'],['💊','remedio farmacia'],['🩺','saude medico'],['🥗','salada comida receita'],['🍳','cozinhar receita'],['☕','cafe'],['🍎','maca fruta'],
+ ['🎵','musica nota'],['🎶','musica trilha'],['🎧','fone musica'],['🎤','microfone'],['🎸','guitarra'],['🎮','jogo game'],['🏋️','academia treino'],['🧘','meditar yoga'],['⚽','futebol'],['🏆','trofeu vitoria'],['🎓','formatura estudo curso'],['👶','bebe'],['🐶','cachorro'],['🐱','gato'],
+ ['🔗','link'],['🔎','busca lupa'],['🔐','cadeado senha'],['🔒','cadeado'],['✅','feito check'],['☑️','checkbox'],['❌','erro x'],['⚠️','aviso'],['❓','pergunta'],['💬','conversa chat'],['📣','anuncio'],['🧩','quebra cabeca'],['🎲','dado'],['💎','diamante'],['🪄','magica'],['🥷','ninja'],['🧏','pessoa'],['👤','pessoa perfil'],['👥','pessoas equipe'],['🏷️','etiqueta preco'],['🎉','festa'],['🌍','mundo terra']];
+const fold=(v:string)=>v.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 /** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */
 // 0.3.268: a previa local da capa so vale no aparelho que enviou (caminho file:// do celular nao abre no site e vice-versa);
@@ -51,7 +64,7 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
  </View>;
 }
 export function PageCover({data,api,repositioning=false,onPosition}:{data:Record<string,any>;api:SofiaApi;repositioning?:boolean;onPosition?:(n:number)=>void}){
- const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=localPreview(String(data.cover_local_uri||''));
+ const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=localPreview(String(data.cover_local_uri||'')),gradientId='cover'+React.useId().replace(/[^a-zA-Z0-9]/g,'');
  const [uri,setUri]=useState(preview),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  const retry=useRef<()=>void>(()=>{});
  useEffect(()=>{
@@ -72,9 +85,11 @@ export function PageCover({data,api,repositioning=false,onPosition}:{data:Record
   return <CoverImage key={attachment+':'+attempt+':'+uri} uri={uri} position={coverPosition(data)} repositioning={repositioning} onPosition={onPosition} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
  }
  const colors=String(data.cover_value||'').match(/#[0-9a-fA-F]{6}\b/g)||[c.accentSoft,c.accentSoft];
- return <Svg width="100%" height="100%"><Defs><LinearGradient id="cover" x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill="url(#cover)"/></Svg>;
+ // 0.3.267: id único por capa (no site todas as miniaturas usavam o 1º degradê com o mesmo id "cover")
+ return <Svg width="100%" height="100%"><Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill={'url(#'+gradientId+')'}/></Svg>;
 }
-export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'cover';pageId:string;api:SofiaApi;onApply:(patch:Record<string,any>)=>void;onClose:()=>void}){
+export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:{kind:'icon'|'cover';pageId:string;api:SofiaApi;onApply:(patch:Record<string,any>)=>void;onClose:()=>void;anchor?:{x:number;y:number}|null;current?:Record<string,any>}){
+ const desktop=useDesktop(),[tab,setTab]=useState<'gallery'|'upload'>('gallery'),[query,setQuery]=useState('');
  const c=useTheme(),[mode,setMode]=useState<'emoji'|'icon'>('emoji'),[custom,setCustom]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),alive=useRef(true),recovering=useRef(false);
  function choose(patch:Record<string,any>){onApply(patch);onClose();}
  async function clearPending(){try{await AsyncStorage.removeItem(PENDING_COVER_KEY);}catch{}}
@@ -86,10 +101,12 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
   if(!asset?.uri)throw new Error('Não foi possível preparar a imagem. Escolha outra foto.');
   let base64='';
   if(Platform.OS==='web'){ // 0.3.268: no site a imagem escolhida vem do navegador (sem a pasta de arquivos do celular)
-   const blob=await (await fetch(asset.uri)).blob();
-   if(blob.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
-   const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(blob);});
-   base64=data.slice(data.indexOf(',')+1);
+   // 0.3.267: o arquivo é lido direto (antes fetch do link blob:, que a política de segurança do site bloqueia: "Failed to fetch")
+   const file:Blob|undefined=(asset as any).file;
+   if(file){if(file.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
+    const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(file);});base64=data.slice(data.indexOf(',')+1);}
+   else throw new Error('Não foi possível ler a imagem escolhida. Tente de novo.');
+   if(base64.length*0.75>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
   }else{
   const file=new File(asset.uri);
   if(!file.exists||file.size<1)throw new Error('A foto selecionada não está mais disponível no aparelho.');
@@ -115,10 +132,50 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
  },[]);
  async function upload(){if(busy)return;setBusy(true);setError('');try{
   await AsyncStorage.setItem(PENDING_COVER_KEY,pageId);
-  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.78});
+  const result=await ImagePicker.launchImageLibraryAsync(Platform.OS==='web'?{mediaTypes:['images'],allowsEditing:false,quality:0.9}:{mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.78});
   if(!alive.current)return;
   await finishPick(result);
  }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
+ if(desktop){
+  // 0.3.267 (computador): janela pequena presa ao botão, como no Notion (antes: painel de baixo na largura toda)
+  const W=kind==='icon'?408:440,vw=typeof window!=='undefined'?window.innerWidth:1200,vh=typeof window!=='undefined'?window.innerHeight:800;
+  const left=Math.max(12,Math.min((anchor?.x??vw/2-W/2),vw-W-12)),top=Math.max(12,Math.min((anchor?.y??120)+8,vh-420));
+  const tabStyle=(on:boolean)=>({paddingVertical:8,marginRight:14,borderBottomWidth:2,borderColor:on?c.text:'transparent'});
+  const tabText=(on:boolean)=>({color:on?c.text:c.muted,fontSize:13,fontWeight:'500' as const});
+  const q=fold(query.trim()),emojis=EMOJI_WORDS.filter(([e,w])=>!q||fold(w).includes(q)||e===query.trim()),symbols=q?SYMBOLS.filter(x=>x===query.trim()):SYMBOLS;
+  const textAction=(label:string,fn:()=>void,danger=false)=><Pressable accessibilityRole="button" disabled={busy} onPress={fn} style={({hovered}:any)=>({paddingHorizontal:8,paddingVertical:5,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:danger?c.danger:c.muted,fontSize:13}}>{label}</Text></Pressable>;
+  return <MotionModal visible transparent onRequestClose={()=>{if(!busy)onClose();}}>
+   <Pressable accessibilityLabel="Fechar" onPress={()=>{if(!busy)onClose();}} style={{flex:1}}>
+    <Pressable testID={'page-'+kind+'-picker'} onPress={()=>{}} style={{position:'absolute',left,top,width:W,maxHeight:Math.min(460,vh-top-12),borderRadius:10,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:24,shadowOffset:{width:0,height:10},elevation:16,overflow:'hidden'}}>
+     <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,borderBottomWidth:1,borderColor:c.line}}>
+      {kind==='icon'?<>{(['emoji','icon'] as const).map(v=><Pressable key={v} onPress={()=>setMode(v)} style={tabStyle(mode===v)}><Text style={tabText(mode===v)}>{v==='emoji'?'Emoji':'Ícones'}</Text></Pressable>)}</>
+       :<>{(['gallery','upload'] as const).map(v=><Pressable key={v} onPress={()=>setTab(v)} style={tabStyle(tab===v)}><Text style={tabText(tab===v)}>{v==='gallery'?'Galeria':'Enviar'}</Text></Pressable>)}</>}
+      <View style={{flex:1}}/>
+      {kind==='icon'?<>{textAction('Aleatório',()=>{const list=mode==='emoji'?EMOJI_WORDS.map(x=>x[0]):SYMBOLS;choose({icon:list[Math.floor(Math.random()*list.length)],icon_mode:mode});})}{current?.icon?textAction('Remover',()=>choose({icon:'',icon_mode:'default'})):null}</>
+       :current?.cover_type?textAction('Remover',()=>choose({cover_type:'',cover_value:'',cover_attachment_id:'',cover_local_uri:''})):null}
+     </View>
+     {error?<View style={{padding:10}}><ErrorBanner text={error}/></View>:null}
+     {kind==='icon'?<View style={{padding:10,gap:8}}>
+      <TextInput autoFocus value={query} onChangeText={setQuery} placeholder={mode==='emoji'?'Filtrar… (ex.: casa, música, livro)':'Cole um símbolo'} placeholderTextColor={c.muted} accessibilityLabel="Filtrar ícones" onSubmitEditing={()=>{const first=mode==='emoji'?emojis[0]?.[0]:symbols[0];if(first)choose({icon:first,icon_mode:mode});else if(query.trim())choose({icon:query.trim(),icon_mode:mode});}} style={{height:32,borderRadius:6,borderWidth:1,borderColor:c.line,backgroundColor:c.input,color:c.text,paddingHorizontal:10,fontSize:13}}/>
+      <ScrollView style={{maxHeight:300}} keyboardShouldPersistTaps="handled"><View style={{flexDirection:'row',flexWrap:'wrap'}}>
+       {(mode==='emoji'?emojis.map(x=>x[0]):symbols).map(icon=><Pressable key={icon} accessibilityLabel={'Usar '+icon} onPress={()=>choose({icon,icon_mode:mode})} style={({hovered}:any)=>({width:36,height:36,borderRadius:6,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{fontSize:24,color:c.text}}>{icon}</Text></Pressable>)}
+       {mode==='emoji'&&!emojis.length&&query.trim()?<Pressable onPress={()=>choose({icon:query.trim(),icon_mode:'emoji'})} style={{padding:8}}><Text style={{color:c.muted,fontSize:13}}>Usar “{query.trim()}” como ícone</Text></Pressable>:null}
+      </View></ScrollView>
+     </View>
+     :tab==='gallery'?<ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:380}} contentContainerStyle={{padding:12,gap:8}}>
+      <Text style={{color:c.muted,fontSize:12,fontWeight:'500'}}>Cores e degradês</Text>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{PAGE_COVERS.map(([name,value])=><Pressable key={name} disabled={busy} accessibilityLabel={'Capa '+name} onPress={()=>choose({cover_type:'preset',cover_value:value,cover_attachment_id:'',cover_local_uri:''})} style={({hovered}:any)=>({width:(W-24-24)/4,gap:4,opacity:hovered?0.85:1})}><View style={{height:56,borderRadius:6,overflow:'hidden'}}><PageCover api={api} data={{cover_type:'preset',cover_value:value}}/></View><Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{name}</Text></Pressable>)}</View>
+     </ScrollView>
+     :<View style={{padding:16,gap:12}}>
+      {busy?<View style={{padding:18,alignItems:'center',gap:8}}><ActivityIndicator color={c.accent}/><Text style={{color:c.muted}}>Enviando capa…</Text></View>:<>
+       <Pressable accessibilityRole="button" onPress={()=>void upload()} style={({hovered}:any)=>({height:34,borderRadius:6,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>Enviar arquivo</Text></Pressable>
+       <Text style={{color:c.muted,fontSize:12,textAlign:'center'}}>Imagens com mais de 1500 pixels de largura ficam melhores. Depois dá para reposicionar.</Text>
+      </>}
+     </View>}
+    </Pressable>
+   </Pressable>
+  </MotionModal>;
+ }
  // 0.3.268: entra e sai animada (antes sumia de uma vez ao fechar)
  return <MotionModal visible transparent onRequestClose={()=>{if(!busy)onClose();}}>
   <Pressable onPress={()=>{if(!busy)onClose();}} style={{flex:1,backgroundColor:PALETTE.black+'55',justifyContent:'flex-end'}}>

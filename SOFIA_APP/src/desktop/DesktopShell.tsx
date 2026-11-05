@@ -13,6 +13,9 @@ import {NotificationBell} from '../components/NotificationCenter';
 import {ProfileAvatar} from '../components/ProfileAvatar';
 import {fuzzyFilter} from '../lib/fuzzy';
 import {comparePageOrder} from '../lib/page-order';
+import {openContextMenu,contextMenu} from '../components/ContextMenu';
+import type {MenuItem} from '../components/ContextMenu';
+import {appAlert} from '../lib/app-alert';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
@@ -50,15 +53,20 @@ function usePageDirectory(api:SofiaApi){
  return pages;
 }
 
-function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onToggle,expanded,hasChildren,hint,testID}:{icon?:IconName;emoji?:string;label:string;selected?:boolean;onPress:()=>void;depth?:number;collapsed?:boolean;trailing?:string;onToggle?:()=>void;expanded?:boolean;hasChildren?:boolean;hint?:string;testID?:string}){
- const c=useTheme();
- return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress}
+function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onToggle,expanded,hasChildren,hint,testID,menu,onAdd}:{icon?:IconName;emoji?:string;label:string;selected?:boolean;onPress:()=>void;depth?:number;collapsed?:boolean;trailing?:string;onToggle?:()=>void;expanded?:boolean;hasChildren?:boolean;hint?:string;testID?:string;menu?:()=>MenuItem[];onAdd?:()=>void}){
+ const c=useTheme(),[hover,setHover]=useState(false);
+ return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress} onHoverIn={()=>setHover(true)} onHoverOut={()=>setHover(false)} {...(menu?contextMenu(menu):{})}
   style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:32,paddingLeft:collapsed?0:8+depth*14,paddingRight:8,justifyContent:collapsed?'center':'flex-start',marginHorizontal:8,borderRadius:8,backgroundColor:selected?c.accentSoft:hovered?c.line+'80':'transparent'})}>
   {onToggle?<Pressable accessibilityRole="button" accessibilityLabel={(expanded?'Recolher ':'Abrir ')+label} onPress={onToggle} hitSlop={6} style={{width:16,height:16,alignItems:'center',justifyContent:'center',opacity:hasChildren?1:0.35}}><View style={{...({transitionProperty:'transform',transitionDuration:'160ms',transitionTimingFunction:'ease-out'} as any),transform:[{rotate:expanded?'90deg':'0deg'}]}}><Icon name="chevron" size={13} color={c.muted}/></View></Pressable>:null}
   {emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{emoji}</Text>:icon?<Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>:null}
   {collapsed?null:<Text numberOfLines={1} style={{flex:1,color:selected?c.accent:c.text,fontSize:14,fontWeight:selected?'600':'400'}}>{label}</Text>}
   {!collapsed&&hint?<Text style={{color:c.muted,fontSize:11}}>{hint}</Text>:null}
   {!collapsed&&trailing?<Text style={{color:c.muted,fontSize:11}}>{trailing}</Text>:null}
+  {/* 0.3.267: como no Notion, ⋯ e + aparecem ao passar o mouse na página da barra lateral */}
+  {!collapsed&&(menu||onAdd)?<View style={{flexDirection:'row',gap:2,opacity:hover?1:0}}>
+   {menu?<Pressable testID={testID?testID+'-more':undefined} accessibilityRole="button" accessibilityLabel={'Mais ações para '+label} onPress={(e:any)=>{const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.left:(e?.nativeEvent?.pageX??0),r?r.bottom+4:(e?.nativeEvent?.pageY??0),menu());}} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="more" size={15} color={c.muted}/></Pressable>:null}
+   {onAdd?<Pressable testID={testID?testID+'-add':undefined} accessibilityRole="button" accessibilityLabel={'Nova subpágina em '+label} onPress={onAdd} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>:null}
+  </View>:null}
  </Pressable>;
 }
 
@@ -73,14 +81,20 @@ function Section({title,children,action}:{title:string;children:React.ReactNode;
 const EXPANDED_KEY='sofia.desktop.tree.expanded';
 function readExpanded():Set<string>{try{return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY)||'[]'));}catch{return new Set();}}
 
-function PageTree({pages,openId,onOpen}:{pages:Entity[];openId:string;onOpen:(id:string)=>void}){
+function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi}){
+ // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
+ const newChild=async(parent:Entity)=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent.id,node_type:'page',blocks_json:'[]'}});
+  setExpanded(prev=>{const n=new Set(prev);n.add(parent.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});onOpen(saved.id);}catch(e){appAlert('Não foi possível criar a subpágina',e instanceof Error?e.message:String(e));}};
+ const duplicate=async(p:Entity)=>{try{await api.saveEntity({kind:'user_page',title:((p.title||'Sem título')+' (cópia)').slice(0,240),content:p.content||'',area:p.area||'Pessoal',privacy:p.privacy||'private',state:'active',tags:p.tags||[],data:{...p.data}});}catch(e){appAlert('Não foi possível duplicar',e instanceof Error?e.message:String(e));}};
+ const remove=(p:Entity)=>appAlert('Excluir página?','Excluir “'+(p.title||'Sem título')+'” e suas subpáginas também?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void api.deleteEntity(p.id).catch(e=>appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e)));}}]);
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:'Duplicar',icon:'copy',run:()=>void duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
-  rows.push(<Row key={p.id} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0}/>);
+  rows.push(<Row key={p.id} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
@@ -162,7 +176,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)}/>)}</Section>
      <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={onCreatePage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
-      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
+      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}
    </ScrollView>

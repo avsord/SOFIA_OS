@@ -28,6 +28,7 @@ import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
 import {entryBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
+import {openContextMenu} from '../components/ContextMenu';
 import {PageCover,PageAppearance,PAGE_COVERS,coverPosition} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
@@ -153,6 +154,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 0.3.267: editor no estilo Notion no computador (web): Enter divide, Backspace junta, setas entre blocos, menu "/",
  // atalhos markdown e colar várias linhas. No celular o teclado continua como antes.
  const webKeys=Platform.OS==='web';
+ const appearanceAnchor=useRef<{x:number;y:number}|null>(null);
+ function openAppearance(kind:'icon'|'cover',e?:any){const ne=e?.nativeEvent,t=e?.currentTarget;let at:{x:number;y:number}|null=null;
+  try{const r=t?.getBoundingClientRect?.();if(r)at={x:r.left,y:r.bottom};}catch{}if(!at&&ne&&typeof ne.pageX==='number')at={x:ne.pageX,y:ne.pageY};appearanceAnchor.current=at;setAppearance(kind);}
  const [slash,setSlash]=useState<{id:string;start:number;caret:number;active:number}|null>(null),[blockMenu,setBlockMenu]=useState<string|null>(null),slashScroll=useRef<ScrollView>(null);
  useEffect(()=>{if(slash)slashScroll.current?.scrollTo({y:Math.max(0,slash.active*49-140),animated:false});},[slash?.active]);
  useEffect(()=>{setBlockMenu(null);},[focus,selectedId]);
@@ -175,12 +179,62 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   flushNow(()=>{edit(d=>({...d,blocks:next}));setFocus(target.id);setSlash({id:target.id,start:0,caret:1,active:0});});placeCaret(target.id,1);}
  function moveBlock(id:string,dir:1|-1){edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=blocks.length)return d;[blocks[i],blocks[j]]=[blocks[j],blocks[i]];return {...d,blocks};});}
  function duplicateBlock(id:string){edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===id);if(i<0)return d;blocks.splice(i+1,0,{...JSON.parse(JSON.stringify(blocks[i])),id:newBlock().id});return {...d,blocks};});}
+ // 0.3.267 (computador): arrastar blocos pelo ⋮⋮ (linha azul mostra onde cai) e selecionar vários blocos
+ const [picked,setPicked]=useState<Set<string>>(()=>new Set()),pickedRef=useRef(picked);pickedRef.current=picked;
+ const [drop,setDrop]=useState<{y:number;index:number}|null>(null),[dragging,setDragging]=useState<string|null>(null);
+ const pickAnchor=useRef(-1),pickFocus=useRef(-1),dragMoved=useRef(false);
+ const blockRows=()=>{const host=(globalThis as any).document?.querySelector?.('[data-testid="page-blocks"]');return host?Array.from(host.children) as HTMLElement[]:[];};
+ function pickRange(a:number,z:number){const blocks=currentBlocks();if(!blocks.length)return;const lo=Math.max(0,Math.min(a,z)),hi=Math.min(blocks.length-1,Math.max(a,z));pickAnchor.current=a;pickFocus.current=z;setPicked(new Set(blocks.slice(lo,hi+1).map(x=>x.id)));}
+ function enterPick(a:number,z=a){const d=(globalThis as any).document;(d?.activeElement as any)?.blur?.();d?.getSelection?.()?.removeAllRanges?.();setSlash(null);setBlockMenu(null);setFocus(null);pickRange(a,z);}
+ function pickedIndexes(){const blocks=currentBlocks();return blocks.map((x,i)=>pickedRef.current.has(x.id)?i:-1).filter(i=>i>=0);}
+ function blocksText(idx:number[]){const blocks=currentBlocks();let n=0;return idx.map(i=>{const x=blocks[i],t=String(x.text||'');n=x.type==='number'?n+1:0;const pre=({heading1:'# ',heading2:'## ',heading3:'### ',bullet:'- ',number:n+'. ',todo:x.checked?'[x] ':'[ ] ',quote:'> '} as Record<string,string>)[x.type];return pre!==undefined?pre+t:x.type==='divider'?'---':t;}).join('\n');}
+ // o arrasto começa no mousedown do próprio ⋮⋮ (o onPressIn do Pressable chega depois do clique e deixava o arrasto "preso")
+ const dragStart=useRef<(b:PageBlock,e:any)=>void>(()=>{});dragStart.current=(b,e)=>startBlockDrag(b,e);
+ function bindGrip(node:any,b:PageBlock){if(!webKeys||!node||typeof node.addEventListener!=='function'||node.__sofiaGrip===b.id)return;node.__sofiaGrip=b.id;node.addEventListener('mousedown',(ev:MouseEvent)=>{if(ev.button!==0)return;ev.preventDefault();dragMoved.current=false;dragStart.current(b,ev);});}
+ function startBlockDrag(b:PageBlock,e:any){
+  if(!webKeys)return;const ne=e?.nativeEvent||e||{},startX=ne.pageX??0,startY=ne.pageY??0,d=(globalThis as any).document;if(!d)return;let moved=false;
+  const target=(y:number)=>{const rows=blockRows();if(!rows.length)return null;const host=rows[0].parentElement!.getBoundingClientRect();let index=rows.length,line=rows[rows.length-1].getBoundingClientRect().bottom;
+   for(let i=0;i<rows.length;i++){const r=rows[i].getBoundingClientRect();if(y<r.top+r.height/2){index=i;line=r.top;break;}}return {index,y:line-host.top};};
+  const move=(ev:MouseEvent)=>{if(!moved&&Math.hypot(ev.pageX-startX,ev.pageY-startY)<4)return;if(!moved){moved=true;setDragging(b.id);setBlockMenu(null);d.getSelection?.()?.removeAllRanges?.();}ev.preventDefault();const t=target(ev.clientY);setDrop(t);};
+  const up=(ev:MouseEvent)=>{d.removeEventListener('mousemove',move);d.removeEventListener('mouseup',up);
+   dragMoved.current=moved;if(!moved)return;
+   const t=target(ev.clientY);setDrop(null);setDragging(null);if(!t)return;
+   edit(dr=>{const blocks=dr.blocks.slice(),from=blocks.findIndex(x=>x.id===b.id);if(from<0)return dr;let to=t.index;if(from<to)to--;if(to===from)return dr;const [m]=blocks.splice(from,1);blocks.splice(to,0,m);return {...dr,blocks};});};
+  d.addEventListener('mousemove',move);d.addEventListener('mouseup',up);
+ }
+ useEffect(()=>{if(!webKeys||!active)return;const d=(globalThis as any).document;if(!d)return;
+  const key=(e:KeyboardEvent)=>{if(!pickedRef.current.size||!selectedId)return;const t=e.target as HTMLElement;if(t?.closest?.('textarea,input,[contenteditable="true"]'))return;
+   const idx=pickedIndexes(),blocks=currentBlocks(),last=blocks.length-1,mod=(e.ctrlKey||e.metaKey)&&!e.altKey,k=e.key.toLowerCase();if(!idx.length)return;
+   if(e.key==='Escape'){e.preventDefault();setPicked(new Set());return;}
+   if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const dir=e.key==='ArrowDown'?1:-1;if(e.shiftKey)pickRange(pickAnchor.current<0?idx[0]:pickAnchor.current,Math.max(0,Math.min(last,(pickFocus.current<0?idx[0]:pickFocus.current)+dir)));else{const n=Math.max(0,Math.min(last,(dir>0?idx[idx.length-1]:idx[0])+dir));pickRange(n,n);}return;}
+   if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());return;}
+   if(e.key==='Enter'){e.preventDefault();const first=blocks[idx[0]];setPicked(new Set());if(first&&TEXT_BLOCKS.has(first.type)){setFocus(first.id);placeCaret(first.id,'end');}return;}
+   if(mod&&k==='a'){e.preventDefault();pickRange(0,last);return;}
+   if(mod&&(k==='c'||k==='x')){e.preventDefault();const text=blocksText(idx);void (globalThis as any).navigator?.clipboard?.writeText?.(text);if(k==='x'){const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());}return;}
+   if(mod&&k==='d'){e.preventDefault();const copies=idx.map(i=>({...JSON.parse(JSON.stringify(blocks[i])),id:newBlock().id}));const at=idx[idx.length-1]+1;edit(dr=>{const next=dr.blocks.slice();next.splice(at,0,...copies);return {...dr,blocks:next};});setPicked(new Set(copies.map(x=>x.id)));return;}
+  };
+  // arrastar o mouse de um bloco para outro (ou a partir da margem) seleciona os blocos do caminho
+  let press:{start:number;x:number;y:number}|null=null;
+  const rowAt=(y:number)=>{const rows=blockRows();for(let i=0;i<rows.length;i++){const r=rows[i].getBoundingClientRect();if(y>=r.top&&y<=r.bottom)return i;}return -1;};
+  const down=(e:MouseEvent)=>{const t=e.target as HTMLElement;if(e.button!==0)return;if(!t?.closest?.('[data-testid="page-blocks"]')&&!t?.closest?.('[data-testid^="page-document-"]')){if(pickedRef.current.size)setPicked(new Set());return;}
+   if(t?.closest?.('[data-testid^="page-block-gutter"],[data-testid="page-block-menu"],[data-testid="page-slash-menu"]'))return;if(pickedRef.current.size)setPicked(new Set());
+   if(t?.closest?.('button,[role="button"],[role="checkbox"]')&&!t?.closest?.('textarea'))return;press={start:rowAt(e.clientY),x:e.clientX,y:e.clientY};};
+  const moveSel=(e:MouseEvent)=>{if(!press||!(e.buttons&1))return;const i=rowAt(e.clientY);if(press.start<0){if(Math.hypot(e.clientX-press.x,e.clientY-press.y)<8||i<0)return;press.start=i;}if(i>=0&&i!==press.start){e.preventDefault();if(!pickedRef.current.size)enterPick(press.start,i);else pickRange(press.start,i);}};
+  const upSel=()=>{press=null;};
+  d.addEventListener('keydown',key);d.addEventListener('mousedown',down,true);d.addEventListener('mousemove',moveSel);d.addEventListener('mouseup',upSel);
+  return()=>{d.removeEventListener('keydown',key);d.removeEventListener('mousedown',down,true);d.removeEventListener('mousemove',moveSel);d.removeEventListener('mouseup',upSel);};
+ },[webKeys,active,selectedId]);
+ useEffect(()=>{setPicked(new Set());},[selectedId]);
+ // menu do ⋮⋮ fecha com Esc ou clique fora
+ useEffect(()=>{if(!webKeys||!blockMenu)return;const d=(globalThis as any).document;if(!d)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();setBlockMenu(null);}};const down=(e:MouseEvent)=>{const t=e.target as HTMLElement;if(!t?.closest?.('[data-testid="page-block-menu"],[data-testid^="page-block-gutter"]'))setBlockMenu(null);};d.addEventListener('keydown',key,true);d.addEventListener('mousedown',down,true);return()=>{d.removeEventListener('keydown',key,true);d.removeEventListener('mousedown',down,true);};},[webKeys,blockMenu]);
  function onBlockKey(e:any,b:PageBlock){
   if(!webKeys)return;const ne=e.nativeEvent||{},key=String(ne.key||''),node=e.target as HTMLTextAreaElement,text=String(node?.value??b.text??''),start=node?.selectionStart??text.length,end=node?.selectionEnd??start;
   if(slash&&slash.id===b.id){const items=slashMatches(text.slice(slash.start+1,start));
    if(key==='ArrowDown'||key==='ArrowUp'){e.preventDefault();const n=Math.max(1,items.length);setSlash({...slash,active:(slash.active+(key==='ArrowDown'?1:-1)+n)%n});return;}
    if((key==='Enter'||key==='Tab')&&items.length){e.preventDefault();chooseSlash(b,items[Math.min(slash.active,items.length-1)].type);return;}
    if(key==='Escape'){e.preventDefault();setSlash(null);return;}}
+  if(key==='Escape'){e.preventDefault();const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0)enterPick(i);return;}
+  if(ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&((key==='ArrowUp'&&start===0&&end===0)||(key==='ArrowDown'&&start===text.length&&end===text.length))){const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0){e.preventDefault();enterPick(i,Math.max(0,Math.min(currentBlocks().length-1,i+(key==='ArrowDown'?1:-1))));}return;}
   if(key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&b.type!=='code'){e.preventDefault();applyCaret(splitBlock(currentBlocks(),b.id,start,end));return;}
   if(key==='Backspace'&&start===0&&end===0){const r=backspaceAtStart(currentBlocks(),b.id);if(r){e.preventDefault();applyCaret(r);}return;}
   if(key==='Delete'&&start===text.length&&end===text.length){const r=deleteAtEnd(currentBlocks(),b.id);if(r){e.preventDefault();applyCaret(r);}return;}
@@ -259,19 +313,19 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    // 0.3.269: link numa Pagina vira item da Biblioteca (uma das entradas do fluxo de criar)
    return <Pressable accessibilityRole="button" testID={'page-link-to-library-'+b.id} onPress={()=>{void api.linkPreview(link).catch(()=>null).then(pv=>api.saveEntity({kind:'library_item',title:(pv?.title||String(b.text||'').replace(link,'').trim()||link).slice(0,240),content:'',area:'Biblioteca',privacy:'private',state:'saved',tags:[],data:{type:'reference',status:'0',url:pv?.url||link,site:pv?.site||'',cover_url:pv?.image||''}})).then(()=>appAlert('Biblioteca','Guardado na Biblioteca, em Referências.')).catch(e=>setError(errorText(e)));}} style={{alignSelf:'flex-start',marginTop:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Guardar na Biblioteca</Text></Pressable>;})()}</Pressable>;
   const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
-  const prefix=b.type==='bullet'?'• ':b.type==='number'?String(listNumber(currentBlocks().length?currentBlocks():[b],currentBlocks().length?i:0)||i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
+  const prefix=b.type==='bullet'?'• ':b.type==='number'?String(listNumber(currentBlocks().length?currentBlocks():[b],currentBlocks().length?i:0)||i+1)+'. ':b.type==='quote'&&!desktop?'│ ':b.type==='callout'?'💡 ':'';
   const slashOpen=webKeys&&!preview&&slash?.id===b.id,menuOpen=desktop&&!preview&&blockMenu===b.id,lineH=heading+9;
   const slashItems=slashOpen&&slash?slashMatches(String(b.text||'').slice(slash.start+1,slash.caret)):[];
-  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0}}>{({hovered}:any)=><>
+  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0,...(desktop&&b.type==='callout'?{backgroundColor:c.input,borderRadius:6,paddingHorizontal:14,paddingVertical:10,marginVertical:4,gap:8}:{})}}>{({hovered}:any)=><>
    {desktop&&!preview?<View testID={'page-block-gutter-'+b.id} style={{position:'absolute',left:-48,top:Math.max(0,(lineH-26)/2)+4,flexDirection:'row',opacity:hovered||menuOpen?1:0}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Adicionar bloco abaixo" onPress={()=>insertWithSlash(b)} style={({hovered:h}:any)=>({width:22,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Opções do bloco" onPress={()=>setBlockMenu(m=>m===b.id?null:b.id)} style={({hovered:h}:any)=>({width:20,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h||menuOpen?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={({hovered:h}:any)=>({width:20,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h||menuOpen?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable>
    </View>:null}
    {b.type==='todo'&&desktop?<Pressable accessibilityRole="checkbox" accessibilityLabel="Concluir tarefa" accessibilityState={{checked:!!b.checked}} onPress={()=>updateBlock(b,{checked:!b.checked})} style={{width:18,height:18,marginTop:(lineH-18)/2+4,borderRadius:4,borderWidth:1.5,borderColor:b.checked?c.accent:c.muted,backgroundColor:b.checked?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{b.checked?<Icon name="check" size={12} color={c.onAccent}/>:null}</Pressable>
    :b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
    <TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
     onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
-    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
+    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
    {slashOpen?<View testID="page-slash-menu" style={{position:'absolute',top:lineH+12,left:prefix||b.type==='todo'?24:0,width:310,maxHeight:360,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,shadowColor:'#000',shadowOpacity:0.28,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12}}>
     <ScrollView ref={slashScroll} keyboardShouldPersistTaps="always">
      <Text style={{color:c.muted,fontSize:11,fontWeight:'500',paddingHorizontal:8,paddingTop:4,paddingBottom:6}}>{slash&&slash.caret>slash.start+1?'Resultados':'Blocos'}</Text>
@@ -282,7 +336,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     </ScrollView>
    </View>:null}
    {menuOpen?<View testID="page-block-menu" style={{position:'absolute',top:lineH+8,left:-48,width:230,maxHeight:380,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,shadowColor:'#000',shadowOpacity:0.28,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12}}>
-    <ScrollView>
+    <ScrollView keyboardShouldPersistTaps="handled">
      {([['Duplicar',()=>duplicateBlock(b.id)],['Mover para cima',()=>moveBlock(b.id,-1)],['Mover para baixo',()=>moveBlock(b.id,1)]] as const).map(([label,fn])=><Pressable key={label} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);fn();}} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:8,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
      <Text style={{color:c.muted,fontSize:11,fontWeight:'500',paddingHorizontal:10,paddingTop:8,paddingBottom:4}}>Transformar em</Text>
      {slashMatches('').filter(it=>TEXT_BLOCKS.has(it.type)&&it.type!==b.type).map(it=><Pressable key={it.type} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);updateBlock(b,{type:it.type});}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{width:22,color:c.muted,fontSize:12,fontWeight:'600'}}>{it.icon}</Text><Text style={{color:c.text,fontSize:13}}>{it.label}</Text></Pressable>)}
@@ -295,13 +349,22 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
   const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
+  const titleInput=<TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
   return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
    <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
-    {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>:<Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={StyleSheet.absoluteFill}>
+    {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
+     // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
+     :desktop?(hasCover?<Pressable accessible={false} style={StyleSheet.absoluteFill}>{({hovered}:any)=><>
+      <PageCover data={draft.appearance} api={api}/>
+      {!preview&&!coverMove?<View style={{position:'absolute',right:16,bottom:12,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:hovered?1:0}}>
+       <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
+       {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
+      </View>:null}</>}</Pressable>:null)
+     :<Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={StyleSheet.absoluteFill}>
      {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
     </Pressable>}
     {/* 0.3.255: botao de reposicionar a capa */}
-    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:PALETTE.black+'7a'}}><Icon name="move" size={14} color={PALETTE.white}/><Text style={{color:PALETTE.white,fontSize:12,fontWeight:'500'}}>Reposicionar</Text></Pressable>:null}
+    {!preview&&!desktop&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:PALETTE.black+'7a'}}><Icon name="move" size={14} color={PALETTE.white}/><Text style={{color:PALETTE.white,fontSize:12,fontWeight:'500'}}>Reposicionar</Text></Pressable>:null}
     {!preview&&imageCover&&coverMove?<><View pointerEvents="none" style={{position:'absolute',top:12,left:0,right:0,alignItems:'center'}}><View style={{paddingHorizontal:12,paddingVertical:6,borderRadius:10,backgroundColor:PALETTE.black+'a0'}}><Text style={{color:PALETTE.white,fontSize:12}}>Arraste a imagem para reposicionar</Text></View></View>
      <View style={{position:'absolute',right:12,bottom:12,flexDirection:'row',gap:8}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:PALETTE.black+'a0'}}><Text style={{color:PALETTE.white,fontSize:12,fontWeight:'500'}}>Cancelar</Text></Pressable>
@@ -309,10 +372,21 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      </View></>:null}
    </View>
    <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
+    {/* 0.3.267 (computador): como no Notion, sem ícone não aparece o 📄; "Adicionar ícone" e "Adicionar capa" surgem ao passar o mouse */}
+    {desktop?<Pressable accessible={false} testID="page-header">{({hovered}:any)=><>
+     {draft.appearance.icon?<Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({width:82,height:82,marginLeft:-4,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:56,lineHeight:78,color:c.text}}>{String(draft.appearance.icon)}</Text></Pressable>:<View style={{height:hasCover?50:24}}/>}
+     {!preview?<View style={{flexDirection:'row',gap:2,height:30,marginTop:6,marginLeft:-6,opacity:hovered?1:0}}>
+      {!draft.appearance.icon?<Pressable testID="page-add-icon" accessibilityRole="button" accessibilityLabel="Adicionar ícone" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:13}}>☺</Text><Text style={{color:c.muted,fontSize:13}}>Adicionar ícone</Text></Pressable>:null}
+      {!hasCover?<Pressable testID="page-add-cover" accessibilityRole="button" accessibilityLabel="Adicionar capa" onPress={()=>{const pick=PAGE_COVERS[Math.floor(Math.random()*PAGE_COVERS.length)][1];store.edit(selected.id,d=>({...d,appearance:{...d.appearance,cover_type:'preset',cover_value:pick,cover_attachment_id:'',cover_position:''}}));void store.flush(selected.id);}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Icon name="image" size={14} color={c.muted}/><Text style={{color:c.muted,fontSize:13}}>Adicionar capa</Text></Pressable>:null}
+     </View>:null}
+     {titleInput}
+    </>}</Pressable>:<>
     <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:56,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
-    <TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
+    {titleInput}
+    </>}
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
-    <View style={{gap:2}}>{draft.blocks.map((block,index)=>blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus))}</View>
+    <View testID={preview?undefined:"page-blocks"} style={{gap:2,position:'relative'}}>{draft.blocks.map((block,index)=><View key={block.id} style={{borderRadius:4,backgroundColor:!preview&&picked.has(block.id)?c.accentSoft:'transparent',opacity:dragging===block.id?0.4:1,zIndex:(slash?.id===block.id||blockMenu===block.id)?50:0}}>{blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus)}</View>)}
+     {!preview&&drop?<View pointerEvents="none" testID="page-drop-line" style={{position:'absolute',left:0,right:0,top:drop.y-2,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null}</View>
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
       <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={preview?undefined:changePageInteraction} onDragChange={preview?undefined:setPageDragging} compact/>
@@ -369,7 +443,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
     <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
-    <IconButton name="more" label="Opções da página" size={34} onPress={()=>setPageMenu(true)}/>
+    <IconButton name="more" label="Opções da página" size={34} onPress={()=>{if(!desktop){setPageMenu(true);return;}
+     // 0.3.267 (computador): menu pequeno junto do ⋯, como no Notion (antes: painel de baixo na largura toda)
+     const vw=typeof window!=='undefined'?window.innerWidth:1200,imageCoverNow=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id,blk=focus?draft.blocks.find(x=>x.id===focus):undefined;
+     openContextMenu(vw-236,92,[{label:'Nova subpágina ou template',icon:'plus',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
+      ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
    </View>
   </View>
   {/* 0.3.230: opcoes da pagina no ⋯ do topo, como no Notion (antes: icones soltos e "segure para excluir" nos blocos) */}
@@ -390,7 +468,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
     </View>
 </ScrollView></View></KeyboardToolbar>
-  <Presence>{appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}</Presence>
+  <Presence>{appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} anchor={appearanceAnchor.current} current={draft.appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}</Presence>
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <KeyboardViewport>{editor}</KeyboardViewport>

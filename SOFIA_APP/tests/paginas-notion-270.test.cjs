@@ -66,3 +66,21 @@ test('A tela de Páginas usa o teclado novo só no computador e foca o bloco nov
  assert.ok(src.includes("testID=\"page-slash-menu\""));
  assert.ok(fs.readFileSync(path.join(__dirname,'..','src/lib/flush-sync.ts'),'utf8').includes('fn();'),'celular não usa react-dom');
 });
+
+test('Arrastar blocos pelo ⋮⋮ começa no mousedown (não fica "preso") e mostra a linha de destino',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');
+ assert.ok(src.includes("node.addEventListener('mousedown',(ev:MouseEvent)=>{if(ev.button!==0)return;"));
+ assert.ok(src.includes('ref={(n:any)=>bindGrip(n,b)}'));assert.ok(src.includes('testID="page-drop-line"'));
+ assert.ok(src.includes("if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();const gone="),'apagar blocos selecionados');
+});
+test('Capa: miniaturas com degradê próprio, envio no site sem link blob: e janelas presas ao botão no computador',()=>{
+ const a=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');
+ assert.ok(a.includes("gradientId='cover'+React.useId()"),'cada capa tem seu degradê');
+ assert.ok(a.includes('const file:Blob|undefined=(asset as any).file;')&&!a.includes('await fetch(asset.uri)'),'sem fetch do blob: (bloqueado pela CSP)');
+ assert.ok(a.includes("Platform.OS==='web'?{mediaTypes:['images'],allowsEditing:false"),'sem recorte 3:1 no site');
+ assert.ok(a.includes("testID={'page-'+kind+'-picker'}"));
+});
+test('Barra lateral: ⋯ e + nas páginas, como no Notion',()=>{
+ const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
+ assert.ok(d.includes('menu={menuFor(p)} onAdd={()=>void newChild(p)}'));assert.ok(d.includes("{label:'Duplicar',icon:'copy'"));
+});
