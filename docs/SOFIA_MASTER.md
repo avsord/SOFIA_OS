@@ -234,6 +234,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **Railway (05/11):** cada publicação reinicia o servidor e corta a resposta da Sofia em andamento ("A chamada foi interrompida"); o app agora reenvia sozinho. Proposto ao Pedro: ligar o tempo de espera no desligamento (~30 s) — mudança de configuração do Railway, só com o OK dele. O servidor hoje cancela a resposta antes de esperar (src/server.js `stop`).
+
 - **Lista do Pedro (WhatsApp 03–04/11) — DEFEITOS:** corrigidos em 04/11 à noite: mini chat por baixo das fileiras (fileira 1 com zIndex), nomes do balão (380 px, 2 linhas, balão acima dos rótulos), "agora" desliza ao voltar à aba, clicar numa bolinha cria naquele horário (no computador; prévia no passar do mouse), segurar a data abre o criador, criar pela Sofia atualiza na hora (leituras não reaproveitam dado velho após escrita; agenda relê), painel Editar (largura em % da janela, sem passar da borda) e confirmação por cima do painel. Price Tracker: decisão do Pedro (05/11) — o menor preço real entre as lojas em todo lugar (`primaryNow` = oferta atual mais barata). **Falta confirmar com o Pedro:** perfil no canto inferior esquerdo (não existe no código atual; já saiu antes) e "tirar tudo do filtro" de Notas/Biblioteca (a rodada de 03/11 já deixou só áreas — ver se ainda falta algo).
 - **Lista do Pedro — NOVO (desenho antes, aprovação dele):** linha do tempo "microscópica" (entrar como num universo); painel de edição de eventos fixo à direita, didático e premium (05/11: já existe o mini editor no balão da linha do tempo — `QuickEditor`/`QuickDose` em HomeBrief.tsx, `quickEdit` em Home.tsx: nome, descrição, data/hora por seletor, nível de importância; doses: horário + Tomei); "drive" na Sofia; colar/arrastar imagem no mini chat.
 
@@ -290,11 +292,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Linha do tempo: X ao lado do lápis em tudo (tarefa: "Tirar da linha do tempo" ou "Excluir tarefa"; compromisso/lembrete: excluir; conta/encomenda/dose: tirar só da linha, neste computador); mover é definitivo (sem voltar ao horário combinado na virada do dia); brilho da abertura sem escurecer no meio da troca faixa→oval | testado: tarefa saiu da linha e ficou em Tarefas (API); testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um item de um grupo (pela alça do balão) deixa a bolinha centrada sob o mouse (antes ficava deslocada pela distância até a alça) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um grupo — ao soltar, todos os itens já aparecem juntos no lugar novo enquanto cada um é gravado (antes o grupo se separava e depois se juntava) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: "+ Adicionar às HH:MM" no balão abre o criador naquele horário; brilho da abertura volta a trocar faixa→oval ao mesmo tempo (curvas complementares, sem escurecer e sem as duas acesas) — o oval final não mudou (medido contra a versão de 04/11) | testado: + abre o criador; testes ok |
 | 2026-11-05 | (delivery) | Brilho da abertura: troca faixa→oval volta a ser simultânea como antes, agora em 2,2 s com fim bem lento; oval ~25% menos intenso | testes ok |
+| 2026-11-05 | (delivery) | Mini chat/Conversa: resposta cortada por reinício do servidor (publicação no Railway — "A chamada foi interrompida") é reenviada sozinha até 2 vezes (mesmo client_message_id; o servidor não duplica). Railway sem tempo de espera no desligamento: sugerido ao Pedro | testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

@@ -261,7 +261,17 @@ export class SofiaApi {
   async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
   async clearChatHistory() {const result=await this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forgetChat();await this.snapshots.flush();return result;}
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
-  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);agendaChanged(this);systemChanged(this);await this.snapshots.flush();return result; /* 04/11/2026 (Pedro: "criar com a Sofia demora a aparecer"): avisa as telas antes de gravar o cache (a gravacao continua antes de responder) */ }
+  // 05/11/2026 (Pedro: "coloquei importante e ficou assim" - "A chamada foi interrompida"): o servidor reiniciou (publicacao) no meio
+  // da resposta. Interrompida pelo reinicio ou sem conexao, a mesma mensagem (mesmo client_id) e reenviada sozinha ate 2 vezes;
+  // o servidor reconhece a repeticao e nao duplica (retry=true so autoriza refazer a que nao terminou).
+  private async chatOnce(data: object) {let last: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {return await this.request<ChatResult>('/messages', attempt ? {...(data as any), retry: true} : data, 'POST', 180000);}
+      catch (e) {const err = e as ApiError, code = String((err as any)?.code || ''), status = Number((err as any)?.status || 0);
+        const restart = code === 'CANCELLED' || code === 'NETWORK' || code === 'RETRY_REQUIRED' || ((status === 502 || status === 503) && code !== 'TURN_TIMEOUT');
+        if (!restart || attempt === 2) throw e; last = e; await new Promise(r => setTimeout(r, attempt ? 8000 : 4000));}}
+    throw last;}
+  async chat(data: object) { const result=await this.chatOnce(data);this.rememberChatResult(result,data);agendaChanged(this);systemChanged(this);await this.snapshots.flush();return result; /* 04/11/2026 (Pedro: "criar com a Sofia demora a aparecer"): avisa as telas antes de gravar o cache (a gravacao continua antes de responder) */ }
   async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);agendaChanged(this);systemChanged(this);await this.snapshots.flush();return result; /* 04/11/2026 (Pedro: "criar com a Sofia demora a aparecer"): avisa as telas antes de gravar o cache (a gravacao continua antes de responder) */ }
   home() { return this.request<HomeData>('/home'); }
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
