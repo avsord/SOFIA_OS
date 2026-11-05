@@ -155,3 +155,9 @@ test('Capa nasce na posição escolhida (sem pular do centro) e arrastar na late
  assert.ok(read('src/components/PageAppearance.tsx').includes("objectFit:'cover',objectPosition:'50% '+position+'%'"));
  const d=read('src/desktop/DesktopShell.tsx');assert.ok(d.includes('testID="sidebar-drop-line"')&&d.includes("kind:f<0.34?'before':f>0.66?'after':'inside'"));
 });
+
+test('Início: bloco "Agenda · próximos" começa amanhã (o de hoje está na linha do tempo)',()=>{
+ const h=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');
+ assert.ok(h.includes('const fromTomorrow = useMemo(')&&(h.match(/upcoming=\{fromTomorrow\}/g)||[]).length===2);
+ assert.ok(h.includes("new Date(r.date + 'T00:00:00')"),'dia inteiro pela data, sem o fuso puxar para hoje');
+});

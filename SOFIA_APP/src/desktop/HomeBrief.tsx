@@ -227,6 +227,9 @@ export function HomeBrief(p: HomeBriefProps) {
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
+  // 05/11/2026 (Pedro: "em Agenda proximos coloca o que vai vir so um dia depois... nao de hoje, pro usuario ficar atento"):
+  // o de hoje ja esta na linha do tempo; o bloco mostra a partir de amanha (dia inteiro pela data, sem o fuso puxar para hoje)
+  const fromTomorrow = useMemo(() => {const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1); const at = (r: DayRecord) => /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? new Date(r.date + 'T00:00:00') : new Date(r.date); return nextItems.filter(r => at(r).getTime() >= start.getTime());}, [nextItems, now.toDateString()]);
   const low = (p.series || []).filter(s => s.atLow);
 
   const actions: {label: string; primary?: boolean; run: () => void}[] = [];
@@ -273,7 +276,7 @@ export function HomeBrief(p: HomeBriefProps) {
     {p.compact ? <CompactCtx.Provider value={true}>
       {/* celular: os blocos de verdade do site, adaptados. Agenda, Rotina e Financas na largura toda (tem seletor/duas
           colunas de numeros); Tarefas, E-mails, Price Tracker e Encomendas em pares do mesmo tamanho. */}
-      <AgendaTile style={{height: 176}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
+      <AgendaTile style={{height: 176}} card={card} upcoming={fromTomorrow} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <View style={{flexDirection: 'row', gap: 10}}>
         <TasksTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
         <MailTile style={{flex: 1, minWidth: 0, height: HALF_H}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
@@ -286,7 +289,7 @@ export function HomeBrief(p: HomeBriefProps) {
       <FinanceTile style={{height: 204}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
     </CompactCtx.Provider> : <>
     <RowIn i={1} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
-      <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={nextItems} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
+      <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={fromTomorrow} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
       <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
       <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
     </View></RowIn>
@@ -1086,7 +1089,7 @@ function AgendaTile({style, card, upcoming, onOpen, onOpenAgenda}: {style: any; 
       <Text numberOfLines={1} style={{width: 92, fontSize: 13, color: c.muted, fontVariant: ['tabular-nums']}}>{whenLabel(r)}</Text>
       <View style={{width: 3, height: 16, borderRadius: 2, backgroundColor: colorOf(r, c.accent)}} />
       <Text numberOfLines={1} style={{flex: 1, fontSize: 13, color: c.text}}>{r.title}</Text>
-    </Pressable>)}</ScrollView> : <Quiet text="Nada marcado" sub="Nenhum compromisso pela frente neste mês." />}
+    </Pressable>)}</ScrollView> : <Quiet text="Nada marcado" sub="Nenhum compromisso a partir de amanhã neste mês." />}
   </View>;
 }
 /** 0.3.322 (Pedro): troca suave do item mostrado - sai descendo um pouco e apagando (160 ms), entra subindo (260 ms). */

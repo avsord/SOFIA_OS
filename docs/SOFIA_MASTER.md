@@ -297,11 +297,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Páginas estilo Notion, 3ª parte (prints do Pedro): texto rico no site (negrito/itálico/sublinhado/tachado/código/link/cor) com barra ao selecionar + Sofia (Melhorar escrita, Revisão, Explicar, Reformatar), espaço numa linha vazia chama a Sofia, subpáginas como links no texto com prévia, /paginas/<id>, Editada/copiar link/favorito, ↑ Topo, barra lateral: arrastar páginas, Favoritos, Próximos eventos | testado no navegador; tsc e testes ok |
 | 2026-11-05 | (delivery) | Prints do Pedro (noite): botões que sumiam no hover (capa, + ⋮⋮, Adicionar ícone, barra lateral), barra de formatação abre embaixo quando não cabe, caixa da Sofia no fluxo, linha do tempo do Início do dia 1 do mês ao fim do mês seguinte ao próximo, Agenda cria com um clique, Dia inteiro duplicado, próximos eventos sem 03:00, + cria página direto com "Comece a usar", áreas só criadas pela pessoa | testado no navegador; tsc e testes ok |
 | 2026-11-05 | (delivery) | Início não pula mais ao voltar de outra tela (altura 0 de quando estava escondido era guardada); página criada pela lateral abre direto (cria antes de trocar de tela); o que a Sofia cria na conversa rápida entra na linha do tempo junto com a resposta; testes 055/257/230 atualizados à regra nova de áreas e ao + direto | testado no navegador (Início/criar página); tsc e testes ok |
 | 2026-11-05 | (delivery) | Capa: botões no canto de baixo por cima do cabeçalho, reposicionar abre sozinho depois de enviar, sem piscar ao trocar de página (capa da memória no 1º quadro, tamanho guardado, capas recentes baixadas antes, foto reduzida a 2000 px ao enviar) | medido: capa em ~10 ms ao trocar com rede lenta; testes ok |
 | 2026-11-05 | (delivery) | Capa no site nasce na posição escolhida (img com object-position; antes aparecia centralizada e pulava); arrastar página na lateral: terço de cima/baixo = acima/abaixo com linha de destino, meio = dentro | quadros gravados: troca de página sem quadro intermediário; testes ok |
+| 2026-11-05 | (delivery) | Início: bloco "Agenda · próximos" mostra a partir de amanhã (o de hoje fica na linha do tempo), dia inteiro pela data | testado no navegador; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
