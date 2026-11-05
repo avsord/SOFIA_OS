@@ -17,15 +17,11 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 /** 04/11/2026 (Pedro: "ainda esta flikando, analisa toda a animacao"): a abertura do site roda inteira em CSS, numa linha do
  * tempo unica que comeca quando a saudacao aparece (at). Animacao em JavaScript para quando a pagina esta ocupada montando
  * os dados (era o engasgo e a piscada); a do navegador continua. Montado atrasado, o atraso negativo poe cada parte no ponto certo. */
-// 04/11/2026: versao aprovada pelo Pedro (branch aprovado/site-abertura-2026-11-04-v2) e a versao de TESTE, que so liga com
-// ?teste=1 no endereco (Pedro: "zoom out mais lento e suave, quase nada de escala, e os blocos aparecem rapidamente")
-export const INTRO_TEST = typeof location !== 'undefined' && /[?&]teste=1(?:&|$)/.test(location.search || '');
-export const INTRO = INTRO_TEST
-  ? {scale: 1.04, moveMs: 2400, scaleMs: 3200, ease: 'cubic-bezier(0.4,0,0.08,1)', scaleEase: 'cubic-bezier(0.25,0.1,0.1,1)', rowGap: 110, rowMs: 600, travel: 0.1}
-  : {scale: 1.6, moveMs: 1300, scaleMs: 1300, ease: 'cubic-bezier(0.33,0,0.15,1)', scaleEase: 'cubic-bezier(0.33,0,0.15,1)', rowGap: 180, rowMs: 520, travel: 1};
-export const INTRO_T = INTRO_TEST
-  ? {greet: 0, move: 140, date: 990, summary: 1140, rows: 480, glow: 1500} /* move 140: a subida comeca 0,5 s antes de a tela abrir */
-  : {greet: 0, move: 640, date: 990, summary: 1140, rows: 700, glow: 1350};
+// 05/11/2026: a versao que o Pedro aprovou em /inicio?teste=1 virou a principal (a anterior esta na branch
+// aprovado/site-abertura-2026-11-04-v2): quase sem escala (104% -> 100%, 3,2 s proprios), subida leve (10% da distancia, 2,4 s)
+// comecando 0,5 s antes de a tela abrir, e as fileiras logo ao abrir
+export const INTRO = {scale: 1.04, moveMs: 2400, scaleMs: 3200, ease: 'cubic-bezier(0.4,0,0.08,1)', scaleEase: 'cubic-bezier(0.25,0.1,0.1,1)', rowGap: 110, rowMs: 600, travel: 0.1};
+export const INTRO_T = {greet: 0, move: 140, date: 990, summary: 1140, rows: 480, glow: 1500};
 export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
   return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
 }

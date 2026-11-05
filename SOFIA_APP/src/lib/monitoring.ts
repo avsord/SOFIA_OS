@@ -439,6 +439,9 @@ export type MonitorWidgetRow = {id: string; title: string; color: string; curren
  * barata do momento. As outras lojas continuam acompanhadas, so nao aparecem no widget. Se a
  * principal ainda nao tem nenhuma leitura, mostra a melhor oferta com a loja indicada. */
 export function primaryNow(p: ProductSeries): {price: number; store: Store; change: number | null} | null {
+  // 05/11/2026 (Pedro: "o menor preco nos dois lugares, tem que ser o que e real do site da loja"): o preco mostrado em todo lugar
+  // (Inicio, lista e detalhe) e a oferta atual mais barata entre as lojas; a loja principal so vale se nenhuma tiver leitura
+  if (p.now) return {price: p.now.price, store: p.now.store, change: p.change};
   const primary = p.stores.find(s => s.primary);
   const pts = primary ? primary.points : [];
   if (primary && pts.length) {
@@ -446,7 +449,7 @@ export function primaryNow(p: ProductSeries): {price: number; store: Store; chan
     for (let i = pts.length - 2; i >= 0; i--) if (pts[i].v !== last) { prev = pts[i].v; break; }
     return {price: last, store: primary, change: prev ? (last - prev) / prev * 100 : null};
   }
-  return p.now ? {price: p.now.price, store: p.now.store, change: p.change} : null;
+  return null;
 }
 export function widgetRows(list: ProductSeries[]): MonitorWidgetRow[] {
   return [...list].sort((a, b) => Number(b.atLow) - Number(a.atLow) || (b.lastAt ?? 0) - (a.lastAt ?? 0)).map(p => { const n = primaryNow(p); return {
