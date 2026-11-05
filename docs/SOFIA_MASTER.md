@@ -207,6 +207,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Armazenamento** (Perfil → Configurações do aplicativo): espaço da conta como o Drive mostra, a Sofia separada do resto.
 - **Comprovantes** (fotos da conversa para Finanças) e **Áudios** da conversa se apagam sozinhos com mais de 7 dias (cada um com a sua chave, ligada por padrão); a despesa, a miniatura e a transcrição ficam. Arquivo apagado deixa a linha com `removed_at` e a rota responde 410 com o motivo.
 - 04/11/2026 (Pedro): abertura do site — véu na cor do fundo que abre no 1º quadro (1 s); a animação do Início já acontecendo por trás; Páginas da barra lateral prontas antes (pedidas no carregamento); blocos do Início no computador SEM esqueleto/shimmer, entrando com conteúdo fileira por fileira.
+- 05/11/2026 (Pedro): mover/alterar um item na linha do tempo é definitivo — a tarefa não feita NÃO volta ao horário combinado na virada do dia (substitui a regra da 0.3.317). X na linha do tempo: tarefa pergunta "Tirar da linha do tempo" (fica em Tarefas sem horário) ou "Excluir tarefa".
 
 ## 8. Regras que não se quebram
 
@@ -289,11 +290,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Abertura mais leve, quase imperceptível: subida 5% da distância (era 10%), escala 102% (era 104%), blocos sobem 6 px (era 14 px); brilho oval logo ao abrir (0,56 s na linha do tempo, era 1,5 s) | filmado; testes ok |
 | 2026-11-05 | (delivery) | Abertura com menos movimento ainda: subida 2% da distância, escala 101%, blocos sobem 3 px (quase só fade) | testes ok |
 | 2026-11-05 | (delivery) | Abertura com bem menos movimento: subida 0,8% da distância, escala 100,5%, blocos sobem 1 px (praticamente só fade) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: número da bolinha agrupada e o "+N" do rótulo contam só itens em aberto (tarefa concluída não conta); o rótulo mostra o primeiro em aberto | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: ao voltar para a aba, a linha e o "agora" vão direto para a hora certa no mesmo instante (antes deslizavam a partir de onde pararam) — o navegador pausa a aba escondida | testes ok |
+| 2026-11-05 | (delivery) | Linha do tempo: X ao lado do lápis em tudo (tarefa: "Tirar da linha do tempo" ou "Excluir tarefa"; compromisso/lembrete: excluir; conta/encomenda/dose: tirar só da linha, neste computador); mover é definitivo (sem voltar ao horário combinado na virada do dia); brilho da abertura sem escurecer no meio da troca faixa→oval | testado: tarefa saiu da linha e ficou em Tarefas (API); testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

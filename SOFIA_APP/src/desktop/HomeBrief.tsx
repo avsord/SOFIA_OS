@@ -2,6 +2,7 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
+import {appAlert} from '../lib/app-alert';
 import {DateTimeField} from '../components/DateTimeField';
 import {TASK_PRIORITIES} from '../lib/task-filters';
 import {INTRO} from '../components/HomeHero';
@@ -65,6 +66,7 @@ export type HomeBriefProps = {
   onMove?: (moves: Move[]) => void;
   onAddAt?: (kind: AddKind, at: Date) => void;
   onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>;
+  onRemove?: (r: DayRecord, mode: 'timeline' | 'all') => Promise<void>;
   sofia?: SofiaBridge;
   /** 03/11/2026: o mesmo Inicio do site no celular (aprovado no quadro): Seu dia, Agenda e os blocos em duas colunas. */
   compact?: boolean;
@@ -197,6 +199,10 @@ export function HomeBrief(p: HomeBriefProps) {
   // (a data delas vem do banco e do rastreio); fica guardado neste computador e some 2 dias depois
   const MK = 'sofia.timeline.marks.v1';
   const [markMoves, setMarkMoves] = useState<Record<string, string>>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(MK) || '{}'), old = Date.now() - 2 * 864e5; return Object.fromEntries(Object.entries(v || {}).filter(([, iso]) => Date.parse(String(iso)) > old)) as Record<string, string>;} catch {return {};}});
+  // 05/11/2026 (Pedro: X na linha do tempo): conta, encomenda e dose saem so da linha do tempo, neste computador (somem 3 dias depois)
+  const HK = 'sofia.timeline.hidden.v1';
+  const [hiddenMarks, setHiddenMarks] = useState<Record<string, number>>(() => {try {const v = JSON.parse(globalThis.localStorage?.getItem(HK) || '{}'), old = Date.now() - 3 * 864e5; return Object.fromEntries(Object.entries(v || {}).filter(([, t]) => Number(t) > old)) as Record<string, number>;} catch {return {};}});
+  const hideMark = (m: TimeMark) => setHiddenMarks(o => {const n = {...o, [m.id]: Date.now()}; try {globalThis.localStorage?.setItem(HK, JSON.stringify(n));} catch {} return n;});
   const moveMarks = (list: {id: string; to: Date}[]) => setMarkMoves(o => {const n = {...o}; for (const x of list) n[x.id] = x.to.toISOString(); try {globalThis.localStorage?.setItem(MK, JSON.stringify(n));} catch {} return n;});
   const onMove = (moves: Move[]) => {const marks = moves.filter(x => 'mark' in x.t), rest = moves.filter(x => !('mark' in x.t));
     if (marks.length) moveMarks(marks.map(x => ({id: (x.t as {mark: TimeMark}).mark.id, to: x.to}))); if (rest.length) p.onMove?.(rest);};
@@ -215,8 +221,8 @@ export function HomeBrief(p: HomeBriefProps) {
       try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : hhmm(ds.date), done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
     }
     for (const m of out) {const iso = m.kind !== 'routine' ? markMoves[m.id] : ''; if (iso) {m.at = new Date(iso); m.late = false;}}
-    return out.sort((x, y) => x.at.getTime() - y.at.getTime());
-  }, [p.data, p.masked, markMoves]);
+    return out.filter(m => !hiddenMarks[m.id]).sort((x, y) => x.at.getTime() - y.at.getTime());
+  }, [p.data, p.masked, markMoves, hiddenMarks]);
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
@@ -259,7 +265,7 @@ export function HomeBrief(p: HomeBriefProps) {
       {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline nav={dayNav} onDay={setViewDay} items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, onQuickEdit: p.onQuickEdit, sofia: p.sofia}} />
+        actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, onQuickEdit: p.onQuickEdit, onRemove: p.onRemove, onHideMark: hideMark, sofia: p.sofia}} />
       {/* 03/11/2026 (desenho 01): no celular, a dica de como criar pela linha */}
       {p.compact && p.onAskAt ? <Text style={{fontSize: 11, color: c.muted, paddingTop: 2, paddingHorizontal: 2}}>Segure num horário vazio para criar · arraste para ver outras horas</Text> : null}
     </View></RowIn>
@@ -312,7 +318,7 @@ const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
 export type QuickEdit = {title: string; at: Date; priority: string; description: string};
-export type TimelineActions = {onAskAt?: (at: Date) => void; onEdit: (r: DayRecord) => void; onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
+export type TimelineActions = {onAskAt?: (at: Date) => void; onEdit: (r: DayRecord) => void; onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>; onRemove?: (r: DayRecord, mode: 'timeline' | 'all') => Promise<void>; onHideMark?: (m: TimeMark) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
 /** 0.3.331 (Pedro): clicar num lugar vazio da linha do tempo abre um seletor pequeno; a escolha abre o editor da propria
@@ -853,6 +859,11 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
   const W = quick || quickMark ? 380 : single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
   const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
+  // 05/11/2026 (Pedro): X ao lado do lapis em tudo da linha do tempo; tarefa pergunta se sai so da linha ou de vez
+  const askRemove = actions.onRemove ? (r: DayRecord) => {const t = '\u201c' + r.title + '\u201d', go = (mode: 'timeline' | 'all') => () => {onClose(); void actions.onRemove!(r, mode);};
+    if (r.isTask) appAlert('Remover ' + t + '?', 'Tirar da linha do tempo mantém a tarefa, sem horário.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tirar da linha do tempo', onPress: go('timeline')}, {text: 'Excluir tarefa', style: 'destructive', onPress: go('all')}]);
+    else appAlert('Excluir ' + t + '?', (r.kind === 'reminder' ? 'O lembrete' : 'O compromisso') + ' sai da Agenda e da linha do tempo.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Excluir', style: 'destructive', onPress: go('all')}]);} : undefined;
+  const askHide = actions.onHideMark ? (m: TimeMark) => appAlert('Tirar \u201c' + m.title + '\u201d da linha do tempo?', 'Continua em ' + (m.kind === 'routine' ? 'Rotina' : m.kind === 'package' ? 'Encomendas' : 'Finanças') + '.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tirar', onPress: () => {onClose(); actions.onHideMark!(m);}}]) : undefined;
   const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
   const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
   const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
@@ -886,6 +897,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       <View style={{height: 1, backgroundColor: c.line, marginHorizontal: -12, marginTop: 0}} />
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
         <Pressable accessibilityRole="button" onPress={() => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}} style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 10, borderRadius: 8, backgroundColor: hovered ? c.line : c.input, transform: [{scale: pressed ? 0.97 : 1}]})}><Icon name="edit" size={12} color={c.text} /><Text style={{fontSize: 12, fontWeight: '600', color: c.text}}>Editar</Text></Pressable>
+        {askRemove ? <Pressable accessibilityRole="button" accessibilityLabel={'Remover ' + r.title} onPress={() => askRemove(r)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name="close" size={13} color={c.muted} /></Pressable> : null}
         {onGrab ? null : null}
       </View>
     </View>, col);}
@@ -893,7 +905,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const recs = point.recs.slice(0, 5), marks = point.marks.slice(0, 6), extra = point.recs.length - recs.length + point.marks.length - marks.length;
   const total = point.recs.length + point.marks.length, imp = point.recs.filter(r => urgOf(r) === 3).length;
   const firstAt = point.recs[0] ? new Date(point.recs[0].date) : point.marks[0]?.at;
-  const Row = ({k, color, icon, time, title, meta, done, check, onEdit, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
+  const Row = ({k, color, icon, time, title, meta, done, check, onEdit, onRemove, action, onAction, grab, first}: {k: string; color: string; icon: IconName; time: string; title: string; meta?: string; done?: boolean; check?: () => void; onEdit?: () => void; onRemove?: () => void; action?: string; onAction?: () => void; grab?: (e: any) => void; first: boolean}) =>
     <HoverPressable key={k} accessibilityRole="button" accessibilityLabel={title} onPress={onEdit} style={{flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: 4, borderRadius: 10, outlineStyle: 'none'} as any}>{({hovered}: any) => <>
       {/* 0.3.349 (Pedro): a alca de arrastar fica no comeco, a esquerda */}
       {grab ? <Pressable accessibilityLabel={'Arrastar ' + title + ' na linha do tempo'} onPressIn={grab} {...({dataSet: {noveil: '1'}} as any)} style={{cursor: 'grab', width: 14, alignSelf: 'stretch', marginRight: -4, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>{/* 0.3.351 (Pedro): sem a selecao colorida na alca; so a maozinha de arrastar */}<Text style={{fontSize: 12, color: c.muted, lineHeight: 14}}>⠿</Text></Pressable> : null}
@@ -904,7 +916,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
         {meta ? <Text numberOfLines={1} style={{fontSize: 11, color: c.muted, marginTop: 1}}>{meta.split(' · ').map((part, n) => <Text key={n} style={{color: part === 'Importante' ? IMPORTANT_RED : c.muted}}>{(n ? ' · ' : '') + part}</Text>)}</Text> : null}
       </View>
       {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
-      {hovered && onEdit ? iconBtn('edit', 'Editar ' + title, onEdit)
+      {hovered && (onEdit || onRemove) ? <View style={{flexDirection: 'row', gap: 4}}>{onEdit ? iconBtn('edit', 'Editar ' + title, onEdit) : null}{onRemove ? iconBtn('close', 'Remover ' + title, onRemove) : null}</View>
         : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
     </>}</HoverPressable>;
   const many = total > 1;
@@ -914,10 +926,10 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       <View style={{flex: 1}} />{imp ? <View style={{borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: tint(IMPORTANT_RED, 0.16)}}><Text style={{fontSize: 11, color: IMPORTANT_RED}}>{imp} importante{imp > 1 ? 's' : ''}</Text></View> : null}
     </View> : null}
     {recs.map((r, n) => Row({k: r.id + n, first: n === 0, color: colOf(r), icon: iconOf(r), time: hhmm(new Date(r.date)), title: r.title, meta: metaOf(r) + (desc(r) && !many ? ' · ' + desc(r) : ''), done: r.isTask ? (r.original as any)?.state === 'done' : false,
-      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, onEdit: () => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}, grab: onGrab && total > 1 ? (e: any) => onGrab(e, {rec: r}, colOf(r)) : undefined}))}
+      check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, onEdit: () => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}, onRemove: askRemove ? () => askRemove(r) : undefined, grab: onGrab && total > 1 ? (e: any) => onGrab(e, {rec: r}, colOf(r)) : undefined}))}
     {marks.map((m, n) => Row({k: m.id, first: !recs.length && n === 0, color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
       time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: m.done && m.kind === 'routine',
-      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: m.kind === 'routine' && m.dose && actions.onMove ? () => {onPin?.(); setQuickMark(m);} : actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: m.kind === 'routine' && m.dose && actions.onMove ? () => {onPin?.(); setQuickMark(m);} : actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, onRemove: askHide ? () => askHide(m) : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 16, paddingVertical: 6}}>+{extra} mais</Text> : null}
   </View>, !many && point.marks[0]?.kind === 'routine' ? markColor(point.marks[0], c.danger) : undefined);
 }
