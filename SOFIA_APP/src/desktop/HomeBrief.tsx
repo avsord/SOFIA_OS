@@ -373,6 +373,10 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   }), []);
   const snapNext = useRef(false);
   const [hover, setHover] = useState(''), [pin, setPin] = useState(''), hide = useRef<any>(null);
+  // 05/11/2026 (Pedro: "arrasto um grupo e os dois vao individualmente, depois vira grupo"): ao soltar, todos os itens ja
+  // aparecem juntos no lugar novo enquanto cada um e gravado (antes a linha mudava a cada gravacao e o grupo se separava)
+  const [moved, setMoved] = useState<Record<string, string>>({});
+  const withMoved = (list: DayRecord[]) => {if (!Object.keys(moved).length) return list; return list.map(r => {const m = moved[r.id + '|' + r.date]; return m ? {...r, date: m} : r;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));};
   // 0.3.326 (Pedro: "abrir e fechar a barra lateral faz as bolinhas e os nomes tremerem"): a largura que decide quem junta
   // numa bolinha, em que fileira vai cada nome e o tamanho dos nomes so muda quando a largura PARA de mudar; enquanto a
   // barra abre ou fecha, tudo anda junto em porcentagem da linha (antes os nomes eram em pixels de um quadro atras e as
@@ -399,7 +403,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
-  for (const r of items) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
+  for (const r of withMoved(items)) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
   const mpoints: Point[] = [];
   for (const m of marks) {const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && wS && (x - p.x) * wS < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
@@ -471,6 +475,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       // posicao, para continuar certo se a linha rolar); antes qualquer atualizacao da tela (a Rotina atualiza todo segundo) desfazia
       const to = snapDate(d.fx), delta = to.getTime() - items[0].at.getTime(), hAbs = (to.getTime() - day0) / 3600000;
       setSettle(o => ({...o, [key]: hAbs})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
+      const keys: Record<string, string> = {}; for (const x of items) if ('rec' in x.t) keys[x.t.rec.id + '|' + x.t.rec.date] = new Date(x.at.getTime() + delta).toISOString();
+      if (Object.keys(keys).length) {setMoved(o => ({...o, ...keys})); setTimeout(() => setMoved(o => {const n = {...o}; for (const k of Object.keys(keys)) delete n[k]; return n;}), 12000);}
       actions.onMove!(items.map(x => ({t: x.t, to: new Date(x.at.getTime() + delta)})));};
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('keydown', esc, true);
   };

@@ -290,11 +290,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Abertura com bem menos movimento: subida 0,8% da distância, escala 100,5%, blocos sobem 1 px (praticamente só fade) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: número da bolinha agrupada e o "+N" do rótulo contam só itens em aberto (tarefa concluída não conta); o rótulo mostra o primeiro em aberto | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: ao voltar para a aba, a linha e o "agora" vão direto para a hora certa no mesmo instante (antes deslizavam a partir de onde pararam) — o navegador pausa a aba escondida | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: X ao lado do lápis em tudo (tarefa: "Tirar da linha do tempo" ou "Excluir tarefa"; compromisso/lembrete: excluir; conta/encomenda/dose: tirar só da linha, neste computador); mover é definitivo (sem voltar ao horário combinado na virada do dia); brilho da abertura sem escurecer no meio da troca faixa→oval | testado: tarefa saiu da linha e ficou em Tarefas (API); testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um item de um grupo (pela alça do balão) deixa a bolinha centrada sob o mouse (antes ficava deslocada pela distância até a alça) | testes ok |
+| 2026-11-05 | (delivery) | Linha do tempo: arrastar um grupo — ao soltar, todos os itens já aparecem juntos no lugar novo enquanto cada um é gravado (antes o grupo se separava e depois se juntava) | testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
