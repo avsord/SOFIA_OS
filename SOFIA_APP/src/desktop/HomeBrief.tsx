@@ -2,6 +2,8 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
+import {DateTimeField} from '../components/DateTimeField';
+import {TASK_PRIORITIES} from '../lib/task-filters';
 import {INTRO} from '../components/HomeHero';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
@@ -306,7 +308,7 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type QuickEdit = {title: string; at: Date; important: boolean};
+export type QuickEdit = {title: string; at: Date; priority: string; description: string};
 export type TimelineActions = {onAskAt?: (at: Date) => void; onEdit: (r: DayRecord) => void; onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
@@ -795,22 +797,22 @@ function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
  * Compromisso sozinho: faixa de cor, nome grande, horario com a duracao, local e descricao. Varios itens: cabecalho com o
  * horario, quantos sao e "1 importante"; cada linha com a barrinha da cor, o icone do tipo e uma segunda linha dizendo o que e;
  * ao passar o mouse na linha aparecem concluir e editar. Setinha aponta para a bolinha. Mantem arrastar pelo horario (⠿). */
-function QuickEditor({r, color, kind, important, onSave, onCancel, onMore}: {r: DayRecord; color: string; kind: string; important: boolean; onSave: (ch: QuickEdit) => Promise<void>; onCancel: () => void; onMore: () => void}) {
-  const c = useTheme(), d0 = new Date(r.date);
-  const [title, setTitle] = useState(r.title), [time, setTime] = useState(hhmm(d0)), [imp, setImp] = useState(important), [busy, setBusy] = useState(false), [err, setErr] = useState('');
-  const parsed = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(time.trim());
-  const ok = !!title.trim() && !!parsed && !busy;
-  const save = async () => {if (!ok || !parsed) return; const at = new Date(d0); at.setHours(Number(parsed[1]), Number(parsed[2]), 0, 0); setBusy(true); setErr('');
-    try {await onSave({title: title.trim(), at, important: imp});} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
-  const field = {height: 36, borderRadius: 10, backgroundColor: c.input, color: c.text, paddingHorizontal: 11, fontSize: 14, outlineStyle: 'none'} as any;
-  return <View style={{padding: 12, gap: 9}} {...({onKeyDown: (e: any) => {if (e.key === 'Escape') {e.stopPropagation(); onCancel();} if (e.key === 'Enter') {e.preventDefault(); void save();}}} as any)}>
+function QuickEditor({r, color, kind, priority, description, onSave, onCancel, onMore}: {r: DayRecord; color: string; kind: string; priority: string; description: string; onSave: (ch: QuickEdit) => Promise<void>; onCancel: () => void; onMore: () => void}) {
+  // 05/11/2026 (Pedro): nome, descricao, data e horario por seletor e nivel de importancia
+  const c = useTheme();
+  const [title, setTitle] = useState(r.title), [desc, setDesc] = useState(description), [at, setAt] = useState(new Date(r.date).toISOString()), [prio, setPrio] = useState(priority || 'none'), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const ok = !!title.trim() && Number.isFinite(Date.parse(at)) && !busy;
+  const save = async () => {if (!ok) return; setBusy(true); setErr('');
+    try {await onSave({title: title.trim(), at: new Date(at), priority: prio, description: desc});} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
+  const field = {borderRadius: 10, backgroundColor: c.input, color: c.text, paddingHorizontal: 11, fontSize: 14, outlineStyle: 'none'} as any;
+  return <View style={{padding: 12, gap: 9}}>
     <Text style={{fontSize: 11, color: c.muted}}>Editar {kind.toLowerCase()}</Text>
-    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') onCancel();}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={field} />
-    <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
-      <TextInput value={time} onChangeText={t => setTime(t.replace(/[^0-9:]/g, '').slice(0, 5))} onSubmitEditing={() => void save()} placeholder="hh:mm" placeholderTextColor={c.muted} accessibilityLabel="Horário" style={[field, {width: 84, textAlign: 'center', fontVariant: ['tabular-nums']}]} />
-      <Pressable accessibilityRole="switch" accessibilityState={{checked: imp}} onPress={() => setImp(v => !v)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 11, borderRadius: 10, backgroundColor: imp ? tint(IMPORTANT_RED, 0.18) : hovered ? c.line : c.input})}>
-        <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: imp ? IMPORTANT_RED : c.muted}} /><Text style={{fontSize: 13, color: imp ? IMPORTANT_RED : c.text}}>Importante</Text></Pressable>
-    </View>
+    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') onCancel();}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
+    <TextInput value={desc} onChangeText={setDesc} multiline placeholder="Descrição" placeholderTextColor={c.muted} accessibilityLabel="Descrição" style={[field, {minHeight: 54, paddingVertical: 8, fontSize: 13, textAlignVertical: 'top'}]} />
+    <DateTimeField label="Data e horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} />
+    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{TASK_PRIORITIES.map(o => {const on = prio === o.value, col = o.color || c.muted;
+      return <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{checked: on}} onPress={() => setPrio(o.value)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 10, borderRadius: 9, backgroundColor: on ? tint(col, 0.2) : hovered ? c.line : c.input})}>
+        <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: col}} /><Text style={{fontSize: 12, color: on ? (o.color || c.text) : c.text}}>{o.label}</Text></Pressable>;})}</View>
     {err ? <Text style={{fontSize: 12, color: IMPORTANT_RED}}>{err}</Text> : null}
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
       <Pressable accessibilityRole="button" onPress={onMore} style={({hovered}: any) => ({height: 32, paddingHorizontal: 10, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Text style={{fontSize: 13, color: c.muted}}>Mais opções</Text></Pressable>
@@ -820,25 +822,47 @@ function QuickEditor({r, color, kind, important, onSave, onCancel, onMore}: {r: 
     </View>
   </View>;
 }
+/** 05/11/2026 (Pedro: "faz para as outras areas tambem, capsulas..."): dose da Rotina/capsula - muda o horario so desta vez e marca como tomada. */
+function QuickDose({m, color, action, onAction, onSave, onCancel, onMore}: {m: TimeMark; color: string; action?: string; onAction?: () => void; onSave: (at: Date) => Promise<void>; onCancel: () => void; onMore?: () => void}) {
+  const c = useTheme(), [at, setAt] = useState(m.at.toISOString()), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const save = async () => {setBusy(true); setErr(''); try {await onSave(new Date(at));} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
+  return <View style={{padding: 12, gap: 9}}>
+    <Text style={{fontSize: 11, color: c.muted}}>Rotina · só desta vez</Text>
+    <Text numberOfLines={2} style={{fontSize: 14, fontWeight: '600', color: c.text}}>{m.title}</Text>
+    <DateTimeField label="Horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} />
+    {err ? <Text style={{fontSize: 12, color: IMPORTANT_RED}}>{err}</Text> : null}
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+      {onMore ? <Pressable accessibilityRole="button" onPress={onMore} style={({hovered}: any) => ({height: 32, paddingHorizontal: 10, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Text style={{fontSize: 13, color: c.muted}}>Abrir Rotina</Text></Pressable> : null}
+      <View style={{flex: 1}} />
+      {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? tint(color, 0.3) : tint(color, 0.18)})}><Text style={{fontSize: 13, color: c.text}}>{action}</Text></Pressable> : null}
+      <Pressable accessibilityRole="button" onPress={onCancel} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Text style={{fontSize: 13, color: c.text}}>Cancelar</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={busy} onPress={() => void save()} style={({hovered}: any) => ({height: 32, paddingHorizontal: 14, borderRadius: 9, justifyContent: 'center', backgroundColor: color, opacity: busy ? 0.5 : hovered ? 0.9 : 1})}><Text style={{fontSize: 13, fontWeight: '600', color: '#fff'}}>{busy ? 'Salvando…' : 'Salvar'}</Text></Pressable>
+    </View>
+  </View>;
+}
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onPin, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onPin?: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
-  const [quick, setQuick] = useState<DayRecord | null>(null);
+  const [quick, setQuick] = useState<DayRecord | null>(null), [quickMark, setQuickMark] = useState<TimeMark | null>(null);
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
-  const W = quick ? 360 : single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
+  const W = quick || quickMark ? 380 : single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
   const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
   const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
   const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
   const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
   const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
     return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
-  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, bottom: 92, width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item) */>
+  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, ...(quick || quickMark ? {top: 88} : {bottom: 92}), width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item); editando, abre para baixo (para cima ficava sob a barra do topo) */>
     <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
-    <View style={{position: 'absolute', left: caret - 6, bottom: -6, width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
+    <View style={{position: 'absolute', left: caret - 6, ...(quick || quickMark ? {top: -6} : {bottom: -6}), width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: quick || quickMark ? '-1px -1px 0 rgba(255,255,255,0.07)' : '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
   const chip = (icon: IconName, col: string, s = 24) => <View style={{width: s, height: s, borderRadius: 9, backgroundColor: tint(col, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={Math.round(s * 0.5)} color={col} /></View>;
   const iconBtn = (icon: IconName, label: string, run: () => void) => <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} hitSlop={4} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Icon name={icon} size={14} color={c.muted} /></Pressable>;
   // 05/11/2026 (Pedro: "alterar por ali, pode aparecer um mini editor"): o lapis do balao abre um editor pequeno no proprio
   // balao (nome, horario, importante); "Mais opcoes" abre o editor completo
-  if (quick && actions.onQuickEdit) return shell(<QuickEditor r={quick} color={colOf(quick)} kind={kindOf(quick)} important={urgOf(quick) === 3}
+  if (quickMark && quickMark.dose && actions.onMove) {const m = quickMark, col = markColor(m, c.danger), act = markAction(m);
+    return shell(<QuickDose m={m} color={col} action={act} onAction={actions.onMarkAction ? () => {setQuickMark(null); onClose(); actions.onMarkAction!(m);} : undefined}
+      onMore={actions.onMarkOpen ? () => {setQuickMark(null); onClose(); actions.onMarkOpen!(m);} : undefined} onCancel={() => setQuickMark(null)}
+      onSave={async at => {actions.onMove!([{t: {dose: m.dose!}, to: at}]); setQuickMark(null); onClose();}} />, col);}
+  if (quick && actions.onQuickEdit) return shell(<QuickEditor r={quick} color={colOf(quick)} kind={kindOf(quick)} priority={String((quick.original as any)?.priority_level ?? (quick.original as any)?.data?.priority_level ?? '')} description={String(quick.isTask ? (quick.original as any)?.description || '' : (quick.original as any)?.content || (quick.original as any)?.data?.description || '')}
     onCancel={() => setQuick(null)} onMore={() => {const q = quick; setQuick(null); onClose(); actions.onEdit(q);}}
     onSave={async ch => {await actions.onQuickEdit!(quick, ch); setQuick(null); onClose();}} />, colOf(quick));
   // --- compromisso sozinho
@@ -885,7 +909,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, onEdit: () => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}, grab: onGrab && total > 1 ? (e: any) => onGrab(e, {rec: r}, colOf(r)) : undefined}))}
     {marks.map((m, n) => Row({k: m.id, first: !recs.length && n === 0, color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
       time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: m.done && m.kind === 'routine',
-      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
+      action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: m.kind === 'routine' && m.dose && actions.onMove ? () => {onPin?.(); setQuickMark(m);} : actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 16, paddingVertical: 6}}>+{extra} mais</Text> : null}
   </View>, !many && point.marks[0]?.kind === 'routine' ? markColor(point.marks[0], c.danger) : undefined);
 }
