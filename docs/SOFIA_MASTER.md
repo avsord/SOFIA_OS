@@ -21,7 +21,8 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-04 ~19:30 (Brasília), no **Claude Code** (nuvem). Railway publica sozinho cada push em `sofia-app-android`.
+- **Atualizado em:** 2026-11-05 (Brasília), no **Claude Code** (nuvem). Railway publica sozinho cada push em `sofia-app-android`.
+- **Páginas estilo Notion (05/11):** primeira parte publicada no site (só computador; celular igual): teclado (Enter/Backspace/Delete/setas), menu "/", atalhos markdown, colar várias linhas, + e ⋮⋮ no hover, caixinha de tarefa, campo do tamanho do texto. Lógica em `src/lib/page-block-keys.ts` (testes em `tests/paginas-notion-270.test.cjs`). Próximo: o resto da lista em §9, conforme o Pedro for testando. Obs.: por engano a branch `main` (antiga, não publicada) recebeu 2 commits do painel antigo `public/app.js`; não afeta o site.
 - **ABERTURA DO SITE APROVADA pelo Pedro ("agora ta certo, grava essa versão") — commit `adc82a6`, branch `aprovado/site-abertura-2026-11-04` (tags são recusadas pelo proxy da sessão).** Não mexer na abertura sem nova aprovação; para voltar a ela: `git checkout origin/aprovado/site-abertura-2026-11-04 -- SOFIA_APP/src SOFIA_APP/public`.
   - Véu na cor do tema do app (`#sofia-veil` em public/index.html; `revealWebVeil` guarda a cor e `early.js` a aplica na abertura seguinte) sai no 1º quadro do app, fade de 0,8 s (ajuste do Pedro após aprovar).
   - Linha do tempo única em CSS (`INTRO_T` em HomeHero.tsx, adiantada `INTRO_LEAD`=640 ms em Home.tsx): saudação já subindo quando a tela abre; data digitada; resumo; fileiras de blocos (0,70 s, 0,18 s entre elas) que sobem junto; brilho reto→oval começando em 1,35 s (ajuste do Pedro após aprovar).
@@ -234,6 +235,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **Páginas estilo Notion — próximas partes (pedido do Pedro 05/11, "faz tudo"):** primeira parte no ar (teclado, menu "/", atalhos, colar, + e ⋮⋮). Falta: arrastar blocos pelo ⋮⋮, selecionar vários blocos, Tab para recuar (exige blocos aninhados), espaço → Sofia, prévia de subpágina no hover, favoritos. No celular o teclado continua o de antes.
+
 - **Railway (05/11):** cada publicação reinicia o servidor e corta a resposta da Sofia em andamento ("A chamada foi interrompida"); o app agora reenvia sozinho. Proposto ao Pedro: ligar o tempo de espera no desligamento (~30 s) — mudança de configuração do Railway, só com o OK dele. O servidor hoje cancela a resposta antes de esperar (src/server.js `stop`).
 
 - **Lista do Pedro (WhatsApp 03–04/11) — DEFEITOS:** corrigidos em 04/11 à noite: mini chat por baixo das fileiras (fileira 1 com zIndex), nomes do balão (380 px, 2 linhas, balão acima dos rótulos), "agora" desliza ao voltar à aba, clicar numa bolinha cria naquele horário (no computador; prévia no passar do mouse), segurar a data abre o criador, criar pela Sofia atualiza na hora (leituras não reaproveitam dado velho após escrita; agenda relê), painel Editar (largura em % da janela, sem passar da borda) e confirmação por cima do painel. Price Tracker: decisão do Pedro (05/11) — o menor preço real entre as lojas em todo lugar (`primaryNow` = oferta atual mais barata). **Falta confirmar com o Pedro:** perfil no canto inferior esquerdo (não existe no código atual; já saiu antes) e "tirar tudo do filtro" de Notas/Biblioteca (a rodada de 03/11 já deixou só áreas — ver se ainda falta algo).
@@ -292,11 +295,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Brilho da abertura: troca faixa→oval volta a ser simultânea como antes, agora em 2,2 s com fim bem lento; oval ~25% menos intenso | testes ok |
 | 2026-11-05 | (delivery) | Mini chat/Conversa: resposta cortada por reinício do servidor (publicação no Railway — "A chamada foi interrompida") é reenviada sozinha até 2 vezes (mesmo client_message_id; o servidor não duplica). Railway sem tempo de espera no desligamento: sugerido ao Pedro | testes ok |
 | 2026-11-05 | (delivery) | Conversa rápida da linha do tempo: a linha não anda sozinha com ela/menu/balão abertos; fecha sozinha 2,5 s depois de criar algo (com aviso); recarrega já e de novo em 1,5 s. Janela "Editar lembrete" (e outras ancoradas): fica parada ao crescer e rola por dentro | testado: janela parada com 3 datas novas; testes ok |
 | 2026-11-05 | (delivery) | Lote: painel lateral sai deslizando (antes corte seco); "Mais opções" abre o painel de editar ali mesmo (tarefa não vai mais para Tarefas) e abre na hora (lembrete/compromisso); lembrete com várias datas pergunta "Só esta data / Todas"; mini editor rola por dentro (horário visível); meia-noite com linha tracejada e o dia que começa; oval termina com a 2ª fileira; "agora" não desliza ao voltar de outra aba | testes ok |
 | 2026-11-05 | (delivery) | Conversa rápida aceita colar (Ctrl+V) e arrastar imagem/PDF; "‹ 1 de N ›" também na Rotina e nos E-mails (E-mails passa de um em um); bolinhas de página alinhadas ao botão; foto do perfil no site: era pedida antes do login ficar pronto e o "sem foto" ficava guardado — agora espera o login | testado: foto aparece no site; testes ok |
+| 2026-11-05 | (delivery) | Páginas no computador estilo Notion: Enter divide o bloco no cursor, Backspace no início converte/junta, Delete junta, setas entre blocos, menu "/" (busca sem acento, setas/Enter/Esc), atalhos # - [] 1. > --- , colar várias linhas vira blocos, + e ⋮⋮ no hover, caixinha de tarefa, numeração por lista, campo do tamanho do texto (antes 2 linhas fixas) | testado no navegador; tsc e testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
