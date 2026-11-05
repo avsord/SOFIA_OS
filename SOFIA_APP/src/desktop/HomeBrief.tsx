@@ -422,6 +422,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
   const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
+  // 05/11/2026 (Pedro: "quando clicar fora em qualquer janela tem que sair"): clique fora do balao, do editor pequeno, da
+  // conversa rapida ou do menu de criar fecha tudo (clicar na propria linha continua com o comportamento dela)
+  useEffect(() => {if (!WEB || !(pin || adding)) return;
+    const out = (e: any) => {const t = e.target as any; if (t?.closest?.('[data-testid="timeline-preview"],[data-testid="sofia-add"],[data-testid="add-menu"],[data-testid="timeline-add-area"]')) return; setPin(''); setHover(''); setAdding(null); setGuide(null);};
+    document.addEventListener('pointerdown', out, true); return () => document.removeEventListener('pointerdown', out, true);}, [pin, adding]);
   // confirmacao depois de adicionar pelo mini editor ("Reuniao adicionada as 21:30 · Desfazer"), some em 6 s
   const [toast, setToast] = useState<{text: string; undo?: () => Promise<void>} | null>(null), toastT = useRef<any>(null);
   const showToast = (text: string, undo?: (() => Promise<void>) | void) => {setToast({text, undo: undo || undefined}); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToast(null), 6000);};

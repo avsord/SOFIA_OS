@@ -223,12 +223,12 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             <View style={{flex: 1}} />
             <Pressable accessibilityRole="button" accessibilityLabel="Ordem e notas fixadas ou arquivadas" accessibilityState={{expanded: orderOpen}} onPress={() => {setAreaOpen(false); setOrderOpen(v => !v);}} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{sort === 'recent' ? 'Editadas' : sort === 'created' ? 'Criadas' : 'A a Z'} ⌄</Text></Pressable>
           </View> : null}
-          {!desktop && areaOpen ? <DropPanel title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
+          {!desktop && areaOpen ? <DropPanel onClose={() => setAreaOpen(false)} title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
             <PanelRow label="Todas as áreas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
             {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => !n.archived && (n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key)).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
           </DropPanel> : null}
           {/* 03/11/2026 (desenho 24): Fixadas e Arquivadas sairam da lista de areas (recusado misturar); ficam aqui, com a ordem */}
-          {!desktop && orderOpen ? <DropPanel title="Ordem">
+          {!desktop && orderOpen ? <DropPanel onClose={() => setOrderOpen(false)} title="Ordem">
             {([['recent', 'Editadas por último'], ['created', 'Criadas por último'], ['az', 'A a Z']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={sort === k} onPress={() => { setSort(k as any); setOrderOpen(false); }} />)}
             <PanelRow kind="plain" icon="pin" label={'Fixadas · ' + notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go(view === 'pinned' ? 'all' : 'pinned'); setOrderOpen(false); }} />
             <PanelRow kind="plain" icon="box" label={'Arquivadas · ' + notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go(view === 'archived' ? 'all' : 'archived'); setOrderOpen(false); }} />

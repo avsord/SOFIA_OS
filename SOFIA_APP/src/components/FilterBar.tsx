@@ -1,5 +1,5 @@
-import React from 'react';
-import {Pressable, Text, View} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {Platform, Pressable, Text, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {PALETTE} from '../lib/palette';
 import {Icon, type IconName} from './Icon';
@@ -9,7 +9,7 @@ import {Icon, type IconName} from './Icon';
  * (nada abre de baixo da tela, nada de fileira solta de etiquetas). Pecas reaproveitadas pelas duas telas. */
 export function BarPill({label, open, onPress, dot, count, testID}: {label: string; open: boolean; onPress: () => void; dot?: string; count?: number; testID?: string}) {
   const c = useTheme();
-  return <Pressable testID={testID} accessibilityRole="button" accessibilityState={{expanded: open}} onPress={onPress} style={({pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 7, height: 38, paddingLeft: 14, paddingRight: 12, borderRadius: 12, borderWidth: open ? 0 : 1, borderColor: c.line, backgroundColor: open ? c.accentSoft : c.surface, transform: [{scale: pressed ? 0.97 : 1}]})}>
+  return <Pressable testID={testID} {...({dataSet: {droptoggle: '1'}} as any)} accessibilityRole="button" accessibilityState={{expanded: open}} onPress={onPress} style={({pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 7, height: 38, paddingLeft: 14, paddingRight: 12, borderRadius: 12, borderWidth: open ? 0 : 1, borderColor: c.line, backgroundColor: open ? c.accentSoft : c.surface, transform: [{scale: pressed ? 0.97 : 1}]})}>
     {dot ? <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: dot}} /> : null}
     <Text numberOfLines={1} style={{color: c.text, fontSize: 14, fontWeight: '600', maxWidth: 160}}>{label}</Text>
     {count ? <View style={{minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: c.onAccent, fontSize: 11, fontWeight: '700'}}>{count}</Text></View> : null}
@@ -17,9 +17,12 @@ export function BarPill({label, open, onPress, dot, count, testID}: {label: stri
   </Pressable>;
 }
 /** Lista que desce logo abaixo da barra, por cima do conteudo. */
-export function DropPanel({title, action, children, footer}: {title: string; action?: {label: string; onPress: () => void}; children: React.ReactNode; footer?: React.ReactNode}) {
-  const c = useTheme();
-  return <View accessibilityRole="menu" style={{marginTop: -4, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, borderRadius: 18, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 18px 40px rgba(0,0,0,0.35)'} as any}>
+export function DropPanel({title, action, children, footer, onClose}: {title: string; action?: {label: string; onPress: () => void}; children: React.ReactNode; footer?: React.ReactNode; onClose?: () => void}) {
+  const c = useTheme(), box = useRef<View>(null), close = useRef(onClose); close.current = onClose;
+  // 05/11/2026 (Pedro: "clicar fora em qualquer janela tem que sair"): no site, clique fora do painel fecha (o proprio botao da barra continua alternando)
+  useEffect(() => {if (Platform.OS !== 'web' || !onClose || typeof document === 'undefined') return; const h = (e: any) => {const el: any = box.current, t: any = e.target; if (t?.closest?.('[data-droptoggle]')) return; if (el?.contains && !el.contains(t)) close.current?.();};
+    const t = setTimeout(() => document.addEventListener('pointerdown', h, true), 0); return () => {clearTimeout(t); document.removeEventListener('pointerdown', h, true);};}, [!!onClose]);
+  return <View ref={box} accessibilityRole="menu" style={{marginTop: -4, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, borderRadius: 18, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 18px 40px rgba(0,0,0,0.35)'} as any}>
     <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44}}>
       <Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>{title}</Text>
       {action ? <Pressable accessibilityRole="button" hitSlop={8} onPress={action.onPress}><Text style={{color: c.accent, fontSize: 14, fontWeight: '600'}}>{action.label}</Text></Pressable> : null}
