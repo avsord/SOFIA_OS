@@ -376,6 +376,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // 05/11/2026 (Pedro: "arrasto um grupo e os dois vao individualmente, depois vira grupo"): ao soltar, todos os itens ja
   // aparecem juntos no lugar novo enquanto cada um e gravado (antes a linha mudava a cada gravacao e o grupo se separava)
   const [moved, setMoved] = useState<Record<string, string>>({});
+  // 05/11/2026 (Pedro: "criou e logo em seguida arrastou bruscamente a linha do tempo"): com a conversa rapida, o menu de criar ou
+  // um balao abertos a linha nao anda sozinha (a janela ficava solta no lugar antigo)
+  const holdRef = useRef(false);
   const withMoved = (list: DayRecord[]) => {if (!Object.keys(moved).length) return list; return list.map(r => {const m = moved[r.id + '|' + r.date]; return m ? {...r, date: m} : r;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));};
   // 0.3.326 (Pedro: "abrir e fechar a barra lateral faz as bolinhas e os nomes tremerem"): a largura que decide quem junta
   // numa bolinha, em que fileira vai cada nome e o tamanho dos nomes so muda quando a largura PARA de mudar; enquanto a
@@ -386,7 +389,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
-  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState !== 'visible') return; /* 05/11/2026 (Pedro: "tem que rodar em segundo plano"): o navegador pausa a aba escondida; ao voltar, a linha e o agora ja vao direto para a hora certa no mesmo instante (sem deslizar a partir de onde parou) */ if (dayRef.current === 0 && !dragRef.current) {const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.0005) jump(h);} tick(n => n + 1);};
+  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState !== 'visible') return; /* 05/11/2026 (Pedro: "tem que rodar em segundo plano"): o navegador pausa a aba escondida; ao voltar, a linha e o agora ja vao direto para a hora certa no mesmo instante (sem deslizar a partir de onde parou) */ if (dayRef.current === 0 && !dragRef.current && !holdRef.current) {const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.0005) jump(h);} tick(n => n + 1);};
     document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
@@ -399,7 +402,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   if (nav) nav.current = {go: goDay, add: addHere};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
-  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, gap > 0.25 ? 1400 : 900);}, [day0, Math.floor(Date.now() / 30000)]);
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || holdRef.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, gap > 0.25 ? 1400 : 900);}, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -435,6 +438,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
   const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
+  holdRef.current = !!(adding || pin);
+  // fechou a conversa/menu: a linha fica onde a pessoa estava por um tempo (como se tivesse mexido nela)
+  const wasHolding = useRef(false); useEffect(() => {if (wasHolding.current && !(adding || pin)) manualAt.current = Date.now(); wasHolding.current = !!(adding || pin);}, [adding, pin]);
   // 05/11/2026 (Pedro: "quando clicar fora em qualquer janela tem que sair"): clique fora do balao, do editor pequeno, da
   // conversa rapida ou do menu de criar fecha tudo (clicar na propria linha continua com o comportamento dela)
   useEffect(() => {if (!WEB || !(pin || adding)) return;
@@ -644,6 +650,7 @@ const TYPE_INFO: {id: AddKind | 'expense' | 'income'; label: string; color: stri
 function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: number; fx: number; at: Date; sofia: SofiaBridge; onMore: (k: AddKind, at?: Date) => void; onSaved: (text: string, undo?: (() => Promise<void>) | void) => void; onClose: () => void}) {
   const c = useTheme(), box = useRef<View>(null), [open, setOpen] = useState(false), [kind, setKind] = useState<(typeof TYPE_INFO)[number]['id'] | null>(null);
   const [text, setText] = useState(''), [file, setFile] = useState<any>(null), [preview, setPreview] = useState(''), [msgs, setMsgs] = useState<ChatMsg[]>([]), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [listening, setListening] = useState(false);
+  const textRef = useRef(''); textRef.current = text;
   const [when, setWhen] = useState(at), fileIn = useRef<any>(null), rec = useRef<any>(null), scroller = useRef<any>(null);
   useClickOutside(box, onClose);
   useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
@@ -656,7 +663,9 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     r.onresult = (e: any) => {let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setText(base + t);}; r.onend = () => setListening(false); r.onerror = () => setListening(false); rec.current = r; setListening(true); try {r.start();} catch {setListening(false);}};
   const send = async (custom?: string, label?: string) => {const t = (custom ?? text).trim(); if (busy || (!t && !file)) return; const shown = label || t || (file ? 'Foto enviada' : ''), img = preview;
     setMsgs(m => [...m, {who: 'me', text: shown, img}]); setText(''); setBusy(true); setErr(''); const f = file; setFile(null); setPreview('');
-    try {const reply = await sofia.ask((t || 'Veja este arquivo.') + '\n\n(Pedido pela linha do tempo do Início, para ' + dayTxt + ' às ' + hm + '.)', f); setMsgs(m => [...m, {who: 'sofia', text: reply || 'Pronto.'}]);}
+    try {const reply = await sofia.ask((t || 'Veja este arquivo.') + '\n\n(Pedido pela linha do tempo do Início, para ' + dayTxt + ' às ' + hm + '.)', f); setMsgs(m => [...m, {who: 'sofia', text: reply || 'Pronto.'}]);
+      // 05/11/2026 (Pedro: "quando termina, o chat continua na mesma bolinha"): criou algo -> fecha sozinho em 2,5 s e mostra o aviso (se a pessoa nao estiver escrevendo)
+      if (/\b(criad[ao]|agendad[ao]|marcad[ao]|adicionad[ao]|registrad[ao]|anotad[ao]|lembrete)\b/i.test(reply || '')) setTimeout(() => {if (!textRef.current.trim()) onSaved(String(reply).split(/\n/)[0].slice(0, 120));}, 2500);}
     catch (e: any) {setErr(String(e?.message || 'Não deu para falar com a Sofia agora.')); setMsgs(m => m.slice(0, -1)); if (!custom) setText(t); if (f) {setFile(f); setPreview(img);}}
     finally {setBusy(false);}};
   const W = 400, lw = lineW || 1, /* 0.3.347 (Pedro): janela bem menor */ left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));

@@ -254,7 +254,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
     const up=await api.uploadAttachment(entity.id,{name,mime,base64:await attachmentBase64(uri)});
     message=[text,attachmentText([{uri,name,mime,size:file.size||0,entityId:entity.id,attachmentId:up.id}],SITE)].filter(Boolean).join('\n\n');}
    const result=await api.chat({conversation_id:conv.id,message,client_message_id:'linha-'+Date.now().toString(36)});
-   reloadAll();return result.reply||'';},
+   reloadAll();setTimeout(reloadAll,1500) /* 05/11/2026 (Pedro: "a bolinha demora a ser criada"): le de novo logo em seguida caso o servidor ainda esteja gravando */;return result.reply||'';},
   save:async(x:MiniSave)=>{const iso=x.at.toISOString(),hm=String(x.at.getHours()).padStart(2,'0')+':'+String(x.at.getMinutes()).padStart(2,'0');
    if(x.kind==='task'){const r=await api.saveTask({title:x.title,area:'Pessoal',state:'scheduled',due_at:iso,start_at:iso,priority_level:x.priority||'none',...(x.notify===false?{tags:['sofia-notify-v1:off']}:{})} as any);setTasks(prev=>[r.item,...prev.filter(t=>t.id!==r.item.id)]);refreshAgenda();
     return async()=>{await api.deleteTask(r.item.id);setTasks(prev=>prev.filter(t=>t.id!==r.item.id));refreshAgenda();};}

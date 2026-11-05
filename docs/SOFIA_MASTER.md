@@ -292,11 +292,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Linha do tempo: arrastar um item de um grupo (pela alça do balão) deixa a bolinha centrada sob o mouse (antes ficava deslocada pela distância até a alça) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: arrastar um grupo — ao soltar, todos os itens já aparecem juntos no lugar novo enquanto cada um é gravado (antes o grupo se separava e depois se juntava) | testes ok |
 | 2026-11-05 | (delivery) | Linha do tempo: "+ Adicionar às HH:MM" no balão abre o criador naquele horário; brilho da abertura volta a trocar faixa→oval ao mesmo tempo (curvas complementares, sem escurecer e sem as duas acesas) — o oval final não mudou (medido contra a versão de 04/11) | testado: + abre o criador; testes ok |
 | 2026-11-05 | (delivery) | Brilho da abertura: troca faixa→oval volta a ser simultânea como antes, agora em 2,2 s com fim bem lento; oval ~25% menos intenso | testes ok |
 | 2026-11-05 | (delivery) | Mini chat/Conversa: resposta cortada por reinício do servidor (publicação no Railway — "A chamada foi interrompida") é reenviada sozinha até 2 vezes (mesmo client_message_id; o servidor não duplica). Railway sem tempo de espera no desligamento: sugerido ao Pedro | testes ok |
+| 2026-11-05 | (delivery) | Conversa rápida da linha do tempo: a linha não anda sozinha com ela/menu/balão abertos; fecha sozinha 2,5 s depois de criar algo (com aviso); recarrega já e de novo em 1,5 s. Janela "Editar lembrete" (e outras ancoradas): fica parada ao crescer e rola por dentro | testado: janela parada com 3 datas novas; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
