@@ -18,7 +18,7 @@ import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
 import {systemChanged,subscribeSystemChanged} from '../lib/system-events';
 import {useHoverHold} from '../lib/hover-hold';
-import {prefetchPageCover} from '../lib/page-cover-prefetch';
+import {prefetchAllCovers,prefetchPageCover} from '../lib/page-cover-prefetch';
 import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
@@ -189,6 +189,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
  if(pagesDirectory.get()===null){const saved=api.webPeek?.<Entity[]>('pages');if(Array.isArray(saved))pagesDirectory.set(saved);} /* abre com a arvore guardada (criptografada) e confere com o servidor */
  const pages=useStore(pagesDirectory)??null,favorites=useStore(favoritePages);
+ useEffect(()=>pages?prefetchAllCovers(api,pages):undefined,[pages,api]);
  const createRootPage=async()=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:'',node_type:'space',blocks_json:'[]'}});createdPage.set(saved);onOpenPage(saved.id);}catch{onCreatePage();}};usePageDirectory(api);const pagesLate=useRef(pages===null);
  const path=useStore(pagePath),moduleTitle=useStore(appModuleTitle);
  const openPageId=tab==='pages'&&path.length?path[path.length-1].id:'';

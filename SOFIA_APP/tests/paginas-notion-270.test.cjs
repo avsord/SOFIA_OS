@@ -225,3 +225,8 @@ test('mover pagina na lateral com a lista antiga (revisao velha) funciona: o pla
  const plan=LM.legacyMovePlan([pg('a',7,'',1),pg('b',1,'',2)],{id:'a',revision:3,parentId:'',kind:'after',anchorId:'b'});
  assert.equal(plan.page.revision,7);assert.deepEqual([...plan.siblings.map(p=>p.id)],['b','a']);
 });
+test('capas: todas baixam em segundo plano desde o Inicio e a pagina reusa a imagem ja decodificada (sem piscar)',()=>{
+ const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/export function prefetchAllCovers/);assert.match(pre,/DECODED\.set\(uri,pic\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8'),/prefetchAllCovers\(api,pages\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8'),/let pic:any=DECODED\.get\(uri\)/);
+});

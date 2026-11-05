@@ -13,7 +13,7 @@ import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
 import {cachedPageCover} from '../lib/page-cover-cache';
-import {IMAGE_SIZES,peekCover,prefetchPageCover} from '../lib/page-cover-prefetch';
+import {DECODED,IMAGE_SIZES,peekCover,prefetchPageCover} from '../lib/page-cover-prefetch';
 export {prefetchPageCover};
 import {MotionModal} from './MotionModal';
 import {useDesktop} from '../lib/desktop';
@@ -72,6 +72,18 @@ export function coverPosition(data:Record<string,any>):number{const raw=data?.co
 // baixada aparece no mesmo quadro (antes comecava vazia e mostrava o carregando), o tamanho da imagem fica guardado
 // (sem redesenhar depois de medir) e as capas das paginas recentes sao baixadas antes de abrir.
 /** Desenha a imagem cobrindo a capa e deslocada pela posicao. No modo reposicionar, arrastar move a imagem. */
+// 05/11/2026 (Pedro: "capas piscando ao entrar na pagina"): um <img> novo, mesmo com o arquivo ja baixado, levava 1-2
+// quadros para ser desenhado. Agora a capa usa o MESMO elemento que foi decodificado em segundo plano (DECODED) e
+// e colocada antes do primeiro desenho da pagina; o elemento fica guardado para a proxima visita.
+function WebCoverImg({uri,position,onError}:{uri:string;position:number;onError:()=>void}){
+ const host=useRef<any>(null),err=useRef(onError);err.current=onError;
+ React.useLayoutEffect(()=>{const box=host.current;if(!box||typeof document==='undefined')return;
+  let pic:any=DECODED.get(uri);if(!pic||pic.isConnected){pic=document.createElement('img');pic.decoding='sync';pic.src=uri;pic.addEventListener('load',()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);});}
+  pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
+  Object.assign(pic.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'});
+  box.appendChild(pic);return()=>{pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
+ return React.createElement('div',{ref:host,style:{position:'absolute',inset:0}});
+}
 function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
  const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(()=>IMAGE_SIZES.get(uri)||null),[pos,setPos]=useState(position);
  const live=useRef({pos:position,start:position,extra:0,editing:repositioning,onPosition});
@@ -92,7 +104,7 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
  // 05/11/2026 (Pedro: "ao clicar na pagina a capa flica, aparece uma imagem por tras"): no site a capa era desenhada
  // primeiro centralizada e, depois de medir a imagem, pulava para a posicao escolhida. Fora do reposicionar ela agora e
  // um <img> com object-fit/object-position: ja nasce no lugar certo, sem medir.
- if(Platform.OS==='web'&&!repositioning)return <View testID="page-cover-image" style={StyleSheet.absoluteFill}>{React.createElement('img',{src:uri,alt:'',draggable:false,decoding:'sync',onError,style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'}})}</View>;
+ if(Platform.OS==='web'&&!repositioning)return <View testID="page-cover-image" style={StyleSheet.absoluteFill}><WebCoverImg uri={uri} position={position} onError={onError}/></View>;
  return <View testID="page-cover-image" style={StyleSheet.absoluteFill} {...(repositioning?pan.panHandlers:{})} onLayout={e=>{const {width:w,height:h}=e.nativeEvent.layout;if(Math.abs(w-box.w)>.5||Math.abs(h-box.h)>.5)setBox({w,h});}}>
   {scale?<Image source={{uri}} onError={onError} style={{position:'absolute',width,height,left:-(width-box.w)/2,top:-extra*(repositioning?pos:position)/100}}/>:<Image source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={onError}/>}
  </View>;
