@@ -66,6 +66,7 @@ export type HomeBriefProps = {
   onMove?: (moves: Move[]) => void;
   onAddAt?: (kind: AddKind, at: Date) => void;
   onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>;
+  onEditItem?: (r: DayRecord) => void;
   onRemove?: (r: DayRecord, mode: 'timeline' | 'all') => Promise<void>;
   sofia?: SofiaBridge;
   /** 03/11/2026: o mesmo Inicio do site no celular (aprovado no quadro): Seu dia, Agenda e os blocos em duas colunas. */
@@ -265,7 +266,7 @@ export function HomeBrief(p: HomeBriefProps) {
       {gear ? <TimelineSettingsPanel boxRef={gearBox} s={tl} set={setTl} onClose={() => setGear(false)} plans={p.data.capsules.plans.filter(x => x.state === 'active').map(x => ({id: x.id, title: x.title, type: String(x.data?.rotina_type || 'capsula'), color: typeInfo(x).color}))} bills={[...new Set((p.data.money || []).filter(d => d.kind === 'pagar').map(d => d.title))]} incomes={[...new Set((p.data.money || []).filter(d => d.kind === 'receber').map(d => d.title))]} /> : null}
       <Timeline nav={dayNav} onDay={setViewDay} items={timelineItems.filter(r => tl.cats[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] !== false)} next={next} op={{rec: r => tl.op[r.isTask ? 'tasks' : r.kind === 'reminder' ? 'reminders' : 'events'] ?? 1, mark: m => (m.kind === 'routine' && m.dose ? tl.op['routine:' + m.dose.planId] : (m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') ? tl.op['fin:' + m.title] : undefined) ?? tl.op[m.kind] ?? 1}}
         marks={timeMarks.filter(m => tl.cats[m.kind] !== false && !(m.kind === 'routine' && m.dose && tl.items['routine:' + m.dose.planId] === false) && !((m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice') && tl.items['fin:' + m.title] === false))}
-        actions={{onAskAt: p.onAskAt, onEdit: r => r.isTask && p.onOpenTask ? p.onOpenTask(String((r.original as any)?.id || r.id.replace(/^task:/, ''))) : p.onOpenItem(r), onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, onQuickEdit: p.onQuickEdit, onRemove: p.onRemove, onHideMark: hideMark, sofia: p.sofia}} />
+        actions={{onAskAt: p.onAskAt, onEdit: r => (p.onEditItem || p.onOpenItem)(r) /* 05/11/2026 (Pedro: "tarefa esta indo para o app Tarefas, nao pode"): tarefa tambem abre o painel lateral ali mesmo */, onToggleTask: r => r.original && p.onToggleTask(r.original as any), onMarkAction: p.onMarkAction, onMarkOpen: m => p.onOpenModule(m.kind === 'package' ? 'packages' : m.kind === 'routine' ? 'capsules' : 'finance'), onMove: p.onMove ? onMove : undefined, onAddAt: p.onAddAt, onQuickEdit: p.onQuickEdit, onRemove: p.onRemove, onHideMark: hideMark, sofia: p.sofia}} />
       {/* 03/11/2026 (desenho 01): no celular, a dica de como criar pela linha */}
       {p.compact && p.onAskAt ? <Text style={{fontSize: 11, color: c.muted, paddingTop: 2, paddingHorizontal: 2}}>Segure num horário vazio para criar · arraste para ver outras horas</Text> : null}
     </View></RowIn>
@@ -402,7 +403,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   if (nav) nav.current = {go: goDay, add: addHere};
   // 0.3.336: a janela de hoje acompanha o dia sozinha (a cada meio minuto), a nao ser que a pessoa tenha mexido na linha ha pouco;
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
-  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || holdRef.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, gap > 0.25 ? 1400 : 900);}, [day0, Math.floor(Date.now() / 30000)]);
+  useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || holdRef.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current || gap > 0.1 || (WEB && document.visibilityState !== 'visible')) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, 900);} /* 05/11/2026 (Pedro: "o agora sai de onde parou e anda ate a hora"): atraso grande (voltou de outra aba) ou aba escondida = vai direto, sem deslizar */, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
@@ -613,7 +614,16 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
     {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 60)) return null;
       if (side && wS && (side === 'left' ? x * wS < 86 : (1 - x) * wS < 86)) return null; // a hora que ficaria embaixo do botao "agora" some
-      const end = x > 0.96, beg = x < 0.04; return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
+      const end = x > 0.96, beg = x < 0.04;
+      // 05/11/2026 (Pedro: "aqui e a divisao de um dia para o outro, crie uma forma de entender"): na meia-noite, uma linha tracejada
+      // atravessa a faixa e o rotulo mostra o dia que comeca (ex.: "sex, 6/11") em vez de so 00:00
+      const md = new Date(day0 + h * 3600000), midnight = md.getHours() === 0 && md.getMinutes() === 0;
+      if (midnight) {const dayName = md.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ', ' + md.getDate() + '/' + (md.getMonth() + 1);
+        return <React.Fragment key={h}>
+          <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, width: 0, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: tint(c.accent, 0.55)} as any} />
+          <Text style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent} as any}>{dayName}</Text>
+        </React.Fragment>;}
+      return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
       <View style={{position: 'absolute', left: (WEB ? `calc(${drag.fx * 100}% - ${dpx(9)})` : drag.fx * w - 9) as any, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
@@ -873,6 +883,8 @@ function QuickDose({m, color, action, onAction, onSave, onCancel, onMore}: {m: T
 }
 function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onClose, onPin, onAddHere, onGrab}: {point: Point; width: number; pinned: boolean; actions: TimelineActions; desc: (r: DayRecord) => string; onEnter: () => void; onLeave: () => void; onClose: () => void; onPin?: () => void; onAddHere?: () => void; onGrab?: (e: any, t: MoveTarget, color: string) => void}) {
   const [quick, setQuick] = useState<DayRecord | null>(null), [quickMark, setQuickMark] = useState<TimeMark | null>(null);
+  const shellRef = useRef<any>(null), [quickMax, setQuickMax] = useState<number>(520);
+  useLayoutEffect(() => {if (!(quick || quickMark) || !WEB) return; const el = shellRef.current; const top = el?.getBoundingClientRect?.().top; if (Number.isFinite(top)) setQuickMax(Math.max(260, Math.round(window.innerHeight - top - 16)));}, [quick, quickMark]);
   const c = useTheme(), single = point.recs.length === 1 && !point.marks.length && !point.recs[0].isTask && point.recs[0].kind !== 'reminder';
   const W = quick || quickMark ? 380 : single ? 320 : 380, /* 04/11/2026 (Pedro: "precisa ter um jeito de ver o nome todo"): um pouco mais larga e nome em ate 2 linhas */ w = width || 1, x = Math.max(0, Math.min(w - W, point.x * w - W / 2)), caret = Math.max(18, Math.min(W - 18, point.x * w - x));
   const kindOf = (r: DayRecord) => r.isTask ? 'Tarefa' : r.kind === 'reminder' ? 'Lembrete' : 'Compromisso';
@@ -886,8 +898,8 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
   const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
     return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
-  const shell = (inner: React.ReactNode, strip?: string) => <View testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, ...(quick || quickMark ? {top: 88} : {bottom: 92}), width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item); editando, abre para baixo (para cima ficava sob a barra do topo) */>
-    <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)'} as any}>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
+  const shell = (inner: React.ReactNode, strip?: string) => <View ref={shellRef} testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, ...(quick || quickMark ? {top: 88} : {bottom: 92}), width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item); editando, abre para baixo (para cima ficava sob a barra do topo) */>
+    <View style={{backgroundColor: c.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(255,255,255,0.07), 0 18px 40px rgba(0,0,0,0.5)', ...(quick || quickMark ? {maxHeight: quickMax, overflowY: 'auto'} : null)} as any} /* 05/11/2026 (Pedro: "seletor de horas ficou escondido"): editando, cabe na tela e rola por dentro */>{strip ? <View style={{height: 4, backgroundColor: strip}} /> : null}{inner}</View>
     <View style={{position: 'absolute', left: caret - 6, ...(quick || quickMark ? {top: -6} : {bottom: -6}), width: 12, height: 12, backgroundColor: c.bg, transform: [{rotate: '45deg'}], boxShadow: quick || quickMark ? '-1px -1px 0 rgba(255,255,255,0.07)' : '1px 1px 0 rgba(255,255,255,0.07)'} as any} />
   </View>;
   const chip = (icon: IconName, col: string, s = 24) => <View style={{width: s, height: s, borderRadius: 9, backgroundColor: tint(col, 0.14), alignItems: 'center', justifyContent: 'center'}}><Icon name={icon} size={Math.round(s * 0.5)} color={col} /></View>;

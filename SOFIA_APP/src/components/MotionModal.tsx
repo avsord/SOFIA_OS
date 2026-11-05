@@ -1,9 +1,9 @@
 import {uiScale} from '../web/desktop-scale';
-import React,{useContext,useRef} from 'react';
+import React,{useContext,useLayoutEffect,useRef} from 'react';
 import {PresenceClosing} from './Presence';
 import {useWebBackClose} from '../lib/web-panels';
 import {PALETTE} from '../lib/palette';
-import {Animated,Modal,Pressable,View} from 'react-native';
+import {Animated,Modal,Platform,Pressable,View} from 'react-native';
 import {DialogContext,useDesktop,contentArea} from '../lib/desktop';
 import type {ModalProps} from 'react-native';
 import {useMotionPresence} from '../lib/motion';
@@ -35,8 +35,17 @@ function SidePeek({visible=true,children,onRequestClose,peekWidth,peekDim}:Modal
  useWebBackClose(!!visible,onRequestClose?()=>onRequestClose({} as any):undefined);
  const c=useTheme(),{mounted,progress}=useMotionPresence(!!visible),last=useRef(children);
  if(visible)last.current=children;
+ // 05/11/2026 (Pedro: "a janela entra da direita e sai com corte seco"): varias telas tiram o painel de uma vez ao fechar (sem
+ // passar visible=false); no site, antes de sumir, deixamos uma copia dele deslizando para fora, como a entrada
+ const rootEl=useRef<any>(null),showing=useRef(false);showing.current=!!visible;
+ useLayoutEffect(()=>()=>{if(Platform.OS!=='web'||!showing.current||typeof document==='undefined')return;const el=rootEl.current;if(!el?.cloneNode)return;
+  try{const ghost=el.cloneNode(true) as HTMLElement;Object.assign(ghost.style,{position:'fixed',left:'0',top:'0',width:'100vw',height:'100vh',zIndex:'2147483000',pointerEvents:'none'});document.body.appendChild(ghost);
+   const panel=ghost.querySelector('[data-testid="side-peek-panel"]') as HTMLElement|null;const dim=ghost.firstElementChild as HTMLElement|null;
+   panel?.animate([{transform:'translateX(0px)',opacity:1},{transform:'translateX(40px)',opacity:0}],{duration:240,easing:'cubic-bezier(0.4,0,1,1)',fill:'forwards'});
+   if(dim&&dim!==panel)dim.animate([{opacity:1},{opacity:0}],{duration:240,easing:'ease-out',fill:'forwards'});
+   setTimeout(()=>ghost.remove(),280);}catch{/* sem animacao */}},[]);
  return <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>
-  <View testID="side-peek" style={{flex:1,flexDirection:'row'}} pointerEvents={visible?'auto':'none'}>
+  <View ref={rootEl} testID="side-peek" style={{flex:1,flexDirection:'row'}} pointerEvents={visible?'auto':'none'}>
    <Animated.View style={{flex:1,opacity:progress}}><Pressable accessibilityLabel="Fechar painel" onPress={()=>onRequestClose?.({} as any)} style={{flex:1,backgroundColor:PALETTE.black+(peekDim||'59')}}/></Animated.View>
    <Animated.View testID="side-peek-panel" style={{...peekSize(peekWidth),height:'100%',backgroundColor:c.bg,borderLeftWidth:1,borderColor:c.line,shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:-8,height:0},opacity:progress,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[40,0]})}]}}>
     <DialogContext.Provider value={true}>{visible?children:last.current}</DialogContext.Provider>

@@ -21,7 +21,7 @@ const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary:
 // aprovado/site-abertura-2026-11-04-v2): quase sem escala (104% -> 100%, 3,2 s proprios), subida leve (10% da distancia, 2,4 s)
 // comecando 0,5 s antes de a tela abrir, e as fileiras logo ao abrir
 export const INTRO = {scale: 1.005, moveMs: 2400, scaleMs: 3200, ease: 'cubic-bezier(0.4,0,0.08,1)', scaleEase: 'cubic-bezier(0.25,0.1,0.1,1)', rowGap: 110, rowMs: 600, travel: 0.008, rowLift: 1}; /* 05/11 (Pedro): mais leve, quase imperceptivel */
-export const INTRO_T = {greet: 0, move: 140, date: 120, summary: 700, rows: 480, glow: 560}; /* brilho oval logo ao abrir a tela */ /* 05/11 (Pedro): data em fade quase junto da saudacao; resumo mais cedo */
+export const INTRO_T = {greet: 0, move: 140, date: 120, summary: 700, rows: 480, glow: 140}; /* brilho oval logo ao abrir a tela */ /* 05/11 (Pedro): data em fade quase junto da saudacao; resumo mais cedo */
 export function introAnim(at: number, offset: number, ms: number, from: any, to: any, ease = 'cubic-bezier(0.25,0.46,0.45,0.94)') {
   return {animationKeyframes: {'0%': from, '100%': to}, animationDuration: ms + 'ms', animationDelay: Math.round(at + offset - Date.now()) + 'ms', animationTimingFunction: ease, animationFillMode: 'both'} as any;
 }

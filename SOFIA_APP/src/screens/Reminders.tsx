@@ -58,7 +58,14 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  // 0.3.331: rascunho vindo da linha do tempo do Inicio (horario do clique)
  useDraft<Partial<Entity>>('reminder',active,d=>open(d));
  function patchData(patch:Record<string,any>){setEditing(old=>old?{...old,data:{...(old.data||{}),...patch}}:old);}
- async function save(){
+ // 05/11/2026 (Pedro: "mais de um lembrete: ao alterar, perguntar se e so para aquele ou para os das outras datas")
+ function save(){
+  if(!editing?.title?.trim()||busy)return;
+  const others=editing.id&&groupOf(editing)?records.items.filter(x=>groupOf(x)===groupOf(editing)&&x.id!==editing.id):[];
+  if(!others.length){void saveNow(false);return;}
+  appAlert('Alterar as outras datas também?','Este lembrete tem '+(others.length+1)+' datas.',[{text:'Cancelar',style:'cancel'},{text:'Só esta data',onPress:()=>void saveNow(true)},{text:'Todas as datas',onPress:()=>void saveNow(false)}]);
+ }
+ async function saveNow(onlyThis:boolean){
   if(!editing?.title?.trim()||busy)return;setBusy(true);setError('');
   try{
    const d={...(editing.data||{})};d.remind_at=String(d.remind_at||'');d.message=String(d.message||'');d.location=String(d.location||'');
@@ -69,6 +76,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
    const g=extraAts.length?(groupOf(editing)||GROUP+(editing.id||'r'+Date.now().toString(36))):'';
    const base={kind:'reminder',title:editing.title.trim(),content:String(editing.content||''),area:editing.area||'Lembretes',privacy:'private' as const,state:editing.state||'active',tags:withGroup(editing.tags||[],g)};
    const saved=await api.saveEntity({...editing,...base,data:d});records.merge(saved);
+   if(onlyThis){setEditing(null);setExtras([]);return;} /* so esta data: as outras ficam como estavam */
    // as outras datas: atualiza as que ja existiam, cria as novas e apaga as que a pessoa tirou
    const before=editing.id&&groupOf(editing)?records.items.filter(x=>groupOf(x)===groupOf(editing)&&x.id!==editing.id):[];
    for(const x of extraAts){const old=before.find(b=>b.id===x.id);const r=await api.saveEntity(old?{...old,...base,revision:old.revision,data:{...d,remind_at:x.at}}:{...base,data:{...d,remind_at:x.at}} as any);records.merge(r);}
