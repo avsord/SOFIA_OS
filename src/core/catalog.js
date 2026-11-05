@@ -859,6 +859,7 @@ const CATALOG={
       {"key":"suggested","label":"Criado a partir de sugestão da Sofia","type":"checkbox"},
       {"key":"parent_id","label":"Página pai","type":"text"},
       {"key":"node_type","label":"Tipo de nó","type":"select","options":["space","page"]},
+      {"key":"template_id","label":"Template de origem","type":"text"},
       {"key":"blocks_json","label":"Conteúdo em blocos","type":"textarea","max":250000}
     ],
     "description": "Espaço ou página personalizável do usuário. Espaços raiz aparecem em Seus Espaços; páginas podem ficar aninhadas dentro deles.",
