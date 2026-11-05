@@ -446,7 +446,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
     const el: any = lineBox.current; if (!actions.onMove || !items.length || !el?.getBoundingClientRect || !WEB) return;
     const ne = e?.nativeEvent || {}, sx = Number(ne.pageX ?? ne.clientX), rect = el.getBoundingClientRect(); if (!Number.isFinite(sx) || !rect.width) return;
-    const grab = sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
+    // 05/11/2026 (Pedro: "ao mover uma bolinha de um grupo, centralizar a bolinha e o mouse"): pegando pela alca do balao
+    // (chave 'g...'), a bolinha fica centrada sob o mouse; pegando a propria bolinha, mantem o ponto em que foi pega
+    const grab = key.startsWith('g') ? 0 : sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
     const fxOf = (x: number) => Math.max(0, Math.min(1, (x - grab - rect.left) / rect.width));
     const tickEdge = () => {if (!edge || !dragRef.current) {edgeRaf = null; return;} glide(target.current + edge * 0.08); const d = {...dragRef.current, fx: fxOf(lastX)}; dragRef.current = d; setDrag(d); edgeRaf = requestAnimationFrame(tickEdge);};
     const stop = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('keydown', esc, true); edge = 0; if (edgeRaf) cancelAnimationFrame(edgeRaf);
