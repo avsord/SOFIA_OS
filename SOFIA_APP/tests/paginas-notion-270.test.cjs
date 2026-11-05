@@ -161,3 +161,10 @@ test('Início: bloco "Agenda · próximos" começa amanhã (o de hoje está na l
  assert.ok(h.includes('const fromTomorrow = useMemo(')&&(h.match(/upcoming=\{fromTomorrow\}/g)||[]).length===2);
  assert.ok(h.includes("new Date(r.date + 'T00:00:00')"),'dia inteiro pela data, sem o fuso puxar para hoje');
 });
+
+test('Colar imagem copiada: na janela da capa (Ctrl+V e botão) e no texto da página (vira bloco de imagem)',()=>{
+ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');const a=read('src/components/PageAppearance.tsx'),r=read('src/components/PageRichInput.web.tsx'),pg=read('src/screens/Pages.tsx');
+ assert.ok(a.includes('export async function uploadPageImage(')&&a.includes("d?.addEventListener('paste',on)")&&a.includes('Colar imagem copiada'));
+ assert.ok(r.includes('props.onPasteImage(f);return;')&&r.includes('onDrop:(e:any)=>'));
+ assert.ok(pg.includes('onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)}')&&pg.includes('<PageAttachmentImage api={api}'));
+});

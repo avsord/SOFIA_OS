@@ -31,7 +31,7 @@ import {mergeRemotePages} from '../lib/page-sync';
 import {entryBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {openContextMenu} from '../components/ContextMenu';
-import {PageCover,PageAppearance,PAGE_COVERS,coverPosition,prefetchPageCover} from '../components/PageAppearance';
+import {PageCover,PageAppearance,PAGE_COVERS,coverPosition,prefetchPageCover,PageAttachmentImage,uploadPageImage} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
 import {comparePageOrder} from '../lib/page-order';
@@ -326,6 +326,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </ScrollView>
   </View>;
  }
+ // imagem colada ou arrastada no texto: entra um bloco de imagem logo abaixo (ou no lugar da linha vazia) e envia
+ async function pasteImageBlock(b:PageBlock,img:Blob){if(!selectedId)return;const pageId=selectedId,block={...newBlock('image'),text:'',data:{uploading:true}};
+  edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===b.id);const empty=b.type==='text'&&!String(b.text||'').trim();if(i<0)blocks.push(block);else if(empty)blocks.splice(i,1,block);else blocks.splice(i+1,0,block);if(blocks[blocks.length-1].id===block.id)blocks.push(newBlock());return {...d,blocks};});
+  try{const id=await uploadPageImage(api,pageId,img);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===block.id?{...x,data:{attachment_id:id,caption:''}}:x)}));void store.flush(pageId);}
+  catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==block.id)}));setError(errorText(e));}}
  const htmlOfBlock=(x:PageBlock)=>x.html?String(x.html):textToHtml(String(x.text||''));
  // juntar linhas com Backspace leva a formatação das duas
  function keepHtmlOnMerge(blocks:PageBlock[],r:Caret,id:string):Caret{const i=blocks.findIndex(x=>x.id===id),cur=blocks[i],prev=blocks[i-1];
@@ -458,6 +463,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     </View>:null}
    </View>;}
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{paddingVertical:14,borderRadius:6,backgroundColor:focus===b.id?c.accentSoft:'transparent'}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
+  if(b.type==='image'&&b.data?.uploading)return <View key={b.id} style={{marginVertical:8,height:120,borderRadius:8,backgroundColor:c.input,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Enviando imagem…</Text></View>;
+  if(b.type==='image'&&b.data?.attachment_id&&desktop)return <Pressable key={b.id} accessible={false} onPress={()=>setFocus(b.id)} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent',alignSelf:'flex-start',maxWidth:'100%'}}><PageAttachmentImage api={api} id={String(b.data.attachment_id)} caption={b.data.caption?String(b.data.caption):''}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
   if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text>{(()=>{const link=String((b as any).url||'').trim()||(String(b.text||'').match(/https?:\/\/\S+/)||[''])[0];if(!link)return null;
@@ -478,6 +485,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     value={b.text||''} html={b.html||''} placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderColor={placeholderColor}
     onChange={(text:string,html:string)=>onBlockText(b,text,html)} onKeyPress={preview?undefined:(e:any)=>onBlockKey(e,b)} onFocus={()=>setFocus(b.id)}
     onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}}
+    onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)}
     onPasteText={(pasted:string,a:number,z:number)=>{if(!pasted.includes('\n'))return false;const before=String(b.text||'');return applyCaret(pastedLines(currentBlocks(),b.id,before,before.slice(0,a)+pasted+before.slice(z)));}}
     style={{flex:1,minHeight:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
    :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}

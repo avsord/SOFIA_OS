@@ -44,6 +44,24 @@ async function shrinkCover(file:Blob):Promise<Blob>{
   const canvas=g.document.createElement('canvas');canvas.width=Math.round(bmp.width*scale);canvas.height=Math.round(bmp.height*scale);canvas.getContext('2d').drawImage(bmp,0,0,canvas.width,canvas.height);bmp.close?.();
   const out:Blob|null=await new Promise(ok=>canvas.toBlob((b:Blob|null)=>ok(b),'image/jpeg',0.86));return out&&out.size<file.size?out:file;}catch{return file;}
 }
+/** 05/11/2026 (Pedro: "tem que ter a opcao de colar imagem caso eu tenha copiado uma"): imagem colada/arrastada no site
+ * e enviada como anexo da pagina (reduzida a ate 2000 px). Devolve o id do anexo. */
+export async function uploadPageImage(api:SofiaApi,pageId:string,blob:Blob):Promise<string>{
+ if(blob.size>10*1024*1024)throw new Error('A imagem deve ter até 10 MB.');const small=await shrinkCover(blob);
+ const data:string=await new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>bad(r.error);r.readAsDataURL(small);});
+ const base64=data.slice(data.indexOf(',')+1),mime=coverMime(base64,small.type||'image/png');const a=await api.uploadAttachment(pageId,{name:coverName(mime),mime,base64});return a.id;
+}
+/** Primeira imagem da area de transferencia (evento de colar ou botao "Colar imagem"). */
+export function clipboardImage(e:any):Blob|null{const items=[...(e?.clipboardData?.items||[])] as any[];for(const it of items)if(it.kind==='file'&&/^image\//.test(it.type)){const f=it.getAsFile();if(f)return f;}return null;}
+async function readClipboardImage():Promise<Blob|null>{const nav=(globalThis as any).navigator;if(!nav?.clipboard?.read)return null;const list=await nav.clipboard.read();for(const item of list){const type=(item.types||[]).find((t:string)=>/^image\//.test(t));if(type)return await item.getType(type);}return null;}
+/** Imagem anexada a pagina (bloco de imagem no site): baixada com a sessao, como a capa. */
+export function PageAttachmentImage({api,id,caption}:{api:SofiaApi;id:string;caption?:string}){
+ const c=useTheme(),[uri,setUri]=useState(()=>peekCover(id)),[failed,setFailed]=useState(false);
+ useEffect(()=>{let live=true;if(peekCover(id)){setUri(peekCover(id));return;}cachedPageCover(api.attachmentSource(id),id,false,0).then(u=>{if(live)setUri(u);}).catch(()=>{if(live)setFailed(true);});return()=>{live=false;};},[id,api]);
+ if(failed)return <Text style={{color:c.muted,fontSize:12,padding:12}}>Não foi possível abrir esta imagem.</Text>;
+ if(!uri)return <View style={{height:160,alignItems:'center',justifyContent:'center',backgroundColor:c.input,borderRadius:6}}><Spinner size={18}/></View>;
+ return <View>{React.createElement('img',{src:uri,alt:caption||'',draggable:false,style:{display:'block',maxWidth:'100%',maxHeight:520,borderRadius:6,objectFit:'contain'}})}{caption?<Text style={{color:c.muted,fontSize:12,marginTop:4}}>{caption}</Text>:null}</View>;
+}
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 /** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */
 // 0.3.268: a previa local da capa so vale no aparelho que enviou (caminho file:// do celular nao abre no site e vice-versa);
@@ -153,6 +171,8 @@ export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:
   if(!alive.current)return;
   await finishPick(result);
  }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
+ async function pasteBlob(blob:Blob){if(busy)return;setBusy(true);setError('');try{const id=await uploadPageImage(api,pageId,blob);if(alive.current)choose({cover_type:'attachment',cover_value:'',cover_attachment_id:id,cover_local_uri:''});}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Não foi possível usar a imagem colada.');}finally{if(alive.current)setBusy(false);}}
+ useEffect(()=>{if(!desktop||kind!=='cover'||Platform.OS!=='web')return;const d=(globalThis as any).document;const on=(e:any)=>{const img=clipboardImage(e);if(img){e.preventDefault();void pasteBlob(img);}};d?.addEventListener('paste',on);return()=>d?.removeEventListener('paste',on);});
  if(desktop){
   // 0.3.267 (computador): janela pequena presa ao botão, como no Notion (antes: painel de baixo na largura toda)
   const W=kind==='icon'?408:440,vw=typeof window!=='undefined'?window.innerWidth:1200,vh=typeof window!=='undefined'?window.innerHeight:800;
@@ -186,7 +206,8 @@ export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:
      :<View style={{padding:16,gap:12}}>
       {busy?<View style={{padding:18,alignItems:'center',gap:8}}><ActivityIndicator color={c.accent}/><Text style={{color:c.muted}}>Enviando capa…</Text></View>:<>
        <Pressable accessibilityRole="button" onPress={()=>void upload()} style={({hovered}:any)=>({height:34,borderRadius:6,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>Enviar arquivo</Text></Pressable>
-       <Text style={{color:c.muted,fontSize:12,textAlign:'center'}}>Imagens com mais de 1500 pixels de largura ficam melhores. Depois dá para reposicionar.</Text>
+       <Pressable accessibilityRole="button" onPress={()=>{void readClipboardImage().then(b=>{if(b)void pasteBlob(b);else setError('Nenhuma imagem copiada. Copie uma imagem e tente de novo (ou aperte Ctrl+V).');}).catch(()=>setError('O navegador não deixou ler a imagem copiada. Aperte Ctrl+V com esta janela aberta.'));}} style={({hovered}:any)=>({height:34,borderRadius:6,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>Colar imagem copiada</Text></Pressable>
+       <Text style={{color:c.muted,fontSize:12,textAlign:'center'}}>Ou aperte Ctrl+V com esta janela aberta. Imagens com mais de 1500 pixels de largura ficam melhores; depois dá para reposicionar.</Text>
       </>}
      </View>}
     </Pressable>

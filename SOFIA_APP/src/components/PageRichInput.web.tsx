@@ -7,7 +7,7 @@ import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
 
 type Props={value:string;html?:string;placeholder?:string;placeholderColor?:string;style?:any;editable?:boolean;accessibilityLabel?:string;testID?:string;
- onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean};
+ onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onPasteImage?:(image:Blob)=>void};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i;
@@ -96,9 +96,14 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
    const wrapped={key,nativeEvent:{key,shiftKey:e.shiftKey,ctrlKey:e.ctrlKey,metaKey:e.metaKey,altKey:e.altKey},target:el.current,preventDefault:()=>e.preventDefault(),isDefaultPrevented:()=>e.defaultPrevented};
    props.onKeyPress?.(wrapped);
    if(!e.defaultPrevented&&key==='Enter'){e.preventDefault();if(e.shiftKey)document.execCommand('insertLineBreak');}},
-  onPaste:(e:any)=>{const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
+  onPaste:(e:any)=>{
+   // 05/11/2026 (Pedro): imagem copiada colada no texto vira bloco de imagem
+   if(props.onPasteImage){const items=[...(e.clipboardData?.items||[])] as any[];const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));const f=it?.getAsFile?.();if(f){e.preventDefault();props.onPasteImage(f);return;}}
+   const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
    if(props.onPasteText?.(text,start,end))return;
    const sel=document.getSelection();if(sel&&!sel.isCollapsed&&/^https?:\/\/\S+$/i.test(text.trim()))document.execCommand('createLink',false,text.trim());else document.execCommand('insertText',false,text);},
+  onDragOver:(e:any)=>{if(props.onPasteImage&&[...(e.dataTransfer?.items||[])].some((x:any)=>x.kind==='file'))e.preventDefault();},
+  onDrop:(e:any)=>{const f=[...(e.dataTransfer?.files||[])].find((x:any)=>/^image\//.test(x.type));if(f&&props.onPasteImage){e.preventDefault();props.onPasteImage(f as Blob);}},
   onFocus:props.onFocus,onBlur:props.onBlur,
  });
 });
