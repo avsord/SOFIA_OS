@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const load=require('./load-ts.cjs');const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('0.3.263: menu do botao direito abre com as acoes certas',()=>{
   let opened=null;const host={};
-  const m=load('src/components/ContextMenu.tsx',{react:{useEffect(){},useState:v=>[v,()=>{}]},'react-native':{},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib/theme':{useTheme:()=>({})},'./Icon':{Icon:()=>null}},{document:{}});
+  const m=load('src/components/ContextMenu.tsx',{react:{useEffect(){},useState:v=>[v,()=>{}]},'react-native':{},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib/theme':{useTheme:()=>({})},'./Icon':{Icon:()=>null},'../lib/over-all':{OverAll:p=>p.children}},{document:{}});
   const props=m.contextMenu(()=>[{label:'Abrir',run(){}},{label:'Apagar',danger:true,run(){}}]);
   assert.equal(typeof props.onContextMenu,'function','no site ha onContextMenu');
 });

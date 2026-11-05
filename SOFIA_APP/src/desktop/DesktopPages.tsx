@@ -20,7 +20,9 @@ export function DesktopPages({activeTab,maxWidth,children}:{activeTab:Tab;maxWid
    // (0.3.291, briefH, homeViewH). Agora a tela de fora fica invisivel MAS com o tamanho real (visibility hidden): nada mede
    // 0, nada recalcula ao voltar. Sem clique/foco (pointerEvents none, aria-hidden) e atras da tela atual.
    const hidden=!on;
-   return <View key={id} testID={'desktop-page-'+id} pointerEvents={hidden?'none':'auto'} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:shown?'flex':'none',...(hidden?{visibility:'hidden',zIndex:0}:{zIndex:1}) as any}} accessibilityElementsHidden={hidden} importantForAccessibility={on?'auto':'no-hide-descendants'} {...({'aria-hidden':hidden?true:undefined,'data-active':on?'1':'0'} as any)}>
+   // 05/11/2026 (Pedro: capa de uma pagina aparecendo por cima do Inicio e da Agenda): alem de visibility (que um filho
+   // pode desfazer), a tela de fora fica com opacidade 0 - vale para tudo dentro dela e nao muda nenhum tamanho.
+   return <View key={id} testID={'desktop-page-'+id} pointerEvents={hidden?'none':'auto'} style={{position:'absolute',top:0,left:0,right:0,bottom:0,display:shown?'flex':'none',...(hidden?{visibility:'hidden',opacity:0,zIndex:0}:{zIndex:1}) as any}} accessibilityElementsHidden={hidden} importantForAccessibility={on?'auto':'no-hide-descendants'} {...({'aria-hidden':hidden?true:undefined,'data-active':on?'1':'0'} as any)}>
     <Activity mode={shown?'visible':'hidden'}>{body}</Activity>
    </View>;})}
  </View>;

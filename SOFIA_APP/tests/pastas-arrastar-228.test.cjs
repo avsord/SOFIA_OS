@@ -5,7 +5,7 @@ const React=require('react'),{act,create}=require('react-test-renderer');global.
 const load=require('./load-ts.cjs');
 const host=name=>function H(props){return React.createElement(name,props,props.children);};
 let pan=null,locks=[];const rects={};
-function labelOf(p){const ch=p.children;if(ch&&ch.props&&ch.props.accessibilityLabel)return ch.props.accessibilityLabel;if(p.style&&p.style.borderStyle==='dashed')return '__up__';return 'root';}
+function labelOf(p){const ch=Array.isArray(p.children)&&p.children[0]&&p.children[0].props&&String(p.children[0].props.accessibilityLabel||'').startsWith('Abrir nota')?p.children[0]:p.children;if(ch&&ch.props&&ch.props.accessibilityLabel)return ch.props.accessibilityLabel;if(p.style&&p.style.borderStyle==='dashed')return '__up__';return 'root';}
 const RN={View:React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({measureInWindow:cb=>{const r=rects[labelOf(p)]||{x:0,y:0,w:0,h:0};cb(r.x,r.y,r.w,r.h);}}));return React.createElement('View',p,p.children);}),
  Text:host('Text'),TextInput:host('TextInput'),ScrollView:host('ScrollView'),Pressable:host('Pressable'),
  PanResponder:{create:c=>{pan=c;return {panHandlers:{}};}},
@@ -14,7 +14,7 @@ const M=load('src/components/NotebookBlock.tsx',{react:React,'react/jsx-runtime'
  './MotionModal':{MotionModal:()=>null},'../lib/leaf-document':{applyLeafPatch:(p,x)=>({...p,...x})},'./KeyboardViewport':{KeyboardViewport:host('KV')},'./LeafEditor':{LeafEditor:()=>null},
  '../lib/theme':{useTheme:()=>({text:'t',muted:'m',surface:'s',line:'l',accent:'a',accentSoft:'as',input:'i',onAccent:'o',danger:'d',bg:'b'})},
  './UI':{Button:host('Button'),IconButton:host('IconButton')},'./Sheet':{Sheet:p=>p.visible?React.createElement('Sheet',p,p.children):null},
- '../lib/app-alert':{appAlert:()=>{}},'../lib/fuzzy':{fuzzyScore:()=>0},'../lib/desktop':{tap:t=>t,useDesktop:()=>false}});
+ '../lib/app-alert':{appAlert:()=>{}},'../lib/fuzzy':{fuzzyScore:()=>0},'../lib/desktop':{tap:t=>t,useDesktop:()=>false},'./ContextMenu':{contextMenu:()=>({}),openContextMenu:()=>{}},'./Icon':{Icon:()=>null},'../lib/hover-hold':{useHoverKey:()=>({key:null,enter(){},leave(){}})}});
 const leaf=(id,t)=>({id,title:t,content:'',created_at:'2026-10-25T10:00:00Z'});
 const base=()=>({mode:'notebooks',title:'Notas',notebooks:[
  {id:'A',name:'Trabalho',emoji:'💼',expanded:true,pages:[leaf('n1','Ideia 1'),leaf('n2','Ideia 2')]},

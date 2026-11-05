@@ -2,6 +2,9 @@
 // código, link e cor dentro do texto. É um contentEditable que se apresenta para o Pages.tsx como se fosse o <textarea>
 // de antes (value, selectionStart/End, setSelectionRange, focus), para o teclado (Enter, Backspace, setas, "/")
 // continuar igual. O HTML guardado passa sempre por uma lista fechada de marcas permitidas.
+import {findLinks} from '../lib/leaf-document';
+import {LinkHoverCard,openUrl} from './LinkHover';
+import type {LinkPop} from './LinkHover';
 import React,{useImperativeHandle,useLayoutEffect,useRef} from 'react';
 import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
@@ -50,7 +53,11 @@ function ensureStyle(){if(styleReady||typeof document==='undefined')return;style
  '[data-rich-block]:empty:before{content:attr(data-placeholder);color:var(--rich-ph,#8888);pointer-events:none}',
  '[data-rich-block] code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:85%;padding:1px 5px;border-radius:4px;background:rgba(135,131,120,.18);color:#EB5757}',
  '[data-rich-block] a{color:inherit;text-decoration:underline;text-decoration-color:rgba(160,160,160,.6);text-underline-offset:2px}',
- '[data-rich-block] b{font-weight:700}'].join('\n');document.head.appendChild(s);}
+ '[data-rich-block] b{font-weight:700}',
+ // 05/11/2026 (Pedro: imagem de outro site aparecendo por cima do Inicio e da Agenda): conteudo arrastado de outra pagina
+ // entrava no texto com o estilo original (posicao fixa, sempre visivel). Nada dentro do texto pode sair do lugar.
+ '[data-rich-block] *{position:static!important;visibility:inherit!important;transform:none!important;max-width:100%}',
+ '[data-rich-block] img,[data-rich-block] svg,[data-rich-block] video,[data-rich-block] iframe{display:none!important}'].join('\n');document.head.appendChild(s);}
 const CSS_PX=new Set(['fontSize','lineHeight','paddingTop','paddingBottom','paddingLeft','paddingRight','marginTop','marginBottom','minHeight','borderRadius','borderLeftWidth']);
 function toCss(style:any):Record<string,any>{
  const flat:any={...(StyleSheet.flatten(style)||{})};
@@ -66,6 +73,10 @@ function toCss(style:any):Record<string,any>{
 
 export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(props,ref){
  const el=useRef<HTMLDivElement|null>(null),emitted=useRef<string|null>(null),composing=useRef(false);
+ // 05/11/2026 (Pedro: links como no Notion): colar um endereco ja vira link; passar o mouse mostra Copiar / Remover link
+ const [pop,setPop]=React.useState<LinkPop>(null),popA=useRef<HTMLAnchorElement|null>(null),popTimer=useRef<any>(null);
+ const popKeep=()=>{if(popTimer.current)clearTimeout(popTimer.current);popTimer.current=null;};
+ const popLeave=()=>{popKeep();popTimer.current=setTimeout(()=>setPop(null),220);};
  useImperativeHandle(ref,()=>el.current,[]);
  const desired=props.html?sanitizeRich(props.html):textToHtml(props.value||'');
  useLayoutEffect(()=>{ensureStyle();const node=el.current;if(!node)return;if(desired!==emitted.current&&node.innerHTML!==desired){node.innerHTML=desired;}emitted.current=desired;},[desired]);
@@ -81,9 +92,12 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
  };
  const emit=()=>{const node=el.current;if(!node)return;const text=textOf(node);let html=text?sanitizeRich(node.innerHTML):'';if(!text&&node.innerHTML)node.innerHTML='';
   // sem formatação nenhuma, guarda só o texto (html vazio, como antes)
-  if(html===textToHtml(text))html='';emitted.current=html?html:textToHtml(text);props.onChange(text,html);};
+  if(html===textToHtml(text))html='';emitted.current=html?html:textToHtml(text);
+  if(text&&node.querySelector('img,svg,video,iframe,div,p,[style*="position"],[class]')){const a=(node as any).selectionStart,b=(node as any).selectionEnd;node.innerHTML=emitted.current;try{if(document.activeElement===node)(node as any).setSelectionRange(a,b);}catch{}}
+  props.onChange(text,html);};
  const css=toCss(props.style);
- return React.createElement('div',{ref:attach,contentEditable:props.editable===false?'false':'true',suppressContentEditableWarning:true,role:'textbox','aria-multiline':'true','aria-label':props.accessibilityLabel,
+ const removeLink=()=>{const a=popA.current,node=el.current;if(!a||!node||!node.contains(a))return;const parent=a.parentNode!;while(a.firstChild)parent.insertBefore(a.firstChild,a);parent.removeChild(a);popA.current=null;emit();};
+ return React.createElement(React.Fragment,null,React.createElement('div',{ref:attach,contentEditable:props.editable===false?'false':'true',suppressContentEditableWarning:true,role:'textbox','aria-multiline':'true','aria-label':props.accessibilityLabel,
   'data-testid':props.testID,'data-rich-block':'1','data-placeholder':props.placeholder||'',spellCheck:true,
   style:{...css,'--rich-ph':props.placeholderColor||'#8888'},
   onInput:()=>{if(!composing.current)emit();},
@@ -101,9 +115,19 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
    if(props.onPasteImage){const items=[...(e.clipboardData?.items||[])] as any[];const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));const f=it?.getAsFile?.();if(f){e.preventDefault();props.onPasteImage(f);return;}}
    const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
    if(props.onPasteText?.(text,start,end))return;
-   const sel=document.getSelection();if(sel&&!sel.isCollapsed&&/^https?:\/\/\S+$/i.test(text.trim()))document.execCommand('createLink',false,text.trim());else document.execCommand('insertText',false,text);},
+   const sel=document.getSelection();if(sel&&!sel.isCollapsed&&/^https?:\/\/\S+$/i.test(text.trim())){document.execCommand('createLink',false,text.trim());return;}
+   const links=findLinks(text);if(!links.length){document.execCommand('insertText',false,text);return;}
+   let html='',at=0;for(const l of links){html+=escapeHtml(text.slice(at,l.start))+'<a href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.url)+'</a>';at=l.end;}
+   html+=escapeHtml(text.slice(at));document.execCommand('insertHTML',false,html.replace(/\n/g,'<br>'));},
+  onMouseOver:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement|null;if(!a||!el.current?.contains(a))return;popKeep();if(popA.current===a&&pop)return;popA.current=a;const r=a.getBoundingClientRect();setPop({url:a.getAttribute('href')||'',x:r.left,y:r.bottom});},
+  onMouseOut:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]');if(a)popLeave();},
+  onClick:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement|null;if(!a||!el.current?.contains(a))return;const sel=document.getSelection();if(sel&&!sel.isCollapsed)return;e.preventDefault();openUrl(a.getAttribute('href')||'');},
   onDragOver:(e:any)=>{if(props.onPasteImage&&[...(e.dataTransfer?.items||[])].some((x:any)=>x.kind==='file'))e.preventDefault();},
-  onDrop:(e:any)=>{const f=[...(e.dataTransfer?.files||[])].find((x:any)=>/^image\//.test(x.type));if(f&&props.onPasteImage){e.preventDefault();props.onPasteImage(f as Blob);}},
+  onDrop:(e:any)=>{const f=[...(e.dataTransfer?.files||[])].find((x:any)=>/^image\//.test(x.type));if(f&&props.onPasteImage){e.preventDefault();props.onPasteImage(f as Blob);return;}
+   // arrastar algo de outro site: entra so o texto (com os links), nunca o HTML com o estilo de la
+   const dt=e.dataTransfer;if(!dt||(dt.files&&dt.files.length))return;const text=dt.getData('text/plain')||dt.getData('text/uri-list')||'';e.preventDefault();if(!text.trim())return;
+   const d:any=document;const pos=d.caretRangeFromPoint?.(e.clientX,e.clientY);if(pos){const sel=document.getSelection();sel?.removeAllRanges();sel?.addRange(pos);}
+   const links=findLinks(text);if(!links.length){document.execCommand('insertText',false,text);return;}let html='',at=0;for(const l of links){html+=escapeHtml(text.slice(at,l.start))+'<a href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.url)+'</a>';at=l.end;}document.execCommand('insertHTML',false,(html+escapeHtml(text.slice(at))).replace(/\n/g,'<br>'));},
   onFocus:props.onFocus,onBlur:props.onBlur,
- });
+ }),React.createElement(LinkHoverCard,{pop,onEnter:popKeep,onLeave:popLeave,onClose:()=>setPop(null),onRemove:removeLink}));
 });

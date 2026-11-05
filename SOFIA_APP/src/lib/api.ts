@@ -6,6 +6,7 @@ try{appState?.addEventListener('change',state=>{if(state!=='active')lastBackgrou
 export function wentToBackgroundSince(t:number){return lastBackgroundAt>=t||(!!appState&&appState.currentState!=='active');}
 export function waitForActive(maxMs=15000){if(!appState||appState.currentState==='active')return Promise.resolve();return new Promise<void>(resolve=>{let sub:{remove:()=>void}|null=null;const done=()=>{sub?.remove();clearTimeout(timer);resolve();};sub=appState.addEventListener('change',s=>{if(s==='active')done();});const timer=setTimeout(done,maxMs);});}
 export function isChatSend(path:string,method:string){return method==='POST'&&/^\/(chat|conversations|messages)/.test(path)&&!path.startsWith('/chat-sync');}
+import {mergeOnConflict} from './merge-save';
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
 import type {StoreConnectionsState} from './store-connections-types';
 import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivreCatalogUrl,resolveCatalogViaBrowser,resetCatalogTrace,lastCatalogTrace} from './mercado-livre-device';
@@ -197,6 +198,7 @@ export class SofiaApi {
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {this.onExpired();} throw new ApiError(data.error || (response.status>=502&&response.status<=504?'O servidor da Sofia está reiniciando ou ocupado ('+response.status+'). Tente de novo em alguns segundos.':'Não foi possível concluir ('+response.status+').'), data.code || (response.status>=502&&response.status<=504?'SERVER_UNAVAILABLE':'HTTP_ERROR'), response.status, data); }
+      this.noteSeen(data);
       if(method==='GET'&&generation===this.cacheGeneration)this.snapshots.remember(path,data);
       if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
       return data as T;
@@ -341,7 +343,18 @@ export class SofiaApi {
     return decorated; }
   library(q = '', offset = 0) { return this.request<{items:Entity[]}>('/workspace/entities?limit=100&group=library&q='+encodeURIComponent(q)+'&offset='+offset); }
   async entity(id: string) { const item=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(id));return item.kind==='user_page'?(await this.md.decorate([item]))[0]:item; }
-  async saveEntity(input: Partial<Entity>) { let body=input.data?await this.md.clean(input):input;let saved: Entity;
+  async saveEntity(input: Partial<Entity>, base?: Partial<Entity>): Promise<Entity> {
+    if(!input.id||input.revision==null)return this.saveEntityOnce(input);
+    try{return await this.saveEntityOnce(input);}catch(e){if(!(e instanceof ApiError)||e.status!==409)throw e;
+      // a versao que a tela viu: a que ela passou, ou a copia com essa revisao que veio do servidor (lista, cache)
+      const seen=base||this.seenVersion(input.id,input.revision);if(!seen)throw e;
+      const current=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(input.id));return await this.saveEntityOnce(mergeOnConflict(input,seen,current));} }
+  private seen=new Map<string,Entity>();
+  private noteSeen(data:any){try{const add=(x:any)=>{if(x&&typeof x==='object'&&typeof x.id==='string'&&typeof x.revision==='number'&&x.data&&typeof x.data==='object'){const k=x.id+'@'+x.revision;if(!this.seen.has(k)){this.seen.set(k,JSON.parse(JSON.stringify(x)));if(this.seen.size>4000)this.seen.delete(this.seen.keys().next().value as string);}}};
+    add(data);for(const v of Object.values(data||{}))if(Array.isArray(v))for(const x of v.slice(0,2000))add(x);else if(v&&typeof v==='object')add(v);}catch{/* so memoria de apoio */}}
+  private seenVersion(id:string,revision:number):Entity|undefined{const k=id+'@'+revision;if(this.seen.has(k))return this.seen.get(k);
+    for(const [,v] of this.snapshots.all()){this.noteSeen(v);if(this.seen.has(k))return this.seen.get(k);}return undefined;}
+  private async saveEntityOnce(input: Partial<Entity>) { let body=input.data?await this.md.clean(input):input;let saved: Entity;
     // 0.3.227: se o servidor ainda nao conhece um campo novo (app atualizado antes do servidor), salva sem ele em vez de dar erro
     for(let attempt=0;;attempt++){try{saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');break;}
       catch(e){const m=/Campo não previsto: ([a-z_]+)/.exec(String((e as Error)?.message||''));const data=(body as {data?: Record<string, unknown>}).data;if(!m||attempt>=6||!data||!(m[1] in data))throw e;const next={...data};delete next[m[1]];body={...(body as object),data:next} as typeof body;}}if(['commitment','reminder'].includes(saved.kind))agendaChanged(this);systemChanged(this);return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }

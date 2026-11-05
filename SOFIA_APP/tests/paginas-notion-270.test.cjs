@@ -177,7 +177,51 @@ test('Título da página com a altura do texto (sem cortar e sem barrinha de rol
 
 test('RAIZ do Início "achatando": telas de fora ficam invisíveis com o tamanho real (nada mede 0)',()=>{
  const d=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopPages.tsx'),'utf8');
- assert.ok(d.includes("...(hidden?{visibility:'hidden',zIndex:0}:{zIndex:1})")&&d.includes("pointerEvents={hidden?'none':'auto'}"));
+ assert.ok(d.includes("...(hidden?{visibility:'hidden',opacity:0,zIndex:0}:{zIndex:1})")&&d.includes("pointerEvents={hidden?'none':'auto'}"));
  assert.ok(!d.includes("display:on?'flex':'none'"),'não esconde mais com display:none (que media tudo como 0)');
  assert.ok(fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeDeskCards.tsx'),'utf8').includes('if (h > 0) setListH(h);'));
+});
+
+// 05/11/2026: rodada notas/links/agenda/conflito
+const M=load('src/lib/merge-save.ts',{});
+test('salvar com copia velha junta: muda so o que a pessoa mexeu, mantem o resto do servidor',()=>{
+ const base={id:'x',revision:1,title:'Levar Edivaldo',content:'',data:{start_at:'2026-11-06T10:00',location:''}};
+ const current={id:'x',kind:'commitment',revision:3,title:'Levar Edivaldo',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],data:{start_at:'2026-11-06T10:00',location:'Clínica',notified:true}};
+ const input={...base,title:'Levar Edivaldo médico',data:{start_at:'2026-11-06T11:00',location:''}};
+ const out=M.mergeOnConflict(input,base,current);
+ assert.equal(out.revision,3);assert.equal(out.title,'Levar Edivaldo médico');assert.equal(out.data.start_at,'2026-11-06T11:00');
+ assert.equal(out.data.location,'Clínica');assert.equal(out.data.notified,true);
+ const partial=M.mergeOnConflict({id:'x',revision:1,state:'done'},{...base,state:'active'},current);assert.equal(partial.state,'done');assert.equal(partial.data.location,'Clínica');
+});
+test('api: conflito 409 busca a versao atual e salva de novo (com a copia que a tela viu)',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/lib/api.ts'),'utf8');
+ assert.match(src,/e\.status!==409/);assert.match(src,/mergeOnConflict\(input,seen,current\)/);assert.match(src,/this\.noteSeen\(data\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/workspace/EntityEditor.tsx'),'utf8'),/data:packed\},item\)/);
+});
+const L=load('src/lib/leaf-document.ts',{});
+test('links: endereco no texto vira link (sem a pontuacao do fim) e "Remover link" volta a texto',()=>{
+ const t='veja https://artlist.io/song/6000342 (PUBLICIDADE). e http://a.com/x.';
+ assert.deepEqual([...L.findLinks(t).map(l=>l.url)],['https://artlist.io/song/6000342','http://a.com/x']);
+ const b={id:'b',type:'text',text:t,marks:[]};const l=L.linkRanges(b)[0];assert.equal(L.linkRanges(L.unlinkRange(b,l.start,l.end)).length,1);
+});
+test('nota no site mostra o texto salvo (nao [object Object]) e tem camada de link + cartao Copiar/Remover',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/components/LeafEditor.tsx'),'utf8');
+ assert.match(src,/Platform\.OS==='web'\?\{value:b\.text\}:\{\}/);assert.match(src,/leaf-link-layer/);assert.match(src,/LinkHoverCard/);
+ const rich=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');
+ assert.match(rich,/findLinks\(text\)/);assert.match(rich,/position:static!important;visibility:inherit!important/);
+});
+test('notas: ⋯ em cada linha, menu pequeno, reordenar arrastando e faixa de tirar da pasta embaixo',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/components/NotebookBlock.tsx'),'utf8');
+ assert.match(src,/note-row-more/);assert.match(src,/openContextMenu\(x,y,noteItems/);assert.match(src,/r\.id\.startsWith\('note:'\)/);
+ assert.ok(src.indexOf("opened.pages.map(p=>noteCard(opened,p))")<src.indexOf("targets.current['__up__']"));
+ assert.doesNotMatch(src,/<Button title="Mover para outra pasta"/);
+});
+test('agenda dia: compromissos no mesmo horario ficam lado a lado',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/desktop/AgendaDesk.tsx'),'utf8');assert.match(src,/width: \(100 \/ L\.cols\) \+ '%'/);
+});
+test('mover pagina na lateral com a lista antiga (revisao velha) funciona: o plano usa a pagina atual',()=>{
+ const LM=load('src/lib/legacy-md.ts',{'./page-hierarchy':{canReparentPage:()=>true,pageParentId:p=>p.data.parent_id||''},'./page-order':{comparePageOrder:(a,b)=>(a.data.sort_order||0)-(b.data.sort_order||0)}});
+ const pg=(id,rev,parent='',o=0)=>({id,revision:rev,kind:'user_page',state:'active',data:{parent_id:parent,sort_order:o}});
+ const plan=LM.legacyMovePlan([pg('a',7,'',1),pg('b',1,'',2)],{id:'a',revision:3,parentId:'',kind:'after',anchorId:'b'});
+ assert.equal(plan.page.revision,7);assert.deepEqual([...plan.siblings.map(p=>p.id)],['b','a']);
 });

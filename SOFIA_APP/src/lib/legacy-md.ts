@@ -7,7 +7,9 @@ export type MoveInput={id:string;revision:number;parentId:string;kind:string;anc
 export function legacyMovePlan(pages:Entity[],input:MoveInput){
  const page=pages.find(p=>p.id===input.id),anchor=pages.find(p=>p.id===input.anchorId);
  if(!page||!anchor||page.id===anchor.id)throw Error('Página de origem ou destino indisponível.');
- if(page.revision!==input.revision)throw Error('A página mudou. Atualize a lista antes de mover.');
+ // 05/11/2026 (Pedro: "Nao foi possivel mover a pagina"): a lista lateral guarda a revisao de quando carregou e cada
+ // edicao da pagina sobe a revisao. Mover so troca pai e ordem e o plano ja usa a pagina lida agora do servidor (com a
+ // revisao atual), entao uma revisao antiga na lista nao e motivo para recusar.
  if(!['before','after','inside'].includes(input.kind)||!canReparentPage(pages,page.id,input.parentId))throw Error('Destino de página inválido.');
  if((input.kind==='inside'?anchor.id:pageParentId(anchor))!==input.parentId)throw Error('O destino mudou durante o arraste.');
  const siblings=pages.filter(p=>p.id!==page.id&&pageParentId(p)===input.parentId).sort(comparePageOrder);

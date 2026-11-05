@@ -161,11 +161,20 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
         {Array.from({length: 24}, (_, h) => <Pressable key={h} accessibilityRole="button" accessibilityLabel={'Clique para criar às ' + String(h).padStart(2, '0') + ':00'} onPress={() => p.onCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h), true) /* 05/11/2026 (Pedro: "quando clico nao esta abrindo pra criar"): no computador um clique cria; antes era so segurar, gesto do celular */} style={({pressed}: any) => ({position: 'absolute', left: 0, right: 0, top: h * HOUR, height: HOUR, borderTopWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.accentSoft : 'transparent'})}>
           <Text style={{position: 'absolute', left: p.compact ? -50 : -64, top: -8, width: p.compact ? 42 : 52, textAlign: 'right', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{String(h).padStart(2, '0')}:00</Text>
         </Pressable>)}
-        {timed.map(i => {
+        {(() => {
+          // 05/11/2026 (Pedro: compromissos no mesmo horario um em cima do outro): quem se cruza no tempo divide a largura
+          // em colunas lado a lado, como na agenda do Google; quem esta sozinho continua com a largura toda.
+          const minVis = (26 / HOUR) * 60, slots = timed.map(i => {const st = p.start(i), a = +new Date(st), dur = Math.max(15, (endOf(i, st) - a) / 60000); return {i, a, z: a + Math.max(dur, minVis) * 60000};}).sort((x, y) => x.a - y.a || y.z - x.z);
+          const lay = new Map<AgendaItem, {col: number; cols: number}>();let group: typeof slots = [], cols: number[] = [], groupEnd = -Infinity;
+          const flush = () => {const n = Math.max(1, cols.length); for (const g of group) lay.get(g.i)!.cols = n; group = []; cols = [];};
+          for (const sl of slots) {if (sl.a >= groupEnd) {flush(); groupEnd = -Infinity;} let col = cols.findIndex(end => end <= sl.a); if (col < 0) {col = cols.length; cols.push(sl.z);} else cols[col] = sl.z; lay.set(sl.i, {col, cols: 1}); group.push(sl); groupEnd = Math.max(groupEnd, sl.z);}
+          flush();
+          return timed.map(i => {
+          const L = lay.get(i) || {col: 0, cols: 1};
           const st = p.start(i), s = new Date(st), e = endOf(i, st), dur = Math.max(15, (e - +s) / 60000), y = (s.getHours() + s.getMinutes() / 60) * HOUR, h = (dur / 60) * HOUR, short = dur <= 48;
           const col = colorOf(i, c.accent), done = isTask(i) && isDone(i);
           return <Pressable key={i.id + (i as any).occurrence_start} accessibilityRole="button" accessibilityLabel={i.title + ', ' + hhmm(s)} onPress={() => p.onOpen(i)}
-            style={({hovered}: any) => ({position: 'absolute', left: 0, right: 0, top: y + 2, height: Math.max(22, h - 4), borderRadius: 9, borderLeftWidth: 3, borderColor: col, backgroundColor: tint(col, hovered ? 0.24 : 0.16), paddingHorizontal: 12, paddingVertical: short ? 0 : 7, justifyContent: short ? 'center' : 'flex-start', overflow: 'hidden', opacity: done ? 0.55 : 1})}>
+            style={({hovered}: any) => ({position: 'absolute', left: (L.col * 100 / L.cols) + '%' as any, width: (100 / L.cols) + '%' as any, paddingRight: L.cols > 1 ? 4 : 0, top: y + 2, height: Math.max(22, h - 4), borderRadius: 9, borderLeftWidth: 3, borderColor: col, backgroundColor: tint(col, hovered ? 0.24 : 0.16), paddingHorizontal: 12, paddingVertical: short ? 0 : 7, justifyContent: short ? 'center' : 'flex-start', overflow: 'hidden', opacity: done ? 0.55 : 1})}>
             <View style={{flexDirection: 'row', alignItems: short ? 'center' : 'flex-start'}}>
               {isTask(i) ? <Check i={i} /> : null}
               <View style={{flex: 1, minWidth: 0, flexDirection: short ? 'row' : 'column', alignItems: short ? 'baseline' : 'flex-start', gap: short ? 8 : 1}}>
@@ -174,7 +183,7 @@ function DayView({x, d}: {x: Ctx; d: Date}) {
               </View>
             </View>
           </Pressable>;
-        })}
+        });})()}
         {isToday ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: nowY, height: 2, backgroundColor: c.danger}}><View style={{position: 'absolute', left: -5, top: -4, width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger}} /></View> : null}
       </View>
     </ScrollView>
