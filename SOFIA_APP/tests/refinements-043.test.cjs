@@ -18,7 +18,9 @@ test('tasks filter by user areas and create/edit reuses the Library-style creata
  assert.ok(workspace.includes('Choice label="Filtrar por área"'));
  assert.ok(workspace.includes("const areaOptions=[...new Set([...areas,...items.map(t=>t.area?.trim()||'Pessoal')])"));
  assert.ok(workspace.includes('<Choice creatable label="Área da tarefa"'));
- assert.ok(workspace.includes('options={areaOptions.map(value=>({value,label:value}))}'));
- assert.ok(workspace.includes('Escolha uma área existente ou pesquise e crie uma nova.'));
+ // 05/11/2026 (Pedro): no editor so as areas criadas pela pessoa (criar salva na lista; × tira da lista)
+ assert.ok(workspace.includes("options={[...new Set([editing.area||'',...myAreas])].filter(Boolean).map(value=>({value,label:value}))}"));
+ assert.ok(workspace.includes('onCreate={v=>{setMyAreas(')&&workspace.includes("api.areaChange({add:v})"));
+ assert.ok(workspace.includes('Só aparecem as áreas que você criou.'));
  assert.ok(workspace.includes("area:areaFilter||'Pessoal'"));
 });

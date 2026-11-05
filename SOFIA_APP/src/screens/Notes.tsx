@@ -105,7 +105,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     const all = [...new Set([...(curTag ? [curTag.name] : []), ...tg.map(t => tagBy(t)?.name || t)])];
     const locked = all.map(tagBy).find(t => t?.lock);
     if (locked && !unlocked(locked.key)) { toast('Abra "' + locked.name + '" com a senha antes de criar notas nela.'); return; }
-    let body: Partial<Entity> = {kind: 'annotation', title: title.slice(0, 240), content: '', area: 'Notas', privacy: 'private', state: 'saved', tags: all.map(t => 'cat:' + t), data: {pinned: view === 'pinned'}};
+    let body: Partial<Entity> = {kind: 'annotation', title: title.slice(0, 240), content: '', area: 'Pessoal', privacy: 'private', state: 'saved', tags: all.map(t => 'cat:' + t), data: {pinned: view === 'pinned'}};
     if (locked) { const s = await sealNote(body as Entity, locked.name, title, ''); if (s) body = s; }
     const saved = await save(body); if (!saved) return;
     if (locked) setPlain(p => ({...p, [saved.id]: {title, body: ''}}));
@@ -129,7 +129,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     openMore(e, n.title || 'Nota', [
       {label: 'Abrir como página', icon: 'book', run: () => void (async () => { const blocks = n.body.split(/\n{2,}/).filter(Boolean).map((t, i) => ({id: 'b' + Date.now() + i, type: 'text', text: t})); const pg = await save({kind: 'user_page', title: n.title || 'Sem título', content: n.body, area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {node_type: 'space', blocks_json: JSON.stringify(blocks)}}); if (pg) toast('Página "' + pg.title + '" criada em Páginas.'); })()},
       {label: 'Criar tarefa', icon: 'checklist', run: () => void api.saveTask({title: n.title || 'Sem título', state: 'todo', description: n.body.slice(0, 4000)}).then(() => toast('Tarefa criada em Tarefas.')).catch(err => toast(errorText(err)))},
-      {label: 'Lembrar amanhã às 9:00', icon: 'bell', run: () => void (async () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); const r = await save({kind: 'reminder', title: n.title || 'Nota', content: '', area: 'Lembretes', privacy: 'private', state: 'active', tags: [], data: {remind_at: d.toISOString(), message: n.lockTag ? '' : n.body.slice(0, 300), location: ''}}); if (r) toast('Lembrete criado para amanhã às 9:00.', [{label: 'Desfazer', run: () => void api.deleteEntity(r.id)}]); })()},
+      {label: 'Lembrar amanhã às 9:00', icon: 'bell', run: () => void (async () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); const r = await save({kind: 'reminder', title: n.title || 'Nota', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {remind_at: d.toISOString(), message: n.lockTag ? '' : n.body.slice(0, 300), location: ''}}); if (r) toast('Lembrete criado para amanhã às 9:00.', [{label: 'Desfazer', run: () => void api.deleteEntity(r.id)}]); })()},
       {label: 'Copiar', icon: 'copy', run: () => void Clipboard.setStringAsync((n.title ? n.title + '\n\n' : '') + n.body).then(() => toast('Nota copiada.'))},
       {label: n.pinned ? 'Desafixar' : 'Fixar', icon: 'pin', run: () => void update(n, {pinned: !n.pinned})},
       {label: n.archived ? 'Desarquivar' : 'Arquivar', icon: 'box', run: () => { void update(n, {archived: !n.archived}); if (!n.archived) { setOpenId(null); toast('Nota arquivada.', [{label: 'Desfazer', run: () => void update({...n, archived: true}, {archived: false})}]); } }},
@@ -144,7 +144,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     let key: Uint8Array | null = prev ? keys.current.get(prev.key) || null : null;
     if (password) { const made = await newLock(password); lockJson = JSON.stringify(made.lock); key = made.key; }
     if (removeLock) lockJson = '';
-    const ent = prev?.e ? await save({...prev.e, title: nameClean, data: {...prev.e.data, color, lock_json: lockJson}, revision: prev.e.revision}) : await save({kind: 'note_tag', title: nameClean, content: '', area: 'Notas', privacy: 'private', state: 'active', tags: [], data: {color, lock_json: lockJson}});
+    const ent = prev?.e ? await save({...prev.e, title: nameClean, data: {...prev.e.data, color, lock_json: lockJson}, revision: prev.e.revision}) : await save({kind: 'note_tag', title: nameClean, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {color, lock_json: lockJson}});
     if (!ent) return;
     const k = tagKey(nameClean); if (prev && prev.key !== k) keys.current.delete(prev.key); if (key && lockJson) keys.current.set(k, key);
     // renomear: as notas acompanham; proteger: as notas da etiqueta passam a ser cifradas; tirar a senha: voltam a ser texto

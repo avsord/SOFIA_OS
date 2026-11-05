@@ -17,6 +17,8 @@ import {openContextMenu,contextMenu} from '../components/ContextMenu';
 import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
 import {systemChanged,subscribeSystemChanged} from '../lib/system-events';
+import {useHoverHold} from '../lib/hover-hold';
+import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
@@ -55,8 +57,8 @@ function usePageDirectory(api:SofiaApi){
 }
 
 function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onToggle,expanded,hasChildren,hint,testID,menu,onAdd,drop,dragRef,dimmed}:{icon?:IconName;emoji?:string;label:string;selected?:boolean;onPress:()=>void;depth?:number;collapsed?:boolean;trailing?:string;onToggle?:()=>void;expanded?:boolean;hasChildren?:boolean;hint?:string;testID?:string;menu?:()=>MenuItem[];onAdd?:()=>void;drop?:'before'|'after'|'inside'|null;dragRef?:(node:any)=>void;dimmed?:boolean}){
- const c=useTheme(),[hover,setHover]=useState(false);
- return <Pressable ref={dragRef as any} testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress} onHoverIn={()=>setHover(true)} onHoverOut={()=>setHover(false)} {...(menu?contextMenu(menu):{})}
+ const c=useTheme(),hold=useHoverHold(),hover=hold.on;
+ return <Pressable ref={dragRef as any} testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress} onHoverIn={hold.enter} onHoverOut={hold.leave} {...(menu?contextMenu(menu):{})}
   style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:32,paddingLeft:collapsed?0:8+depth*14,paddingRight:8,justifyContent:collapsed?'center':'flex-start',marginHorizontal:8,borderRadius:8,backgroundColor:drop==='inside'?c.accent+'40':selected?c.accentSoft:hovered?c.line+'80':'transparent',opacity:dimmed?0.45:1,borderTopWidth:2,borderBottomWidth:2,borderTopColor:drop==='before'?c.accent:'transparent',borderBottomColor:drop==='after'?c.accent:'transparent'})}>
   {onToggle?<Pressable accessibilityRole="button" accessibilityLabel={(expanded?'Recolher ':'Abrir ')+label} onPress={onToggle} hitSlop={6} style={{width:16,height:16,alignItems:'center',justifyContent:'center',opacity:hasChildren?1:0.35}}><View style={{...({transitionProperty:'transform',transitionDuration:'160ms',transitionTimingFunction:'ease-out'} as any),transform:[{rotate:expanded?'90deg':'0deg'}]}}><Icon name="chevron" size={13} color={c.muted}/></View></Pressable>:null}
   {emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{emoji}</Text>:icon?<Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>:null}
@@ -65,8 +67,8 @@ function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onTog
   {!collapsed&&trailing?<Text style={{color:c.muted,fontSize:11}}>{trailing}</Text>:null}
   {/* 0.3.267: como no Notion, ⋯ e + aparecem ao passar o mouse na página da barra lateral */}
   {!collapsed&&(menu||onAdd)?<View style={{flexDirection:'row',gap:2,opacity:hover?1:0}}>
-   {menu?<Pressable testID={testID?testID+'-more':undefined} accessibilityRole="button" accessibilityLabel={'Mais ações para '+label} onPress={(e:any)=>{const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.left:(e?.nativeEvent?.pageX??0),r?r.bottom+4:(e?.nativeEvent?.pageY??0),menu());}} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="more" size={15} color={c.muted}/></Pressable>:null}
-   {onAdd?<Pressable testID={testID?testID+'-add':undefined} accessibilityRole="button" accessibilityLabel={'Nova subpágina em '+label} onPress={onAdd} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>:null}
+   {menu?<Pressable testID={testID?testID+'-more':undefined} accessibilityRole="button" accessibilityLabel={'Mais ações para '+label} onHoverIn={hold.enter} onHoverOut={hold.leave} onPress={(e:any)=>{const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.left:(e?.nativeEvent?.pageX??0),r?r.bottom+4:(e?.nativeEvent?.pageY??0),menu());}} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="more" size={15} color={c.muted}/></Pressable>:null}
+   {onAdd?<Pressable testID={testID?testID+'-add':undefined} accessibilityRole="button" accessibilityLabel={'Nova subpágina em '+label} onHoverIn={hold.enter} onHoverOut={hold.leave} onPress={onAdd} style={({hovered:h}:any)=>({width:22,height:22,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>:null}
   </View>:null}
  </Pressable>;
 }
@@ -126,10 +128,12 @@ function UpcomingEvents({api,onOpen}:{api:SofiaApi;onOpen:()=>void}){
  const c=useTheme(),[items,setItems]=useState<{id:string;title:string;when:string;at:number}[]|null>(null);
  useEffect(()=>{let alive=true;const load=async()=>{try{const now=new Date(),month=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),next=new Date(now.getFullYear(),now.getMonth()+1,1);
    const lists=await Promise.all([api.agenda(month(now)),api.agenda(month(next)).catch(()=>({items:[]}))]);const seen=new Set<string>(),out:{id:string;title:string;when:string;at:number}[]=[];
-   for(const it of lists.flatMap(l=>l.items||[])){if(seen.has(it.id)||it.state==='done'||it.state==='archived')continue;seen.add(it.id);const start=it.data?.start_at||it.data?.remind_at||it.data?.due_at;if(!start)continue;const t=new Date(start);if(Number.isNaN(t.getTime())||t.getTime()<Date.now()-30*60000)continue;
+   // mesma leitura da Agenda e do Início: repetições expandidas e dia inteiro pela data (sem virar 03:00/21:00 pelo fuso)
+   const base=[...new Map(lists.flatMap(l=>l.items||[]).map(i=>[i.id,i])).values()];
+   for(const it of expandForHome(base)){const start=eventStart(it),key=it.id+'|'+start;if(!start||seen.has(key)||it.state==='done'||it.state==='archived')continue;seen.add(key);const allDay=!!it.data?.calendar_all_day||/^\d{4}-\d{2}-\d{2}$/.test(start);const t=allDay?new Date(start.slice(0,10)+'T12:00:00'):new Date(start);if(Number.isNaN(t.getTime())||(allDay?t.getTime()+12*3600000<Date.now():t.getTime()<Date.now()-30*60000))continue;
     const end=it.data?.end_at?new Date(it.data.end_at):null,hm=(d:Date)=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),today=t.toDateString()===now.toDateString();
-    const when=it.data?.calendar_all_day?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t)+(end&&!Number.isNaN(end.getTime())?' – '+hm(end):''):t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
-    out.push({id:it.id,title:it.title||'Sem título',when,at:t.getTime()});}
+    const when=allDay?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t)+(end&&!Number.isNaN(end.getTime())?' – '+hm(end):''):t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
+    out.push({id:key,title:it.title||'Sem título',when,at:allDay?t.getTime()-12*3600000:t.getTime()});}
    out.sort((a,b)=>a.at-b.at);if(alive)setItems(out.slice(0,6));}catch{if(alive)setItems([]);}};
   void load();const off=subscribeSystemChanged(owner=>{if(owner===api)void load();});const timer=setInterval(()=>void load(),5*60000);return()=>{alive=false;off();clearInterval(timer);};},[api]);
  if(!items||!items.length)return null;

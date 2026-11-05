@@ -110,3 +110,19 @@ test('Barra lateral: arrastar página, favoritos e próximos eventos',()=>{
  assert.ok(d.includes('testID="sidebar-drag-ghost"')&&d.includes("kind:f<0.28?'before':f>0.72?'after':'inside'"));
  assert.ok(d.includes('<Section title="Favoritos">')&&d.includes('<Section title="Próximos eventos">'));
 });
+
+test('Prints de 05/11 à noite: botões que sumiam, linha do tempo, Agenda, + minimalista e áreas só da pessoa',()=>{
+ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+ const pg=read('src/screens/Pages.tsx'),shell=read('src/desktop/DesktopShell.tsx'),home=read('src/desktop/HomeBrief.tsx'),agenda=read('src/desktop/AgendaDesk.tsx');
+ assert.ok(read('src/lib/hover-hold.ts').includes('export function useHoverHold'),'hover que não some ao ir para o botão');
+ assert.ok(pg.includes('onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={e=>openAppearance(\'cover\',e)}'));
+ assert.ok(pg.includes('opacity:rowHover.key===b.id||menuOpen?1:0')&&pg.includes('opacity:headHover.on?1:0'));
+ assert.ok(shell.includes('hold=useHoverHold()'));
+ assert.ok(home.includes('export function timelineRange(')&&!home.includes('Math.min(24 * 3 - spanRef.current'),'linha do tempo passa de 3 dias');
+ assert.ok(agenda.includes("accessibilityLabel={'Clique para criar às '"),'um clique cria na Agenda do computador');
+ assert.ok(pg.includes('testID="page-start-bar"')&&pg.includes('if(desktop)void create();else setCreateParent(null);'),'+ cria direto');
+ assert.ok(pg.includes('{preview?null:aiBox(block)}')&&!pg.includes("position:'absolute',top:lineH+6,left:0,right:0,zIndex:60"),'caixa da Sofia no fluxo do texto');
+ assert.ok(shell.includes('expandForHome(base)'),'próximos eventos com a mesma leitura da Agenda');
+ const ed=read('src/screens/workspace/EntityEditor.tsx');assert.ok(ed.includes("!(isAppointment&&f.key==='calendar_all_day')"),'"Dia inteiro" não aparece duas vezes');
+ for(const f of ['src/screens/Reminders.tsx','src/screens/Packages.tsx','src/components/NotificationCenter.tsx','src/screens/Notes.tsx'])assert.ok(!/area: *'(Lembretes|Encomendas|Notas)'/.test(read(f)),f+' não cria área com nome pronto');
+});

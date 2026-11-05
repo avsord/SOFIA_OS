@@ -31,14 +31,14 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
  const c=useTheme(),records=useWorkspaceRecords(api,'package','',true),[editing,setEditing]=useState<Partial<Entity>|null>(null),[viewing,setViewing]=useState<Entity|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{if(active)void records.load();else{setEditing(null);setViewing(null);}},[active,api]);
  const groups=useMemo(()=>splitPackages(records.items.filter(i=>i.state!=='archived')),[records.items]);
- function open(){setError('');setEditing({kind:'package',title:'',content:'',area:'Encomendas',privacy:'private',state:'active',tags:[],data:{code:'',carrier:'',status:'',last_event_at:'',events:'[]',checked_at:'',error:'',note:''}});}
+ function open(){setError('');setEditing({kind:'package',title:'',content:'',area:'Pessoal',privacy:'private',state:'active',tags:[],data:{code:'',carrier:'',status:'',last_event_at:'',events:'[]',checked_at:'',error:'',note:''}});}
  function patchData(patch:Record<string,any>){setEditing(old=>old?{...old,data:{...(old.data||{}),...patch}}:old);}
  async function save(){
   if(busy||!editing)return;const code=normalizeCode(String(editing.data?.code||''));if(code.length<8){setError('Digite o código de rastreio completo.');return;}
   setBusy(true);setError('');
   try{
    const carrier=detectCarrier(code);
-   const saved=await api.saveEntity({...editing,kind:'package',title:(editing.title||'').trim()||code,content:'',area:'Encomendas',privacy:'private',state:'active',tags:[],data:{...(editing.data||{}),code,carrier}});
+   const saved=await api.saveEntity({...editing,kind:'package',title:(editing.title||'').trim()||code,content:'',area:'Pessoal',privacy:'private',state:'active',tags:[],data:{...(editing.data||{}),code,carrier}});
    records.merge(saved);setEditing(null);
    void refresh(saved,true);
   }catch(e){setError(errorText(e));}finally{setBusy(false);}

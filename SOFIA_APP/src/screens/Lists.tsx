@@ -254,7 +254,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     if (oldTask) await api.deleteTask(oldTask).catch(() => {});
     if (!when) { await save({...meta, data: {...meta.data, remind_at: '', remind_agenda: false, remind_ref: ''}, revision: meta.revision}); setDialog(null); toast('Lembrete removido.'); return; }
     const title = 'Ir ' + (L.model === 'market' ? 'ao mercado' : 'às compras') + (L.model === 'market' ? '' : ': ' + L.name);
-    const rem = await save({kind: 'reminder', title, content: 'Abre a lista ' + L.name + ' em Listas.', area: 'Lembretes', privacy: 'private', state: 'active', tags: [], data: {remind_at: new Date(when).toISOString(), message: '', location: ''}});
+    const rem = await save({kind: 'reminder', title, content: 'Abre a lista ' + L.name + ' em Listas.', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {remind_at: new Date(when).toISOString(), message: '', location: ''}});
     let taskId = '';
     if (agenda) { try { const t = await api.saveTask({title, state: 'scheduled', due_at: new Date(when).toISOString()}); taskId = t.item.id; } catch (e) { toast(errorText(e)); } }
     await save({...meta, data: {...meta.data, remind_at: new Date(when).toISOString(), remind_agenda: agenda, remind_ref: (rem?.id || '') + '|' + taskId}, revision: meta.revision});

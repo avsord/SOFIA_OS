@@ -217,7 +217,7 @@ export function HomeBrief(p: HomeBriefProps) {
       for (const ev of pk.events || []) {const t = Date.parse(ev.at); if (Number.isFinite(t) && t >= from) out.push({id: 'p' + pk.id + ev.at, kind: 'package', at: new Date(t), title: pk.title, sub: ev.status, done: true});}
       if (pk.estimated && /^\d{4}-\d{2}-\d{2}/.test(pk.estimated)) out.push({id: 'pe' + pk.id, kind: 'package', at: new Date(pk.estimated.slice(0, 10) + 'T12:00:00'), title: pk.title, sub: 'previsão de entrega'});
     }
-    for (let k = 0; k < 3; k++) {
+    for (let k = -Math.min(7, timelineRange().back); k <= Math.min(30, timelineRange().ahead); k++) {
       const day = new Date(); day.setDate(day.getDate() + k);
       try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : hhmm(ds.date), done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
     }
@@ -241,7 +241,7 @@ export function HomeBrief(p: HomeBriefProps) {
     for (const r of timelineItems) if (r.isTask && new Date(r.date).toDateString() === key) {total++; if ((r.original as any)?.state === 'done') done++;}
     try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(shownDay))) {total++; if (ds.taken) done++;}} catch {/* sem rotina */}
     return {done, total};}, [timelineItems, p.data.capsules, shownDay]);
-  const dayWord = viewDay === 0 ? 'Hoje' : viewDay === 1 ? 'Amanhã' : shownDay.toLocaleDateString('pt-BR', {weekday: 'long'}).replace(/^./, ch => ch.toUpperCase()).replace('-feira', '');
+  const dayWord = viewDay === 0 ? 'Hoje' : viewDay === 1 ? 'Amanhã' : viewDay === -1 ? 'Ontem' : Math.abs(viewDay) <= 6 ? shownDay.toLocaleDateString('pt-BR', {weekday: 'long'}).replace(/^./, ch => ch.toUpperCase()).replace('-feira', '') : shownDay.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'short'}).replace(/^./, ch => ch.toUpperCase());
   const dayDate = shownDay.toLocaleDateString('pt-BR', {day: 'numeric', month: 'long'});
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
@@ -254,10 +254,10 @@ export function HomeBrief(p: HomeBriefProps) {
         <View style={{flex: 1}} />
         {/* 0.3.335: dia no meio do cabecalho, com setas para o dia anterior/seguinte (clicar no dia volta para hoje) */}
         <View testID="day-nav" style={{position: 'absolute', left: '50%' as any, top: 0, bottom: 0, transform: [{translateX: '-50%' as any}], flexDirection: 'row', alignItems: 'center', gap: 4} as any}>
-          <Pressable testID="day-prev" accessibilityRole="button" accessibilityLabel="Dia anterior" disabled={viewDay <= 0} onPress={() => dayNav.current?.go(viewDay - 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay <= 0 ? 0.3 : 1, backgroundColor: hovered && viewDay > 0 ? c.input : 'transparent', transform: [{rotate: '180deg'}]})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
+          <Pressable testID="day-prev" accessibilityRole="button" accessibilityLabel="Dia anterior" disabled={viewDay <= -timelineRange().back} onPress={() => dayNav.current?.go(viewDay - 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay <= -timelineRange().back ? 0.3 : 1, backgroundColor: hovered && viewDay > -timelineRange().back ? c.input : 'transparent', transform: [{rotate: '180deg'}]})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
           <Pressable testID="day-label" accessibilityRole="button" accessibilityLabel="Voltar para hoje (segure para criar)" onPress={() => dayNav.current?.go(0)} onLongPress={() => dayNav.current?.add?.()} delayLongPress={420} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}>
             <Text style={{fontSize: 14, fontWeight: '600', color: viewDay === 0 ? c.accent : c.text}}>{dayWord}</Text>{p.compact ? null : <Text style={{fontSize: 13, color: c.muted}}>{dayDate}</Text>}</Pressable>
-          <Pressable testID="day-next" accessibilityRole="button" accessibilityLabel="Próximo dia" disabled={viewDay >= 2} onPress={() => dayNav.current?.go(viewDay + 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay >= 2 ? 0.3 : 1, backgroundColor: hovered && viewDay < 2 ? c.input : 'transparent'})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
+          <Pressable testID="day-next" accessibilityRole="button" accessibilityLabel="Próximo dia" disabled={viewDay >= timelineRange().ahead} onPress={() => dayNav.current?.go(viewDay + 1)} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: viewDay >= timelineRange().ahead ? 0.3 : 1, backgroundColor: hovered && viewDay < timelineRange().ahead ? c.input : 'transparent'})}><Icon name="chevron" size={14} color={c.muted} /></Pressable>
         </View>
         {score.total ? <Text testID="day-score" style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums'], marginRight: 4}}>{p.compact ? '' : dayWord + ' · '}<Text style={{color: '#5FD3A2', fontWeight: '700'}}>{score.done} de {score.total} feitos</Text></Text> : null}
         <Pressable testID="timeline-gear" accessibilityRole="button" accessibilityLabel="Ajustar a linha do tempo" onPress={() => setGear(v => !v)} hitSlop={8} style={({hovered}: any) => ({width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered || gear ? c.input : 'transparent'})}><Icon name="settings" size={16} color={gear ? c.accent : c.muted} /></Pressable>
@@ -303,6 +303,9 @@ export function HomeBrief(p: HomeBriefProps) {
 /** Linha do tempo: 16 horas por vez, comecando nas 7h de hoje. A rodinha do mouse em cima dela anda pelas horas e
  * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
+/** 05/11/2026 (Pedro: "preciso de todas as datas na linha do tempo, quando ando no scroll fica limitado"): antes so
+ * hoje, amanha e depois; agora vai do dia 1 deste mes ao fim do mes seguinte ao proximo (os meses que o Inicio ja carrega). */
+export function timelineRange(now = new Date()): {back: number; ahead: number} {const end = new Date(now.getFullYear(), now.getMonth() + 3, 0); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); return {back: now.getDate() - 1, ahead: Math.max(2, Math.round((end.getTime() - today.getTime()) / 86400000))};}
 const SPAN_FULL = 16, SPAN_MIN = 4, REMIND = '#7FD1E8'; // cor dos lembretes na linha do tempo
 type BillMark = {id: string; title: string; date: string; amount: number; late: boolean};
 /** 0.3.311 (Pedro): cada area na linha do tempo do seu jeito. kind: bill (conta a pagar, losango ambar "$"), income
@@ -349,7 +352,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(homeOf(0, SPAN_FULL, nowHours())), target = useRef(homeOf(0, SPAN_FULL, nowHours())), raf = useRef<any>(null), dayRef = useRef(0), manualAt = useRef(0);
-  const clampStart = (v: number) => Math.max(0, Math.min(24 * 3 - spanRef.current, v)); // 0.3.338 (Pedro): rolar passa de um dia para o outro, liso
+  const clampStart = (v: number) => {const r = timelineRange(); return Math.max(-24 * r.back, Math.min(24 * (r.ahead + 1) - spanRef.current, v));}; // 0.3.338 (Pedro): rolar passa de um dia para o outro, liso
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
   const tween = useRef({from: startRef.current, t0: 0, ms: 380, home: false});
@@ -395,9 +398,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
   // 0.3.338: o dia do cabecalho e o que esta no meio da linha (rolando, ele troca sozinho ao passar da meia-noite)
-  const viewDay = Math.max(0, Math.min(2, Math.floor((start + SPAN / 2) / 24))); dayRef.current = viewDay;
+  const range = timelineRange(), viewDay = Math.max(-range.back, Math.min(range.ahead, Math.floor((start + SPAN / 2) / 24))); dayRef.current = viewDay;
   useEffect(() => {onDay?.(viewDay);}, [viewDay]);
-  const goDay = (d: number) => {const dd = Math.max(0, Math.min(2, d)); dayRef.current = dd; manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
+  const goDay = (d: number) => {const r = timelineRange(), dd = Math.max(-r.back, Math.min(r.ahead, d)); dayRef.current = dd; manualAt.current = dd ? Date.now() : 0; setPin(''); setHover(''); glide(homeOf(dd, spanRef.current, nowHours()), 520, true);};
   // 04/11/2026 (Pedro: "segurar na data tambem cria compromisso, tarefa ou lembrete"): abre o mesmo criador do clique na linha
   const addHere = () => {if (!(actions.sofia || actions.onAddAt)) return; const now = new Date(), fx = dayRef.current === 0 ? Math.max(0.02, Math.min(0.98, pos(now))) : 0.5; setPin(''); setHover(''); setGuide(null); setAdding({fx, at: dayRef.current === 0 ? new Date(Math.ceil(now.getTime() / 300000) * 300000) : snapDate(fx)});};
   if (nav) nav.current = {go: goDay, add: addHere};

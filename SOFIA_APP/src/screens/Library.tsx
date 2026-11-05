@@ -188,9 +188,9 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   async function runAction(it: {id: string; title: string; url: string; notes: string; links: Record<string, string>; e?: Entity}, action: string, when?: string): Promise<Record<string, string>> {
     const links = {...it.links};
     try {
-      if (action === 'monitor' && it.url) { const m = await save({kind: 'monitor', title: it.title.slice(0, 200), content: '', area: 'Monitoramento', privacy: 'private', state: 'active', tags: [], data: {method: 'product', variant: it.title.slice(0, 200), preferred_url: it.url, source_urls: '', discover: false, currency: 'BRL', interval_minutes: 360, new_low: true}}, true); /* 0.3.274: mesmo formato do Price Tracker (antes o servidor recusava: pedia um item de Comprar) */ if (m) { links.monitor = m.id; toast('O Price Tracker vai acompanhar o preço.'); } }
+      if (action === 'monitor' && it.url) { const m = await save({kind: 'monitor', title: it.title.slice(0, 200), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {method: 'product', variant: it.title.slice(0, 200), preferred_url: it.url, source_urls: '', discover: false, currency: 'BRL', interval_minutes: 360, new_low: true}}, true); /* 0.3.274: mesmo formato do Price Tracker (antes o servidor recusava: pedia um item de Comprar) */ if (m) { links.monitor = m.id; toast('O Price Tracker vai acompanhar o preço.'); } }
       if (action === 'schedule') { const d = when ? new Date(when) : (() => { const x = new Date(); x.setDate(x.getDate() + 1); x.setHours(20, 0, 0, 0); return x; })(); const t = await api.saveTask({title: it.title, state: 'scheduled', due_at: d.toISOString(), description: it.url}); links.task = t.item.id; toast('Na agenda: ' + d.toLocaleString('pt-BR', {weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) + '.'); }
-      if (action === 'remind') { const d = when ? new Date(when) : (() => { const x = new Date(); x.setDate(x.getDate() + 1); x.setHours(9, 0, 0, 0); return x; })(); const r = await save({kind: 'reminder', title: it.title, content: '', area: 'Lembretes', privacy: 'private', state: 'active', tags: [], data: {remind_at: d.toISOString(), message: it.url, location: ''}}, true); if (r) { links.reminder = r.id; toast('Lembrete criado.'); } }
+      if (action === 'remind') { const d = when ? new Date(when) : (() => { const x = new Date(); x.setDate(x.getDate() + 1); x.setHours(9, 0, 0, 0); return x; })(); const r = await save({kind: 'reminder', title: it.title, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {remind_at: d.toISOString(), message: it.url, location: ''}}, true); if (r) { links.reminder = r.id; toast('Lembrete criado.'); } }
       if (action === 'page') { const blocks = [{id: 'b' + Date.now(), type: 'text', text: [it.url, it.notes].filter(Boolean).join('\n\n') || it.title}]; const pg = await save({kind: 'user_page', title: it.title, content: it.notes, area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {node_type: 'space', blocks_json: JSON.stringify(blocks)}}, true); if (pg) { links.page = pg.id; toast('Página criada em Páginas.'); } }
     } catch (e) { toast(errorText(e)); }
     return links;
@@ -227,18 +227,18 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   async function saveType(edit: TypeDef | null, name: string, icon: IconName, model: string, statuses: string[], rating: boolean, fields: string[]) {
     const cfg = JSON.stringify({statuses, rating, fields});
     if (edit?.e) await save({...edit.e, title: name, data: {...edit.e.data, icon, config_json: cfg}, revision: edit.e.revision});
-    else if (edit?.builtin) await save({kind: 'library_type', title: name, content: '', area: 'Biblioteca', privacy: 'private', state: 'active', tags: [], data: {builtin: edit.builtin, icon, model: edit.builtin, config_json: cfg, position: edit.position === 999 ? types.indexOf(edit) : edit.position}});
-    else { const r = await save({kind: 'library_type', title: name, content: '', area: 'Biblioteca', privacy: 'private', state: 'active', tags: [], data: {builtin: '', icon, model, config_json: cfg, position: types.length}}); if (r) setView('type:' + r.id); }
+    else if (edit?.builtin) await save({kind: 'library_type', title: name, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {builtin: edit.builtin, icon, model: edit.builtin, config_json: cfg, position: edit.position === 999 ? types.indexOf(edit) : edit.position}});
+    else { const r = await save({kind: 'library_type', title: name, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {builtin: '', icon, model, config_json: cfg, position: types.length}}); if (r) setView('type:' + r.id); }
     setTypeDialog(null);
   }
   async function reorder(ids: string[]) {
     for (let i = 0; i < ids.length; i++) { const t = types.find(x => x.id === ids[i]); if (!t || t.area) continue; if (t.e) { if (Number(t.e.data?.position) !== i) await save({...t.e, data: {...t.e.data, position: i}, revision: t.e.revision}, true); }
-      else if (t.builtin) await save({kind: 'library_type', title: t.name, content: '', area: 'Biblioteca', privacy: 'private', state: 'active', tags: [], data: {builtin: t.builtin, icon: t.icon, model: t.builtin, config_json: '', position: i}}, true); }
+      else if (t.builtin) await save({kind: 'library_type', title: t.name, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {builtin: t.builtin, icon: t.icon, model: t.builtin, config_json: '', position: i}}, true); }
   }
   async function setTypeFlag(t: TypeDef, flag: 'pinned' | 'in_more', value: boolean) {
     if (t.area) return;
     if (t.e) await save({...t.e, data: {...t.e.data, [flag]: value}, revision: t.e.revision}, true);
-    else await save({kind: 'library_type', title: t.name, content: '', area: 'Biblioteca', privacy: 'private', state: 'active', tags: [], data: {builtin: t.builtin || '', icon: t.icon, model: t.builtin || 'blank', config_json: '', position: types.indexOf(t), [flag]: value}}, true);
+    else await save({kind: 'library_type', title: t.name, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {builtin: t.builtin || '', icon: t.icon, model: t.builtin || 'blank', config_json: '', position: types.indexOf(t), [flag]: value}}, true);
   }
 
   /* ---------- entradas: N, Ctrl+V, arrastar arquivo, Ctrl+K ---------- */

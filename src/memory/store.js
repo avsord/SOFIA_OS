@@ -73,6 +73,8 @@ class Store {
   close() { if (this.db.isOpen) { this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); this.db.close(); } }
   audit(event, entityId = null) { this.db.prepare('INSERT INTO audit VALUES (?,?,?,?)').run(id(), event, entityId, now()); }
   settings() { return Object.fromEntries(this.db.prepare('SELECT * FROM settings').all().map(r => [r.key, JSON.parse(r.value)])); }
+  /** Areas criadas pela pessoa. Ainda sem lista guardada: so "Pessoal" (o padrao de sempre). */
+  userAreas() { const v = this.settings().userAreas; return Array.isArray(v) && v.length ? v.map(String) : ['Pessoal']; }
   updateSettings(input) {
     const updates = {};
     if (input.privacyMode !== undefined) {
@@ -96,6 +98,8 @@ class Store {
     if(input.userNavWidgets!==undefined){const allowed=new Set(['lists','library']);if(!Array.isArray(input.userNavWidgets)||input.userNavWidgets.some(x=>!allowed.has(x)))throw new AppError('INVALID_SETTING','Widgets de navegação inválidos.');updates.userNavWidgets=[...new Set(input.userNavWidgets)];}
     if(input.listViews!==undefined){const allowed=new Set(['market','pharmacy','purchase','blackfriday','monitor']);if(!Array.isArray(input.listViews)||input.listViews.some(x=>!allowed.has(x)))throw new AppError('INVALID_SETTING','Listas padrão inválidas.');updates.listViews=[...new Set(input.listViews)];}
     if(input.libraryViews!==undefined){if(!Array.isArray(input.libraryViews)||input.libraryViews.length>30||input.libraryViews.some(x=>typeof x!=='string'||x.length>80))throw new AppError('INVALID_SETTING','Categorias da Biblioteca inválidas.');updates.libraryViews=[...new Set(input.libraryViews)];}
+    // 05/11/2026 (Pedro): areas so existem se a pessoa criar; a lista fica aqui (sem nomes inventados pela IA)
+    if(input.userAreas!==undefined){if(!Array.isArray(input.userAreas)||input.userAreas.length>60)throw new AppError('INVALID_SETTING','Lista de áreas inválida.');const seen=new Set(),out=[];for(const raw of input.userAreas){const a=cleanText(String(raw??''),'Área',60);const k=a.toLocaleLowerCase('pt-BR');if(!seen.has(k)){seen.add(k);out.push(a);}}updates.userAreas=out;}
     if(input.profileName!==undefined){updates.profileName=cleanText(input.profileName,'Nome do perfil',80);}
     if(input.profileEmail!==undefined){const email=cleanText(input.profileEmail,'E-mail do perfil',160);if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new AppError('INVALID_EMAIL','Informe um e-mail válido.');updates.profileEmail=email;}
 

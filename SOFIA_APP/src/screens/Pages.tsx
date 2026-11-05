@@ -22,6 +22,7 @@ import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {blocksFromMarkdown,TEXT_BLOCKS,splitBlock,backspaceAtStart,deleteAtEnd,markdownShortcut,slashMatches,slashStart,applySlash,pastedLines,listNumber,neighbourText} from '../lib/page-block-keys';
 import type {Caret} from '../lib/page-block-keys';
 import {flushNow} from '../lib/flush-sync';
+import {useHoverHold,useHoverKey} from '../lib/hover-hold';
 import {PageRichInput,textToHtml} from '../components/PageRichInput';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
@@ -37,7 +38,7 @@ import {comparePageOrder} from '../lib/page-order';
 import type {PageDrop} from '../lib/page-order';
 import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
-import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
+import {PAGE_TEMPLATES,freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
@@ -146,7 +147,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const handledOpen=useRef(0);
  useEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;const page=byId.get(openPageId);if(!page)return;handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
  const handledCreate=useRef(0);
- useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}setCreateParent(null);},[createPageKey,ready]);
+ useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}if(desktop)void create();else setCreateParent(null);},[createPageKey,ready]);
  useEffect(()=>{if(Platform.OS!=='web')return;const trail:{id:string;title:string}[]=[];let cur=selectedId?byId.get(selectedId):undefined;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&trail.length<40){seen.add(cur.id);trail.unshift({id:cur.id,title:cur.title||'Sem título'});cur=byId.get(String(cur.data?.parent_id||''));}const prev=pagePath.get();if(prev.length!==trail.length||prev.some((x,i)=>x.id!==trail[i].id||x.title!==trail[i].title))pagePath.set(trail);},[selectedId,byId]);
  useEffect(()=>{if(ready&&selectedId&&!byId.has(selectedId)&&store.get(selectedId)?.state==='saved'){history.current=history.current.filter(id=>byId.has(id));setSelectedId(null);setFocus(null);}},[ready,selectedId,byId,store]);
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
@@ -156,7 +157,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 0.3.267: editor no estilo Notion no computador (web): Enter divide, Backspace junta, setas entre blocos, menu "/",
  // atalhos markdown e colar várias linhas. No celular o teclado continua como antes.
  const webKeys=Platform.OS==='web';
- const appearanceAnchor=useRef<{x:number;y:number}|null>(null);
+ const appearanceAnchor=useRef<{x:number;y:number}|null>(null),rowHover=useHoverKey(),headHover=useHoverHold();
+ // botões da capa: o hover da capa não conta quando o mouse está em cima deles; o estado é controlado à mão
+ const [coverHover,setCoverHoverRaw]=useState(false),coverHoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const coverHoverOn=()=>{if(coverHoverTimer.current)clearTimeout(coverHoverTimer.current);coverHoverTimer.current=null;setCoverHoverRaw(true);};
+ const coverHoverOff=()=>{if(coverHoverTimer.current)clearTimeout(coverHoverTimer.current);coverHoverTimer.current=setTimeout(()=>setCoverHoverRaw(false),160);};
  // 0.3.267 (computador): topo da página como no Notion (Editada…, copiar link, favorito) e "↑ Topo" no centro em páginas longas
  const favorites=useStore(favoritePages),[showTop,setShowTop]=useState(false),showTopRef=useRef(false),docScroll=useRef<ScrollView>(null),[flash,setFlash]=useState('');
  useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path!==next)w.history?.replaceState?.(w.history.state,'',next);}catch{/* sem endereço */}},[selectedId,active]);
@@ -265,13 +270,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </View>;
  }
  // 0.3.267 (computador): barra que aparece ao selecionar texto, como no Notion (print do Pedro)
- const [bar,setBar]=useState<{id:string;x:number;y:number;text:string}|null>(null),[barMenu,setBarMenu]=useState<'type'|'color'|'link'|null>(null),[linkUrl,setLinkUrl]=useState('');
+ const [bar,setBar]=useState<{id:string;x:number;y:number;bottom:number;text:string}|null>(null),[barMenu,setBarMenu]=useState<'type'|'color'|'link'|null>(null),[linkUrl,setLinkUrl]=useState('');
  const barRange=useRef<any>(null),barRef=useRef<any>(null);
  useEffect(()=>{if(!webKeys||!active)return;const d=(globalThis as any).document;if(!d)return;
   const on=()=>{const sel=d.getSelection();if(barMenu==='link'&&barRef.current?.contains?.(d.activeElement))return;
    if(!sel||sel.isCollapsed||!sel.rangeCount){setBar(null);setBarMenu(null);return;}const host=(sel.anchorNode?.nodeType===1?sel.anchorNode:sel.anchorNode?.parentElement)?.closest?.('[data-testid^="page-rich-"]');
    if(!host||!host.contains(sel.focusNode)){setBar(null);return;}const r=sel.getRangeAt(0).getBoundingClientRect();barRange.current=sel.getRangeAt(0).cloneRange();
-   setBar({id:String(host.getAttribute('data-testid')).replace('page-rich-',''),x:r.left+r.width/2,y:r.top,text:sel.toString()});};
+   setBar({id:String(host.getAttribute('data-testid')).replace('page-rich-',''),x:r.left+r.width/2,y:r.top,bottom:r.bottom,text:sel.toString()});};
   d.addEventListener('selectionchange',on);return()=>d.removeEventListener('selectionchange',on);},[webKeys,active,barMenu]);
  function keepSelection(node:any){barRef.current=node;if(!node||node.__keep)return;node.__keep=true;node.addEventListener('mousedown',(e:MouseEvent)=>{const t=e.target as HTMLElement;if(t?.tagName!=='INPUT')e.preventDefault();});}
  function restoreBarRange(){const d=(globalThis as any).document,r=barRange.current;if(!d||!r)return;const sel=d.getSelection();sel.removeAllRanges();sel.addRange(r);}
@@ -283,12 +288,15 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const SKILLS:[string,string][]=[['Melhorar escrita','Reescreva o trecho selecionado melhorando a escrita, no mesmo tom.'],['Revisão','Revise ortografia e gramática do trecho selecionado e devolva o texto corrigido.'],['Explicar','Explique o trecho selecionado de forma simples e curta.'],['Reformatar','Reorganize o trecho selecionado em tópicos claros.']];
  function richBar(){
   if(!bar||!desktop)return null;const b=currentBlocks().find(x=>x.id===bar.id);if(!b)return null;const vw=typeof window!=='undefined'?window.innerWidth:1200;
-  const W=300,left=Math.max(12,Math.min(bar.x-W/2,vw-W-12)),top=Math.max(64,bar.y-8);
+  const vh=typeof window!=='undefined'?window.innerHeight:800,W=300,left=Math.max(12,Math.min(bar.x-W/2,vw-W-12));
+  // cabe em cima (~370 px com a Sofia)? senão abre embaixo da seleção; se ainda faltar, rola por dentro
+  const above=bar.y-80>=370,maxH=above?bar.y-80:Math.max(200,vh-bar.bottom-20);
   const tool=(label:string,run:()=>void,child:React.ReactNode,on=false)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered}:any)=>({minWidth:30,height:30,paddingHorizontal:6,borderRadius:6,alignItems:'center',justifyContent:'center',backgroundColor:hovered||on?c.input:'transparent'})}>{child}</Pressable>;
   const typeLabel=(slashMatches('').find(x=>x.type===b.type)?.label)||'Texto';
-  return <View ref={keepSelection} testID="page-format-bar" style={{position:'fixed' as any,left,top,width:W,transform:[{translateY:-8},{translateY:'-100%' as any}],zIndex:9500,borderRadius:12,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,padding:6,shadowColor:'#000',shadowOpacity:0.32,shadowRadius:22,shadowOffset:{width:0,height:10},gap:4}}>
+  return <View ref={keepSelection} testID="page-format-bar" style={{position:'fixed' as any,left,...(above?{bottom:vh-bar.y+8}:{top:bar.bottom+8}),width:W,maxHeight:maxH,zIndex:9500,borderRadius:12,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,shadowColor:'#000',shadowOpacity:0.32,shadowRadius:22,shadowOffset:{width:0,height:10},overflow:'hidden'}}>
+   <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:maxH}} contentContainerStyle={{padding:6,gap:4}}>
    <Pressable accessibilityRole="button" accessibilityLabel="Transformar em" onPress={()=>setBarMenu(m=>m==='type'?null:'type')} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:32,paddingHorizontal:8,borderRadius:6,backgroundColor:hovered||barMenu==='type'?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,fontWeight:'600',width:16}}>T</Text><Text style={{flex:1,color:c.text,fontSize:13}}>{typeLabel==='Texto'?'Texto normal':typeLabel}</Text><Text style={{color:c.muted,fontSize:13}}>›</Text></Pressable>
-   {barMenu==='type'?<View style={{borderTopWidth:1,borderBottomWidth:1,borderColor:c.line,paddingVertical:4}}>{slashMatches('').filter(x=>TEXT_BLOCKS.has(x.type)).map(x=><Pressable key={x.type} onPress={()=>{updateBlock(b,{type:x.type});setBarMenu(null);}} style={({hovered}:any)=>({flexDirection:'row',gap:8,paddingHorizontal:8,paddingVertical:5,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{width:22,color:c.muted,fontSize:12,fontWeight:'600'}}>{x.icon}</Text><Text style={{color:c.text,fontSize:13}}>{x.label}</Text></Pressable>)}</View>:null}
+   {barMenu==='type'?<View style={{borderTopWidth:1,borderBottomWidth:1,borderColor:c.line,paddingVertical:4}}>{slashMatches('').filter(x=>TEXT_BLOCKS.has(x.type)).map(x=><Pressable key={x.type} onPress={()=>{updateBlock(b,{type:x.type});setBarMenu(null);}} style={({hovered}:any)=>({flexDirection:'row',gap:8,paddingHorizontal:8,paddingVertical:5,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text numberOfLines={1} style={{width:28,color:c.muted,fontSize:12,fontWeight:'600'}}>{x.icon}</Text><Text style={{color:c.text,fontSize:13}}>{x.label}</Text></Pressable>)}</View>:null}
    <View style={{height:1,backgroundColor:c.line}}/>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:2}}>
     {tool('Cor',()=>setBarMenu(m=>m==='color'?null:'color'),<View style={{width:20,height:20,borderRadius:4,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.text,fontSize:12,fontWeight:'700'}}>A</Text></View>,barMenu==='color')}
@@ -313,6 +321,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <Text style={{color:c.muted,fontSize:11,paddingHorizontal:8,paddingTop:2}}>Sofia</Text>
    {SKILLS.map(([label,prompt])=><Pressable key={label} accessibilityRole="button" onPress={()=>{const quote=bar.text;setBar(null);void askSofia(prompt,b.id,quote);}} style={({hovered}:any)=>({paddingHorizontal:8,paddingVertical:6,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
    <Pressable accessibilityRole="button" onPress={()=>{const quote=bar.text;setBar(null);setAiText('');setAi({id:b.id,busy:false,error:'',quote});}} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:8,paddingVertical:6,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Icon name="sofia" size={15} color={c.accent}/><Text style={{color:c.text,fontSize:13}}>Editar com a Sofia</Text></Pressable>
+   </ScrollView>
   </View>;
  }
  const htmlOfBlock=(x:PageBlock)=>x.html?String(x.html):textToHtml(String(x.text||''));
@@ -381,7 +390,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
   const preset=template?freshTemplate(template):null;
   const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
-   icon:'',icon_mode:'default',cover_type:'preset',cover_value:PAGE_COVERS[0][1],cover_attachment_id:'',
+   icon:'',icon_mode:'default',cover_type:desktop?'':'preset',cover_value:desktop?'':PAGE_COVERS[0][1],cover_attachment_id:'',
    purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
   }});
   if(!mounted.current)return;mutationEpoch.current++;setPages(old=>[...old,saved]);open(saved);
@@ -440,8 +449,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  }
  function blockView(b:PageBlock,i:number,preview=false,bodyGuide=showBodyGuide,blockFocus=focus){
   if(b.type==='page_link'){const target=byId.get(String(b.data?.page_id||''));if(!target)return <View key={b.id}/>;
-   return <View key={b.id} testID={'page-block-'+b.id} style={{position:'relative'}}>{pageLinkView(target,b.id,b)}
-    {desktop&&!preview?<Pressable accessible={false} style={{position:'absolute',left:-48,top:4,width:44,height:26}}>{({hovered}:any)=><View style={{flexDirection:'row',justifyContent:'flex-end',opacity:hovered?1:0}}><Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={{width:20,height:26,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable></View>}</Pressable>:null}
+   return <View key={b.id} testID={'page-block-'+b.id} style={{position:'relative'}} {...({onMouseEnter:()=>rowHover.enter(b.id),onMouseLeave:rowHover.leave} as any)}>{pageLinkView(target,b.id,b)}
+    {desktop&&!preview?<Pressable accessible={false} onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} style={{position:'absolute',left:-48,top:4,width:44,height:26}}>{()=><View style={{flexDirection:'row',justifyContent:'flex-end',opacity:rowHover.key===b.id?1:0}}><Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={{width:20,height:26,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable></View>}</Pressable>:null}
     {desktop&&!preview&&blockMenu===b.id?<View testID="page-block-menu" style={{position:'absolute',top:32,left:-48,width:200,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,zIndex:60}}>
      {([['Mover para cima',()=>moveBlock(b.id,-1)],['Mover para baixo',()=>moveBlock(b.id,1)],['Tirar o link daqui',()=>removeBlock(b.id)]] as const).map(([label,fn])=><Pressable key={label} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);fn();}} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:8,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
     </View>:null}
@@ -451,15 +460,15 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text>{(()=>{const link=String((b as any).url||'').trim()||(String(b.text||'').match(/https?:\/\/\S+/)||[''])[0];if(!link)return null;
    // 0.3.269: link numa Pagina vira item da Biblioteca (uma das entradas do fluxo de criar)
-   return <Pressable accessibilityRole="button" testID={'page-link-to-library-'+b.id} onPress={()=>{void api.linkPreview(link).catch(()=>null).then(pv=>api.saveEntity({kind:'library_item',title:(pv?.title||String(b.text||'').replace(link,'').trim()||link).slice(0,240),content:'',area:'Biblioteca',privacy:'private',state:'saved',tags:[],data:{type:'reference',status:'0',url:pv?.url||link,site:pv?.site||'',cover_url:pv?.image||''}})).then(()=>appAlert('Biblioteca','Guardado na Biblioteca, em Referências.')).catch(e=>setError(errorText(e)));}} style={{alignSelf:'flex-start',marginTop:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Guardar na Biblioteca</Text></Pressable>;})()}</Pressable>;
+   return <Pressable accessibilityRole="button" testID={'page-link-to-library-'+b.id} onPress={()=>{void api.linkPreview(link).catch(()=>null).then(pv=>api.saveEntity({kind:'library_item',title:(pv?.title||String(b.text||'').replace(link,'').trim()||link).slice(0,240),content:'',area:'Pessoal',privacy:'private',state:'saved',tags:[],data:{type:'reference',status:'0',url:pv?.url||link,site:pv?.site||'',cover_url:pv?.image||''}})).then(()=>appAlert('Biblioteca','Guardado na Biblioteca, em Referências.')).catch(e=>setError(errorText(e)));}} style={{alignSelf:'flex-start',marginTop:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Guardar na Biblioteca</Text></Pressable>;})()}</Pressable>;
   const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(listNumber(currentBlocks().length?currentBlocks():[b],currentBlocks().length?i:0)||i+1)+'. ':b.type==='quote'&&!desktop?'│ ':b.type==='callout'?'💡 ':'';
   const slashOpen=webKeys&&!preview&&slash?.id===b.id,menuOpen=desktop&&!preview&&blockMenu===b.id,lineH=heading+9;
   const slashItems=slashOpen&&slash?slashMatches(String(b.text||'').slice(slash.start+1,slash.caret)):[];
-  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0,...(desktop&&b.type==='callout'?{backgroundColor:c.input,borderRadius:6,paddingHorizontal:14,paddingVertical:10,marginVertical:4,gap:8}:{})}}>{({hovered}:any)=><>
-   {desktop&&!preview?<View testID={'page-block-gutter-'+b.id} style={{position:'absolute',left:-48,top:Math.max(0,(lineH-26)/2)+4,flexDirection:'row',opacity:hovered||menuOpen?1:0}}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Adicionar bloco abaixo" onPress={()=>insertWithSlash(b)} style={({hovered:h}:any)=>({width:22,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={({hovered:h}:any)=>({width:20,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h||menuOpen?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable>
+  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0,...(desktop&&b.type==='callout'?{backgroundColor:c.input,borderRadius:6,paddingHorizontal:14,paddingVertical:10,marginVertical:4,gap:8}:{})}}>{()=><>
+   {desktop&&!preview?<View testID={'page-block-gutter-'+b.id} style={{position:'absolute',left:-48,top:Math.max(0,(lineH-26)/2)+4,flexDirection:'row',opacity:rowHover.key===b.id||menuOpen?1:0}}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Adicionar bloco abaixo" onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} onPress={()=>insertWithSlash(b)} style={({hovered:h}:any)=>({width:22,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={({hovered:h}:any)=>({width:20,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h||menuOpen?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable>
    </View>:null}
    {b.type==='todo'&&desktop?<Pressable accessibilityRole="checkbox" accessibilityLabel="Concluir tarefa" accessibilityState={{checked:!!b.checked}} onPress={()=>updateBlock(b,{checked:!b.checked})} style={{width:18,height:18,marginTop:(lineH-18)/2+4,borderRadius:4,borderWidth:1.5,borderColor:b.checked?c.accent:c.muted,backgroundColor:b.checked?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{b.checked?<Icon name="check" size={12} color={c.onAccent}/>:null}</Pressable>
    :b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
@@ -472,7 +481,6 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
     onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
     style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>}
-   {aiBox(b)?<View style={{position:'absolute',top:lineH+6,left:0,right:0,zIndex:60}}>{aiBox(b)}</View>:null}
    {slashOpen?<View testID="page-slash-menu" style={{position:'absolute',top:lineH+12,left:prefix||b.type==='todo'?24:0,width:310,maxHeight:360,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.line,padding:6,shadowColor:'#000',shadowOpacity:0.28,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:12}}>
     <ScrollView ref={slashScroll} keyboardShouldPersistTaps="always">
      <Text style={{color:c.muted,fontSize:11,fontWeight:'500',paddingHorizontal:8,paddingTop:4,paddingBottom:6}}>{slash&&slash.caret>slash.start+1?'Resultados':'Blocos'}</Text>
@@ -486,7 +494,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     <ScrollView keyboardShouldPersistTaps="handled">
      {([['Duplicar',()=>duplicateBlock(b.id)],['Mover para cima',()=>moveBlock(b.id,-1)],['Mover para baixo',()=>moveBlock(b.id,1)]] as const).map(([label,fn])=><Pressable key={label} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);fn();}} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:8,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:13}}>{label}</Text></Pressable>)}
      <Text style={{color:c.muted,fontSize:11,fontWeight:'500',paddingHorizontal:10,paddingTop:8,paddingBottom:4}}>Transformar em</Text>
-     {slashMatches('').filter(it=>TEXT_BLOCKS.has(it.type)&&it.type!==b.type).map(it=><Pressable key={it.type} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);updateBlock(b,{type:it.type});}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{width:22,color:c.muted,fontSize:12,fontWeight:'600'}}>{it.icon}</Text><Text style={{color:c.text,fontSize:13}}>{it.label}</Text></Pressable>)}
+     {slashMatches('').filter(it=>TEXT_BLOCKS.has(it.type)&&it.type!==b.type).map(it=><Pressable key={it.type} accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);updateBlock(b,{type:it.type});}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text numberOfLines={1} style={{width:28,color:c.muted,fontSize:12,fontWeight:'600'}}>{it.icon}</Text><Text style={{color:c.text,fontSize:13}}>{it.label}</Text></Pressable>)}
      <Pressable accessibilityRole="menuitem" onPress={()=>{setBlockMenu(null);removeBlock(b.id);}} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:8,borderRadius:6,marginTop:4,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.danger,fontSize:13}}>Excluir bloco</Text></Pressable>
     </ScrollView>
    </View>:null}
@@ -496,16 +504,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
   const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
-  const titleInput=<TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
+  const titleInput=<TextInput scrollEnabled={false} editable={!preview} autoFocus={desktop&&!preview&&draft.title==='Sem título'&&emptyBody} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
   return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
    <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
     {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
      // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
-     :desktop?(hasCover?<Pressable accessible={false} style={StyleSheet.absoluteFill}>{({hovered}:any)=><>
+     :desktop?(hasCover?<Pressable accessible={false} onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} style={StyleSheet.absoluteFill}>{()=><>
       <PageCover data={draft.appearance} api={api}/>
-      {!preview&&!coverMove?<View style={{position:'absolute',right:16,bottom:12,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:hovered?1:0}}>
-       <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
-       {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
+      {!preview&&!coverMove?<View style={{position:'absolute',right:16,bottom:56,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:coverHover?1:0}}>
+       <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
+       {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
       </View>:null}</>}</Pressable>:null)
      :<Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={StyleSheet.absoluteFill}>
      {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
@@ -520,11 +528,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </View>
    <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
     {/* 0.3.267 (computador): como no Notion, sem ícone não aparece o 📄; "Adicionar ícone" e "Adicionar capa" surgem ao passar o mouse */}
-    {desktop?<Pressable accessible={false} testID="page-header">{({hovered}:any)=><>
+    {desktop?<Pressable accessible={false} testID="page-header" onHoverIn={headHover.enter} onHoverOut={headHover.leave}>{()=><>
      {draft.appearance.icon?<Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({width:82,height:82,marginLeft:-4,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:56,lineHeight:78,color:c.text}}>{String(draft.appearance.icon)}</Text></Pressable>:<View style={{height:hasCover?50:24}}/>}
-     {!preview?<View style={{flexDirection:'row',gap:2,height:30,marginTop:6,marginLeft:-6,opacity:hovered?1:0}}>
-      {!draft.appearance.icon?<Pressable testID="page-add-icon" accessibilityRole="button" accessibilityLabel="Adicionar ícone" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:13}}>☺</Text><Text style={{color:c.muted,fontSize:13}}>Adicionar ícone</Text></Pressable>:null}
-      {!hasCover?<Pressable testID="page-add-cover" accessibilityRole="button" accessibilityLabel="Adicionar capa" onPress={()=>{const pick=PAGE_COVERS[Math.floor(Math.random()*PAGE_COVERS.length)][1];store.edit(selected.id,d=>({...d,appearance:{...d.appearance,cover_type:'preset',cover_value:pick,cover_attachment_id:'',cover_position:''}}));void store.flush(selected.id);}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Icon name="image" size={14} color={c.muted}/><Text style={{color:c.muted,fontSize:13}}>Adicionar capa</Text></Pressable>:null}
+     {!preview?<View style={{flexDirection:'row',gap:2,height:30,marginTop:6,marginLeft:-6,opacity:headHover.on?1:0}}>
+      {!draft.appearance.icon?<Pressable testID="page-add-icon" accessibilityRole="button" accessibilityLabel="Adicionar ícone" onHoverIn={headHover.enter} onHoverOut={headHover.leave} onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:13}}>☺</Text><Text style={{color:c.muted,fontSize:13}}>Adicionar ícone</Text></Pressable>:null}
+      {!hasCover?<Pressable testID="page-add-cover" accessibilityRole="button" accessibilityLabel="Adicionar capa" onHoverIn={headHover.enter} onHoverOut={headHover.leave} onPress={()=>{const pick=PAGE_COVERS[Math.floor(Math.random()*PAGE_COVERS.length)][1];store.edit(selected.id,d=>({...d,appearance:{...d.appearance,cover_type:'preset',cover_value:pick,cover_attachment_id:'',cover_position:''}}));void store.flush(selected.id);}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Icon name="image" size={14} color={c.muted}/><Text style={{color:c.muted,fontSize:13}}>Adicionar capa</Text></Pressable>:null}
      </View>:null}
      {titleInput}
     </>}</Pressable>:<>
@@ -534,7 +542,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     {/* subpáginas que ainda não estão no texto aparecem no topo, como links (Notion) */}
     {desktop&&subpages.length?<View testID="page-subpage-links" style={{marginBottom:4,gap:2}}>{subpages.filter(sp=>!draft.blocks.some(x=>x.type==='page_link'&&String(x.data?.page_id||'')===sp.id)).map(sp=>pageLinkView(sp,'sub-'+sp.id))}</View>:null}
-    <View testID={preview?undefined:"page-blocks"} style={{gap:2,position:'relative'}}>{draft.blocks.map((block,index)=><View key={block.id} style={{borderRadius:4,backgroundColor:!preview&&picked.has(block.id)?c.accentSoft:'transparent',opacity:dragging===block.id?0.4:1,zIndex:(slash?.id===block.id||blockMenu===block.id)?50:0}}>{blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus)}</View>)}
+    <View testID={preview?undefined:"page-blocks"} style={{gap:2,position:'relative'}}>{draft.blocks.map((block,index)=><View key={block.id} style={{borderRadius:4,backgroundColor:!preview&&picked.has(block.id)?c.accentSoft:'transparent',opacity:dragging===block.id?0.4:1,zIndex:(slash?.id===block.id||blockMenu===block.id)?50:0}}>{blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus)}{preview?null:aiBox(block)}</View>)}
      {!preview&&drop?<View pointerEvents="none" testID="page-drop-line" style={{position:'absolute',left:0,right:0,top:drop.y-2,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null}</View>
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {desktop?<Pressable accessibilityLabel="Continuar escrevendo no fim" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:150,cursor:'text'} as any}/>:null}
@@ -549,7 +557,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
   header={<>
-  <ScreenTitle title="Páginas" right={<IconButton name="plus" label="Criar página" disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
+  <ScreenTitle title="Páginas" right={<IconButton name="plus" label="Criar página" disabled={!ready} onPress={()=>{if(desktop)void create();else setCreateParent(null);}}/>}/>
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   {/* 0.3.262 (fase 3 — Paginas): no computador, as paginas mexidas por ultimo em cartoes no topo (voltar ao que se estava
@@ -601,7 +609,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     <IconButton name="more" label="Opções da página" size={34} onPress={()=>{if(!desktop){setPageMenu(true);return;}
      // 0.3.267 (computador): menu pequeno junto do ⋯, como no Notion (antes: painel de baixo na largura toda)
      const vw=typeof window!=='undefined'?window.innerWidth:1200,imageCoverNow=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id,blk=focus?draft.blocks.find(x=>x.id===focus):undefined;
-     openContextMenu(vw-236,92,[{label:'Nova subpágina ou template',icon:'plus',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
+     openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)},{label:'Usar um modelo nesta página',icon:'grid',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
       ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
    </View>
   </View>
@@ -617,6 +625,18 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </Sheet>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
   {documentContent(selected,draft)}
+  {/* 05/11/2026 (Pedro: o + abria "um trambolho"): como no Notion, a página nova abre direto e embaixo fica "Comece a usar" */}
+  {desktop&&pageBodyIsEmpty(draft.blocks)&&!(children.get(selected.id)||[]).length?<View pointerEvents="box-none" testID="page-start-bar" style={{position:'absolute',left:0,right:0,bottom:36,alignItems:'center',zIndex:25}}>
+   <View style={{gap:8,alignItems:'flex-start'}}>
+    <Text style={{color:c.muted,fontSize:12}}>Comece a usar</Text>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+     {[{label:'Pedir à Sofia',icon:'sofia' as const,run:()=>{const first=draft.blocks[0];if(first){setFocus(first.id);placeCaret(first.id,0);setAiText('');setAi({id:first.id,busy:false,error:''});}}},
+       ...PAGE_TEMPLATES.map(t=>({label:t.title,icon:undefined,glyph:t.icon,run:()=>applyTemplate(t)})),
+       {label:'Modelos',icon:'grid' as const,run:()=>setCreateParent(selected)}].map((x:any)=><Pressable key={x.label} accessibilityRole="button" accessibilityLabel={x.label} onPress={x.run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:34,paddingHorizontal:14,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
+      {x.icon?<Icon name={x.icon} size={15} color={x.icon==='sofia'?c.accent:c.muted}/>:<Text style={{fontSize:13}}>{x.glyph}</Text>}<Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>{x.label}</Text></Pressable>)}
+    </View>
+   </View>
+  </View>:null}
   {peekCard()}
   {richBar()}
   {desktop&&showTop?<View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom:28,alignItems:'center',zIndex:30}}><Pressable testID="page-back-to-top" accessibilityRole="button" accessibilityLabel="Voltar ao topo" onPress={()=>docScroll.current?.scrollTo({y:0,animated:true})} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:14,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface,shadowColor:'#000',shadowOpacity:0.25,shadowRadius:12,shadowOffset:{width:0,height:4}})}><Text style={{color:c.text,fontSize:13}}>↑ Topo</Text></Pressable></View>:null}

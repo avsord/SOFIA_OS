@@ -93,7 +93,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
       if (known.has(x.code)) { toast(x.code + ' já está em Encomendas.', [{label: 'Abrir', run: () => { const p = packs.find(p2 => p2.code === x.code); if (p) setOpenId(p.id); }}]); continue; }
       const carrier = detectCarrier(x.code);
       try {
-        const saved = await api.saveEntity({kind: 'package', title: (x.name || nameFromMail || x.code).slice(0, 120), content: '', area: 'Encomendas', privacy: 'private', state: 'active', tags: [], data: {code: x.code, carrier, status: '', last_event_at: '', events: '[]', checked_at: '', error: '', note: '', source_mail: mailId}});
+        const saved = await api.saveEntity({kind: 'package', title: (x.name || nameFromMail || x.code).slice(0, 120), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {code: x.code, carrier, status: '', last_event_at: '', events: '[]', checked_at: '', error: '', note: '', source_mail: mailId}});
         patchLocal(saved); ok++; known.add(x.code);
         void api.refreshPackage(saved.id).then(r => { patchLocal(r.item); if (r.error) toast(saved.title + ': ' + r.error); }).catch(() => {});
       } catch (e) { toast(errorText(e)); }
@@ -116,7 +116,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
     } catch (e) { toast(errorText(e)); }
   }
   async function pickupReminder(p: Pack, when: string) {
-    try { const r = await api.saveEntity({kind: 'reminder', title: 'Retirar: ' + p.title, content: '', area: 'Lembretes', privacy: 'private', state: 'active', tags: [], data: {remind_at: new Date(when).toISOString(), message: p.local ? 'Local: ' + p.local : '', location: p.local}}); await patch(p, {pickup_reminder: r.id}); setPickDialog(null); toast('Lembrete de retirada criado.'); } catch (e) { toast(errorText(e)); }
+    try { const r = await api.saveEntity({kind: 'reminder', title: 'Retirar: ' + p.title, content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {remind_at: new Date(when).toISOString(), message: p.local ? 'Local: ' + p.local : '', location: p.local}}); await patch(p, {pickup_reminder: r.id}); setPickDialog(null); toast('Lembrete de retirada criado.'); } catch (e) { toast(errorText(e)); }
   }
   const openUrl = (u: string) => { if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(u, '_blank'); else void Linking.openURL(u); };
 

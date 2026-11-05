@@ -332,6 +332,8 @@ export class SofiaApi {
   saveProfilePhoto(mime: string, base64: string) { return this.request<{ok: boolean; updated_at: string}>('/profile/photo', {mime, base64}, 'POST', 60000); }
   deleteProfilePhoto() { return this.request<{ok: boolean}>('/profile/photo', undefined, 'DELETE'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
+  /** 05/11/2026: áreas criadas pela pessoa (criar, tirar da lista, renomear). Os registros antigos mantêm a área que têm. */
+  areaChange(body:{add?:string;remove?:string;rename?:{from:string;to:string}}) { return this.request<{areas:string[]}>('/workspace/areas', body, 'POST'); }
   async entities(kind: string, q = '', offset = 0) { const path='/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset,generation=this.cacheGeneration;const result=await this.request<{items:Entity[]}>(path);if(kind!=='user_page')return result;const decorated={...result,items:await this.md.decorate(result.items)};
     // 0.3.255: a copia guardada para abrir rapido ja vai na ordem que a pessoa escolheu neste aparelho. Antes ela ficava
     // na ordem do servidor e a lista abria assim, trocando de lugar (piscada) quando a ordem do aparelho chegava.
