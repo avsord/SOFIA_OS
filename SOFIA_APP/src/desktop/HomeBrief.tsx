@@ -667,6 +667,17 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
   useEffect(() => () => {if (preview) URL.revokeObjectURL(preview); try {rec.current?.stop();} catch {/* sem microfone */}}, []);
   useEffect(() => {setTimeout(() => {const el = scroller.current as any; if (el?.scrollTo) el.scrollTo({y: 99999, animated: true});}, 30);}, [msgs.length, busy]);
   const hm = hhmm(when), dayTxt = (() => {const d = new Date(when), n = new Date(); return d.toDateString() === n.toDateString() ? 'hoje' : d.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'numeric'});})();
+  // 05/11/2026 (Pedro: "conseguir copiar e colar imagem no mini chat da Sofia, ou arrastar"): Ctrl+V com imagem copiada, ou soltar
+  // um arquivo em cima da janela, anexa igual ao botao da camera
+  const [dropOver, setDropOver] = useState(false);
+  const takeFile = (f: File | null | undefined) => {if (!f || !(f.type.startsWith('image/') || f.type === 'application/pdf')) return false; setFile(f); setPreview(f.type.startsWith('image/') ? URL.createObjectURL(f) : ''); return true;};
+  useEffect(() => {if (!WEB) return; const el: any = box.current;
+    const paste = (e: ClipboardEvent) => {const items = Array.from(e.clipboardData?.items || []); const it = items.find(i => i.kind === 'file' && (i.type.startsWith('image/') || i.type === 'application/pdf')); if (it && takeFile(it.getAsFile())) e.preventDefault();};
+    const over = (e: DragEvent) => {if (Array.from(e.dataTransfer?.types || []).includes('Files')) {e.preventDefault(); setDropOver(true);}};
+    const leave = (e: DragEvent) => {if (!el?.contains?.(e.relatedTarget as any)) setDropOver(false);};
+    const drop = (e: DragEvent) => {const f = e.dataTransfer?.files?.[0]; setDropOver(false); if (f) {e.preventDefault(); takeFile(f);}};
+    window.addEventListener('paste', paste); el?.addEventListener?.('dragover', over); el?.addEventListener?.('dragleave', leave); el?.addEventListener?.('drop', drop);
+    return () => {window.removeEventListener('paste', paste); el?.removeEventListener?.('dragover', over); el?.removeEventListener?.('dragleave', leave); el?.removeEventListener?.('drop', drop);};}, []);
   const pickFile = () => {if (!WEB) return; if (!fileIn.current) {const el = document.createElement('input'); el.type = 'file'; el.accept = 'image/*,application/pdf'; el.onchange = () => {const f = el.files?.[0]; if (f) {setFile(f); setPreview(f.type.startsWith('image/') ? URL.createObjectURL(f) : '');} el.value = '';}; fileIn.current = el;} fileIn.current.click();};
   const SR: any = WEB ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
   const mic = () => {if (!SR) return; if (listening) {try {rec.current?.stop();} catch {/* ja parou */} return;} const r = new SR(); r.lang = 'pt-BR'; r.interimResults = true; r.continuous = false; const base = text ? text + ' ' : '';
@@ -679,7 +690,7 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     catch (e: any) {setErr(String(e?.message || 'Não deu para falar com a Sofia agora.')); setMsgs(m => m.slice(0, -1)); if (!custom) setText(t); if (f) {setFile(f); setPreview(img);}}
     finally {setBusy(false);}};
   const W = 400, lw = lineW || 1, /* 0.3.347 (Pedro): janela bem menor */ left = Math.max(0, Math.min(lw - W, fx * lw - W / 2)), caret = Math.max(18, Math.min(W - 18, fx * lw - left));
-  const shell = (inner: React.ReactNode, strip?: string) => <View ref={box} testID="sofia-add" style={{position: 'absolute', left, top: 29 + 44 + 22, width: W, zIndex: 12} as any}>
+  const shell = (inner: React.ReactNode, strip?: string) => <View ref={box} testID="sofia-add" style={{position: 'absolute', left, top: 29 + 44 + 22, width: W, zIndex: 12, borderRadius: 18, ...(dropOver ? {outlineStyle: 'dashed', outlineWidth: 2, outlineColor: c.accent, outlineOffset: 3} : null)} as any}>
     <View style={{position: 'absolute', left: caret - 7, top: -7, width: 14, height: 14, backgroundColor: c.bg, transform: [{rotate: '45deg'}], borderRadius: 3, boxShadow: '-1px -1px 0 rgba(255,255,255,0.06)'} as any} />
     {/* 0.3.351 (Pedro: "alinhamento ta errado"): sem a faixa de cor no topo (com o canto arredondado ela ficava estreita, como
      uma aba fora do lugar) e com overflow clip - o hidden deixava o navegador rolar o cartao para o lado ao focar o campo,
@@ -984,7 +995,7 @@ function useWheelStep(onStep: (dir: 1 | -1) => void, enabled: boolean) {
 function ItemDots({n, i, color, done, onGo, what = 'Item'}: {n: number; i: number; color: string; done?: (k: number) => boolean; onGo?: (k: number) => void; what?: string}) {
   const c = useTheme(); if (n < 2) return null;
   const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={6} onPress={() => onGo?.(k)} style={({hovered}: any) => ({width: 20, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 13}}>{label}</Text></Pressable>;
-  return <View style={{marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 2}}>
+  return <View style={{marginTop: 8, height: 28, flexDirection: 'row', alignItems: 'center', gap: 2}} /* 05/11/2026 (Pedro: "centraliza isso"): mesma altura do botao ao lado */>
     {onGo ? btn('‹', (i - 1 + n) % n, what + ' anterior') : null}
     <View style={{flexDirection: 'row', gap: 4, paddingHorizontal: onGo ? 2 : 0}}>{Array.from({length: n}, (_, k) => <View key={k} style={{width: k === i ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: k === i ? color : done?.(k) ? tint(color, 0.5) : c.line}} />)}</View>
     {onGo ? btn('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase()) : null}
@@ -1001,6 +1012,14 @@ function Pager({i, n, onGo, what}: {i: number; n: number; onGo: (k: number) => v
   const btn = (label: string, k: number, a11y: string) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={7} onPress={() => onGo(k)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>{label}</Text></Pressable>;
   return <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2}}>
     {btn('‹', (i - 1 + n) % n, what + ' anterior')}<Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % n) + 1} de {n}</Text>{btn('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase())}
+  </View>;
+}
+/** 05/11/2026 (Pedro: "adiciona isso para Rotina e E-mail"): o "‹ 1 de 2 ›" do topo do Price Tracker, para os outros blocos. */
+function HeadPager({i, n, onGo, what, right = 12}: {i: number; n: number; onGo: (k: number) => void; what: string; right?: number}) {
+  const c = useTheme(); if (n < 2) return null;
+  const b = (t: string, k: number, a: string) => <Pressable accessibilityRole="button" accessibilityLabel={a} hitSlop={7} onPress={() => onGo(k)} style={({hovered}: any) => ({width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>{t}</Text></Pressable>;
+  return <View style={{position: 'absolute', top: 14, right, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 4}}>
+    {b('‹', (i - 1 + n) % n, what + ' anterior')}<Text style={{fontSize: 11, color: c.muted, fontVariant: ['tabular-nums'], minWidth: 28, textAlign: 'center'}}>{(i % n) + 1} de {n}</Text>{b('›', (i + 1) % n, 'Próximo: ' + what.toLowerCase())}
   </View>;
 }
 function TileHead({icon, color, name, onOpen}: {icon: IconName; color: string; name: string; onOpen: () => void}) {
@@ -1119,6 +1138,7 @@ function RotinaTile({style, card, data, onOpen}: {style: any; card: any; data: H
   return <View ref={wheel} style={[card, {gap: 6, overflow: 'visible', paddingVertical: 16, zIndex: menu ? 30 : 0}, style]}>
     {late && groups.length < 2 ? <Dot reason={(() => {const d = doses.find(x => !x.taken && x.date.getTime() < Date.now()); return d ? d.plan.title + ' passou da hora (' + hhmm(d.date) + ')' : 'Algo da rotina passou da hora';})()} /> : null}
     <TileHead icon="cycle" color="#88CFB8" name="Rotina" onOpen={onOpen} />
+    {!compact && !(g && groups.length > 1) && list.length > 1 ? <HeadPager i={Math.max(0, curIdx)} n={list.length} what="Item da rotina" right={late ? 34 : 12} onGo={k => swap(() => setK(k))} /> : null}
     {g && groups.length > 1 ? <View style={{position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 5}}>
       {compact ? null : <Pressable accessibilityRole="button" accessibilityLabel="Grupo anterior" hitSlop={7} onPress={() => pickGroup(gi - 1)} style={({hovered}: any) => ({width: 24, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 14}}>‹</Text></Pressable>}
       <Pressable testID="rotina-group" accessibilityRole="button" accessibilityLabel={'Grupo da Rotina: ' + g.name + '. Escolher outro'} onPress={() => setMenu(v => !v)} style={({hovered}: any) => compact ? {flexDirection: 'row', alignItems: 'center', gap: 3, height: 22, paddingLeft: 6, paddingRight: 2, backgroundColor: 'transparent'} : ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint(g.color, hovered || menu ? 0.22 : 0.12)})}>
@@ -1246,9 +1266,10 @@ function PackagesTile({style, card, data, onOpen}: {style: any; card: any; data:
   </View>;
 }
 function MailTile({style, card, data, onOpen}: {style: any; card: any; data: HomeBriefData; onOpen: () => void}) {
-  const list = data.mailNew, first = list[0];
+  const list = data.mailNew, [mi, setMi] = useState(0), first = list[mi % Math.max(1, list.length)];
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <TileHead icon="mail" color="#8fb4ff" name="E-mails" onOpen={onOpen} />
+    <HeadPager i={mi % Math.max(1, list.length)} n={list.length} what="E-mail" onGo={setMi} />
     {first ? <View style={{marginTop: 'auto', gap: 4} as any}>
       <Big value={String(list.length)} unit={list.length === 1 ? 'novo' : 'novos'} />
       <Line text={String(first.data?.from_name || first.data?.from_addr || '') + ' · ' + first.title} />

@@ -292,11 +292,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Linha do tempo: "+ Adicionar às HH:MM" no balão abre o criador naquele horário; brilho da abertura volta a trocar faixa→oval ao mesmo tempo (curvas complementares, sem escurecer e sem as duas acesas) — o oval final não mudou (medido contra a versão de 04/11) | testado: + abre o criador; testes ok |
 | 2026-11-05 | (delivery) | Brilho da abertura: troca faixa→oval volta a ser simultânea como antes, agora em 2,2 s com fim bem lento; oval ~25% menos intenso | testes ok |
 | 2026-11-05 | (delivery) | Mini chat/Conversa: resposta cortada por reinício do servidor (publicação no Railway — "A chamada foi interrompida") é reenviada sozinha até 2 vezes (mesmo client_message_id; o servidor não duplica). Railway sem tempo de espera no desligamento: sugerido ao Pedro | testes ok |
 | 2026-11-05 | (delivery) | Conversa rápida da linha do tempo: a linha não anda sozinha com ela/menu/balão abertos; fecha sozinha 2,5 s depois de criar algo (com aviso); recarrega já e de novo em 1,5 s. Janela "Editar lembrete" (e outras ancoradas): fica parada ao crescer e rola por dentro | testado: janela parada com 3 datas novas; testes ok |
 | 2026-11-05 | (delivery) | Lote: painel lateral sai deslizando (antes corte seco); "Mais opções" abre o painel de editar ali mesmo (tarefa não vai mais para Tarefas) e abre na hora (lembrete/compromisso); lembrete com várias datas pergunta "Só esta data / Todas"; mini editor rola por dentro (horário visível); meia-noite com linha tracejada e o dia que começa; oval termina com a 2ª fileira; "agora" não desliza ao voltar de outra aba | testes ok |
+| 2026-11-05 | (delivery) | Conversa rápida aceita colar (Ctrl+V) e arrastar imagem/PDF; "‹ 1 de N ›" também na Rotina e nos E-mails (E-mails passa de um em um); bolinhas de página alinhadas ao botão; foto do perfil no site: era pedida antes do login ficar pronto e o "sem foto" ficava guardado — agora espera o login | testado: foto aparece no site; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
