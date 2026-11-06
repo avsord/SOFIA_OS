@@ -36,3 +36,10 @@ test('Inicio no site: encaixe e largura da linha do tempo medidos antes da 1a pi
   assert.ok(home.includes('cc.style.zoom=String(z)'),'zoom entra no proprio quadro da medida');
   assert.ok(brief.includes("useLayoutEffect(() => {if (!WEB || w) return; const v = (lineBox.current as any)?.offsetWidth; if (v > 0) {setW(v); setWS(v);}}, [w]);"));
 });
+test('Foto do perfil no site: pedida junto com a pagina (early.js) e o avatar ja nasce com ela',()=>{
+  const early=read('public/assets/early.js'),cloud=read('src/lib/profile-photo-cloud.web.ts'),av=read('src/components/ProfileAvatar.tsx'),ev=read('src/lib/profile-photo-events.ts');
+  assert.ok(early.includes("'/md/capabilities','/profile/photo']")&&early.includes('window.__sofiaPhoto='));
+  assert.ok(cloud.includes("__sofiaEarly?.['/profile/photo']"),'usa a resposta antecipada sem esperar o login');
+  assert.ok(av.includes('useState(()=>photoPreview(scope)||earlyPhoto())'));
+  assert.ok(ev.includes("v.startsWith('data:image/')"),'so aceita imagem');
+});

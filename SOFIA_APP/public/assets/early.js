@@ -19,10 +19,13 @@
  // a lista e o "capabilities" (a ordem das paginas depende dele antes de a lista aparecer)
  window.__sofiaEarly={};
  // + as leituras que o Inicio fez da ultima vez ate os blocos aparecerem (so os enderecos; api.ts saveEarlyPaths)
- var paths=['/workspace/entities?limit=100&kind=user_page&q=&offset=0','/md/capabilities'];
+ // 06/11/2026 (Pedro: "minha foto esta aparecendo so depois"): a foto do perfil tambem sai junto com a pagina
+ var paths=['/workspace/entities?limit=100&kind=user_page&q=&offset=0','/md/capabilities','/profile/photo'];
  try{var saved=JSON.parse(localStorage.getItem('sofia.early.paths.v1')||'[]');if(Array.isArray(saved))saved.slice(0,40).forEach(function(x){if(typeof x==='string'&&x.charAt(0)==='/'&&paths.indexOf(x)<0)paths.push(x);});}catch(e){}
  paths.forEach(function(p){
   window.__sofiaEarly[p]=fetch('/api/mobile'+p,{headers:{Accept:'application/json',Authorization:'Bearer '+a.token},redirect:'error'})
    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
  });
+ // a foto pronta fica a mao do avatar, que ja nasce com ela (sem as iniciais primeiro)
+ window.__sofiaEarly['/profile/photo'].then(function(d){if(d&&d.photo&&/^image\/[a-z+.-]+$/.test(d.photo.mime))window.__sofiaPhoto='data:'+d.photo.mime+';base64,'+d.photo.base64;});
 }catch(e){}})();

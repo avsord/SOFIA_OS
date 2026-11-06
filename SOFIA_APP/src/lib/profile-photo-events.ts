@@ -4,6 +4,8 @@ const listeners=new Set<(scope:string,uri:string)=>void>();
 const pending=new Map<string,Promise<string>>();
 const key=(scope:string)=>scope.trim().toLowerCase();
 export function photoPreview(scope:string){return photos.get(key(scope))||'';}
+/** 06/11/2026 (site): foto ja baixada pelo early.js junto com a pagina; vazio no celular ou se ainda nao chegou. */
+export function earlyPhoto():string{const v=(globalThis as any).__sofiaPhoto;return typeof v==='string'&&v.startsWith('data:image/')?v:'';}
 export function photoChanged(scope:string,uri:string){
  const id=key(scope);photos.set(id,uri);
  listeners.forEach(listener=>listener(id,uri));

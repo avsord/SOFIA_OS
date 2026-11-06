@@ -5,6 +5,10 @@ import {currentApi} from './api';
 // sem conexao com a conta a resposta era "sem foto" e ficava guardada para sempre. Agora espera o login (ate 15 s).
 async function waitApi(){for(let i=0;i<75;i++){const a=currentApi();if(a)return a;await new Promise(r=>setTimeout(r,200));}return null;}
 export async function readProfilePhoto(_scope:string){
+ // 06/11/2026 (Pedro: "minha foto esta aparecendo so depois"): o early.js ja pediu a foto junto com a pagina; usa essa resposta
+ // sem esperar o login do app ficar pronto (as iniciais apareciam primeiro e a foto entrava depois)
+ const early=typeof window!=='undefined'?(window as any).__sofiaEarly?.['/profile/photo']:undefined;
+ if(early){delete (window as any).__sofiaEarly['/profile/photo'];const r=await early.catch(()=>null);if(r&&'photo' in r)return r.photo?'data:'+r.photo.mime+';base64,'+r.photo.base64:'';}
  const api=currentApi()||await waitApi();if(!api)return '';
  try{const r=await api.profilePhoto();return r.photo?'data:'+r.photo.mime+';base64,'+r.photo.base64:'';}catch{return '';}
 }

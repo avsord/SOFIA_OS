@@ -3,14 +3,14 @@ import {Image,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {initials} from '../lib/chat-model';
 import {readProfilePhoto} from '../lib/profile-photo-cloud';
-import {primeProfilePhoto,photoPreview,subscribeProfilePhoto} from '../lib/profile-photo-events';
+import {earlyPhoto,primeProfilePhoto,photoPreview,subscribeProfilePhoto} from '../lib/profile-photo-events';
 import {Brand} from './UI';
 /** Account-owned photo in the title bar, synced with the Profile editor. */
 export function ProfileAvatar({scope,name,size=44}:{scope:string;name:string;size?:number}){
- const c=useTheme(),[uri,setUri]=useState(()=>photoPreview(scope));
+ const c=useTheme(),[uri,setUri]=useState(()=>photoPreview(scope)||earlyPhoto());
  useEffect(()=>{
   let alive=true;
-  setUri(photoPreview(scope));
+  setUri(photoPreview(scope)||earlyPhoto());
   const stop=subscribeProfilePhoto(scope,setUri);
   void primeProfilePhoto(scope,readProfilePhoto).then(value=>{if(alive)setUri(value);}).catch(()=>{});
   return()=>{alive=false;stop();};
