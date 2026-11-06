@@ -261,7 +261,7 @@ test('capa: so pula a roda a foto ja preparada; pagina compartilhada com roda e 
 });
 test('capa ja preparada e pintada de um ImageBitmap num canvas antes do 1o quadro (o navegador nao a descarta)',()=>{
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/function BitmapCover/);assert.match(pa,/if\(bmp\)return <View style=\{StyleSheet\.absoluteFill\}><BitmapCover/);
- const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/createImageBitmap\(img/);assert.doesNotMatch(pre,/await fetch\(uri\)/,'sem fetch de blob: (CSP)');
+ const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/const src=coverBlob\(uri\)\|\|img/);assert.match(pre,/createImageBitmap\(src/);/* 06/11: decodifica do arquivo (fora da linha que desenha) e so depois da abertura, uma por vez */assert.match(pre,/delay=4500/);assert.match(pre,/setTimeout\(\(\)=>\{void worker\(\);\},delay\)/);assert.doesNotMatch(pre,/await fetch\(uri\)/,'sem fetch de blob: (CSP)');
 });
 test('lembrete com outras datas ou que repete: Feito pergunta "parar de lembrar" ou "so desta vez" (continua avisando)',()=>{
  const r=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');assert.match(r,/Feito — parar de lembrar/);assert.match(r,/async function doneOnce/);assert.match(r,/else askDone\(item,e\)/);
