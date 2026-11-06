@@ -190,9 +190,6 @@ function makeMobileApi(runtime, deps) {
         return true;
       } finally { req.off('aborted', cancel); res.off('close', cancel); }
     }
-    // 06/11/2026: e-mail da Sofia como remetente (redefinir senha, codigo do login) - so envio, so a conta da Sofia
-    if (p === '/api/mobile/mail-sender/status' && m === 'GET') return send({configured: runtime.google.configured(), connected: runtime.google.canSendMail(), email: runtime.google.senderEmail(), address: runtime.google.senderAddress()});
-    if (p === '/api/mobile/mail-sender/connect' && m === 'POST') { rate(session, 'mail-sender', 10); const b = await bodyJson(req, 1024).catch(() => ({})); return send(runtime.google.senderConnectUrl({app: !!b.app})); }
     // Vigia de e-mails: senha de app só entra (nunca sai) e a verificação manual.
     if (p.startsWith('/api/mobile/mail/')) {
       const {PROVIDERS} = require('../services/mail-watch');

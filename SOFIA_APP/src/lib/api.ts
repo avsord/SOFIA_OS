@@ -296,8 +296,6 @@ export class SofiaApi {
   driveReceiptsCleanup(enabled:boolean) { return this.request<ReceiptsCleanup>('/md/drive/receipts-cleanup',{enabled},'POST',30000); }
   driveExport(categories:string[]) { return this.request<{export:DriveExport}>('/md/drive/export',{categories},'POST',120000); }
   driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
-  mailSenderStatus() { return this.request<{configured:boolean;connected:boolean;email:string;address:string}>('/mail-sender/status'); }
-  mailSenderConnect() { return this.request<{url:string;address:string}>('/mail-sender/connect',{app:true}); }
   calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{app:true}); }
   // Conexoes de lojas (Price Tracker): o mesmo formato para todas as lojas.
   storeConnections() { return this.request<StoreConnectionsState>('/price-tracker/connections'); }

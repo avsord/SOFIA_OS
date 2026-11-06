@@ -141,7 +141,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   guarda rotas da Home; o restante hidrata por `api.hydrate()`.
 
 ## 7. Decisões fechadas
-- (06/11, Pedro) **E-mail da Sofia (sofiaos.core@gmail.com) é do app**: só manda os e-mails do sistema ao usuário. **O e-mail do usuário é da conta dele**: Drive, Gmail, Agenda e tudo dele. Nunca misturar.
+- (06/11, Pedro) **Site e app são do usuário: nenhuma configuração do e-mail da Sofia na interface; isso é estrutura do servidor.** **E-mail da Sofia (sofiaos.core@gmail.com) é do app**: só manda os e-mails do sistema ao usuário. **O e-mail do usuário é da conta dele**: Drive, Gmail, Agenda e tudo dele. Nunca misturar.
 
 - 05/11/2026 (Pedro): **áreas só existem se a pessoa criar** ("isso nunca foi criado pelo usuário... essas áreas têm que ser criadas pelo próprio usuário"). A lista vem de `userAreas` (configurações; começa só com "Pessoal"), cria-se no próprio seletor ("Criar …") e o × tira da lista; a IA não cria área nova (nome fora da lista vira o padrão) e os apps não gravam mais áreas prontas (Lembretes, Encomendas, Notas, Biblioteca). Registros antigos mantêm a área que tinham.
 
@@ -258,7 +258,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
-- **E-mail da Sofia como remetente (06/11):** publicado. Falta o Pedro ir em Perfil → Conexões → "E-mail da Sofia" → "Ligar o e-mail da Sofia", entrar com sofiaos.core@gmail.com (NÃO a conta pessoal) e Permitir. Depois conferir no Railway que não aparece "[e-mail] Google nao enviou" nem "[login] codigo ... nao enviado". Com o envio funcionando, entrar num navegador novo passa a pedir o código por e-mail.
+- **E-mail da Sofia (remetente do app) — estrutura, nunca interface (Pedro 06/11):** site e app são do USUÁRIO; nada sobre o e-mail da Sofia aparece neles (cartão, botão ou link removidos). O servidor já tem o e-mail da Sofia configurado (SOFIA_SMTP_USER/PASS), mas o Railway bloqueia SMTP. Para funcionar sem ninguém fazer nada no site: (a) plano Pro do Railway (libera SMTP, sem mudar código) ou (b) serviço de envio por HTTPS configurado só nas variáveis do Railway. Decisão do Pedro pendente. O código de envio pelo Gmail (google.js sender*) fica sem uso até lá.
 - Ferramentas de compilação do app (Expo CLI) com 13 avisos de segurança: não chegam ao usuário; resolver na próxima atualização do Expo, não rebaixando versão.
 - Perguntar ao Pedro se alguma dose/compromisso dele "mudou de horário sozinho" (defeito do arrasto pendurado, corrigido 06/11): pode haver registros movidos sem ele perceber (tag `sofia-move-v1:` nos itens).
 - Avisos "locais" (doses da Rotina, tarefa/rotina atrasada) gerados no aparelho (`bell-inbox.ts`): o "limpar" fica só naquele navegador/celular (IndexedDB) e se perde ao sair da conta — limpar no celular não limpa no site e vice-versa. Pedro (06/11): "cliquei pra limpar e não limpou"; aqui o X e "Tomei" funcionam no mesmo navegador. Confirmar com ele qual botão/onde; provável solução: guardar os avisos locais dispensados no servidor.

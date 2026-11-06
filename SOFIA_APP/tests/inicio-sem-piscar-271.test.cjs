@@ -65,8 +65,8 @@ test('Checkup 06/11: leituras insistem durante a troca de versao; Proximos event
   assert.ok(shell.includes("EVENTS_N='sofia.side.events.n'")&&shell.includes('testID="sidebar-events-reserve"'));
   assert.ok(!/setItem\(EVENTS_N,[^)]*title/.test(shell),'so a quantidade, nunca titulos');
 });
-test('Perfil > Conexoes: cartao "E-mail da Sofia" (remetente so de envio, separado da conta Google pessoal)',()=>{
-  const p=read('src/screens/Profile.tsx'),c=read('src/components/MailSenderSettings.tsx'),g=read('src/components/GoogleCalendarSettings.tsx');
-  assert.ok(p.includes('<MailSenderSettings api={api}/>'));assert.ok(c.includes('api.mailSenderConnect()')&&c.includes('não o seu'));
+test('E-mail da Sofia e estrutura do app: nenhuma tela de usuario pede conexao de remetente',()=>{
+  const p=read('src/screens/Profile.tsx'),g=read('src/components/GoogleCalendarSettings.tsx'),api=read('src/lib/api.ts');
+  assert.ok(!p.includes('MailSender')&&!api.includes('mail-sender'),'nada de remetente na tela do usuario');
   assert.ok(!g.includes('can_send'),'a conta pessoal nao pede envio');
 });
