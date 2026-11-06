@@ -918,13 +918,15 @@ function PeriodIcon({kind}: {kind: string}) {
 }
 
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
+/* 06/11/2026 (Pedro: "o Inicio esta piscando as bolinhas"): a aureola do "agora" pulsava pelo JavaScript, reescrevendo o estilo
+ * 60 vezes por segundo (e a posicao junto, tremendo em fracoes de pixel). Agora o proprio navegador anima (CSS), sem tocar na pagina. */
+const NOW_PULSE = StyleSheet.create({halo: {animationKeyframes: {'0%': {opacity: 0.35, transform: 'scale(0.4)'}, '100%': {opacity: 0, transform: 'scale(1.4)'}}, animationDuration: '2200ms', animationTimingFunction: 'cubic-bezier(0.5,1,0.89,1)', animationIterationCount: 'infinite', willChange: 'transform, opacity'} as any});
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
-  const c = useTheme(), reduced = useReducedMotion(), pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {if (reduced || !WEB) return; /* 03/11/2026: no celular o "agora" fica parado - o pulso redesenhava a tela a cada quadro pelo JavaScript (bateria) e o Android nunca via a tela parada */ const loop = Animated.loop(Animated.timing(pulse, {toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: false})); loop.start(); return () => loop.stop();}, [reduced]);
+  const c = useTheme(), reduced = useReducedMotion(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
     {/* aureola */}
-    <Animated.View style={{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.35, 0]}), transform: [{scale: pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1.4]})}]}} />
+    <View style={[{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: 0.35, transform: [{scale: 0.4}]}, WEB && !reduced ? NOW_PULSE.halo : null]} />
     {/* ponto */}
     <View style={{position: 'absolute', left: at(6), top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
     {/* fio ate a escala */}
@@ -1282,27 +1284,32 @@ function goalTicks(target: number): {f: number; label: string}[] {
   for (let v = step; v < target - step * 0.2; v += step) out.push({f: v / target, label: v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', {maximumFractionDigits: 1}) + ' mi' : Math.round(v / 1000) + ' mil'});
   return out;
 }
+// 06/11/2026: fora do FinanceTile. Criado dentro dele, o React via um componente novo a cada redesenho do Inicio e
+// recriava os numeros de Financas do zero (piscada no bloco).
+function Stat({label, value, sub, pct, color, ticks = []}: {label: string; value: string; sub: string; pct: number | null; color: string; ticks?: {f: number; label: string}[]}) {
+  const c = useTheme();
+  return <View style={{flex: 1, minWidth: 0, gap: 6}}>
+  <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{label}</Text>
+  {/* 0.3.317 (Pedro): na meta, o "45% de R$ 40.000" fica ao lado do valor e as divisoes (10 mil, 20 mil...) descem para
+      a linha do "2 lancamentos" do lado, no mesmo tamanho de letra */}
+  <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0}}>
+    <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
+    {ticks.length ? <Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text> : null}
+  </View>
+  {/* sem barra quando nao ha limite (despesas): so a linha fina, para os dois lados ficarem alinhados */}
+  <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}>{pct != null ? <View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /> : null}
+    {ticks.map(t => <View key={t.f} style={{position: 'absolute', left: (t.f * 100 + '%') as any, top: -2, width: 1.5, height: 8, marginLeft: -0.75, borderRadius: 1, backgroundColor: c.muted, opacity: 0.6}} />)}
+  </View>
+  {ticks.length ? <View><Text style={{fontSize: 12, color: 'transparent'}}> </Text>{ticks.map(t => <Text key={t.f} numberOfLines={1} style={{position: 'absolute', top: 0, left: (t.f * 100 + '%') as any, transform: [{translateX: -24}], width: 48, textAlign: 'center', fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View>
+    : <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>}
+</View>;
+}
 function FinanceTile({style, card, data, goal, masked, onOpen, onToggleMask}: {style: any; card: any; data: HomeBriefData; goal: GoalNumbers | null; masked: boolean; onOpen: () => void; onToggleMask?: () => void}) {
   const c = useTheme(), dues = data.dues, first = dues?.[0], today = todayISO(); // 03/11/2026: data local (UTC virava o dia as 21h)
   const when = (d: string) => d === today ? 'vence hoje' : d < today ? 'venceu ' + d.slice(8, 10) + '/' + d.slice(5, 7) : 'vence ' + d.slice(8, 10) + '/' + d.slice(5, 7);
   const money = (v: number) => masked ? 'R$ •••••' : brl(v);
   const g = goal && goal.target > 0 ? goalStats(goal) : null, sp = data.spend && data.spend.available > 0 ? data.spend : null, lo = data.loose;
   const spendColor = sp ? (sp.pct > 100 ? c.danger : sp.pct >= 80 ? '#E8B04A' : '#88CFB8') : '#88CFB8';
-  const Stat = ({label, value, sub, pct, color, ticks = []}: {label: string; value: string; sub: string; pct: number | null; color: string; ticks?: {f: number; label: string}[]}) => <View style={{flex: 1, minWidth: 0, gap: 6}}>
-    <Text numberOfLines={1} style={{fontSize: 12, color: c.muted}}>{label}</Text>
-    {/* 0.3.317 (Pedro): na meta, o "45% de R$ 40.000" fica ao lado do valor e as divisoes (10 mil, 20 mil...) descem para
-        a linha do "2 lancamentos" do lado, no mesmo tamanho de letra */}
-    <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0}}>
-      <Text numberOfLines={1} style={{fontSize: 24, fontWeight: '600', letterSpacing: -0.6, color: c.text, fontVariant: ['tabular-nums']}}>{value}</Text>
-      {ticks.length ? <Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text> : null}
-    </View>
-    {/* sem barra quando nao ha limite (despesas): so a linha fina, para os dois lados ficarem alinhados */}
-    <View style={{height: 4, borderRadius: 2, backgroundColor: c.line}}>{pct != null ? <View style={{height: 4, borderRadius: 2, width: (Math.min(100, Math.max(1, pct)) + '%') as any, backgroundColor: color}} /> : null}
-      {ticks.map(t => <View key={t.f} style={{position: 'absolute', left: (t.f * 100 + '%') as any, top: -2, width: 1.5, height: 8, marginLeft: -0.75, borderRadius: 1, backgroundColor: c.muted, opacity: 0.6}} />)}
-    </View>
-    {ticks.length ? <View><Text style={{fontSize: 12, color: 'transparent'}}> </Text>{ticks.map(t => <Text key={t.f} numberOfLines={1} style={{position: 'absolute', top: 0, left: (t.f * 100 + '%') as any, transform: [{translateX: -24}], width: 48, textAlign: 'center', fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{t.label}</Text>)}</View>
-      : <Text numberOfLines={1} style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{sub}</Text>}
-  </View>;
   return <View style={[card, {gap: 6, overflow: 'hidden', paddingVertical: 16}, style]}>
     <View style={{flexDirection: 'row', alignItems: 'center'}}>
       <TileHead icon="wallet" color="#b49ae6" name="Finanças" onOpen={onOpen} />
