@@ -58,6 +58,7 @@ import {widgetRows,validWidgetRows,type MonitorWidgetRow} from '../lib/monitorin
 import {MONITOR_WIDGET_PATH} from '../lib/startup-snapshot';
 import {readGoalWidget, writeGoalWidget} from '../lib/goal-widget';
 import {appAlert} from '../lib/app-alert';
+import {startHomeProbe} from '../lib/fluency-probe';
 import {dashboardColumns,useDesktop} from '../lib/desktop';
 export const HOME_WIDGET_IDS=['goal','monitoring','tasks','capsules','reminders','packages'];
 /** 0.3.227: todos os widgets podem sair (a meta tambem). Listas antigas sem a meta recebem a meta no topo, a menos que a
@@ -213,6 +214,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
   const ro=new ResizeObserver(measure);ro.observe(box);ro.observe(scroller);return()=>ro.disconnect();
  },[winKey,homeZ,fitZ,desktop,homeWidth,deskShown]);
  // 0.3.290: so troca quando TUDO do Inicio chegou (tarefas, agenda, avisos do Resumo e Price Tracker); 3 s no maximo
+ useEffect(()=>{startHomeProbe(api);},[api]); /* 06/11/2026: gravador de fluidez do Inicio (so site, uma vez por carregamento) */
  const brief=useHomeBriefData(api,active); // 03/11/2026: o celular tambem usa o Inicio do site (HomeBrief compacto)
  // 0.3.312 (Pedro): desligar/ligar o aviso pela linha do tempo - so desta vez (marca sofia-skip-v1) ou todos
  // 0.3.317: com as repeticoes abertas no Inicio, o item da linha do tempo e uma OCORRENCIA (horario daquela vez); para

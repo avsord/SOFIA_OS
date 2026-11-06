@@ -21,3 +21,12 @@ test('Inicio: aureola do "agora" pulsa por CSS, sem Animated.loop no JavaScript'
   assert.ok(nb.includes('NOW_PULSE.halo')&&s.includes("animationIterationCount: 'infinite'"));
   assert.ok(nb.includes('WEB && !reduced'),'respeita movimento reduzido e fica parado no celular');
 });
+test('Gravador de fluidez: so no site, uma vez, envio direto (sem invalidar caches) e sem conteudo do usuario',()=>{
+  const pr=read('src/lib/fluency-probe.ts'),api=read('src/lib/api.ts'),home=read('src/screens/Home.tsx'),srv=fs.readFileSync(path.join(__dirname,'..','..','src/channels/mobile.js'),'utf8');
+  assert.ok(pr.includes("Platform.OS !== 'web'")&&pr.includes('if (started'));
+  assert.ok(api.includes("diagFluidez(body: unknown) { return this.fetchRequest<{ok: boolean}>('/diag/fluidez'"),'nao pode passar pelo request() (invalida caches)');
+  assert.ok(home.includes('useEffect(()=>{startHomeProbe(api);},[api]);'));
+  // textContent so para achar a saudacao; nunca enviado
+  assert.equal((pr.match(/textContent/g)||[]).length,1);assert.ok(!/innerText|innerHTML|outerHTML/.test(pr));
+  assert.ok(srv.includes("p === '/api/mobile/diag/fluidez' && m === 'POST'")&&srv.includes("rate(session, 'diag-fluidez', 6)"));
+});

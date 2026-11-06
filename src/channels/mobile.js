@@ -162,6 +162,12 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/auth/logout-all' && m === 'POST') {
       await bodyJson(req, 1024); mobileSessions.revokeAll(); deps.revokeWebSessions?.(); return send({ ok: true });
     }
+    // 06/11/2026: relatorio do gravador de fluidez do Inicio do site (so posicoes, tempos e nomes de partes; sem conteudo).
+    // Nao grava no banco: vai so para o registro do servidor, onde o agente le pelo Railway.
+    if (p === '/api/mobile/diag/fluidez' && m === 'POST') {
+      rate(session, 'diag-fluidez', 6); const b = await bodyJson(req, 60000);
+      console.log('[fluidez] ' + JSON.stringify(b).slice(0, 60000)); return send({ ok: true });
+    }
     if (p === '/api/mobile/auth/change-password' && m === 'POST') {
       rate(session, 'password', 5); const b = await bodyJson(req, 4096);
       const current = String(b.currentPassword || ''), next = String(b.newPassword || ''), confirmation = String(b.confirmPassword || '');

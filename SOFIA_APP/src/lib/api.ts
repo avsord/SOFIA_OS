@@ -307,6 +307,8 @@ export class SofiaApi {
   calendarSync() { return this.request<{ok:boolean}>('/md/calendar/sync',{},'POST',90000); }
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
+  /** 06/11/2026: relatorio do gravador de fluidez do Inicio (fluency-probe.ts). Envio direto: nao invalida caches nem dispara releituras. */
+  diagFluidez(body: unknown) { return this.fetchRequest<{ok: boolean}>('/diag/fluidez', body, 'POST', 10000); }
   tasks() { return this.request<{items: Task[]}>('/tasks'); }
   /** 0.3.255: qualquer estado valido (ex.: "scheduled" = tarefa que esta na agenda) */
   async taskSetState(task: Pick<Task,'id'|'revision'>, state: 'done' | 'todo' | 'scheduled') { const r=await this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH');this.taskTouched();return r; }
