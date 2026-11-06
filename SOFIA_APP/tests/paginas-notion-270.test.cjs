@@ -279,3 +279,6 @@ test('linha do tempo vai de hoje - 1 mes ate hoje + 1 mes, com o mes anterior ca
 test('proximos eventos na lateral usam a cor da importancia (como a Agenda)',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');assert.match(s,/color:agendaPriority\(it as any\)\.color\|\|''/);assert.match(s,/backgroundColor:\(it as any\)\.color\|\|c\.accent/);
 });
+test('pagina: marca-texto como no Kindle (4 cores e tirar) na barra de formatacao',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/page-highlight-row/);assert.match(s,/Marcar em /);assert.match(s,/fmt\('hiliteColor','transparent'\)/);
+});

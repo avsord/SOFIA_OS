@@ -317,6 +317,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {tool('Link (Ctrl+K)',()=>{setLinkUrl('');setBarMenu(m=>m==='link'?null:'link');},<Icon name="link" size={16} color={c.text}/>,barMenu==='link')}
     {tool('Limpar formatação',()=>fmt('clear'),<Text style={{color:c.text,fontSize:12}}>T<Text style={{fontSize:10}}>x</Text></Text>)}
    </View>
+   {/* 06/11/2026 (Pedro: "marcar igual no Kindle"): marca-texto com um clique - 4 cores e tirar a marca */}
+   <View testID="page-highlight-row" style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,paddingVertical:4,borderTopWidth:1,borderColor:c.line}}>
+    <Text style={{color:c.muted,fontSize:11,marginRight:2}}>Marcar</Text>
+    {([['Amarelo','rgba(250,204,21,.38)'],['Azul','rgba(96,165,250,.38)'],['Rosa','rgba(244,114,182,.38)'],['Laranja','rgba(251,146,60,.38)']] as const).map(([name,bg])=><Pressable key={name} accessibilityRole="button" accessibilityLabel={'Marcar em '+name.toLowerCase()} onPress={()=>fmt('hiliteColor',bg)} style={({hovered}:any)=>({width:22,height:22,borderRadius:11,backgroundColor:bg,borderWidth:hovered?2:1,borderColor:hovered?c.text:c.line})}/>)}
+    <Pressable accessibilityRole="button" accessibilityLabel="Tirar marcação" onPress={()=>fmt('hiliteColor','transparent')} style={({hovered}:any)=>({width:22,height:22,borderRadius:11,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.line:'transparent'})}><Text style={{color:c.muted,fontSize:11}}>✕</Text></Pressable>
+   </View>
    {barMenu==='color'?<View style={{borderTopWidth:1,borderColor:c.line,paddingTop:6,gap:4}}>
     <Text style={{color:c.muted,fontSize:11,paddingHorizontal:6}}>Cor do texto</Text>
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:2}}>{COLORS.map(([name,fg])=><Pressable key={'f'+name} accessibilityLabel={'Texto '+name} onPress={()=>fmt('foreColor',fg||c.text)} style={({hovered}:any)=>({width:26,height:26,borderRadius:6,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:fg||c.text,fontSize:13,fontWeight:'600'}}>A</Text></Pressable>)}</View>

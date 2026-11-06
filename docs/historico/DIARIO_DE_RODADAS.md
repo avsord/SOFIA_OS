@@ -231,3 +231,4 @@ Cada rodada nova acrescenta UMA linha curta no fim (até ~300 caracteres): data 
 | 2026-11-06 | (delivery) | Linha do tempo do Início: de hoje − 1 mês até hoje + 1 mês (pedido do Pedro), mês anterior carregado junto | conferido: limites 5/10 e 5/12 (hoje 5/11); testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: listras do futuro e escurecido do passado agora contínuos (uma faixa só a partir da meia-noite de amanhã / até o começo de hoje), não apagam mais de um dia para o outro; aprovado por imagem | capturas de amanhã, domingo e ontem; testes ok |
 | 2026-11-06 | (delivery) | Próximos eventos (lateral): quadradinho na cor da importância do compromisso, igual à Agenda | conferido: importante em vermelho; testes ok |
+| 2026-11-06 | (delivery) | Páginas: marca-texto como no Kindle — linha "Marcar" na barra de formatação com amarelo, azul, rosa, laranja e ✕ (um clique) | aprovado por imagem; testado marcando duas frases; testes ok |
