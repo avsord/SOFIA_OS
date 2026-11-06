@@ -65,7 +65,12 @@ function endFromRange(text,startIso){
  // so com "das/de" na frente, ou com "h"/":" nos dois horarios ("comprar 2 a 3 pacotes" nao e horario)
  const m=/\b(?:das?|de)\s+(\d{1,2})(?:[:h](\d{2}))?\s*(?:h(?:rs?|oras?)?)?\s*(?:at[ée]|às?|a|-|–)\s*(?:as\s+)?(\d{1,2})(?:[:h](\d{2}))?/i.exec(clean)
   ||/\b(\d{1,2})(?:h|:)(\d{2})?\s*(?:-|–|at[ée]|às?|a)\s*(\d{1,2})(?:h|:)(\d{2})?/i.exec(clean);
- if(!m)return '';const h1=+m[1],m1=+(m[2]||0),h2=+m[3],m2=+(m[4]||0);if(h1>23||h2>23||m1>59||m2>59)return '';
+ if(!m){// so o fim ("desse horario ate 17h", "ate as 17:30"): comeca no proprio inicio (horario de Brasilia)
+  const u=/\bat[ée]\s*(?:as\s+|às\s+)?(\d{1,2})(?:[:h](\d{2}))?\s*(?:h(?:rs?|oras?)?)?(?:\s*(?:da|de)\s+(manh[ãa]|tarde|noite))?/i.exec(clean);if(!u)return '';
+  let h=+u[1];const mm=+(u[2]||0),part=String(u[3]||'').toLowerCase();if((part==='tarde'||part==='noite')&&h<12)h+=12;if(h>23||mm>59)return '';
+  const start=Date.parse(startIso);if(!Number.isFinite(start))return '';const hm=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(start)).split(':').map(Number);
+  let diff=(h*60+mm)-((hm[0]%24)*60+hm[1]);if(diff<=0)diff+=24*60;if(diff>16*60)return '';return new Date(start+diff*60000).toISOString();}
+ const h1=+m[1],m1=+(m[2]||0),h2=+m[3],m2=+(m[4]||0);if(h1>23||h2>23||m1>59||m2>59)return '';
  let diff=(h2*60+m2)-(h1*60+m1);if(diff===0)return '';if(diff<0)diff+=24*60;if(diff>16*60)return '';
  const start=Date.parse(startIso);return Number.isFinite(start)?new Date(start+diff*60000).toISOString():'';
 }

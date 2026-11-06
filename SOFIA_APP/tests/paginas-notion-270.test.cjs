@@ -306,3 +306,16 @@ test('Price Tracker no site: preco lido pelo servidor (sem navegador invisivel) 
 test('linha do tempo agrupa pelo horario mesmo logo depois de arrastar (lista ordenada antes de agrupar)',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/for \(const r of \[\.\.\.withMoved\(items\)\]\.sort\(/);
 });
+test('criar rapido na linha do tempo: entende variacoes (tipo, prioridade, horario, fim, descricao) e manda pergunta para a Sofia',()=>{
+ const Q=load('src/lib/quick-create.ts',{});const at=new Date(2026,10,6,9,5);const f=(t)=>Q.parseQuickCreate(t,at);const hm=d=>d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+ let r=f('cria na agenda dentista às 15h');assert.equal(r.kind,'event');assert.equal(r.title,'Dentista');assert.equal(hm(r.at),'15:00');
+ r=f('bota na agenda reunião com Oliver das 14 às 15:30');assert.equal(r.kind,'event');assert.equal(hm(r.end),'15:30');
+ r=f('me lembra de pagar a luz');assert.equal(r.kind,'reminder');assert.equal(r.title,'Pagar a luz');
+ r=f('Trabalhar prioridade média das 6hrs até 7:30');assert.equal(r.kind,'task');assert.equal(r.priority,'medium');assert.equal(hm(r.at),'6:00');assert.equal(hm(r.end),'7:30');
+ r=f('desse horario até 17horas academia');assert.equal(r.title,'Academia');assert.equal(hm(r.at),'9:05');assert.equal(hm(r.end),'17:00');
+ r=f('Pesquisar rastreador descrição: o da xiaomi');assert.equal(r.description,'o da xiaomi');assert.equal(r.title,'Pesquisar rastreador');
+ r=f('marca consulta 3 da tarde');assert.equal(hm(r.at),'15:00');
+ r=f('comprar 2 a 3 pacotes de café');assert.equal(r.end,null);
+ assert.equal(f('o que tenho amanhã?'),null);assert.equal(f('quais tarefas hoje'),null);
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/const quick = !f \? parseQuickCreate\(t, when\) : null;/);
+});

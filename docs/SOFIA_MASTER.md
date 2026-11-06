@@ -221,6 +221,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Tablet (06/11/2026, Pedro):** versão tablet = o próprio site dentro do APK (`SOFIA_APP/src/components/TabletSite.tsx`), para não refazer no nativo o que já foi acertado no site. Precisa de internet; avisos continuam pelo app. Celular segue nativo.
 
+- **Criar pela linha do tempo (06/11/2026, Pedro):** pedido de criar é entendido no próprio app e salvo na hora; sem tipo = Tarefa; "agenda" = compromisso. Só pergunta/foto/texto não reconhecido vai para a IA.
+
 ## 8. Regras que não se quebram
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
@@ -316,11 +318,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: pontos pegam o mouse num raio de 18 px (hitSlop não vale no navegador); clicar para criar não faz a linha voltar sozinha ao agora; criando, passar o mouse na bolinha mostra a prévia | arrastado pegando 14 px fora: 16:00→18:10; testes ok |
 | 2026-11-06 | (delivery) | Tarefa com início e fim: coluna end_at em task_details (migration-task-end.js, não muda user_version); Sofia entende "das 6h até 7:30"/"de 14:00 a 15:30"/"6h-7h30" para tarefa e compromisso; tarefa com fim ganha a barra de duração na linha do tempo | testes: 90 min gravados; "2 a 3 pacotes" não vira horário; servidor 419/419 |
 | 2026-11-06 | (delivery) | Linha do tempo: vão entre bolinhas mostra horário + criar (grudar só a 15 px); 2º clique fecha o criar; não salta para o agora com o clique que ativa a janela nem com janela aberta | testes ok |
 | 2026-11-06 | (delivery) | Price Tracker no site: preço lido pelo servidor (leitor link-preview, JSON-LD/og:price) em vez do navegador invisível do celular, que não existe no site (dava "a loja não respondeu a tempo") | testes ok; leitura real da KaBuM não testada (rede do ambiente bloqueia a loja) |
 | 2026-11-06 | (delivery) | Linha do tempo: item arrastado para o horário de outro vira grupo na hora (antes ficavam um em cima do outro, parecendo um só, até recarregar) | conferido: Tarefa B arrastada para 05:00 agrupou com Tarefa A; testes ok |
+| 2026-11-06 | (delivery) | Criar rápido na linha do tempo (quick-create.ts): pedido de criar salvo na hora sem esperar a IA (~100 ms); padrão Tarefa; "na agenda/agendar/reunião/consulta/call" = compromisso; "me lembra/me avisa/não esquecer" = lembrete; prioridade, "descrição:", "das X até Y", "desse horário até 17h", "3 da tarde"; pergunta vai para a Sofia. Servidor também entende "até 17h" | medido 98 ms; testes app ok, servidor 420/420 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

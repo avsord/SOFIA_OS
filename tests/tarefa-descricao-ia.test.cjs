@@ -21,3 +21,8 @@ test('tarefa e compromisso "das 6h até 7:30" gravam o fim; numero comum nao vir
  // edicao sem end_at mantem o fim
  const kept=f.store.saveTask({...task,title:'Trabalhar 2',end_at:undefined},task.id);assert.equal(kept.end_at||f.store.task(task.id).end_at,task.end_at);
 });
+test('so o fim ("desse horario ate 17horas") usa o inicio da tarefa',async t=>{
+ const f=fixture(t);await run(f,'desse horario até 17horas academia',{title:'Academia',date:'2026-11-07',time:'10:20'});
+ const task=f.store.tasks().find(x=>x.title==='Academia');assert.ok(task.end_at,'tem fim');
+ assert.equal(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(task.end_at)),'17:00');
+});

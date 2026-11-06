@@ -2,6 +2,7 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
+import {parseQuickCreate} from '../lib/quick-create';
 import {appAlert} from '../lib/app-alert';
 import {DateTimeField} from '../components/DateTimeField';
 import {TASK_PRIORITIES} from '../lib/task-filters';
@@ -336,7 +337,7 @@ export type MoveTarget = MuteTarget | {mark: TimeMark};
  * funcao (compromisso, tarefa, lembrete, Rotina) ja com o horario do clique. */
 export type AddKind = 'event' | 'task' | 'reminder' | 'routine';
 /** 0.3.333 (aprovado por foto): o que o mini editor preso ao ponto grava (o Inicio grava como o app grava cada um). */
-export type MiniSave = {kind: AddKind; title: string; at: Date; minutes?: number; notify?: boolean; google?: boolean; priority?: string; repeat?: string; message?: string; rtype?: string; dose?: string; daily?: boolean; rrepeat?: 'once' | 'daily' | 'weekdays' | 'interval'; weekdays?: number[]};
+export type MiniSave = {kind: AddKind; title: string; at: Date; minutes?: number; notify?: boolean; google?: boolean; priority?: string; repeat?: string; message?: string; rtype?: string; dose?: string; daily?: boolean; description?: string; end?: Date | null; rrepeat?: 'once' | 'daily' | 'weekdays' | 'interval'; weekdays?: number[]};
 /** Ponte do Inicio com a Sofia: conversar (texto e foto) e gravar pelo mini editor; save devolve o "Desfazer". */
 export type SofiaBridge = {first: string; ask: (text: string, file?: any) => Promise<string>; save: (x: MiniSave) => Promise<(() => Promise<void>) | void>};
 /** 0.3.318: um arrastar pode levar varios itens juntos (bolinha com "2 itens", pilula com varias doses): cada um anda o mesmo tanto. */
@@ -719,6 +720,13 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
     r.onresult = (e: any) => {let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setText(base + t);}; r.onend = () => setListening(false); r.onerror = () => setListening(false); rec.current = r; setListening(true); try {r.start();} catch {setListening(false);}};
   const send = async (custom?: string, label?: string) => {const t = (custom ?? text).trim(); if (busy || (!t && !file)) return; const shown = label || t || (file ? 'Foto enviada' : ''), img = preview;
     setMsgs(m => [...m, {who: 'me', text: shown, img}]); setText(''); setBusy(true); setErr(''); const f = file; setFile(null); setPreview('');
+    // 06/11/2026 (Pedro: "ta demorando muito pra criar"): pedido de criar e entendido aqui e salvo na hora (sem esperar a IA);
+    // pergunta, foto ou texto que nao parece um pedido de criar continua indo para a Sofia
+    const quick = !f ? parseQuickCreate(t, when) : null;
+    if (quick) {try {const undo = await sofia.save({kind: quick.kind as AddKind, title: quick.title, at: quick.at, priority: quick.priority, description: quick.description, end: quick.end, minutes: quick.end ? Math.round((quick.end.getTime() - quick.at.getTime()) / 60000) : undefined, notify: true});
+        const word = quick.kind === 'event' ? 'Compromisso' : quick.kind === 'reminder' ? 'Lembrete' : 'Tarefa', pr = quick.priority === 'important' ? ' · Importante' : quick.priority === 'medium' ? ' · Média' : quick.priority === 'light' ? ' · Baixa' : '';
+        onSaved(word + ' criado' + (quick.kind === 'task' ? 'a' : '') + ': “' + quick.title + '” às ' + hhmm(quick.at) + (quick.end ? '–' + hhmm(quick.end) : '') + pr, undo); return;}
+      catch {/* se o salvar rapido falhar, segue para a Sofia */}}
     try {const reply = await sofia.ask((t || 'Veja este arquivo.') + '\n\n(Pedido pela linha do tempo do Início, para ' + dayTxt + ' às ' + hm + '.)', f); setMsgs(m => [...m, {who: 'sofia', text: reply || 'Pronto.'}]);
       // 05/11/2026 (Pedro: "quando termina, o chat continua na mesma bolinha"): criou algo -> fecha sozinho em 2,5 s e mostra o aviso (se a pessoa nao estiver escrevendo)
       if (/\b(criad[ao]|agendad[ao]|marcad[ao]|adicionad[ao]|registrad[ao]|anotad[ao]|lembrete)\b/i.test(reply || '')) setTimeout(() => {if (!textRef.current.trim()) onSaved(String(reply).split(/\n/)[0].slice(0, 120));}, 2500);}
