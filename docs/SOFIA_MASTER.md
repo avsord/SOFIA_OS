@@ -231,6 +231,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Senha escrita numa página (06/11/2026, Pedro):** a página pergunta se quer trancar com senha; se "não", salva normalmente (marca sofia-secret-ok-v1) e fica fora do que a IA lê.
 
 ## 8. Regras que não se quebram
+- **Varredura de coerência antes de entregar mudança no site** (Pedro 06/11: "não quero ficar falando item por item"): `node SOFIA_APP/tools/ux-sweep.cjs http://127.0.0.1:<porta> <email> <senha>` contra um servidor LOCAL de teste (clica em botões; recusa produção). Novo achado = corrigir ou registrar em §9 antes de dizer pronto.
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
 
@@ -331,11 +332,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Página com senha (desenho aprovado): Máxima/Média, AES-GCM no navegador (PBKDF2 310k), lock_json; Média guarda a chave cifrada no servidor (data/page-lock-master.key) e recupera com a senha da conta; IA/link público não leem. Senha escrita na página pergunta "trancar?"; "não" salva (sofia-secret-ok-v1). Corrigido: 387 cópias do editor (useMemo com api) | E2E no navegador ok (inclui reinício do servidor); [manual-apk] |
 | 2026-11-06 | (delivery) | Início piscando/pulando (Pedro): a Rotina (useCapsules) redesenhava o Início INTEIRO a cada 1 s (tarefa de 70–90 ms, CPU 4×); Stat das Finanças era recriado a cada redesenho; aureola do "agora" pulsava por JS 60×/s. Tique só na troca de minuto, Stat fora, pulso em CSS. Ocioso: JS 1,61→0,27 s/10 s, 55→60 fps | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Pedro: "tá do mesmo jeito" após a correção do redesenho de 1 s (não reproduzia aqui com dados pequenos). Gravador de fluidez do Início no site (fluency-probe.ts): 20 s após abrir manda ao log do Railway saltos, partes redesenhadas, animações reiniciadas e travadas, sem conteúdo | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | 1º relatório [fluidez] do Pedro (1762×832, zoom 109%) achou a causa real: encaixe do Início entrava 1 quadro atrasado (100%→92%, "Boa tarde" descia 14 px) e os 7 nomes da linha do tempo esperavam o onLayout. Ambos medidos antes da pintura; reproduzido e confirmado com a tela dele | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Foto do perfil no site entrava 65–180 ms depois das iniciais (buscada só após o login). early.js pede /profile/photo junto com a página e guarda a foto pronta; o avatar já nasce com ela (0 ms). 2º relatório [fluidez] do Pedro: saudação sem o pulo de 14 px | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Linha do tempo: seleção de bolinhas sai clicando fora do quadro (Esc já tirava). Nova varredura `SOFIA_APP/tools/ux-sweep.cjs`: percorre as 17 telas do site num servidor de teste e acusa erros, pulos, rolagem lateral, botões sem nome e menus/janelas que não fecham com Esc ou clique fora | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

@@ -43,3 +43,8 @@ test('Foto do perfil no site: pedida junto com a pagina (early.js) e o avatar ja
   assert.ok(av.includes('useState(()=>photoPreview(scope)||earlyPhoto())'));
   assert.ok(ev.includes("v.startsWith('data:image/')"),'so aceita imagem');
 });
+test('Linha do tempo: selecao sai com Esc e clicando fora do quadro',()=>{
+  const s=read('src/desktop/HomeBrief.tsx');
+  assert.ok(s.includes("document.addEventListener('pointerdown', out, true)")&&s.includes("if (e.key === 'Escape') setSel([]);"));
+  assert.ok(fs.existsSync(path.join(__dirname,'..','tools','ux-sweep.cjs')),'varredura de coerencia do site');
+});

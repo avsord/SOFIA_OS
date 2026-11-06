@@ -484,7 +484,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const keys = allRef.current.filter(q => q.x >= lo && q.x <= hi && tgtOf.current[q.key]).map(q => q.key); if (keys.length) setSel(o => [...new Set([...o, ...keys])]);};
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); return true;};
   marqStart.current = beginMarquee;
-  useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [sel.length]);
+  useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);};
+    // 06/11/2026 (Pedro: "fez a selecao mas nao fez a funcao de quando clicar fora tira a selecao"): clicar fora do quadro
+    // da linha do tempo desmarca, como em qualquer programa (dentro do quadro continua valendo o clique na linha/bolinhas)
+    const out = (e: PointerEvent) => {const card = (lineBox.current as any)?.closest?.('[data-testid="home-brief"]'); const t = e.target as Node | null; if (card && t && !card.contains(t) && !(t as any).closest?.('[data-testid="timeline-selected"]')) setSel([]);};
+    window.addEventListener('keydown', k); document.addEventListener('pointerdown', out, true); return () => {window.removeEventListener('keydown', k); document.removeEventListener('pointerdown', out, true);};}, [sel.length]);
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
   const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
