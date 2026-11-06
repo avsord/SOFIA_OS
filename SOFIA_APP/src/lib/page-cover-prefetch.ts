@@ -7,10 +7,21 @@ import {cachedPageCover,pageCoverDestination} from './page-cover-cache';
 export const IMAGE_SIZES=new Map<string,{w:number;h:number}>();
 /** Imagem da capa ja decodificada (site): a pagina reaproveita este mesmo elemento e a capa aparece no 1o quadro. */
 export const DECODED=new Map<string,any>();
+/** 06/11/2026 (Pedro: capa roxa por um instante ao abrir outra pagina): o navegador descarta a foto decodificada de um <img>
+ * fora da tela; ao voltar ele decodifica de novo e mostra o fundo por 1-3 quadros. Um ImageBitmap fica pronto na memoria e
+ * e pintado num <canvas> antes do primeiro quadro - a capa ja preparada nunca pisca. Reduzido a largura da tela. */
+export const BITMAPS=new Map<string,any>();
+export async function makeBitmap(uri:string,img:any):Promise<any>{
+ const g:any=globalThis;if(BITMAPS.has(uri))return BITMAPS.get(uri);if(typeof g.createImageBitmap!=='function'||!img)return null;
+ try{if(!(img.complete&&img.naturalWidth>0))await new Promise<void>((ok,bad)=>{img.addEventListener('load',()=>ok(),{once:true});img.addEventListener('error',()=>bad(new Error('img')),{once:true});});
+  const target=Math.round(Math.min(2400,(g.screen?.width||1920)*(g.devicePixelRatio||1))),w=img.naturalWidth,h=img.naturalHeight;
+  const bmp=w>target?await g.createImageBitmap(img,{resizeWidth:target,resizeHeight:Math.round(h*target/w),resizeQuality:'high'}):await g.createImageBitmap(img);
+  BITMAPS.set(uri,bmp);return bmp;}catch{return null;}
+}
 export function peekCover(id:string):string{if(!id)return '';try{const d=pageCoverDestination(id) as any;return d?.exists&&d.uri?String(d.uri):'';}catch{return '';}}
 const prefetching=new Set<string>();
-export function prefetchPageCover(api:SofiaApi,data:Record<string,any>|undefined):Promise<void>{const id=String(data?.cover_attachment_id||'');if(data?.cover_type!=='attachment'||!id||prefetching.has(id)||peekCover(id))return Promise.resolve();prefetching.add(id);
- return cachedPageCover(api.attachmentSource(id),id,false,0).then(uri=>{if(Platform.OS==='web'&&uri){try{const pic=new (globalThis as any).Image();pic.decoding='sync';pic.src=uri;void (pic.decode?pic.decode():Promise.resolve()).then(()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);}).catch(()=>{});}catch{/* sem decode */}}if(Platform.OS==='web'&&uri)Image.getSize(uri,(w,h)=>{if(w>0&&h>0)IMAGE_SIZES.set(uri,{w,h});},()=>{});}).catch(()=>{}).finally(()=>prefetching.delete(id)) as Promise<void>;}
+export function prefetchPageCover(api:SofiaApi,data:Record<string,any>|undefined):Promise<void>{const id=String(data?.cover_attachment_id||'');if(data?.cover_type!=='attachment'||!id||prefetching.has(id))return Promise.resolve();{const have=peekCover(id);if(have){if(!BITMAPS.has(have)&&Platform.OS==='web'){try{const pic=new (globalThis as any).Image();pic.src=have;return makeBitmap(have,pic).then(()=>{});}catch{}}return Promise.resolve();}}prefetching.add(id);
+ return cachedPageCover(api.attachmentSource(id),id,false,0).then(uri=>{if(Platform.OS==='web'&&uri){try{const pic=new (globalThis as any).Image();pic.decoding='sync';pic.src=uri;void makeBitmap(uri,pic);void (pic.decode?pic.decode():Promise.resolve()).then(()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);}).catch(()=>{});}catch{/* sem decode */}}if(Platform.OS==='web'&&uri)Image.getSize(uri,(w,h)=>{if(w>0&&h>0)IMAGE_SIZES.set(uri,{w,h});},()=>{});}).catch(()=>{}).finally(()=>prefetching.delete(id)) as Promise<void>;}
 
 // 05/11/2026 (Pedro: "quando carregar, todas as paginas ja ficam carregando em segundo plano, ja que o usuario entra no
 // Inicio primeiro"): logo depois que o Inicio abre, as capas de TODAS as paginas descem em segundo plano, duas por vez,

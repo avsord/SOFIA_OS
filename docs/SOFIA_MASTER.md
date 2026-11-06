@@ -306,13 +306,15 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Capa na 1ª vez: sem fundo roxo antes da foto — área da capa com fundo neutro + roda de carregamento até a foto estar desenhada, foto entra por cima e a roda sai depois | medido 1ª carga sem nada guardado: só roda → foto (antes: fundo → foto); capa guardada segue pronta no 1º quadro |
 | 2026-11-06 | (delivery) | Capa: roda de carregamento fica no mínimo 0,45 s quando aparece (carga rápida virava um piscar), ideia do Pedro | medido: download de 60 ms → roda ~0,6 s e foto; lento igual; capa guardada segue instantânea |
 | 2026-11-06 | (delivery) | Compartilhar página na web (tipo Notion): botão Compartilhar no topo → Publicar na web; link secreto só leitura em /p/<código>, página + subpáginas (subpágina compartilhada mostra só ela e as de dentro); desligar corta, gerar novo link troca; 🌐 na lateral | testes: escopo, desligar, código inventado, privada não vaza, script removido; servidor 417/417, app ok |
 | 2026-11-06 | (delivery) | Barra lateral: página sem subpáginas não mostra a seta de abrir (só o espaço, para alinhar) | conferido: sem filhas sem seta; com filha mostra; testes ok |
 | 2026-11-06 | (delivery) | Capa (pedido repetido do Pedro): roda só não aparece para foto já preparada; qualquer outra fica escondida até carregar+decodificar+0,45 s e entra com fade (antes "carregada" pelo navegador aparecia sem roda e piscava). Página compartilhada: roda e foto entra depois; largura do texto igual ao site (960) | medido: nova → roda ~0,6 s → foto; recarga → roda → foto; preparada → na hora |
+| 2026-11-06 | (delivery) | RAIZ da capa roxa ao abrir outra página: o navegador descarta a foto decodificada fora da tela e decodifica de novo (1-3 quadros de fundo, sem roda, em fotos grandes). Agora cada capa vira ImageBitmap (largura da tela) e é pintada num canvas antes do 1º quadro; capa não preparada segue com roda + tempo mínimo | medido: troca de página → canvas já pintado no 1º quadro; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
+
+- Capa "piscando": medir só o <img> ou testar com imagens pequenas não reproduz; o navegador descarta a decodificação de fotos grandes fora da tela. Gravar a tela e usar foto do tamanho real.
 
 - Afirmou-se que havia "dois S" (JS + nativo); o JS era código morto.
 - A fila do GitHub Actions é 1 em andamento + 1 pendente, não ilimitada.

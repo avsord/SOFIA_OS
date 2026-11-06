@@ -13,7 +13,7 @@ import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
 import {cachedPageCover} from '../lib/page-cover-cache';
-import {DECODED,IMAGE_SIZES,peekCover,prefetchPageCover} from '../lib/page-cover-prefetch';
+import {BITMAPS,DECODED,IMAGE_SIZES,makeBitmap,peekCover,prefetchPageCover} from '../lib/page-cover-prefetch';
 export {prefetchPageCover};
 import {MotionModal} from './MotionModal';
 import {useDesktop} from '../lib/desktop';
@@ -79,6 +79,16 @@ export function coverPosition(data:Record<string,any>):number{const raw=data?.co
 // aparece, ela fica pelo menos MIN_SPIN ms antes da foto entrar. Capa ja pronta continua sem roda.
 const MIN_SPIN=450;
 const now=()=>(globalThis as any).performance?.now?.()??Date.now();
+/** Capa ja preparada: pinta o ImageBitmap no canvas dentro do layout (antes do primeiro quadro), recortando como
+ * object-fit:cover com a posicao escolhida; redesenha quando a largura muda. */
+function BitmapCover({bmp,position}:{bmp:any;position:number}){
+ const ref=useRef<any>(null);
+ React.useLayoutEffect(()=>{const cv=ref.current;if(!cv)return;const g:any=globalThis;
+  const draw=()=>{const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;const dpr=g.devicePixelRatio||1;const W=Math.round(w*dpr),H=Math.round(h*dpr);if(cv.width!==W)cv.width=W;if(cv.height!==H)cv.height=H;
+   const sc=Math.max(W/bmp.width,H/bmp.height),dw=bmp.width*sc,dh=bmp.height*sc;const ctx=cv.getContext('2d');if(!ctx)return;ctx.imageSmoothingQuality='high';ctx.clearRect(0,0,W,H);ctx.drawImage(bmp,(W-dw)/2,(H-dh)*position/100,dw,dh);};
+  draw();const ro=typeof g.ResizeObserver==='function'?new g.ResizeObserver(draw):null;ro?.observe(cv);return()=>ro?.disconnect();},[bmp,position]);
+ return React.createElement('canvas',{ref,style:{position:'absolute',inset:0,width:'100%',height:'100%',display:'block',pointerEvents:'none'}});
+}
 function WebCoverImg({uri,position,onError,since=0}:{uri:string;position:number;onError:()=>void;since?:number}){
  const host=useRef<any>(null),err=useRef(onError);err.current=onError;const c=useTheme();
  // 06/11/2026 (Pedro: "o fundo roxo aparece primeiro, depois a foto; se nao resolver, uma roda de carregando"): enquanto a
@@ -86,9 +96,10 @@ function WebCoverImg({uri,position,onError,since=0}:{uri:string;position:number;
  // 06/11/2026 (Pedro, 10a vez: "a roda nao ta indo; atrasa a foto de proposito pra nao piscar"): so pula a roda a foto que
  // ja foi PREPARADA (decodificada) antes e esta guardada. Qualquer outra - mesmo que o navegador diga "carregada" - fica
  // escondida com a roda por cima ate: carregar + decodificar + tempo minimo (MIN_SPIN). So depois entra com um fade.
- const prepared=()=>{const d=DECODED.get(uri);return !!(d&&!d.isConnected&&d.complete&&d.naturalWidth>0);};
+ const bmp=BITMAPS.get(uri);
+ const prepared=()=>false;
  const [ready,setReady]=useState(prepared);
- React.useLayoutEffect(()=>{const box=host.current;if(!box||typeof document==='undefined')return;
+ React.useLayoutEffect(()=>{const box=host.current;if(bmp||!box||typeof document==='undefined')return;
   const instant=prepared();let pic:any=instant?DECODED.get(uri):null,alive=true;
   if(!pic){pic=document.createElement('img');pic.decoding='async';pic.src=uri;}
   pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
@@ -96,9 +107,10 @@ function WebCoverImg({uri,position,onError,since=0}:{uri:string;position:number;
   if(instant){pic.style.transition='';pic.style.opacity='1';setReady(true);}
   else{const start=since||now();pic.style.transition='opacity 220ms ease-out';pic.style.opacity='0';setReady(false);
    const loaded=pic.complete&&pic.naturalWidth>0?Promise.resolve():new Promise<void>(r=>{pic.addEventListener('load',()=>r(),{once:true});});
-   void loaded.then(()=>pic.decode?pic.decode().catch(()=>{}):undefined).then(()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);const wait=Math.max(0,MIN_SPIN-(now()-start));
+   void makeBitmap(uri,pic);void loaded.then(()=>pic.decode?pic.decode().catch(()=>{}):undefined).then(()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);const wait=Math.max(0,MIN_SPIN-(now()-start));
     setTimeout(()=>{if(!alive)return;requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>{if(alive)setReady(true);},240);});},wait);});}
-  box.appendChild(pic);return()=>{alive=false;pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
+  box.appendChild(pic);return()=>{alive=false;pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position,bmp]);
+ if(bmp)return <View style={StyleSheet.absoluteFill}><BitmapCover bmp={bmp} position={position}/></View>;
  return <View style={StyleSheet.absoluteFill}>{ready?null:<View testID="page-cover-loading" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>}{React.createElement('div',{ref:host,style:{position:'absolute',inset:0}})}</View>;
 }
 function CoverImage({uri,position,repositioning=false,onPosition,onError,since=0}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void;since?:number}){

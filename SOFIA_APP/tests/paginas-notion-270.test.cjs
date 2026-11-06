@@ -259,3 +259,7 @@ test('capa: so pula a roda a foto ja preparada; pagina compartilhada com roda e 
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/pic\.decode\?pic\.decode\(\)/);assert.match(pa,/MIN_SPIN-\(now\(\)-start\)/);
  const sh=fs.readFileSync(path.join(__dirname,'..','..','src/core/page-share.js'),'utf8');assert.match(sh,/main\{max-width:960px/);assert.match(sh,/animation:reveal \.25s ease-out \.5s forwards/);
 });
+test('capa ja preparada e pintada de um ImageBitmap num canvas antes do 1o quadro (o navegador nao a descarta)',()=>{
+ const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/function BitmapCover/);assert.match(pa,/if\(bmp\)return <View style=\{StyleSheet\.absoluteFill\}><BitmapCover/);
+ const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/createImageBitmap\(img/);assert.doesNotMatch(pre,/await fetch\(uri\)/,'sem fetch de blob: (CSP)');
+});
