@@ -18,6 +18,7 @@ import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
 import {systemChanged,subscribeSystemChanged} from '../lib/system-events';
 import {useHoverHold} from '../lib/hover-hold';
+import {agendaPriority} from '../lib/agenda-priority';
 import {prefetchAllCovers,prefetchPageCover} from '../lib/page-cover-prefetch';
 import {refreshSharedPages} from '../components/PageSharePanel';
 import {eventStart,expandForHome} from '../lib/agenda-recurrence';
@@ -132,21 +133,21 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
 
 /** Próximos eventos (agenda) na barra lateral, como no Notion: título, horário e "Ver todos". */
 function UpcomingEvents({api,onOpen}:{api:SofiaApi;onOpen:()=>void}){
- const c=useTheme(),[items,setItems]=useState<{id:string;title:string;when:string;at:number}[]|null>(null);
+ const c=useTheme(),[items,setItems]=useState<{id:string;title:string;when:string;at:number;color?:string}[]|null>(null);
  useEffect(()=>{let alive=true;const load=async()=>{try{const now=new Date(),month=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),next=new Date(now.getFullYear(),now.getMonth()+1,1);
-   const lists=await Promise.all([api.agenda(month(now)),api.agenda(month(next)).catch(()=>({items:[]}))]);const seen=new Set<string>(),out:{id:string;title:string;when:string;at:number}[]=[];
+   const lists=await Promise.all([api.agenda(month(now)),api.agenda(month(next)).catch(()=>({items:[]}))]);const seen=new Set<string>(),out:{id:string;title:string;when:string;at:number;color?:string}[]=[];
    // mesma leitura da Agenda e do Início: repetições expandidas e dia inteiro pela data (sem virar 03:00/21:00 pelo fuso)
    const base=[...new Map(lists.flatMap(l=>l.items||[]).map(i=>[i.id,i])).values()];
    for(const it of expandForHome(base)){const start=eventStart(it),key=it.id+'|'+start;if(!start||seen.has(key)||it.state==='done'||it.state==='archived')continue;seen.add(key);const allDay=!!it.data?.calendar_all_day||/^\d{4}-\d{2}-\d{2}$/.test(start);const t=allDay?new Date(start.slice(0,10)+'T12:00:00'):new Date(start);if(Number.isNaN(t.getTime())||(allDay?t.getTime()+12*3600000<Date.now():t.getTime()<Date.now()-30*60000))continue;
     const end=it.data?.end_at?new Date(it.data.end_at):null,hm=(d:Date)=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),today=t.toDateString()===now.toDateString();
     const when=allDay?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t)+(end&&!Number.isNaN(end.getTime())?' – '+hm(end):''):t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
-    out.push({id:key,title:it.title||'Sem título',when,at:allDay?t.getTime()-12*3600000:t.getTime()});}
+    out.push({id:key,title:it.title||'Sem título',when,at:allDay?t.getTime()-12*3600000:t.getTime(),color:agendaPriority(it as any).color||''});}
    out.sort((a,b)=>a.at-b.at);if(alive)setItems(out.slice(0,6));}catch{if(alive)setItems([]);}};
   void load();const off=subscribeSystemChanged(owner=>{if(owner===api)void load();});const timer=setInterval(()=>void load(),5*60000);return()=>{alive=false;off();clearInterval(timer);};},[api]);
  if(!items||!items.length)return null;
  return <Section title="Próximos eventos">
   {items.map(it=><Pressable key={it.id} testID={'sidebar-event-'+it.id} accessibilityRole="button" accessibilityLabel={it.title+', '+it.when} onPress={onOpen} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:28,paddingHorizontal:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}>
-   <View style={{width:8,height:8,borderRadius:2,backgroundColor:c.accent}}/><Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:13}}>{it.title}</Text><Text style={{color:c.muted,fontSize:11}}>{it.when}</Text>
+   {/* 06/11/2026 (Pedro: "tem que respeitar a cor do que e importante"): o quadradinho usa a cor da importancia, como na Agenda */}<View style={{width:8,height:8,borderRadius:2,backgroundColor:(it as any).color||c.accent}}/><Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:13}}>{it.title}</Text><Text style={{color:c.muted,fontSize:11}}>{it.when}</Text>
   </Pressable>)}
   <Pressable accessibilityRole="button" accessibilityLabel="Ver toda a agenda" onPress={onOpen} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:28,paddingHorizontal:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}><Icon name="more" size={14} color={c.muted}/><Text style={{color:c.muted,fontSize:13}}>Ver tudo</Text></Pressable>
  </Section>;

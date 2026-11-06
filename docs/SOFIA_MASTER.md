@@ -311,11 +311,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: opção 2 aprovada por imagem (marco com bolinha, futuro listrado um dia sim um não, passado escurecido, opacidade baixa); meia-noite não some mais perto do "agora" | capturas enviadas ao Pedro antes; testes ok |
 | 2026-11-06 | (delivery) | Lembrete com várias datas ou que repete: Feito pergunta "parar de lembrar" (todas) ou "só desta vez" (esta data sai; repetição vai para a próxima) | teste: data 8/11 foi para 8/12, outras seguem ativas |
 | 2026-11-06 | (delivery) | Linha do tempo: faixas e símbolos de manhã/tarde/noite agora em qualquer dia visível (antes só hoje, amanhã e depois — em "Ontem" e dias além sumiam) | capturas: Ontem e Domingo 8/11 com faixas; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo do Início: de hoje − 1 mês até hoje + 1 mês (pedido do Pedro), mês anterior carregado junto | conferido: limites 5/10 e 5/12 (hoje 5/11); testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: listras do futuro e escurecido do passado agora contínuos (uma faixa só a partir da meia-noite de amanhã / até o começo de hoje), não apagam mais de um dia para o outro; aprovado por imagem | capturas de amanhã, domingo e ontem; testes ok |
+| 2026-11-06 | (delivery) | Próximos eventos (lateral): quadradinho na cor da importância do compromisso, igual à Agenda | conferido: importante em vermelho; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

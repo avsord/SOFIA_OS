@@ -276,3 +276,6 @@ test('linha do tempo vai de hoje - 1 mes ate hoje + 1 mes, com o mes anterior ca
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/prev = new Date\(now\.getFullYear\(\), now\.getMonth\(\) - 1, now\.getDate\(\)\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8'),/const calPrev=useAgendaMonth/);
 });
+test('proximos eventos na lateral usam a cor da importancia (como a Agenda)',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');assert.match(s,/color:agendaPriority\(it as any\)\.color\|\|''/);assert.match(s,/backgroundColor:\(it as any\)\.color\|\|c\.accent/);
+});
