@@ -76,15 +76,18 @@ export function coverPosition(data:Record<string,any>):number{const raw=data?.co
 // quadros para ser desenhado. Agora a capa usa o MESMO elemento que foi decodificado em segundo plano (DECODED) e
 // e colocada antes do primeiro desenho da pagina; o elemento fica guardado para a proxima visita.
 function WebCoverImg({uri,position,onError}:{uri:string;position:number;onError:()=>void}){
- const host=useRef<any>(null),err=useRef(onError);err.current=onError;
+ const host=useRef<any>(null),err=useRef(onError);err.current=onError;const c=useTheme();
+ // 06/11/2026 (Pedro: "o fundo roxo aparece primeiro, depois a foto; se nao resolver, uma roda de carregando"): enquanto a
+ // foto nao esta desenhada fica o fundo neutro com a roda (igual a capa que ainda baixa) e a foto entra por cima.
+ const [ready,setReady]=useState(()=>{const d=DECODED.get(uri);return !!(d&&!d.isConnected&&d.complete&&d.naturalWidth>0);});
  React.useLayoutEffect(()=>{const box=host.current;if(!box||typeof document==='undefined')return;
   let pic:any=DECODED.get(uri);if(!pic||pic.isConnected){pic=document.createElement('img');pic.decoding='sync';pic.src=uri;pic.addEventListener('load',()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);});}
   pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
   Object.assign(pic.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'});
   // capa que ainda nao estava pronta entra com um fade curto (antes: aparecia de golpe sobre o fundo)
-  if(!(pic.complete&&pic.naturalWidth>0)){pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';const show=()=>{pic.style.opacity='1';};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';}
+  if(!(pic.complete&&pic.naturalWidth>0)){pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';setReady(false);const show=()=>{const go=()=>{requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>setReady(true),200);});};if(pic.decode)pic.decode().then(go,go);else go();};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';setReady(true);}
   box.appendChild(pic);return()=>{pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
- return React.createElement('div',{ref:host,style:{position:'absolute',inset:0}});
+ return <View style={StyleSheet.absoluteFill}>{ready?null:<View testID="page-cover-loading" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>}{React.createElement('div',{ref:host,style:{position:'absolute',inset:0}})}</View>;
 }
 function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
  const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(()=>IMAGE_SIZES.get(uri)||null),[pos,setPos]=useState(position);

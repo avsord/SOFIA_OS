@@ -303,11 +303,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-05 | (delivery) | Rodada notas/links/estabilidade: aviso falso "mudou em outro aparelho" (cópia velha da lista) agora junta só o que a pessoa mudou com a versão atual; mover página na lateral não recusa revisão velha; nota reaberta no site mostrava [object Object]; links clicáveis (Copiar/Remover); ⋯ e menu pequeno nas notas, reordenar; Agenda lado a lado; tela escondida com opacidade 0 | testes do app ok; junção conferida no servidor local (409 → 200) |
 | 2026-11-05 | (delivery) | Capas: todas as páginas baixam e decodificam em segundo plano desde o Início (ideia do Pedro); a página reusa a mesma imagem já decodificada | medido quadro a quadro: capa pronta no 1º quadro (antes 1–2 quadros vazios); 8 capas baixadas sem abrir Páginas |
 | 2026-11-06 | (delivery) | Capa na 1ª carga: guardada cifrada no navegador (IndexedDB, mesma chave do Início, apagada ao sair) + entrada suave; Rotina rápida do Início: "Dias da semana" (D S T Q Q S S) e "Dia sim, dia não" | recarga: capa ~20 ms após a página (antes download); rotina salva weekdays [1,3,5]; testes ok |
 | 2026-11-06 | (delivery) | Voltar do navegador com tela preta (página velha apontando p/ arquivos apagados): HTML no-store + early.js recarrega 1x se arquivo do app falhar; Shift+Enter (cursor depois da quebra, linha nova no fim); Ctrl+Z/Ctrl+Y = desfazer da página; imagem clicada apaga com Delete; nota: cursor no lugar (camada de link só fora da linha em edição) | simulado: página velha se recupera; testes app e servidor ok |
 | 2026-11-06 | (delivery) | Nota: 2ª linha cortada sem rolagem — raiz: a caixa da camada de link (rodada anterior) era coluna e o flex:1 do campo ignorava a altura; agora em linha + remede ao mudar a largura | medido: campo 52 px = texto 52 px em 2 linhas; testes ok |
+| 2026-11-06 | (delivery) | Capa na 1ª vez: sem fundo roxo antes da foto — área da capa com fundo neutro + roda de carregamento até a foto estar desenhada, foto entra por cima e a roda sai depois | medido 1ª carga sem nada guardado: só roda → foto (antes: fundo → foto); capa guardada segue pronta no 1º quadro |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

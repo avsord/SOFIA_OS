@@ -245,3 +245,7 @@ test('nota: campo dentro da caixa da camada de link respeita a propria altura (2
  const src=fs.readFileSync(path.join(__dirname,'..','src/components/LeafEditor.tsx'),'utf8');
  assert.match(src,/position:'relative',flexDirection:'row'/);assert.match(src,/new \(globalThis as any\)\.ResizeObserver/);
 });
+test('capa carregando: fundo neutro com roda ate a foto estar desenhada (sem fundo roxo antes da foto)',()=>{
+ const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/page-cover-loading/);assert.match(pa,/setTimeout\(\(\)=>setReady\(true\),200\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8'),/hasCover\?\(imageCover\?c\.input:c\.accentSoft\)/);
+});
