@@ -14,6 +14,7 @@ import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, 
 const WEB = Platform.OS === 'web' && typeof document !== 'undefined';
 /** 03/11/2026: o Android nao entende calc()/clamp() em left/width (o item ia para a borda esquerda). No navegador continua
  * o CSS de antes; no celular a posicao vem em pixels da largura medida da linha (w). */
+const GUIDE_LAYER: any = WEB ? {willChange: 'transform', transform: 'translateZ(0)', backfaceVisibility: 'hidden'} : {};
 const cx = (frac: number, off: number, w: number): any => WEB ? `calc(${frac * 100}% - ${off}px)` : frac * w - off;
 const clampX = (frac: number, half: number, width: number, w: number): any => WEB ? `clamp(0px, calc(${frac * 100}% - ${half}px), calc(100% - ${width}px))` : Math.max(0, Math.min(Math.max(0, w - width), frac * w - half));
 import {ShimmerBlock, ShimmerGroup, LoadingLines} from '../components/Loading';
@@ -581,9 +582,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       {...({onMouseMove: (e: any) => {if (dragRef.current) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); if (!adding) setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
+    {/* 06/11/2026 (Pedro: "quando arrasto o mouse ta criando um rastro embaixo"): a marca e o "+ hora" andam em camada propria
+        (GUIDE_LAYER); sem isso o Chrome deixava restos do rotulo na faixa larga da linha do tempo ao mover o mouse */}
     {guide != null && !adding && !drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
-      <View style={{position: 'absolute', left: cx(guide, 0.5, w), top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent}} />
-      <View style={{position: 'absolute', left: clampX(guide, 34, 68, w), top: 29 + OFF + 12, width: 68, alignItems: 'center'}}>
+      <View style={{position: 'absolute', left: cx(guide, 0.5, w), top: 29 + OFF - 10, width: 1, height: 20, backgroundColor: c.accent, ...GUIDE_LAYER}} />
+      <View style={{position: 'absolute', left: clampX(guide, 34, 68, w), top: 29 + OFF + 12, width: 68, alignItems: 'center', ...GUIDE_LAYER}}>
         <Text style={{fontSize: 11, fontWeight: '700', color: c.onAccent, backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>+ {hhmm(snapDate(guide))}</Text>
       </View>
     </View> : null}
