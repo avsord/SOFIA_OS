@@ -311,7 +311,8 @@ export function HomeBrief(p: HomeBriefProps) {
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
 /** 05/11/2026 (Pedro: "preciso de todas as datas na linha do tempo, quando ando no scroll fica limitado"): antes so
  * hoje, amanha e depois; agora vai do dia 1 deste mes ao fim do mes seguinte ao proximo (os meses que o Inicio ja carrega). */
-export function timelineRange(now = new Date()): {back: number; ahead: number} {const end = new Date(now.getFullYear(), now.getMonth() + 3, 0); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); return {back: now.getDate() - 1, ahead: Math.max(2, Math.round((end.getTime() - today.getTime()) / 86400000))};}
+// 06/11/2026 (Pedro: "coloca pra 1 mes, tanto pra passado quanto pra futuro"): a linha vai de hoje - 1 mes ate hoje + 1 mes
+export function timelineRange(now = new Date()): {back: number; ahead: number} {const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()), prev = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()), next = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()); return {back: Math.round((today.getTime() - prev.getTime()) / 86400000), ahead: Math.round((next.getTime() - today.getTime()) / 86400000)};}
 const SPAN_FULL = 16, SPAN_MIN = 4, REMIND = '#7FD1E8'; // cor dos lembretes na linha do tempo
 type BillMark = {id: string; title: string; date: string; amount: number; late: boolean};
 /** 0.3.311 (Pedro): cada area na linha do tempo do seu jeito. kind: bill (conta a pagar, losango ambar "$"), income

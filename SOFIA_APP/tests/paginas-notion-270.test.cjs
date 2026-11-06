@@ -272,3 +272,7 @@ test('linha do tempo (opcao 2 aprovada): marco com bolinha, futuro com listras u
 test('linha do tempo: faixas e simbolos de manha/tarde/noite em qualquer dia visivel (nao so hoje, amanha e depois)',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/function visibleDays\(start: number, span: number\)/);assert.doesNotMatch(hb,/\{\[0, 24, 48\]\.flatMap/);
 });
+test('linha do tempo vai de hoje - 1 mes ate hoje + 1 mes, com o mes anterior carregado',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/prev = new Date\(now\.getFullYear\(\), now\.getMonth\(\) - 1, now\.getDate\(\)\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8'),/const calPrev=useAgendaMonth/);
+});

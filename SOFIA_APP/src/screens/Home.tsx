@@ -165,8 +165,10 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  const calendarRecords=useMemo(()=>dayRecords(expandForHome(events),tasks),[events,tasks]);
  // 0.3.296: o bloco Agenda do Inicio mostra TODOS os proximos compromissos (este mes e os dois seguintes), com rolagem
  const wideWebHome=Platform.OS==='web'&&typeof window!=='undefined'&&window.innerWidth>=1024;
+ // 06/11/2026 (Pedro: linha do tempo vai 1 mes para tras): o mes anterior tambem e carregado
+ const calPrev=useAgendaMonth(api,new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1),active&&wideWebHome,false);
  const calNext1=useAgendaMonth(api,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1),active&&wideWebHome,false),calNext2=useAgendaMonth(api,new Date(calendarDate.getFullYear(),calendarDate.getMonth()+2,1),active&&wideWebHome,false);
- const futureRecords=useMemo(()=>dayRecords(expandForHome([...events,...notGone(calNext1.items),...notGone(calNext2.items)]),tasks),[events,calNext1.items,calNext2.items,tasks,notGone]);
+ const futureRecords=useMemo(()=>{const seen=new Set<string>();const all=[...notGone(calPrev.items),...events,...notGone(calNext1.items),...notGone(calNext2.items)].filter((e:any)=>{const k=e.id+'|'+(e.occurrence_start||'');if(seen.has(k))return false;seen.add(k);return true;});return dayRecords(expandForHome(all),tasks);},[events,calPrev.items,calNext1.items,calNext2.items,tasks,notGone]);
  const areaOptions=useMemo(()=>[...new Set([...(agendaCatalog?.areas||[]),...tasks.map(t=>t.area?.trim()||'Pessoal'),...events.map(e=>(e as AgendaItem & {area?:string}).area?.trim()||'').filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'pt-BR')),[agendaCatalog,events,tasks]);
  const [taskQuery,setTaskQuery]=useState(''),[quick,setQuick]=useState<Task|null>(null);
  const first=bootstrap.profile.name.split(' ')[0],todo=useMemo(()=>fuzzyFilter([...tasks].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).filter(t=>!['done','cancelled'].includes(t.state)&&(!priority||taskPriority(t).value===priority)&&(!areaFilter||(t.area?.trim()||'Pessoal')===areaFilter)),taskQuery,t=>t.title+' '+(t.description||'')),[tasks,priority,areaFilter,taskQuery]);
@@ -215,8 +217,8 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // 0.3.312 (Pedro): desligar/ligar o aviso pela linha do tempo - so desta vez (marca sofia-skip-v1) ou todos
  // 0.3.317: com as repeticoes abertas no Inicio, o item da linha do tempo e uma OCORRENCIA (horario daquela vez); para
  // gravar usa o registro de verdade, senao o horario do cadastro viraria o daquela vez
- const rawEvent=(o:any)=>[...events,...(calNext1.items||[]),...(calNext2.items||[])].find(e=>e.id===o?.id)||o;
- const refreshAgenda=()=>{void calendar.refresh();void calNext1.refresh?.();void calNext2.refresh?.();};
+ const rawEvent=(o:any)=>[...events,...(calPrev.items||[]),...(calNext1.items||[]),...(calNext2.items||[])].find(e=>e.id===o?.id)||o;
+ const refreshAgenda=()=>{void calendar.refresh();void calPrev.refresh?.();void calNext1.refresh?.();void calNext2.refresh?.();};
  // 0.3.317 (Pedro): arrastar na linha do tempo muda SO aquela vez. Compromisso/lembrete: marca sofia-move-v1 no registro;
  // dose da Rotina: marca no plano; tarefa: muda o horario guardando o combinado (volta para ele se nao fizer)
  // 0.3.318: um arrastar pode levar varios itens (bolinha com "2 itens", pilula com varias doses): doses do mesmo plano vao
