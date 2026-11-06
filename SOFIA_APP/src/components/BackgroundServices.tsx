@@ -15,9 +15,10 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
  // Large background catalog/chat/network refreshes used to race the first
  // menu taps. Leave Home instantly usable from saved data; begin optional
  // read-ahead only after Home remains active and the JS thread is idle.
+ // 06/11/2026: no site, o preco das lojas e lido pelo servidor (nao ha navegador invisivel). Fica no corpo do componente:
+ // dentro de outro useEffect (como estava em 1eb44b2) o React recusa e a tela cai em "Algo deu errado nesta tela".
+ useEffect(()=>{if(Platform.OS!=='web')return;setWebPriceSource(url=>api.linkPreview(url).then(previewToReader));return()=>setWebPriceSource(null);},[api]);
  useEffect(()=>{
- // 06/11/2026: no site, o preco das lojas e lido pelo servidor (nao ha navegador invisivel)
- React.useEffect(()=>{if(Platform.OS!=='web')return;setWebPriceSource(url=>api.linkPreview(url).then(previewToReader));return()=>setWebPriceSource(null);},[api]);
   if(!enabled||!preloadWhenIdle||started.current===api)return;
   if(newFluency()){
    if(started.current===api)return;
