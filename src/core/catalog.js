@@ -170,6 +170,12 @@ const CATALOG={
         "type": "datetime"
       },
       {
+        "key": "repeat_day",
+        "label": "Dia original da repetição",
+        "type": "number",
+        "developerOnly": true
+      },
+      {
         "key": "message",
         "label": "Lembrete",
         "type": "text"
