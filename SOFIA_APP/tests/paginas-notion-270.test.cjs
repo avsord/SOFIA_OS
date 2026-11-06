@@ -252,3 +252,6 @@ test('capa carregando: fundo neutro com roda ate a foto estar desenhada (sem fun
 test('capa: quando a roda aparece, fica um tempo minimo (nao pisca em carga rapida)',()=>{
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/const MIN_SPIN=450/);assert.match(pa,/MIN_SPIN-\(now\(\)-start\)/);
 });
+test('barra lateral: pagina sem subpaginas nao mostra a seta de abrir',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');assert.match(src,/onToggle&&!hasChildren\?<View style=\{\{width:16,height:16\}\}\/>/);assert.match(src,/onToggle&&hasChildren\?<Pressable/);
+});
