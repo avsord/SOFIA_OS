@@ -13,7 +13,7 @@ test('App: moldura e pager de computador so carregam na web; barra de baixo some
   assert.ok(a.includes("Platform.OS==='web'?require('./src/desktop/DesktopShell').DesktopFrame:null"));
   assert.ok(a.includes("Platform.OS==='web'?require('./src/desktop/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager"));
   assert.ok(a.includes('maxWidth:desktop?undefined:760'));
-  assert.ok(a.includes('{!keyboard&&!desktop?<View nativeID="sofia-menu-bar"'));
+  assert.ok(a.includes('{!keyboard&&!desktop&&!tablet?<View nativeID="sofia-menu-bar"'),'barra de baixo some no computador e no tablet');
   assert.ok(!/from '\.\/src\/components\/DesktopShell'/.test(a),'sem import direto (nao pesa na abertura do celular)');
 });
 test('moldura: barra lateral recolhivel, arvore de paginas, caminho, busca Ctrl+K e atalhos',()=>{

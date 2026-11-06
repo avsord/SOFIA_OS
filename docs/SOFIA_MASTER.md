@@ -219,6 +219,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Linha do tempo do Início — alcance (06/11/2026):** 1 mês para trás e 1 mês para frente a partir de hoje (decisão do Pedro).
 
+- **Tablet (06/11/2026, Pedro):** versão tablet = o próprio site dentro do APK (`SOFIA_APP/src/components/TabletSite.tsx`), para não refazer no nativo o que já foi acertado no site. Precisa de internet; avisos continuam pelo app. Celular segue nativo.
+
 ## 8. Regras que não se quebram
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
@@ -251,6 +253,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Capa por cima do Início/Agenda (05/11 noite):** não reproduzido localmente (capa enviada + voltar ao Início). Proteções aplicadas (opacidade 0 na tela escondida; texto das Páginas sem estilo de fora). Se voltar, pedir print com F12 > elemento.
 - **Compartilhar página:** só no computador por enquanto (no celular falta o botão); a página pública mostra blocos de texto, imagens, notas e tabelas (visões kanban/calendário viram tabela).
 - **Lembrete "coloquei 15 e fica 3 da manhã" (06/11):** não reproduzido (novo lembrete e servidor guardam 15:00 certo); falta saber em qual campo/tela ele vê 03:00.
+- **Tablet (06/11):** conferir num tablet real (login automático, voltar, envio de capa/arquivo pela WebView, avisos). Tocar num aviso no tablet abre a tela nativa de avisos por cima do site (ideal: abrir no site).
 - **Links (05/11):** colar várias linhas nas Páginas ainda não preserva link; links nas notas só no site (celular segue texto).
 
 - **Railway (05/11):** cada publicação reinicia o servidor e corta a resposta da Sofia em andamento ("A chamada foi interrompida"); o app agora reenvia sozinho. Proposto ao Pedro: ligar o tempo de espera no desligamento (~30 s) — mudança de configuração do Railway, só com o OK dele. O servidor hoje cancela a resposta antes de esperar (src/server.js `stop`).
@@ -311,11 +314,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: faixas e símbolos de manhã/tarde/noite agora em qualquer dia visível (antes só hoje, amanhã e depois — em "Ontem" e dias além sumiam) | capturas: Ontem e Domingo 8/11 com faixas; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo do Início: de hoje − 1 mês até hoje + 1 mês (pedido do Pedro), mês anterior carregado junto | conferido: limites 5/10 e 5/12 (hoje 5/11); testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: listras do futuro e escurecido do passado agora contínuos (uma faixa só a partir da meia-noite de amanhã / até o começo de hoje), não apagam mais de um dia para o outro; aprovado por imagem | capturas de amanhã, domingo e ontem; testes ok |
 | 2026-11-06 | (delivery) | Próximos eventos (lateral): quadradinho na cor da importância do compromisso, igual à Agenda | conferido: importante em vermelho; testes ok |
 | 2026-11-06 | (delivery) | Páginas: marca-texto como no Kindle — linha "Marcar" na barra de formatação com amarelo, azul, rosa, laranja e ✕ (um clique) | aprovado por imagem; testado marcando duas frases; testes ok |
+| 2026-11-06 | (delivery) | APK tablet: no Android com tela de tablet (lado menor ≥ 600 dp) o app mostra o próprio site em tela cheia (WebView), já logado com a sessão do app; avisos e serviços de fundo continuam no app; voltar do Android volta no site; links externos no navegador. Celular sem mudança | testes ok; falta conferir num tablet de verdade |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

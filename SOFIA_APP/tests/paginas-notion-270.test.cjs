@@ -282,3 +282,10 @@ test('proximos eventos na lateral usam a cor da importancia (como a Agenda)',()=
 test('pagina: marca-texto como no Kindle (4 cores e tirar) na barra de formatacao',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/page-highlight-row/);assert.match(s,/Marcar em /);assert.match(s,/fmt\('hiliteColor','transparent'\)/);
 });
+test('tablet Android: app mostra o proprio site, entrega a sessao do app e mantem os avisos',()=>{
+ const T=load('src/components/TabletSite.tsx',{react:{useEffect(){},useRef:()=>({current:null}),useState:v=>[v,()=>{}]},'react-native':{},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib/theme':{useTheme:()=>({})}},{process:{env:{}}});
+ assert.equal(T.isTabletSize(1280,800),true);assert.equal(T.isTabletSize(412,915),false);assert.equal(T.isTabletSize(600,960),true);
+ const js=T.sessionScript({token:'abc"x',profile:{email:'a@b.c'}});assert.match(js,/sofia\.secure\.sofia\.native\.session\.v1/);assert.match(js,/if\(!localStorage\.getItem\(k\)\)/);
+ const run=new Function('localStorage',js.replace(/true;$/,''));const st={};run({getItem:k=>st[k]||null,setItem:(k,v)=>{st[k]=v;}});assert.equal(JSON.parse(st['sofia.secure.sofia.native.session.v1']).token,'abc"x');
+ const app=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8');assert.match(app,/:tablet&&auth\?<TabletSite auth=\{auth\}\/>:!initialDataReady\?/);assert.match(app,/<NotificationProvider api=\{api\}/);
+});
