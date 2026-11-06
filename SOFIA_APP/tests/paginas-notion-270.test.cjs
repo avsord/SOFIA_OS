@@ -228,7 +228,7 @@ test('mover pagina na lateral com a lista antiga (revisao velha) funciona: o pla
 test('capas: todas baixam em segundo plano desde o Inicio e a pagina reusa a imagem ja decodificada (sem piscar)',()=>{
  const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/export function prefetchAllCovers/);assert.match(pre,/DECODED\.set\(uri,pic\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8'),/prefetchAllCovers\(api,pages\)/);
- assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8'),/let pic:any=DECODED\.get\(uri\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8'),/let pic:any=instant\?DECODED\.get\(uri\)/);
 });
 test('rotina rapida: repetir em dias da semana escolhidos ou dia sim, dia nao; capa guardada cifrada no navegador',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/'Dias da semana'/);assert.match(hb,/'Dia sim, dia não'/);assert.match(hb,/routine-weekdays/);
@@ -246,7 +246,7 @@ test('nota: campo dentro da caixa da camada de link respeita a propria altura (2
  assert.match(src,/position:'relative',flexDirection:'row'/);assert.match(src,/new \(globalThis as any\)\.ResizeObserver/);
 });
 test('capa carregando: fundo neutro com roda ate a foto estar desenhada (sem fundo roxo antes da foto)',()=>{
- const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/page-cover-loading/);assert.match(pa,/setTimeout\(\(\)=>setReady\(true\),200\)/);
+ const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/page-cover-loading/);assert.match(pa,/const instant=prepared\(\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8'),/hasCover\?\(imageCover\?c\.input:c\.accentSoft\)/);
 });
 test('capa: quando a roda aparece, fica um tempo minimo (nao pisca em carga rapida)',()=>{
@@ -254,4 +254,8 @@ test('capa: quando a roda aparece, fica um tempo minimo (nao pisca em carga rapi
 });
 test('barra lateral: pagina sem subpaginas nao mostra a seta de abrir',()=>{
  const src=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');assert.match(src,/onToggle&&!hasChildren\?<View style=\{\{width:16,height:16\}\}\/>/);assert.match(src,/onToggle&&hasChildren\?<Pressable/);
+});
+test('capa: so pula a roda a foto ja preparada; pagina compartilhada com roda e mesma largura do site',()=>{
+ const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/pic\.decode\?pic\.decode\(\)/);assert.match(pa,/MIN_SPIN-\(now\(\)-start\)/);
+ const sh=fs.readFileSync(path.join(__dirname,'..','..','src/core/page-share.js'),'utf8');assert.match(sh,/main\{max-width:960px/);assert.match(sh,/animation:reveal \.25s ease-out \.5s forwards/);
 });

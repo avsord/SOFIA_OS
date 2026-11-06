@@ -83,14 +83,22 @@ function WebCoverImg({uri,position,onError,since=0}:{uri:string;position:number;
  const host=useRef<any>(null),err=useRef(onError);err.current=onError;const c=useTheme();
  // 06/11/2026 (Pedro: "o fundo roxo aparece primeiro, depois a foto; se nao resolver, uma roda de carregando"): enquanto a
  // foto nao esta desenhada fica o fundo neutro com a roda (igual a capa que ainda baixa) e a foto entra por cima.
- const [ready,setReady]=useState(()=>{const d=DECODED.get(uri);return !!(d&&!d.isConnected&&d.complete&&d.naturalWidth>0);});
+ // 06/11/2026 (Pedro, 10a vez: "a roda nao ta indo; atrasa a foto de proposito pra nao piscar"): so pula a roda a foto que
+ // ja foi PREPARADA (decodificada) antes e esta guardada. Qualquer outra - mesmo que o navegador diga "carregada" - fica
+ // escondida com a roda por cima ate: carregar + decodificar + tempo minimo (MIN_SPIN). So depois entra com um fade.
+ const prepared=()=>{const d=DECODED.get(uri);return !!(d&&!d.isConnected&&d.complete&&d.naturalWidth>0);};
+ const [ready,setReady]=useState(prepared);
  React.useLayoutEffect(()=>{const box=host.current;if(!box||typeof document==='undefined')return;
-  let pic:any=DECODED.get(uri);if(!pic||pic.isConnected){pic=document.createElement('img');pic.decoding='sync';pic.src=uri;pic.addEventListener('load',()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);});}
+  const instant=prepared();let pic:any=instant?DECODED.get(uri):null,alive=true;
+  if(!pic){pic=document.createElement('img');pic.decoding='async';pic.src=uri;}
   pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
   Object.assign(pic.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'});
-  // capa que ainda nao estava pronta entra com um fade curto (antes: aparecia de golpe sobre o fundo)
-  if(!(pic.complete&&pic.naturalWidth>0)){const start=since||now();pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';setReady(false);const show=()=>{const go=()=>{const wait=Math.max(0,MIN_SPIN-(now()-start));setTimeout(()=>requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>setReady(true),200);}),wait);};if(pic.decode)pic.decode().then(go,go);else go();};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';setReady(true);}
-  box.appendChild(pic);return()=>{pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
+  if(instant){pic.style.transition='';pic.style.opacity='1';setReady(true);}
+  else{const start=since||now();pic.style.transition='opacity 220ms ease-out';pic.style.opacity='0';setReady(false);
+   const loaded=pic.complete&&pic.naturalWidth>0?Promise.resolve():new Promise<void>(r=>{pic.addEventListener('load',()=>r(),{once:true});});
+   void loaded.then(()=>pic.decode?pic.decode().catch(()=>{}):undefined).then(()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);const wait=Math.max(0,MIN_SPIN-(now()-start));
+    setTimeout(()=>{if(!alive)return;requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>{if(alive)setReady(true);},240);});},wait);});}
+  box.appendChild(pic);return()=>{alive=false;pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
  return <View style={StyleSheet.absoluteFill}>{ready?null:<View testID="page-cover-loading" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>}{React.createElement('div',{ref:host,style:{position:'absolute',inset:0}})}</View>;
 }
 function CoverImage({uri,position,repositioning=false,onPosition,onError,since=0}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void;since?:number}){

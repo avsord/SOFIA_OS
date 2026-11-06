@@ -115,9 +115,14 @@ function renderSharedPage({root,current,shares,token}){
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:13px;color:var(--muted);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
 .top a{color:var(--muted);text-decoration:none}.top a:hover{color:var(--text)}.top .sep{opacity:.5}
-.cover{height:30vh;min-height:160px;max-height:280px;background:var(--soft) center/cover no-repeat}
-.cover img{width:100%;height:100%;object-fit:cover;object-position:50% ${pos}%;display:block}
-main{max-width:760px;margin:0 auto;padding:0 24px 96px}.icon{font-size:64px;line-height:1;margin-top:${cover?'-36px':'48px'};position:relative}
+.cover{position:relative;height:30vh;min-height:160px;max-height:280px;background:var(--soft);overflow:hidden}
+/* 06/11/2026 (Pedro): roda de carregamento primeiro e a foto entra depois, de proposito, para nao piscar */
+.cover:before{content:"";position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--muted);animation:spin .8s linear infinite}
+.cover img{position:relative;width:100%;height:100%;object-fit:cover;object-position:50% ${pos}%;display:block;opacity:0;animation:reveal .25s ease-out .5s forwards}
+figure img{opacity:0;animation:reveal .25s ease-out .35s forwards}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes reveal{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cover:before{animation:none}.cover img,figure img{animation:none;opacity:1}}
+main{max-width:960px;margin:0 auto;padding:0 48px 96px}.icon{font-size:64px;line-height:1;margin-top:${cover?'-36px':'48px'};position:relative}
 h1.title{font-size:40px;line-height:1.2;margin:${icon?'16px':cover?'40px':'72px'} 0 18px;font-weight:700;letter-spacing:-.01em}
 h1,h2,h3,h4{line-height:1.3}main h1{font-size:30px;margin:28px 0 6px}main h2{font-size:24px;margin:24px 0 4px}main h3{font-size:20px;margin:20px 0 4px}
 p{margin:3px 0;min-height:1.65em;overflow-wrap:anywhere}p.empty{min-height:1.2em}a{color:inherit;text-decoration:underline;text-decoration-color:var(--muted);text-underline-offset:2px}
@@ -130,8 +135,8 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}figure{margin:12px 0}
 .subs{margin-top:28px;padding-top:14px;border-top:1px solid var(--line)}.subs .label{font-size:12px;color:var(--muted);margin-bottom:4px}
 table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}.table-wrap{overflow:auto;margin:12px 0}
 details{margin:6px 0}summary{cursor:pointer;font-weight:600}summary small{color:var(--muted);font-weight:400}details.note{margin:4px 0 4px 18px;padding:6px 10px;border-radius:8px;background:var(--soft)}details.note summary{font-weight:500}.note-body{padding:6px 2px 2px}
-footer{max-width:760px;margin:0 auto;padding:24px;color:var(--muted);font-size:12px}
-@media (max-width:600px){main{padding:0 16px 72px}h1.title{font-size:30px}.icon{font-size:48px}}
+footer{max-width:960px;margin:0 auto;padding:24px 48px;color:var(--muted);font-size:12px}
+@media (max-width:600px){main{padding:0 16px 72px}footer{padding:24px 16px}h1.title{font-size:30px}.icon{font-size:48px}}
 </style></head><body>
 <nav class="top">${trail.map((t,i)=>(i?'<span class="sep">/</span>':'')+(t.id===current.id?'<span>'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</span>':'<a href="'+esc(href(t.id))+'">'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</a>')).join(' ')}</nav>
 ${cover?'<div class="cover"><img src="'+esc(cover)+'" alt=""></div>':''}

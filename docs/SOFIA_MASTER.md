@@ -306,11 +306,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Nota: 2ª linha cortada sem rolagem — raiz: a caixa da camada de link (rodada anterior) era coluna e o flex:1 do campo ignorava a altura; agora em linha + remede ao mudar a largura | medido: campo 52 px = texto 52 px em 2 linhas; testes ok |
 | 2026-11-06 | (delivery) | Capa na 1ª vez: sem fundo roxo antes da foto — área da capa com fundo neutro + roda de carregamento até a foto estar desenhada, foto entra por cima e a roda sai depois | medido 1ª carga sem nada guardado: só roda → foto (antes: fundo → foto); capa guardada segue pronta no 1º quadro |
 | 2026-11-06 | (delivery) | Capa: roda de carregamento fica no mínimo 0,45 s quando aparece (carga rápida virava um piscar), ideia do Pedro | medido: download de 60 ms → roda ~0,6 s e foto; lento igual; capa guardada segue instantânea |
 | 2026-11-06 | (delivery) | Compartilhar página na web (tipo Notion): botão Compartilhar no topo → Publicar na web; link secreto só leitura em /p/<código>, página + subpáginas (subpágina compartilhada mostra só ela e as de dentro); desligar corta, gerar novo link troca; 🌐 na lateral | testes: escopo, desligar, código inventado, privada não vaza, script removido; servidor 417/417, app ok |
 | 2026-11-06 | (delivery) | Barra lateral: página sem subpáginas não mostra a seta de abrir (só o espaço, para alinhar) | conferido: sem filhas sem seta; com filha mostra; testes ok |
+| 2026-11-06 | (delivery) | Capa (pedido repetido do Pedro): roda só não aparece para foto já preparada; qualquer outra fica escondida até carregar+decodificar+0,45 s e entra com fade (antes "carregada" pelo navegador aparecia sem roda e piscava). Página compartilhada: roda e foto entra depois; largura do texto igual ao site (960) | medido: nova → roda ~0,6 s → foto; recarga → roda → foto; preparada → na hora |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
