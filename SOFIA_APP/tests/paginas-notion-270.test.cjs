@@ -241,3 +241,7 @@ test('editor: Shift+Enter poe o cursor depois da quebra; Ctrl+Z usa o desfazer d
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/LeafEditor.tsx'),'utf8'),/typingIn!==b\.id\?linkRanges\(b\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','public/assets/early.js'),'utf8'),/sofia\.reload\.at/);
 });
+test('nota: campo dentro da caixa da camada de link respeita a propria altura (2a linha nao corta) e remede ao mudar a largura',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','src/components/LeafEditor.tsx'),'utf8');
+ assert.match(src,/position:'relative',flexDirection:'row'/);assert.match(src,/new \(globalThis as any\)\.ResizeObserver/);
+});
