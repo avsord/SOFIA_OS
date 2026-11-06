@@ -131,7 +131,7 @@ function createHandler(runtime) {
   const extra=require('./api45').makeApi45(runtime,{bodyJson,json});
   const chatSync=require('../services/chat-sync').makeChatSyncApi(store,{bodyJson,json,client:'web',decorateRows:rows=>decorateMessages(store,rows)});
   const token=crypto.randomBytes(32).toString('hex');
-  const ownerAuth=runtime.ownerAuth||new OwnerAuth(config,store),accountMailer=runtime.accountMailer||new AccountMailer(config);
+  const ownerAuth=runtime.ownerAuth||new OwnerAuth(config,store),accountMailer=runtime.accountMailer||new AccountMailer(config,{google:runtime.google});
   // 06/11/2026: chave guardada das paginas trancadas no nivel Media (ver page-lock.js)
   if(!runtime.pageLocks)runtime.pageLocks=require('./page-lock').makePageLocks(store,{keyFile:require('path').join(config.dataDir||'data','page-lock-master.key'),ownerAuth});
   const loginAttempts=new Map(),resetAttempts=new Map(),sessionCookie='sofia_session',sessionTtlMs=12*60*60*1000;

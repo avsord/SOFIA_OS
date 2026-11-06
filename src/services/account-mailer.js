@@ -6,12 +6,21 @@ function smtpLine(value){return String(value||'').replace(/[\r\n]+/g,' ').trim()
 function dotStuff(text){return String(text).replace(/(^|\r?\n)\./g,'$1..').replace(/\r?\n/g,'\r\n');}
 
 class AccountMailer {
-  constructor(config){this.config=config;}
-  configured(){return Boolean(this.config.smtpHost&&this.config.smtpPort&&this.config.smtpUser&&this.config.smtpPass&&this.config.smtpFrom);}
+  /** options.google: conexao Google (google.js). 06/11/2026: o Railway bloqueia SMTP, entao os e-mails da Sofia saem primeiro
+   * pela conta Google ligada (permissao "enviar"); o SMTP continua como segunda opcao (computador local, outro servidor). */
+  constructor(config,options={}){this.config=config;this.google=options.google||null;}
+  smtpConfigured(){return Boolean(this.config.smtpHost&&this.config.smtpPort&&this.config.smtpUser&&this.config.smtpPass&&this.config.smtpFrom);}
+  googleReady(){try{return Boolean(this.google&&this.google.canSendMail&&this.google.canSendMail());}catch{return false;}}
+  configured(){return this.googleReady()||this.smtpConfigured();}
+  /** Entrega a mensagem: Google primeiro; se falhar (ou nao houver), SMTP seguro. */
+  async _deliver({to,subject,body}){
+    const head=from=>['From: '+smtpLine(from),'To: '+smtpLine(to),'Subject: '+encodeSubject(subject),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: 8bit','',body].join('\r\n');
+    let googleError=null;
+    if(this.googleReady()){try{const from=this.google.link?.()?.email||this.config.smtpFrom||'';await this.google.sendRawMail(head(from?'Sofia OS <'+from+'>':'Sofia OS'));return {via:'google'};}catch(e){googleError=e;console.warn('[e-mail] Google nao enviou:',String(e.message||e).slice(0,160));}}
+    if(this.smtpConfigured()&&this.config.smtpSecure){await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message:head(this.config.smtpFrom)});return {via:'smtp'};}
+    throw googleError||new Error('Envio de e-mail ainda não configurado.');
+  }
   async sendPasswordReset({to,url}){
-    if(!this.config.smtpSecure)throw new Error('A recuperação exige SMTP seguro (TLS/porta 465).');
-    if(!this.configured())throw new Error('Envio de e-mail ainda não configurado.');
-    const host=this.config.smtpHost,port=this.config.smtpPort,user=this.config.smtpUser,pass=this.config.smtpPass,from=this.config.smtpFrom;
     const body=[
       'Recebemos uma solicitação para redefinir a senha da Sofia OS.',
       '',
@@ -21,25 +30,12 @@ class AccountMailer {
       'O link expira em 30 minutos e só pode ser usado uma vez.',
       'Se você não solicitou esta alteração, ignore esta mensagem.'
     ].join('\n');
-    const message=[
-      'From: '+smtpLine(from),
-      'To: '+smtpLine(to),
-      'Subject: '+encodeSubject('Redefinir senha da Sofia OS'),
-      'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      body
-    ].join('\r\n');
-    await this._send({host,port,user,pass,from,to,message});
+    return this._deliver({to,subject:'Redefinir senha da Sofia OS',body});
   }
   /** 0.3.258: codigo do segundo passo no login do site (navegador novo). */
   async sendLoginCode({to,code}){
-    if(!this.config.smtpSecure)throw new Error('O código de acesso exige SMTP seguro (TLS/porta 465).');
-    if(!this.configured())throw new Error('Envio de e-mail ainda não configurado.');
     const body=['Seu código para entrar na Sofia OS neste navegador:','',code,'','Ele vale por 10 minutos.','Se não foi você, troque sua senha: alguém sabe a senha atual.'].join('\n');
-    const message=['From: '+smtpLine(this.config.smtpFrom),'To: '+smtpLine(to),'Subject: '+encodeSubject('Código de acesso da Sofia OS: '+code),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: 8bit','',body].join('\r\n');
-    await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message});
+    return this._deliver({to,subject:'Código de acesso da Sofia OS: '+code,body});
   }
   _send({host,port,user,pass,from,to,message}){
     return new Promise((resolve,reject)=>{

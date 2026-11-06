@@ -25,7 +25,9 @@ function cleanData(kind, data) {
 }
 
 const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.readonly'];
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
+// 06/11/2026 (Pedro: "nao consegue fazer enviar uma redefinicao pra o email do usuario?"): o Railway bloqueia SMTP; os e-mails
+// da propria Sofia (redefinir senha, codigo do login) saem pela conta Google ligada (gmail.send = so enviar, nao le nada a mais)
+const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
@@ -263,6 +265,15 @@ class GoogleService {
     }
     return out;
   }
+  /** Pode enviar e-mail pela conta Google ligada (permissao gmail.send concedida). */
+  canSendMail() { const l = this.link(); return !!(l && l.refresh && /gmail\.send/.test(l.scopes || '')); }
+  /** Envia uma mensagem pronta (cabecalhos + corpo) pela conta Google ligada. */
+  async sendRawMail(message) {
+    if (!this.canSendMail()) throw new AppError('GOOGLE_NO_SEND', 'A conta Google ligada não permite enviar e-mail.', 409);
+    const raw = Buffer.from(message, 'utf8').toString('base64url');
+    await this.call('POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {raw});
+    return {from: this.link()?.email || ''};
+  }
   async status() {
     const l = this.link(), base = {configured: this.configured(), connected: !!(l && l.refresh)};
     if (!base.connected) return {...base, error: l?.last_error || undefined, redirect_uri: this.configured() ? this.redirectUri() : undefined};
@@ -275,7 +286,7 @@ class GoogleService {
     if (calendars.some(c => c.id !== (cal?.id) && c.selected)) warnings.push('Os outros calendários visíveis no seu Google também aparecem na Sofia, somente para leitura.');
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], item_errors: l.item_errors || [], history: (l.history || []).slice(0, 10),
-      gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
+      gmail: {connected: /gmail\.readonly/.test(l.scopes || ''), can_send: /gmail\.send/.test(l.scopes || '')},
       drive: {...this.driveState(l), portable: {configured: String(process.env.SOFIA_BACKUP_PASSPHRASE || '').length >= 12, at: l.drive?.portable_at || '', error: l.drive?.portable_error || ''}, last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: this.hiddenOn(l) ? 'área oculta da Sofia no seu Drive' : 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
   select(calendarId) {
