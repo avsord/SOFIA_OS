@@ -230,3 +230,8 @@ test('capas: todas baixam em segundo plano desde o Inicio e a pagina reusa a ima
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8'),/prefetchAllCovers\(api,pages\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8'),/let pic:any=DECODED\.get\(uri\)/);
 });
+test('rotina rapida: repetir em dias da semana escolhidos ou dia sim, dia nao; capa guardada cifrada no navegador',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/'Dias da semana'/);assert.match(hb,/'Dia sim, dia não'/);assert.match(hb,/routine-weekdays/);
+ const home=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');assert.match(home,/x\.rrepeat==='weekdays'\?'weekdays'/);assert.match(home,/interval_days:x\.rrepeat==='interval'\?2:1/);
+ const cache=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-cache.web.ts'),'utf8');assert.match(cache,/readSecureBytes\('cover\|'\+id\)/);assert.match(cache,/writeSecureBytes\('cover\|'\+id/);
+});

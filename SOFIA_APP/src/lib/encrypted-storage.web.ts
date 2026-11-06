@@ -51,6 +51,18 @@ export const encryptedStorage: SnapshotStorage = {
   },
   remove: async scope => {await op('readwrite', s => s.delete('v1|' + scope));},
 };
+/** 06/11/2026 (Pedro: capa piscando na primeira carga): imagens das capas guardadas cifradas no mesmo banco (somem ao sair da conta). */
+export async function readSecureBytes(scope: string): Promise<ArrayBuffer | null> {
+  const [k, rec] = await Promise.all([key(), op<{iv: Uint8Array; data: ArrayBuffer}>('readonly', s => s.get('b1|' + scope))]);
+  if (!k || !rec?.iv || !rec.data) return null;
+  try {return await crypto.subtle.decrypt({name: 'AES-GCM', iv: rec.iv as BufferSource}, k, rec.data);} catch {return null;}
+}
+export async function writeSecureBytes(scope: string, bytes: ArrayBuffer) {
+  const k = await key(); if (!k) return;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, k, bytes);
+  await op('readwrite', s => s.put({iv, data}, 'b1|' + scope));
+}
 /** Ao sair da conta no site: apaga tudo que este site guardou cifrado neste navegador, inclusive a chave. */
 export async function wipeEncryptedStorage() {
   try {const d = await db(); d?.close();} catch { /* ignore */ }

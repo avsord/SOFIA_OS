@@ -16,7 +16,7 @@ export function prefetchPageCover(api:SofiaApi,data:Record<string,any>|undefined
 // Inicio primeiro"): logo depois que o Inicio abre, as capas de TODAS as paginas descem em segundo plano, duas por vez,
 // nos momentos livres do navegador. Ao entrar numa pagina a capa ja esta pronta (sem piscar).
 let queued=new Set<string>();
-export function prefetchAllCovers(api:SofiaApi,pages:{data?:Record<string,any>}[],delay=1500):()=>void{
+export function prefetchAllCovers(api:SofiaApi,pages:{data?:Record<string,any>}[],delay=300):()=>void{
  if(Platform.OS!=='web')return ()=>{};
  const todo=pages.map(p=>p.data).filter(d=>d?.cover_type==='attachment'&&d.cover_attachment_id&&!queued.has(String(d.cover_attachment_id))&&!peekCover(String(d.cover_attachment_id)));
  for(const d of todo)queued.add(String(d!.cover_attachment_id));

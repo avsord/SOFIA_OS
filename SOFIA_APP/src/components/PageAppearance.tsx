@@ -81,6 +81,8 @@ function WebCoverImg({uri,position,onError}:{uri:string;position:number;onError:
   let pic:any=DECODED.get(uri);if(!pic||pic.isConnected){pic=document.createElement('img');pic.decoding='sync';pic.src=uri;pic.addEventListener('load',()=>{if(!DECODED.has(uri))DECODED.set(uri,pic);});}
   pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
   Object.assign(pic.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'});
+  // capa que ainda nao estava pronta entra com um fade curto (antes: aparecia de golpe sobre o fundo)
+  if(!(pic.complete&&pic.naturalWidth>0)){pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';const show=()=>{pic.style.opacity='1';};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';}
   box.appendChild(pic);return()=>{pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
  return React.createElement('div',{ref:host,style:{position:'absolute',inset:0}});
 }
