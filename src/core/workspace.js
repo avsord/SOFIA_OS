@@ -32,7 +32,10 @@ class Workspace {
  validate(input,old){
    const kind=old?.kind||input.kind,def=CATALOG[kind];if(!def)throw new AppError('BAD_KIND','Categoria inválida.');
    const title=cleanText(input.title??old?.title,'Título',240),content=cleanText(input.content??old?.content??'','Descrição',16000,true);
-   rejectSecrets(title+'\n'+content);
+   // 06/11/2026 (Pedro: "a pagina pergunta se quer colocar senha; se falar que nao, fica sem, mas nao aparece esse erro"):
+   // pagina marcada pelo dono (sofia-secret-ok-v1) ou trancada (sofia-lock-v1) guarda o texto como esta; ela nao vai para a IA (context)
+   const secretOk=kind==='user_page'&&(input.tags??old?.tags??[]).some(t=>t==='sofia-secret-ok-v1'||t==='sofia-lock-v1');
+   if(!secretOk)rejectSecrets(title+'\n'+content);
    const area=cleanText(input.area||old?.area||'Geral','Área',80),state=input.state||old?.state||def.states[0];if(!def.states.includes(state))throw new AppError('BAD_STATE','Estado inválido para '+def.label+'.');
    let privacy=input.privacy||old?.privacy||def.defaultPrivacy||(def.group==='study'||def.group==='library'?'shared':'private');if(privacy==='public')privacy='shared';if(!PRIV.includes(privacy))throw new AppError('BAD_PRIVACY','Privacidade inválida.');if(def.private&&privacy==='shared')throw new AppError('PRIVATE_RECORD','Esse tipo de registro deve permanecer privado ou local.');
    const raw=input.data===undefined?(old?.data||{}):input.data;if(!raw||Array.isArray(raw)||typeof raw!=='object')throw new AppError('BAD_DATA','Campos inválidos.');
@@ -45,7 +48,7 @@ class Workspace {
      else if(f.type==='time'){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))throw new AppError('BAD_TIME','Use HH:MM.');}
      else if(f.type==='select'){if(!f.options.includes(v))throw new AppError('BAD_FIELD',f.label+': escolha uma opção válida.');}
      else if(f.type==='url')v=url(v);
-     else {v=cleanText(v,f.label,f.type==='textarea'?(f.max||16000):(f.max||1000),true);rejectSecrets(v);}
+     else {v=cleanText(v,f.label,f.type==='textarea'?(f.max||16000):(f.max||1000),true);if(!secretOk)rejectSecrets(v);}
      data[f.key]=v;
    }
    if(kind==='user_page'){
@@ -56,10 +59,10 @@ class Workspace {
        for(const block of blocks){
          if(!block||typeof block!=='object'||Array.isArray(block))throw new AppError('BAD_PAGE_BLOCKS','Bloco inválido.');
          if(!allowedBlocks.has(String(block.type||'text')))throw new AppError('BAD_PAGE_BLOCKS','Tipo de bloco inválido.');
-         const text=String(block.text||'');if(text.length>12000)throw new AppError('BAD_PAGE_BLOCKS','Um bloco não pode ultrapassar 12000 caracteres.');rejectSecrets(text);
-         const html=String(block.html||'');if(html.length>24000||/<\/?(?:script|style|iframe|object|embed|form|svg)|on\w+\s*=|javascript\s*:/i.test(html))throw new AppError('BAD_PAGE_BLOCKS','Formatação rich text inválida.');rejectSecrets(html.replace(/<[^>]*>/g,' '));
-         if(block.comments!==undefined){if(!Array.isArray(block.comments)||block.comments.length>100)throw new AppError('BAD_PAGE_BLOCKS','Use até 100 comentários por bloco.');for(const c of block.comments){if(!c||typeof c!=='object'||Array.isArray(c))throw new AppError('BAD_PAGE_BLOCKS','Comentário inválido.');const q=String(c.quote||''),body=String(c.text||'');if(q.length>2000||body.length>4000)throw new AppError('BAD_PAGE_BLOCKS','Comentário grande demais.');rejectSecrets(q);rejectSecrets(body);}}
-         if(block.data!==undefined){if(!block.data||typeof block.data!=='object'||Array.isArray(block.data))throw new AppError('BAD_PAGE_BLOCKS','Dados do bloco inválidos.');const packed=JSON.stringify(block.data);if(packed.length>50000)throw new AppError('BAD_PAGE_BLOCKS','Dados do bloco grandes demais.');rejectSecrets(packed);if(block.type==='table'&&block.data.rows!==undefined){if(!Array.isArray(block.data.rows)||block.data.rows.length>50||block.data.rows.some(r=>!Array.isArray(r)||r.length>20||r.some(c=>String(c??'').length>3000)))throw new AppError('BAD_PAGE_BLOCKS','Tabela limitada a 50 linhas, 20 colunas e 3000 caracteres por célula.');}}
+         const text=String(block.text||'');if(text.length>12000)throw new AppError('BAD_PAGE_BLOCKS','Um bloco não pode ultrapassar 12000 caracteres.');secretOk||rejectSecrets(text);
+         const html=String(block.html||'');if(html.length>24000||/<\/?(?:script|style|iframe|object|embed|form|svg)|on\w+\s*=|javascript\s*:/i.test(html))throw new AppError('BAD_PAGE_BLOCKS','Formatação rich text inválida.');secretOk||rejectSecrets(html.replace(/<[^>]*>/g,' '));
+         if(block.comments!==undefined){if(!Array.isArray(block.comments)||block.comments.length>100)throw new AppError('BAD_PAGE_BLOCKS','Use até 100 comentários por bloco.');for(const c of block.comments){if(!c||typeof c!=='object'||Array.isArray(c))throw new AppError('BAD_PAGE_BLOCKS','Comentário inválido.');const q=String(c.quote||''),body=String(c.text||'');if(q.length>2000||body.length>4000)throw new AppError('BAD_PAGE_BLOCKS','Comentário grande demais.');secretOk||rejectSecrets(q);secretOk||rejectSecrets(body);}}
+         if(block.data!==undefined){if(!block.data||typeof block.data!=='object'||Array.isArray(block.data))throw new AppError('BAD_PAGE_BLOCKS','Dados do bloco inválidos.');const packed=JSON.stringify(block.data);if(packed.length>50000)throw new AppError('BAD_PAGE_BLOCKS','Dados do bloco grandes demais.');secretOk||rejectSecrets(packed);if(block.type==='table'&&block.data.rows!==undefined){if(!Array.isArray(block.data.rows)||block.data.rows.length>50||block.data.rows.some(r=>!Array.isArray(r)||r.length>20||r.some(c=>String(c??'').length>3000)))throw new AppError('BAD_PAGE_BLOCKS','Tabela limitada a 50 linhas, 20 colunas e 3000 caracteres por célula.');}}
        }
      }
      if(data.parent_id){
@@ -378,7 +381,7 @@ class Workspace {
  }
  removePurchaseGroup(groupId){const group=this.get(groupId);if(group.kind!=='purchase_group')throw new AppError('BAD_KIND','Selecione um grupo de compras.');return this.s.tx(()=>{const items=this.list({kind:'purchase',limit:500}).filter(e=>e.data.purchase_group_id===groupId);for(const e of items)this.save({...e,revision:e.revision,data:{...e.data,purchase_group_id:''}},e.id);const deleted=this.deleteEntity(groupId);return {deleted,detached:items.length};});}
  panorama(){const all=this.list({limit:500}),tasks=this.s.tasks(),today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const activeTasks=tasks.filter(t=>!['done','cancelled'].includes(t.state));return {today,stats:this.s.stats(),tasks:activeTasks.slice(0,12),priorities:activeTasks.filter(t=>t.priority),today_tasks:activeTasks.filter(t=>t.due_at&&require('../services/scheduler').localISO(new Date(t.due_at))===today),active_flows:all.filter(e=>!['completed','archived','cancelled','purchased','watched','paid_reported','uploaded_reported'].includes(e.state)&&CATALOG[e.kind]?.group==='flow'),lessons:all.filter(e=>e.kind==='lesson'&&['active','paused'].includes(e.state)),notifications:this.notifications().filter(n=>n.state==='unread'),timeline:this.timeline({limit:12}),truncated:all.length===500};}
- context(query,limit=5,{route='private'}={}){const allowed=e=>route==='shared'?e.privacy==='shared':e.privacy!=='local';return this.list({limit:500}).filter(e=>allowed(e)&&!['contact','payment','invoice','approval','recipe_session'].includes(e.kind)&&e.state!=='archived').map(e=>({...e,rank:normalize(query).split(/\W+/).filter(t=>t.length>2&&normalize(e.title+' '+e.content+' '+e.tags.join(' ')+' '+JSON.stringify(e.data)).includes(t)).length})).filter(e=>e.rank>0).sort((a,b)=>b.rank-a.rank).slice(0,limit).map(e=>({id:e.id,kind:e.kind,title:e.title,content:e.content,data:e.data,tags:e.tags,area:e.area,privacy:e.privacy}));}
+ context(query,limit=5,{route='private'}={}){const allowed=e=>(route==='shared'?e.privacy==='shared':e.privacy!=='local')&&!(e.kind==='user_page'&&(e.tags||[]).some(t=>t==='sofia-secret-ok-v1'||t==='sofia-lock-v1'));return this.list({limit:500}).filter(e=>allowed(e)&&!['contact','payment','invoice','approval','recipe_session'].includes(e.kind)&&e.state!=='archived').map(e=>({...e,rank:normalize(query).split(/\W+/).filter(t=>t.length>2&&normalize(e.title+' '+e.content+' '+e.tags.join(' ')+' '+JSON.stringify(e.data)).includes(t)).length})).filter(e=>e.rank>0).sort((a,b)=>b.rank-a.rank).slice(0,limit).map(e=>({id:e.id,kind:e.kind,title:e.title,content:e.content,data:e.data,tags:e.tags,area:e.area,privacy:e.privacy}));}
  contextSensitivity(query){const hits=this.context(query,8,{route:'private'});if(hits.some(e=>e.privacy==='private'))return 'private';if(hits.some(e=>e.privacy==='shared'))return 'shared';return 'none';}
 }
 module.exports={Workspace,AREAS,dateISO,dateTime,tags,url};

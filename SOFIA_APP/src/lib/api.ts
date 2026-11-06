@@ -338,6 +338,9 @@ export class SofiaApi {
   /** 06/11/2026: compartilhar pagina na web (link secreto, so leitura; subpaginas vao junto). */
   pageShare(id:string) { return this.request<{token:string|null}>('/workspace/pages/'+encodeURIComponent(id)+'/share'); }
   setPageShare(id:string,body:{on:boolean;regenerate?:boolean}) { return this.request<{token:string|null}>('/workspace/pages/'+encodeURIComponent(id)+'/share', body, 'POST'); }
+  // 06/11/2026 (pagina com senha, nivel Media): o servidor guarda a chave da pagina cifrada; recuperar pede a senha da conta
+  pageLockKey(kid:string,key:string|null) { return this.request<{ok:boolean}>('/workspace/pages/lock-key', {kid,key}, 'POST'); }
+  pageLockRecover(kid:string,password:string) { return this.request<{key:string}>('/workspace/pages/lock-recover', {kid,password}, 'POST'); }
   sharedPages() { return this.request<{pages:string[]}>('/workspace/pages/shared'); }
   areaChange(body:{add?:string;remove?:string;rename?:{from:string;to:string}}) { return this.request<{areas:string[]}>('/workspace/areas', body, 'POST'); }
   async entities(kind: string, q = '', offset = 0) { const path='/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset,generation=this.cacheGeneration;const result=await this.request<{items:Entity[]}>(path);if(kind!=='user_page')return result;const decorated={...result,items:await this.md.decorate(result.items)};

@@ -25,6 +25,9 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
  // 06/11/2026: compartilhar pagina (link publico so leitura, tipo Notion)
  match=p.match(/^\/api\/pages\/([\w-]+)\/share$/);if(match&&runtime.pageShares){const key=validId(match[1]);if(m==='GET')return send(runtime.pageShares.status(key));if(m==='POST'){const b=await body();return send(runtime.pageShares.set(key,{on:!!b.on,regenerate:!!b.regenerate}));}}
  if(m==='GET'&&p==='/api/pages/shared'&&runtime.pageShares)return send({pages:runtime.pageShares.list()});
+ // 06/11/2026: pagina trancada com senha - nivel Media guarda a chave da pagina; recuperar pede a senha da conta
+ if(m==='POST'&&p==='/api/pages/lock-key'&&runtime.pageLocks){const b=await body();return send(runtime.pageLocks.put(b.kid,b.key===undefined?null:b.key));}
+ if(m==='POST'&&p==='/api/pages/lock-recover'&&runtime.pageLocks){const b=await body();return send(runtime.pageLocks.recover(b.kid,b.password));}
  if(m==='GET'&&p==='/api/areas')return send({areas:store.userAreas()});
  if(m==='POST'&&p==='/api/areas'){const b=await body();const now=store.userAreas();let next=now;
   if(typeof b.add==='string'&&b.add.trim())next=[...now,b.add.trim()];

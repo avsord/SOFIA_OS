@@ -10,7 +10,7 @@ import {KeyboardToolbar} from '../components/KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
 import {legacyMovePlan} from '../lib/legacy-md';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Platform,StyleSheet} from 'react-native';
+import {ActivityIndicator,View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Platform,StyleSheet} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -47,6 +47,9 @@ import {appAlert} from '../lib/app-alert';
 import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
 import {pageUrlPath} from '../lib/web-route';
 import {ContentWidth} from '../lib/content-width';
+import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
+import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
+import {SECRET_OK_TAG} from '../lib/page-editor';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
@@ -77,12 +80,21 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function changeKanbanInteraction(value:boolean){kanbanInteractionRef.current=value;changePageInteraction(value);}
  function endPageTouch(){if(kanbanInteractionRef.current||!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
  function refreshPages(){if(refreshGuard.current.canRefresh()&&!selectedRef.current)void load(true);}
- selectedRef.current=selectedId;
+ const pagesRef=useRef<Entity[]>([]);selectedRef.current=selectedId;pagesRef.current=pages;
  const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope);
- const store=useMemo(()=>new PageEditorStore({save:patch=>api.saveEntity(patch),read:id=>api.entity(id),
+ // 06/11/2026 (pagina com senha): pagina trancada (ou subpagina nova de uma trancada e aberta) sai daqui cifrada; o servidor
+ // so recebe lock_json. Trancada e fechada nunca salva (o texto aberto nao existe aqui).
+ const apiRef=useRef(api);apiRef.current=api;
+ const store=useMemo(()=>new PageEditorStore({view:viewOf,save:async patch=>{
+   const id=String(patch.id),all=pagesRef.current,cur=all.find(x=>x.id===id);let h=cur&&isLocked(cur)?lockHeader(cur):null;
+   if(!h&&cur){const par=all.find(x=>x.id===String((patch.data as any)?.parent_id??cur.data?.parent_id??''));const ph=par&&isLocked(par)?lockHeader(par):null;if(ph&&isOpen(ph.kid))h=ph;}
+   if(h){if(!isOpen(h.kid))throw Error('Página trancada: abra com a senha para salvar.');
+    if(patch.data){const plain=String((patch.data as any).blocks_json??plainOf(id,h)??'[]');patch={...patch,data:{...patch.data,blocks_json:'[]',lock_json:await seal(id,h.kid,plain)}};}
+    const tags=[...((patch.tags as string[]|undefined)||cur?.tags||[])];if(!tags.includes(LOCK_TAG))patch={...patch,tags:[...tags.filter(t=>t!==SECRET_OK_TAG),LOCK_TAG]};}
+   return apiRef.current.saveEntity(patch);},read:id=>apiRef.current.entity(id),
   persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
   onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
- }),[api,key]);
+ }),[key]); // 06/11/2026: um editor por tela (antes, cada redesenho com outro `api` criava outro: 387 copias, e a resposta "nao, salvar sem senha" ia para a copia errada)
  const storeSession=useMemo(()=>pageStoreSession(store),[store]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
  // A fast tab touch can race Shell's post-reveal archive hydration. Restore the
@@ -142,6 +154,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
+ // 06/11/2026 (pagina com senha): Maxima tranca ao sair da pagina (subpagina da mesma chave nao conta como sair); Media
+ // conta 5 min. Com a chave aberta, o texto e decifrado em segundo plano e entra no editor.
+ const [lockDialog,setLockDialog]=useState<null|'lock'|'change'>(null),[lockTick,setLockTick]=useState(0);
+ useEffect(()=>onLockChange(()=>setLockTick(t=>t+1)),[]);
+ const selRaw=selectedId?pages.find(x=>x.id===selectedId):undefined,selKid=selRaw&&isLocked(selRaw)?(lockHeader(selRaw)?.kid||''):'';
+ useEffect(()=>{if(!selKid)return;entered(selKid);return()=>left(selKid);},[selKid]);
+ useEffect(()=>{if(selRaw&&needsOpen(selRaw)){const h=lockHeader(selRaw)!;void openBlocks(selRaw.id,h).then(()=>store.rebase(selRaw)).catch(e=>setError(errorText(e)));}},[selRaw?.id,selRaw?.revision,lockTick]); // eslint-disable-line react-hooks/exhaustive-deps
  // 0.3.250 (computador): a barra lateral mostra a arvore destas paginas e abre uma pagina daqui; o caminho
  // da pagina aberta vai para a barra de cima. No celular nada disso roda.
  useEffect(()=>{if(Platform.OS==='web'&&loaded&&!samePages(pagesDirectory.get(),displayPages))pagesDirectory.set(displayPages);},[displayPages,loaded]);
@@ -617,8 +636,30 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
+ // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada
+ const lk=isLocked(selected)?lockHeader(selected):null,lockedNow=!!lk&&!isOpen(lk.kid),decrypting=!!lk&&!lockedNow&&!!selRaw&&needsOpen(selRaw);
+ const family=(kid:string)=>pagesRef.current.filter(x=>isLocked(x)&&lockHeader(x)?.kid===kid);
+ const descendants=(id:string)=>{const out:Entity[]=[];const walk=(i:string)=>{for(const ch of children.get(i)||[]){out.push(ch);walk(ch.id);}};walk(id);return out;};
+ const putSaved=(saved:Entity)=>{store.rebase(saved);setPages(prev=>prev.map(x=>x.id===saved.id?saved:x));};
+ const lockPage=async(pw:string,level:LockLevel)=>{
+  const {kid,raw}=await createLock(pw,level);
+  for(const t of [selected,...descendants(selected.id)]){if(t.id!==selected.id&&isLocked(t))continue;const e=store.get(t.id),base:any=pagesRef.current.find(x=>x.id===t.id)||t;
+   const blocks=e?JSON.stringify(e.draft.blocks):String(base.data?.blocks_json||'[]'),lock_json=await seal(t.id,kid,blocks);
+   putSaved(await api.saveEntity({id:t.id,revision:(e?.base||base).revision,tags:[...((e?.base||base).tags||[]).filter((x:string)=>x!==SECRET_OK_TAG),LOCK_TAG],data:{...(base.data||{}),blocks_json:'[]',lock_json}} as any));}
+  if(level==='medium')await api.pageLockKey(kid,b64(raw));
+  setLockDialog(null);};
+ const newHeader=async(kid:string,head:any)=>{for(const x of family(kid)){const h=lockHeader(x)!;putSaved(await api.saveEntity({id:x.id,revision:x.revision,data:{...(x.data||{}),lock_json:JSON.stringify({...h,salt:head.salt,iter:head.iter,wiv:head.wiv,wk:head.wk})}} as any));}};
+ const unlockPage=async(pw:string)=>{if(!lk||!selRaw)return;await unlock(lk,pw);await openBlocks(selRaw.id,lk);store.rebase(selRaw);};
+ const recoverPage=async(account:string,pw:string)=>{if(!lk||!selRaw)return;const {key}=await api.pageLockRecover(lk.kid,account);const head=await recoverWith(lk,key,pw);await newHeader(lk.kid,head);await openBlocks(selRaw.id,lk);store.rebase(selRaw);};
+ const changePassword=async(pw:string)=>{if(!lk)return;await newHeader(lk.kid,await rewrap(lk.kid,pw));setLockDialog(null);};
+ const removeLock=()=>{if(!lk)return;const kid=lk.kid,level=lk.level;appAlert('Tirar a senha?','A página e as subpáginas dela voltam a ficar sem criptografia.',[{text:'Cancelar',style:'cancel'},{text:'Tirar senha',style:'destructive',onPress:()=>void(async()=>{try{
+   for(const x of family(kid)){const h=lockHeader(x)!,e=store.get(x.id),blocks=e&&isOpen(kid)&&plainOf(x.id,h)!=null?JSON.stringify(e.draft.blocks):await openBlocks(x.id,h);
+    putSaved(await api.saveEntity({id:x.id,revision:x.revision,tags:[...(x.tags||[]).filter(t=>t!==LOCK_TAG&&t!==SECRET_OK_TAG),SECRET_OK_TAG],data:{...(x.data||{}),blocks_json:blocks,lock_json:''}} as any));}
+   if(level==='medium')await api.pageLockKey(kid,null);forget(kid);}catch(err){setError(errorText(err));}})()}]);};
+ const lockItems=lk?(lockedNow?[]:[{label:'Trancar agora',icon:'lock' as const,run:()=>forget(lk.kid)},{label:'Trocar senha…',icon:'lock' as const,run:()=>setLockDialog('change')},{label:'Tirar senha…',icon:'lock' as const,run:removeLock}]):[{label:'Trancar com senha…',icon:'lock' as const,run:()=>setLockDialog('lock')}];
+ void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
- const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
+ const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
  const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   {/* 0.3.263 (fase 3 — Paginas no computador): o caminho e o titulo ja estao na barra de cima; aqui fica uma faixa fina so com o
@@ -639,7 +680,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      // 0.3.267 (computador): menu pequeno junto do ⋯, como no Notion (antes: painel de baixo na largura toda)
      const vw=typeof window!=='undefined'?window.innerWidth:1200,imageCoverNow=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id,blk=focus?draft.blocks.find(x=>x.id===focus):undefined;
      openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)},{label:'Usar um modelo nesta página',icon:'grid',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
-      ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
+      ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),...lockItems,{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
    </View>
   </View>
   {/* 0.3.230: opcoes da pagina no ⋯ do topo, como no Notion (antes: icones soltos e "segure para excluir" nos blocos) */}
@@ -650,12 +691,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <Button title={hasCover?'Alterar capa':'Adicionar capa'} secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('cover'),120);}}/>
    {draft.appearance.cover_type==='attachment'&&draft.appearance.cover_attachment_id?<><View style={{height:8}}/><Button title="Reposicionar capa" secondary onPress={()=>{setPageMenu(false);setTimeout(startCoverMove,120);}}/></>:null}
    {focus&&draft.blocks.some(x=>x.id===focus)?<><View style={{height:8}}/><Button title="Remover bloco selecionado" secondary onPress={()=>{const blk=draft.blocks.find(x=>x.id===focus);setPageMenu(false);if(blk)setTimeout(()=>confirmRemoveBlock(blk),120);}}/></>:null}
+   {lockItems.map(it=><React.Fragment key={it.label}><View style={{height:8}}/><Button title={it.label} secondary onPress={()=>{setPageMenu(false);setTimeout(it.run,120);}}/></React.Fragment>)}
    <Pressable accessibilityRole="button" onPress={()=>{setPageMenu(false);setTimeout(removePage,120);}} style={{paddingVertical:18}}><Text style={{color:c.danger,fontWeight:'600'}}>Excluir página</Text></Pressable>
   </Sheet>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
-  {documentContent(selected,draft)}
+  {/* a pergunta fica ate a pessoa responder (o clique tira o foco do texto e dispara outro salvar; antes ela sumia sob o clique) */}
+  {entry.secretAsk&&!lk?<SecretAsk onLock={()=>setLockDialog('lock')} onKeep={()=>store.allowSecret(selected.id)}/>:null}
+  {lockedNow&&lk?<PageLockScreen title={selected.title} level={lk.level} onUnlock={unlockPage} onRecover={recoverPage}/>:decrypting?<View style={{flex:1,alignItems:'center',paddingTop:80}}><ActivityIndicator color={c.accent}/></View>:documentContent(selected,draft)}
+  {lockDialog?<PageLockDialog title={selected.title} change={lockDialog==='change'?lk?.level:undefined} onCancel={()=>setLockDialog(null)} onLock={lockDialog==='change'?pw=>changePassword(pw):lockPage}/>:null}
   {/* 05/11/2026 (Pedro: o + abria "um trambolho"): como no Notion, a página nova abre direto e embaixo fica "Comece a usar" */}
-  {desktop&&pageBodyIsEmpty(draft.blocks)&&!(children.get(selected.id)||[]).length?<View pointerEvents="box-none" testID="page-start-bar" style={{position:'absolute',left:0,right:0,bottom:36,alignItems:'center',zIndex:25}}>
+  {desktop&&!lk&&pageBodyIsEmpty(draft.blocks)&&!(children.get(selected.id)||[]).length?<View pointerEvents="box-none" testID="page-start-bar" style={{position:'absolute',left:0,right:0,bottom:36,alignItems:'center',zIndex:25}}>
    <View style={{gap:8,alignItems:'flex-start'}}>
     <Text style={{color:c.muted,fontSize:12}}>Comece a usar</Text>
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>

@@ -320,6 +320,8 @@ class SofiaCore{
     if(['append_page_block','append_page_structure','edit_page_block','delete_page_block'].includes(plan.intent)){
       const pageId=String(a.page_id||'');if(!pageId)throw new AppError('PAGE_REQUIRED','A IA não indicou qual página existente deve ser editada.',409);
       const page=this.workspace.get(pageId);if(page.kind!=='user_page'||page.state==='archived')throw new AppError('PAGE_INVALID','A página indicada não está disponível.',409);
+      // 06/11/2026: pagina trancada com senha - a Sofia nao le nem escreve (o conteudo esta cifrado no navegador)
+      if((page.tags||[]).includes('sofia-lock-v1'))throw new AppError('PAGE_LOCKED','Essa página está trancada com senha. Abra a página e edite por lá.',409);
       let blocks=safeJSON(page.data?.blocks_json||'[]',[]);if(!Array.isArray(blocks))blocks=[];
       const allowed=new Set(['text','heading1','heading2','heading3','heading4','bullet','number','todo','toggle','code','quote','callout','equation','divider','page_link','image','file','table','date','task_link','commitment_link','bookmark','sofia','collection']);
       let changedBlockId=String(a.block_id||'');

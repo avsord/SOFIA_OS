@@ -25,10 +25,13 @@ export function conflictingFields(base:Entity,patch:Partial<Entity>,remote:Entit
  for(const k of ['blocks_json',...APPEARANCE_KEYS])if(patch.data&& !same(patch.data[k],base.data?.[k]) && !same(remote.data?.[k],base.data?.[k]) && !same(remote.data?.[k],patch.data[k]))out.push(k);
  return out;
 }
-export type SaveState='saved'|'pending'|'saving'|'error'|'conflict';
-export type PageEntry={base:Entity;baseDraft:PageDraft;draft:PageDraft;past:PageDraft[];future:PageDraft[];version:number;acked:number;state:SaveState;error:string;group:string;groupAt:number;firstChange:number};
+export type SaveState='saved'|'pending'|'saving'|'error'|'conflict'|'secret';
+/** 06/11/2026: pagina com senha escrita que o dono decidiu deixar sem trancar (o servidor aceita e a IA nao le). */
+export const SECRET_OK_TAG='sofia-secret-ok-v1';
+const ALLOW_SECRET=new Set<string>(),STORES=new Set<PageEditorStore>();
+export type PageEntry={allowSecret?:boolean;secretAsk?:boolean;base:Entity;baseDraft:PageDraft;draft:PageDraft;past:PageDraft[];future:PageDraft[];version:number;acked:number;state:SaveState;error:string;group:string;groupAt:number;firstChange:number};
 export type PendingPage={base:Entity;baseDraft:PageDraft;draft:PageDraft};
-type Deps={save:(patch:Partial<Entity>)=>Promise<Entity>;read:(id:string)=>Promise<Entity>;
+type Deps={view?:(e:Entity)=>Entity;save:(patch:Partial<Entity>)=>Promise<Entity>;read:(id:string)=>Promise<Entity>;
  persist:(entries:PendingPage[])=>Promise<void>;onSaved?:(page:Entity)=>void;delay?:number;maxWait?:number;now?:()=>number};
 
 /** One serialized save lane per page. A response never replaces newer local typing. */
@@ -40,11 +43,12 @@ export class PageEditorStore {
  private disk:Promise<void>=Promise.resolve();
  private disposed=false;
  private now:()=>number;
- constructor(private deps:Deps){this.now=deps.now||Date.now;}
+ constructor(private deps:Deps){this.now=deps.now||Date.now;STORES.add(this);}
  subscribe(fn:()=>void){this.listeners.add(fn);return()=>{this.listeners.delete(fn);};}
  private changed(){if(!this.disposed)this.listeners.forEach(fn=>fn());}
  get(id:string){return this.entries.get(id);}
  open(base:Entity):PageEntry {
+  if(this.deps.view)base=this.deps.view(base); /* 06/11/2026: pagina trancada e aberta entra com o texto decifrado */
   let e=this.entries.get(base.id);
   if(!e){const d=pageDraft(base);e={base,baseDraft:clone(d),draft:d,past:[],future:[],version:0,acked:0,state:'saved',error:'',group:'',groupAt:0,firstChange:0};this.entries.set(base.id,e);}
   else if(e.state==='saved'&&base.revision>e.base.revision){e.base=base;e.baseDraft=pageDraft(base);e.draft=clone(e.baseDraft);e.past=[];e.future=[];}
@@ -56,6 +60,16 @@ export class PageEditorStore {
    const e=this.open(p.base);e.baseDraft=p.baseDraft;e.draft=p.draft;e.version=1;e.state='pending';e.firstChange=this.now();}
  }
  resume(){this.disposed=false;for(const [id,e] of this.entries)if(e.version>e.acked&&e.state!=='conflict')this.schedule(id);}
+ /** 06/11/2026 (pagina com senha): texto decifrado chegou ou a pagina acabou de ser trancada - troca a base sem perder
+  * digitacao pendente (se o rascunho igual a base nova, fica salvo). */
+ rebase(base:Entity){if(this.deps.view)base=this.deps.view(base);const e=this.entries.get(base.id);if(!e){this.open(base);this.changed();return;}
+  if((base.tags||[]).includes('sofia-lock-v1'))e.secretAsk=false;
+  const d=pageDraft(base);if(e.state==='saved'){e.base=base;e.baseDraft=d;e.draft=clone(d);e.past=[];e.future=[];this.changed();return;}
+  e.base=base;e.baseDraft=d;if(same(d,e.draft)){e.acked=e.version;e.state='saved';e.error='';}else{e.state='pending';this.schedule(base.id);}this.changed();}
+ /** "Nao, salvar sem senha": marca a pagina e salva de novo. */
+ // a resposta vale para a pagina em qualquer copia do editor (a tela pode ter mais de uma; a que salva pode nao ser a que perguntou)
+ allowSecret(id:string){ALLOW_SECRET.add(id);for(const st of STORES)st.wakeSecret(id);}
+ private wakeSecret(id:string){const e=this.entries.get(id);if(!e)return;e.allowSecret=true;e.secretAsk=false;if(e.version>e.acked&&e.state!=='conflict'){e.state='pending';e.error='';this.schedule(id);}this.changed();}
  edit(id:string,change:(draft:PageDraft)=>PageDraft,group=''){
   const e=this.entries.get(id);if(!e)return;const next=change(clone(e.draft));if(same(next,e.draft))return;
   const now=this.now();if(!group||group!==e.group||now-e.groupAt>700){e.past.push(clone(e.draft));if(e.past.length>80)e.past.shift();}
@@ -86,16 +100,19 @@ export class PageEditorStore {
  }
  private async saveEntry(id:string,e:PageEntry){
   const version=e.version,snapshot=clone(e.draft);let patch=pagePatch(e.base,e.baseDraft,snapshot);
+  if((e.allowSecret||ALLOW_SECRET.has(id))&&!(e.base.tags||[]).includes(SECRET_OK_TAG))patch={...patch,tags:[...(e.base.tags||[]),SECRET_OK_TAG]};
   if(patch.title===undefined&&!patch.data){e.acked=version;e.state='saved';await this.persist();this.changed();return;}
   e.state='saving';e.error='';this.changed();
   try {
    let saved:Entity;
    try{saved=await this.deps.save(patch);}catch(error:any){
+    // 06/11/2026 (Pedro): texto com senha - em vez do erro, a pagina pergunta se quer trancar com senha (o rascunho fica guardado)
+    if(error?.code==='POSSIBLE_SECRET'){const ok=e.allowSecret||ALLOW_SECRET.has(id);e.state=ok?'pending':'secret';e.secretAsk=!ok;e.error='';this.changed();await this.persist();if(ok)this.schedule(id); /* respondeu "nao" enquanto este salvar estava no caminho: tenta de novo, agora com a marca */ return;}
     if(error?.status!==409)throw error;
     e.state='conflict';e.error='Esta página também foi alterada no site. Seu rascunho está preservado; escolha qual versão manter.';this.changed();await this.persist();return;
    }
    if(this.entries.get(id)!==e)return;
-   e.base=saved;e.baseDraft=snapshot;e.acked=version;e.state=e.version===version?'saved':'pending';e.firstChange=this.now();e.error='';
+   e.base=this.deps.view?this.deps.view(saved):saved;e.baseDraft=snapshot; /* trancada: a base guarda o texto aberto (senao o proximo salvar cifraria "[]") */e.acked=version;e.state=e.version===version?'saved':'pending';e.firstChange=this.now();e.error='';
    if(!this.disposed)this.deps.onSaved?.(saved);
   }catch(error:any){if(this.entries.get(id)===e){e.state='error';e.error=error instanceof Error?error.message:'Não foi possível sincronizar. O rascunho continua no aparelho.';}}
   await this.persist();this.changed();
@@ -107,7 +124,7 @@ export class PageEditorStore {
  forget(id:string){const t=this.timers.get(id);if(t)clearTimeout(t);this.timers.delete(id);this.entries.delete(id);void this.persist();this.changed();}
  async flushAll(){await Promise.all([...this.entries.keys()].map(id=>this.flush(id)));await this.disk;}
  pending(){return [...this.entries.values()].filter(e=>e.version>e.acked);}
- dispose(){this.disposed=true;this.timers.forEach(clearTimeout);this.timers.clear();this.listeners.clear();}
+ dispose(){this.disposed=true;STORES.delete(this);this.timers.forEach(clearTimeout);this.timers.clear();this.listeners.clear();}
 }
 
 export function expandedIds(raw:unknown):Set<string>{

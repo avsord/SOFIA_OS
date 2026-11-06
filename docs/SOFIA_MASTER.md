@@ -228,6 +228,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Início sem animação dos blocos (06/11/2026, Pedro):** as fileiras de blocos aparecem prontas, sem entrada; a saudação/fade da abertura continua.
 
+- **Senha escrita numa página (06/11/2026, Pedro):** a página pergunta se quer trancar com senha; se "não", salva normalmente (marca sofia-secret-ok-v1) e fica fora do que a IA lê.
+
 ## 8. Regras que não se quebram
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
@@ -254,8 +256,9 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- Página com senha: imagens/anexos dentro da página ainda NÃO são criptografados (só o texto/blocos); subpágina nova dentro de trancada é cifrada só se a chave estiver aberta. Pedro não respondeu sobre anexos.
+- Chave de backup (KeyStore) no Railway fica na pasta "secure" padrão, que é apagada a cada deploy (descoberto 06/11 ao fazer a página com senha) — verificar se os backups cifrados continuam abríveis.
 - Mercado Livre no site: "Identidade, preço ou data inválidos" sem causa achada (o formato do servidor passa nos testes); a mensagem agora mostra o campo entre colchetes — pedir ao Pedro o texto novo.
-- Página com senha: desenho enviado 06/11 (3 telas: ⋯ Trancar, criar senha/nível, página trancada); implementar só após o "aprovado". Falta decidir anexos/imagens (criptografar também).
 
 - **Páginas estilo Notion — o que falta (pedido do Pedro 05/11: "tudo igual ao Notion"):** feito no site: teclado, menu "/", atalhos, colar, arrastar/selecionar blocos, texto rico com barra ao selecionar, Sofia na página, subpáginas como links com prévia, janelas de ícone/capa, topo (Editada/link/favorito), barra lateral (arrastar, ⋯/+, Favoritos, Próximos eventos). Falta: Tab para recuar (blocos aninhados), alternante (toggle), imagem/arquivo como bloco no site, comentários, tooltip no +. Texto rico só no site: editar a mesma linha no celular tira a formatação dela. Favoritos ficam no navegador (não sincronizam).
 
@@ -325,11 +328,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: Shift+clique seleciona várias bolinhas (anel azul); arrastar uma marcada leva todas o mesmo tanto; Esc/clique na linha limpa. Testado no navegador: 13:00 e 13:30 → 14:00 e 14:30 | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Abertura: "Boa noite pulando" = fonte do nome (itálico) chegava tarde (sem preload) e o cumprimento centralizado mudava de largura aos ~3,7 s; preload acrescentado. Véu em camada própria. Capas preparadas só após 4,5 s, uma por vez, decodificando do arquivo. 5/5 aberturas sem deslocamento tardio | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Conversa: imagem colada dava "Failed to fetch" (CSP connect-src self bloqueia fetch de blob:; confirmado no navegador). blob-registry guarda o arquivo de cada blob: e a leitura não usa fetch (anexo, foto do perfil, Biblioteca). ML: mensagem de leitura descartada agora diz qual campo falhou | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: malha de seleção (Shift ou Alt + arrastar no vazio), retângulo tracejado como no Photoshop, marca as bolinhas dentro (soma às marcadas); Alt+clique também marca. Testado no navegador: malha no lugar do mouse, 4 marcadas, sem abrir criar | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Início: blocos sem animação de entrada (Pedro: "a página já inicia com todos prontos"). Malha de seleção começa em qualquer ponto do quadro da linha do tempo, não só na linha | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Página com senha (desenho aprovado): Máxima/Média, AES-GCM no navegador (PBKDF2 310k), lock_json; Média guarda a chave cifrada no servidor (data/page-lock-master.key) e recupera com a senha da conta; IA/link público não leem. Senha escrita na página pergunta "trancar?"; "não" salva (sofia-secret-ok-v1). Corrigido: 387 cópias do editor (useMemo com api) | E2E no navegador ok (inclui reinício do servidor); [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

@@ -15,12 +15,14 @@ const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]{3,20})$/i;
 function makePageShares(store,workspace){
  const read=()=>{const v=store.settings().pageShares;return v&&typeof v==='object'&&!Array.isArray(v)?v:{};};
  const write=map=>store.db.prepare('INSERT OR REPLACE INTO settings VALUES (?,?)').run('pageShares',JSON.stringify(map));
- const page=id=>{try{const e=workspace.get(id);return e&&e.kind==='user_page'&&e.state!=='archived'?e:null;}catch{return null;}};
+ // 06/11/2026: pagina trancada com senha nunca aparece no link publico (nem como subpagina)
+ const locked=e=>(e.tags||[]).includes('sofia-lock-v1');
+ const page=id=>{try{const e=workspace.get(id);return e&&e.kind==='user_page'&&e.state!=='archived'&&!locked(e)?e:null;}catch{return null;}};
  const parentOf=e=>String((e&&e.data&&e.data.parent_id)||'');
  const tokenOf=pageId=>Object.keys(read()).find(t=>read()[t]&&read()[t].page===pageId)||null;
  /** A pagina continua dentro da compartilhada (ela mesma ou descendente). */
  function inside(root,id){let cur=page(id),guard=0;while(cur&&guard++<60){if(cur.id===root)return true;const up=parentOf(cur);if(!up)return false;cur=page(up);}return false;}
- function children(id){const out=[];for(let offset=0;offset<20000;offset+=500){const rows=workspace.list({kind:'user_page',limit:500,offset});for(const e of rows)if(e.state!=='archived'&&parentOf(e)===id)out.push(e);if(rows.length<500)break;}
+ function children(id){const out=[];for(let offset=0;offset<20000;offset+=500){const rows=workspace.list({kind:'user_page',limit:500,offset});for(const e of rows)if(e.state!=='archived'&&!locked(e)&&parentOf(e)===id)out.push(e);if(rows.length<500)break;}
   return out.sort((a,b)=>(Number(a.data&&a.data.sort_order)||0)-(Number(b.data&&b.data.sort_order)||0)||String(a.title).localeCompare(String(b.title),'pt-BR'));}
  return {
   status(pageId){validId(pageId);if(!page(pageId))throw new AppError('NOT_FOUND','Página não encontrada.',404);return {token:tokenOf(pageId)};},

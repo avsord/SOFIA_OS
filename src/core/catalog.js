@@ -946,7 +946,8 @@ const CATALOG={
       {"key":"suggested","label":"Criado a partir de sugestão da Sofia","type":"checkbox"},
       {"key":"parent_id","label":"Página pai","type":"text"},
       {"key":"node_type","label":"Tipo de nó","type":"select","options":["space","page"]},
-      {"key":"blocks_json","label":"Conteúdo em blocos","type":"textarea","max":250000}
+      {"key":"blocks_json","label":"Conteúdo em blocos","type":"textarea","max":250000},
+      {"key":"lock_json","label":"Conteúdo trancado (cifrado no navegador)","type":"textarea","max":400000,"developerOnly":true}
     ],
     "description": "Espaço ou página personalizável do usuário. Espaços raiz aparecem em Seus Espaços; páginas podem ficar aninhadas dentro deles.",
     "defaultPrivacy": "private"
