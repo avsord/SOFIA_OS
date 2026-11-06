@@ -458,7 +458,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
-  useEffect(() => {if (!WEB || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {setPin(''); setHover('');} /* 06/11/2026 (varredura): com o mouse ainda na bolinha o balao continuava pelo hover */}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
+  useEffect(() => {if (!WEB || !(pin || hover)) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {setPin(''); setHover('');} /* 06/11/2026 (varredura): com o mouse ainda na bolinha o balao continuava pelo hover */}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin, hover]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
   // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
@@ -511,6 +511,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const beginDrag = (e: any, key: string, items: DragItem[], x0: number, color: string) => {
     const el: any = lineBox.current; if (!actions.onMove || !items.length || !el?.getBoundingClientRect || !WEB) return;
     const ne = e?.nativeEvent || {}, sx = Number(ne.pageX ?? ne.clientX), rect = el.getBoundingClientRect(); if (!Number.isFinite(sx) || !rect.width) return;
+    // 06/11/2026 (raiz do arrasto pendurado): num clique rapido o aviso de "apertou" pode chegar depois de o botao ja ter sido
+    // solto; preparar o arrasto ai deixava a bolinha esperando um "soltar" que nunca vinha. Botao do mouse ja solto = sem arrasto.
+    if (typeof ne.buttons === 'number' && ne.buttons === 0 && (ne.pointerType === 'mouse' || /^mouse/.test(String(ne.type || '')))) return;
     // 05/11/2026 (Pedro: "ao mover uma bolinha de um grupo, centralizar a bolinha e o mouse"): pegando pela alca do balao
     // (chave 'g...'), a bolinha fica centrada sob o mouse; pegando a propria bolinha, mantem o ponto em que foi pega
     const grab = key.startsWith('g') ? 0 : sx - (rect.left + x0 * rect.width); let edge = 0, edgeRaf: any = null, lastX = sx;
@@ -531,7 +534,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const d = {key, items, fx, live: true, color, snap}; dragRef.current = d; setDrag(d);
       const px = ev.pageX - rect.left; edge = px < 28 ? -1 : px > rect.width - 28 ? 1 : 0; if (edge && !edgeRaf) edgeRaf = requestAnimationFrame(tickEdge);};
     // 0.3.318 (Pedro): Esc cancela o arrastar - tudo volta para onde estava, nada e gravado
-    const esc = (ev: KeyboardEvent) => {if (ev.key !== 'Escape') return; ev.preventDefault(); ev.stopPropagation(); const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);}};
+    const esc = (ev: KeyboardEvent) => {if (ev.key !== 'Escape') return; if (!dragRef.current?.live) {stop(); return;} /* sem arrasto de verdade o Esc segue (fecha o balao) */ ev.preventDefault(); ev.stopPropagation(); const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);}};
     const up = () => {const d = stop(); if (!d?.live) return; setSel([]);
       justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);
       // o primeiro item vai para onde a bolinha foi solta; os outros andam o mesmo tanto (de 5 em 5 minutos)

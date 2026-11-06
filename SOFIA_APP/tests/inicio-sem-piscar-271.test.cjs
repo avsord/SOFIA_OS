@@ -54,3 +54,8 @@ test('Linha do tempo: arrasto pendurado (mouse sem botao) e cancelado sem gravar
   assert.ok(s.includes("if (e.key === 'Escape') {setPin(''); setHover('');}"));
   const sw=read('tools/ux-sweep.cjs');assert.ok(sw.includes('dado-mudou-sem-pedir'),'varredura confere dados antes/depois');
 });
+test('Linha do tempo: clique rapido nao prepara arrasto com botao ja solto; Esc so e segurado durante arrasto de verdade',()=>{
+  const s=read('src/desktop/HomeBrief.tsx');
+  assert.ok(s.includes("if (typeof ne.buttons === 'number' && ne.buttons === 0 && (ne.pointerType === 'mouse'"));
+  assert.ok(s.includes("if (!dragRef.current?.live) {stop(); return;}"));
+});

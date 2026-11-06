@@ -333,11 +333,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Pedro: "tá do mesmo jeito" após a correção do redesenho de 1 s (não reproduzia aqui com dados pequenos). Gravador de fluidez do Início no site (fluency-probe.ts): 20 s após abrir manda ao log do Railway saltos, partes redesenhadas, animações reiniciadas e travadas, sem conteúdo | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | 1º relatório [fluidez] do Pedro (1762×832, zoom 109%) achou a causa real: encaixe do Início entrava 1 quadro atrasado (100%→92%, "Boa tarde" descia 14 px) e os 7 nomes da linha do tempo esperavam o onLayout. Ambos medidos antes da pintura; reproduzido e confirmado com a tela dele | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Foto do perfil no site entrava 65–180 ms depois das iniciais (buscada só após o login). early.js pede /profile/photo junto com a página e guarda a foto pronta; o avatar já nasce com ela (0 ms). 2º relatório [fluidez] do Pedro: saudação sem o pulo de 14 px | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: seleção de bolinhas sai clicando fora do quadro (Esc já tirava). Nova varredura `SOFIA_APP/tools/ux-sweep.cjs`: percorre as 17 telas do site num servidor de teste e acusa erros, pulos, rolagem lateral, botões sem nome e menus/janelas que não fecham com Esc ou clique fora | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Varredura achou: clique simples numa bolinha deixava o arrasto pendurado — a bolinha seguia o mouse SEM botão e era gravada no próximo clique (moveu dose e reunião para 00:00 nos testes). Cancelado quando o mouse anda sem botão. Esc fecha o balão com o mouse em cima. Varredura agora confere dados antes/depois | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Raiz do arrasto pendurado: num clique rápido o "apertou" chegava depois do "soltou"; o arrasto era preparado com o botão já solto e segurava o Esc (balão não fechava). Agora não prepara com botão solto e só segura Esc em arrasto de verdade. Varredura do Início: 0 achados reais | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

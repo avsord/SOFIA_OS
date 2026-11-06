@@ -24,6 +24,8 @@ const ROUTES = ['/inicio', '/conversa', '/paginas', '/agenda', '/avisos', '/perf
   '/apps/encomendas', '/apps/listas', '/apps/biblioteca', '/apps/notas'];
 // nunca clicar: acoes que apagam, saem, enviam ou mudam dados de verdade
 const DANGER = /apagar|excluir|remover|limpar|sair|desconectar|encerrar|enviar|salvar|concluir|tomei|pagar|paguei|recebi|arquivar|descartar|confirmar|trancar|redefinir|desfazer|marcar tudo|ler todas|restaurar|importar|conectar|instalar|atualizar o app|adiar|criar|lançar|gravar|novo|nova|adicionar|duplicar|mover|copiar|compartilhar|publicar|exportar|baixar|abrir no|ir para|ver todas|continuar|tentar/i;
+// so mudam o layout da tela (nao abrem nada): as pecas que mudam de lugar parecem "novas" para o detector
+const LAYOUT = /barra lateral|tela cheia|expandir|recolher/i;
 // candidatos a abrir menus/janelas/baloes
 const OPENER = /mais|menu|op(ç|c)(õ|o)es|⋯|…|filtr|ordenar|notifica|perfil|conta|buscar|escolher|selecionar|tema|cor|ícone|icone|capa|visualiza|configura|engrenagem|ajustes|tipo|prioridade|data|hora|tag|etiqueta|pasta|área|area/i;
 
@@ -77,7 +79,7 @@ const add = (route, kind, detail) => { findings.push({route, kind, detail}); };
     const openers = await page.evaluate(OPENER_SRC => { const re = new RegExp(OPENER_SRC, 'i'); return [...document.querySelectorAll('[role=button],button,[aria-haspopup],[aria-expanded]')].filter(e => { const b = e.getBoundingClientRect(); if (!b.width || !b.height || b.bottom < 0 || b.top > innerHeight) return false; const name = (e.getAttribute('aria-label') || e.textContent || '').trim(); return !!name && name.length < 80; }).filter((e, i, all) => { const k = (e.getAttribute('aria-label') || e.textContent || '').trim().replace(/\d+([:,.]\d+)*/g, '#').split(' ').slice(0, 2).join(' '); window.__seen = window.__seen || new Set(); if (window.__seen.has(k)) return false; window.__seen.add(k); return true; }).slice(0, 45).map(e => { const b = e.getBoundingClientRect(); return {name: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 50), x: b.x + b.width / 2, y: b.y + b.height / 2}; }); }, OPENER.source);
     for (const o of openers) SEEN.add(o.name.replace(/\d+([:,.]\d+)*/g, '#').split(' ').slice(0, 2).join(' '));
     for (const o of openers) {
-      if (!o.name || DANGER.test(o.name)) continue;
+      if (!o.name || DANGER.test(o.name) || LAYOUT.test(o.name)) continue;
       const result = await probeOverlay(page, base + r, o);
       if (opt.v) console.log('  ' + r + ' | ' + o.name + ' -> ' + (result ? result.kind : (probeOverlay.last || 'ok')));
       if (result) add(r, result.kind, `"${o.name}": ${result.detail}`);
