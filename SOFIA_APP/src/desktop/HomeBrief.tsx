@@ -454,6 +454,10 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // em cima; ao soltar encaixa de 5 em 5 minutos deslizando ate o lugar. Encostar na borda rola a linha (outro dia).
   type DragItem = {t: MoveTarget; at: Date}; type Drag = {key: string; items: DragItem[]; fx: number; live: boolean; color: string; snap?: string};
   const [drag, setDrag] = useState<Drag | null>(null), dragRef = useRef<Drag | null>(null), justDragged = useRef(false);
+  // 06/11/2026 (Pedro: "shift + clicar cria uma selecao; selecionar um ou varios e arrastar todos ao mesmo tempo"): Shift+clique
+  // marca/desmarca bolinhas; arrastar uma marcada leva todas juntas (o mesmo tanto de tempo). Esc ou clique na linha limpa.
+  const [sel, setSel] = useState<string[]>([]), tgtOf = useRef<Record<string, DragItem[]>>({});
+  useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [sel.length]);
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
   const [adding, setAdding] = useState<{fx: number; at: Date} | null>(null), [guide, setGuide] = useState<number | null>(null);
@@ -494,7 +498,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const px = ev.pageX - rect.left; edge = px < 28 ? -1 : px > rect.width - 28 ? 1 : 0; if (edge && !edgeRaf) edgeRaf = requestAnimationFrame(tickEdge);};
     // 0.3.318 (Pedro): Esc cancela o arrastar - tudo volta para onde estava, nada e gravado
     const esc = (ev: KeyboardEvent) => {if (ev.key !== 'Escape') return; ev.preventDefault(); ev.stopPropagation(); const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);}};
-    const up = () => {const d = stop(); if (!d?.live) return;
+    const up = () => {const d = stop(); if (!d?.live) return; setSel([]);
       justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);
       // o primeiro item vai para onde a bolinha foi solta; os outros andam o mesmo tanto (de 5 em 5 minutos)
       // 0.3.323 (Pedro: "arrasto e ele vai e volta"): fica no lugar novo ate os dados chegarem com ele (guarda a HORA, nao a
@@ -577,7 +581,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {visibleDays(start, SPAN).flatMap(d => [[0, 6, 'd'], [6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const x = ((a + b) / 2 - start) / SPAN; if (x < 0.02 || x > 0.98) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})} {/* 0.3.341 (Pedro): o simbolo anda junto com a linha (no meio real de cada periodo: 09:00, 15:00, 21:00) */}
     {visibleDays(start, SPAN).map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {actions.onAddAt ? <Pressable testID="timeline-add-area" dataSet={{noveil: "1"}} accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
-      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; if (WEB && addingRef.current) {setAdding(null); setGuide(null); return;} /* 06/11/2026 (Pedro): com a janela de criar aberta, clicar de novo na linha fecha (nao abre outra) */ const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
+      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; if (sel.length) {setSel([]); return;} if (WEB && addingRef.current) {setAdding(null); setGuide(null); return;} /* 06/11/2026 (Pedro): com a janela de criar aberta, clicar de novo na linha fecha (nao abre outra) */ const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near && !WEB) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} /* 04/11/2026 (Pedro): no computador, clicar numa bolinha cria naquele horario (a previa abre passando o mouse) */ const fx2 = near && WEB ? near.x : fx; manualAt.current = Date.now(); /* 06/11/2026 (Pedro: "clico pra criar e a linha arrasta do nada"): criando, a linha nao volta sozinha para o agora */ setPin(''); setHover(''); setGuide(null); setAdding({fx: fx2, at: snapDate(fx2)});}}
       onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
       {...({onMouseMove: (e: any) => {if (dragRef.current) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
@@ -604,7 +608,14 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
         const tgt: DragItem[] | null = !actions.onMove ? null : m ? p.marks.map(x => ({t: (x.kind === 'routine' && x.dose ? {dose: x.dose} : {mark: x}) as MoveTarget, at: x.at})) : p.recs.map(x => ({t: {rec: x} as MoveTarget, at: new Date(x.date)}));
         const xo = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, ghost = drag?.key === p.key;
-        const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt!, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
+        if (tgt) tgtOf.current[p.key] = tgt;
+        const picked = sel.includes(p.key);
+        const drg: any = tgt ? {onPressIn: (e: any) => {const ne = e?.nativeEvent || {};
+          if (WEB && ne.shiftKey) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 300); setPin(''); setHover(''); setSel(o => o.includes(p.key) ? o.filter(x => x !== p.key) : [...o, p.key]); return;}
+          const group = picked && sel.length > 1 ? [...tgt!, ...sel.filter(k => k !== p.key).flatMap(k => tgtOf.current[k] || [])] : tgt!;
+          if (!picked && sel.length) setSel([]);
+          beginDrag(e, p.key, group, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent));}} : {};
+        if (picked) HITS.push(<View key={p.key + '-sel'} pointerEvents="none" testID="timeline-selected" style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, borderWidth: 2, borderColor: c.accent, backgroundColor: tint(c.accent, 0.12), zIndex: 3, opacity: drag?.live ? 0.3 : 1} as any} />);
         // 06/11/2026 (Pedro: "tem que ter a mira muito afiada pra arrastar"): no navegador o hitSlop nao vale; uma area invisivel
         // de 36 px por cima de cada ponto pega o clique, o passar do mouse e o arrastar mesmo com o mouse um pouco fora
         if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
