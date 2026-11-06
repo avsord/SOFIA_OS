@@ -296,3 +296,6 @@ test('editar na linha do tempo: rascunho guardado ate salvar/cancelar, descricao
 test('linha do tempo: area de pegar de 36px nos pontos (site), nao volta sozinha criando/com item aberto, previa das bolinhas enquanto cria',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/if \(WEB\) HITS\.push\(<Pressable key=\{p\.key \+ '-hit'\}/);assert.match(hb,/addingRef\.current \|\| pinRef\.current/);assert.match(hb,/\(!adding \|\| \(hover === shown\.key && pin !== shown\.key\)\)/);
 });
+test('linha do tempo nao salta para o agora por causa de um clique (focus da janela) nem com janela aberta',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.doesNotMatch(hb,/window\.addEventListener\('focus', back\)/);assert.match(hb,/!holdRef\.current && !addingRef\.current && !pinRef\.current\) \{const h = homeOf/);assert.match(hb,/manualAt\.current = Date\.now\(\); \/\* 06\/11\/2026 \(Pedro\): clicar numa bolinha/);
+});

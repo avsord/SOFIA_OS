@@ -353,6 +353,8 @@ const routineColor = (type?: string) => (ROTINA_TYPES.find(x => x.id === type) |
 const markColor = (m: TimeMark, danger: string) => m.late ? danger : m.kind === 'routine' ? (m.dose?.color || routineColor(m.dose?.type)) : MARK_COLOR[m.kind];
 const markAction = (m: TimeMark) => m.done ? '' : m.kind === 'bill' && m.due?.tx ? 'Paguei' : m.kind === 'income' && m.due?.tx ? 'Recebi' : m.kind === 'routine' ? 'Tomei' : '';
 type Point = {key: string; x: number; recs: DayRecord[]; marks: TimeMark[]};
+// 06/11/2026 (Pedro): tarefa tambem tem fim (end_at na propria tarefa); compromisso guarda em data.end_at
+const endOfRec = (r: DayRecord): string => {const o: any = r.original || {}; return String(o.data?.end_at || o.end_at || '');};
 function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: DayRecord[]; next: DayRecord | null; marks?: TimeMark[]; op: {rec: (r: DayRecord) => number; mark: (m: TimeMark) => number}; actions: TimelineActions; nav?: React.MutableRefObject<{go: (d: number) => void; add?: () => void} | null>; onDay?: (d: number) => void}) {
   const HITS: React.ReactNode[] = []; // areas invisiveis de pegar os pontos (refeitas a cada desenho)
   const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(() => homeOf(0, SPAN_FULL, nowHours())), box = useRef<View>(null), lineBox = useRef<View>(null);
@@ -401,8 +403,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
   const [, tick] = useState(0);
   useEffect(() => {const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t);}, []);
-  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState !== 'visible') return; /* 05/11/2026 (Pedro: "tem que rodar em segundo plano"): o navegador pausa a aba escondida; ao voltar, a linha e o agora ja vao direto para a hora certa no mesmo instante (sem deslizar a partir de onde parou) */ if (dayRef.current === 0 && !dragRef.current && !holdRef.current) {const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.0005) jump(h);} tick(n => n + 1);};
-    document.addEventListener('visibilitychange', back); window.addEventListener('focus', back); return () => {document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back);};}, []);
+  useEffect(() => {if (!WEB) return; const back = () => {if (document.visibilityState !== 'visible') return; /* 05/11/2026 (Pedro: "tem que rodar em segundo plano"): o navegador pausa a aba escondida; ao voltar, a linha e o agora ja vao direto para a hora certa no mesmo instante (sem deslizar a partir de onde parou) */ if (dayRef.current === 0 && !dragRef.current && !holdRef.current && !addingRef.current && !pinRef.current) {const h = homeOf(0, spanRef.current, nowHours()); if (Math.abs(h - target.current) > 0.0005) jump(h);} tick(n => n + 1);};
+    /* 06/11/2026 (Pedro: "fico muito tempo fora e clico numa bolinha ou crio algo e ela arrasta rapido"): o 'focus' da janela vinha junto com o clique e puxava a linha; agora so ao voltar de outra aba */ document.addEventListener('visibilitychange', back); return () => {document.removeEventListener('visibilitychange', back);};}, []);
   const nowX = pos(new Date());
   // 0.3.335 (Pedro: "< 02 Novembro > vai para o proximo dia"): o dia que esta no meio da linha vai para o cabecalho; as setas deslizam a linha para o dia anterior/seguinte
   // 0.3.338: o dia do cabecalho e o que esta no meio da linha (rolando, ele troca sozinho ao passar da meia-noite)
@@ -424,7 +426,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (wS) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * wS < 20)) mp.x += 22 / wS;}
   const all = [...points, ...mpoints];
-  const nearPoint = (fx: number) => {const W0 = wS || w || 1; let best: Point | null = null, bd = 26; for (const q of all) {if (q.x < -0.01 || q.x > 1.01) continue; const dpx = Math.abs(q.x - fx) * W0; if (dpx < bd) {bd = dpx; best = q;}} return best;};
+  const nearPoint = (fx: number) => {const W0 = wS || w || 1; let best: Point | null = null, bd = 15; /* 06/11/2026 (Pedro): no vao entre as bolinhas tem que aparecer o horario + criar; so gruda na bolinha bem perto dela */ for (const q of all) {if (q.x < -0.01 || q.x > 1.01) continue; const dpx = Math.abs(q.x - fx) * W0; if (dpx < bd) {bd = dpx; best = q;}} return best;};
   useEffect(() => {setSettle(o => {const keys = Object.keys(o); if (!keys.length) return o; let ch = false; const n = {...o};
     for (const k of keys) {const pt = all.find(q => q.key === k); if (!pt || Math.abs(pt.x * SPAN + startRef.current - o[k]) < 0.05) {delete n[k]; ch = true;}} return ch ? n : o;});}, [items, marks]);
   useEffect(() => {
@@ -480,7 +482,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       if (!dragRef.current?.live) {setPin(''); setHover(''); document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing';}
       // 0.3.333 (aprovado por foto): ima - perto (ate 10 min) do comeco ou do fim de outro item, encosta nele e diz o motivo
       let fx = fxOf(ev.pageX), snap = ''; const ids = new Set(items.map(x => (x.t as any).rec?.id).filter(Boolean)), h = startRef.current + fx * spanRef.current; let best = 10 / 60;
-      for (const r of recsRef.current) {if (ids.has(r.id)) continue; const a = (new Date(r.date).getTime() - day0) / 3600000, endIso = (r.original as any)?.data?.end_at, b = endIso ? (new Date(endIso).getTime() - day0) / 3600000 : null;
+      for (const r of recsRef.current) {if (ids.has(r.id)) continue; const a = (new Date(r.date).getTime() - day0) / 3600000, endIso = endOfRec(r), b = endIso ? (new Date(endIso).getTime() - day0) / 3600000 : null;
         if (b != null && Math.abs(h - b) < best) {best = Math.abs(h - b); fx = (b - startRef.current) / spanRef.current; const m = Math.round((b - a) * 60); snap = 'logo depois de ' + r.title + (m > 0 ? ' (' + (m >= 60 ? (m / 60).toLocaleString('pt-BR', {maximumFractionDigits: 1}) + ' h' : m + ' min') + ')' : '');}
         else if (Math.abs(h - a) < best) {best = Math.abs(h - a); fx = (a - startRef.current) / spanRef.current; snap = (r.isTask ? 'junto com ' : 'no começo de ') + r.title;}}
       const d = {key, items, fx, live: true, color, snap}; dragRef.current = d; setDrag(d);
@@ -570,7 +572,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {visibleDays(start, SPAN).flatMap(d => [[0, 6, 'd'], [6, 12, 'm'], [12, 18, 't'], [18, 24, 'n']].map(([a, b, k]) => [d + (a as number), d + (b as number), k as string] as const)).map(([a, b, k]) => {const x = ((a + b) / 2 - start) / SPAN; if (x < 0.02 || x > 0.98) return null; return <View key={'p' + a} pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: 0, marginLeft: -8}}><PeriodIcon kind={k} /></View>;})} {/* 0.3.341 (Pedro): o simbolo anda junto com a linha (no meio real de cada periodo: 09:00, 15:00, 21:00) */}
     {visibleDays(start, SPAN).map(m => {const x = (m - start) / SPAN; return x > 0 && x < 1 ? <View key={m} style={{position: 'absolute', left: (x * 100 + '%') as any, top: 20 + OFF, width: 1, height: 18, backgroundColor: c.line}} /> : null;})}
     {actions.onAddAt ? <Pressable testID="timeline-add-area" dataSet={{noveil: "1"}} accessibilityRole="button" accessibilityLabel="Adicionar algo na linha do tempo neste horário"
-      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
+      onPress={(e: any) => {if (justDragged.current || dragRef.current) return; if (WEB && addingRef.current) {setAdding(null); setGuide(null); return;} /* 06/11/2026 (Pedro): com a janela de criar aberta, clicar de novo na linha fecha (nao abre outra) */ const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near && !WEB) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} /* 04/11/2026 (Pedro): no computador, clicar numa bolinha cria naquele horario (a previa abre passando o mouse) */ const fx2 = near && WEB ? near.x : fx; manualAt.current = Date.now(); /* 06/11/2026 (Pedro: "clico pra criar e a linha arrasta do nada"): criando, a linha nao volta sozinha para o agora */ setPin(''); setHover(''); setGuide(null); setAdding({fx: fx2, at: snapDate(fx2)});}}
       onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
       {...({onMouseMove: (e: any) => {if (dragRef.current) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
@@ -583,13 +585,13 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       </View>
     </View> : null}
     {/* 0.3.332 (aprovado por foto): compromisso com fim vira uma faixa do inicio ao fim; se encostar em outro, so se sobrepoe */}
-    {items.map(r => {const end = (r.original as any)?.data?.end_at; if (r.isTask || !end) return null; const a = pos(new Date(r.date)), b = pos(new Date(end)); if (!(b > a) || b < 0 || a > 1) return null;
+    {items.map(r => {const end = endOfRec(r); if (!end) return null; const a = pos(new Date(r.date)), b = pos(new Date(end)); if (!(b > a) || b < 0 || a > 1) return null;
       const col = colorOf(r, c.accent), x0 = Math.max(0, a), x1 = Math.min(1, b);
       return <View key={'d' + r.id + r.date} pointerEvents="none" style={{position: 'absolute', left: (x0 * 100 + '%') as any, width: ((x1 - x0) * 100 + '%') as any, top: 29 + OFF - 6, height: 12, borderRadius: 6, backgroundColor: tint(col, 0.18), boxShadow: 'inset 0 0 0 1px ' + tint(col, 0.5), opacity: op.rec(r)} as any} />;})}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
-        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
+        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; manualAt.current = Date.now(); /* 06/11/2026 (Pedro): clicar numa bolinha conta como mexer na linha - ela nao corre sozinha para o agora */ setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
         // 0.3.317: da para arrastar a bolinha de um item so (compromisso, lembrete, tarefa) e a dose da Rotina sozinha
         // 0.3.318 (Pedro): tudo o que esta na linha arrasta - bolinha de um item ou de varios (andam juntos), dose ou pilula
         // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
@@ -598,7 +600,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         const drg: any = tgt ? {onPressIn: (e: any) => beginDrag(e, p.key, tgt!, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent))} : {};
         // 06/11/2026 (Pedro: "tem que ter a mira muito afiada pra arrastar"): no navegador o hitSlop nao vale; uma area invisivel
         // de 36 px por cima de cada ponto pega o clique, o passar do mouse e o arrastar mesmo com o mouse um pouco fora
-        if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 18, width: 36, height: 36, marginLeft: -18, borderRadius: 18, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
+        if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
         const itemOp = m ? op.mark(m) : op.rec(r), extra: any = {opacity: ghost ? 0.3 * itemOp : itemOp, cursor: 'pointer', /* 0.3.343 (Pedro): passar o mouse mostra o que tem na bolinha (mãozinha de clicar, não a de pegar); arrastar continua funcionando e, ao arrastar, a prévia some */ ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
@@ -950,7 +952,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
   const askHide = actions.onHideMark ? (m: TimeMark) => appAlert('Tirar \u201c' + m.title + '\u201d da linha do tempo?', 'Continua em ' + (m.kind === 'routine' ? 'Rotina' : m.kind === 'package' ? 'Encomendas' : 'Finanças') + '.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tirar', onPress: () => {onClose(); actions.onHideMark!(m);}}]) : undefined;
   const iconOf = (r: DayRecord): IconName => r.isTask ? 'checklist' : r.kind === 'reminder' ? 'bell' : 'calendar';
   const colOf = (r: DayRecord) => r.kind === 'reminder' ? REMIND : colorOf(r, c.accent);
-  const durOf = (r: DayRecord) => {const end = (r.original as any)?.data?.end_at; if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
+  const durOf = (r: DayRecord) => {const end = endOfRec(r); if (!end) return ''; const m = Math.round((new Date(end).getTime() - new Date(r.date).getTime()) / 60000); return m > 0 ? (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min') : '';};
   const metaOf = (r: DayRecord) => {const o: any = r.original || {}, u = urgOf(r), loc = String(o.data?.location || '').trim(), d = durOf(r);
     return [kindOf(r), u === 3 ? 'Importante' : u === 2 ? 'Média' : '', d, loc].filter(Boolean).join(' · ');};
   const shell = (inner: React.ReactNode, strip?: string) => <View ref={shellRef} testID="timeline-preview" {...({onMouseEnter: onEnter, onMouseLeave: onLeave} as any)} style={{position: 'absolute', left: x, ...(quick || quickMark ? {top: 88} : {bottom: 92}), width: W, zIndex: 8} as any} /* acima dos nomes da linha (antes cobria o rotulo do item); editando, abre para baixo (para cima ficava sob a barra do topo) */>
@@ -969,7 +971,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
     onCancel={() => setQuick(null)} onMore={() => {const q = quick; setQuick(null); onClose(); actions.onEdit(q);}}
     onSave={async ch => {await actions.onQuickEdit!(quick, ch); setQuick(null); onClose();}} />, colOf(quick));
   // --- compromisso sozinho
-  if (single) {const r = point.recs[0], col = colOf(r), o: any = r.original || {}, d = durOf(r), end = o.data?.end_at ? hhmm(new Date(o.data.end_at)) : '', loc = String(o.data?.location || '').trim(), text = desc(r);
+  if (single) {const r = point.recs[0], col = colOf(r), o: any = r.original || {}, d = durOf(r), end = endOfRec(r) ? hhmm(new Date(endOfRec(r))) : '', loc = String(o.data?.location || '').trim(), text = desc(r);
     const mins = Math.round((new Date(r.date).getTime() - Date.now()) / 60000), rel = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';
     return shell(<View style={{padding: 12, gap: 8}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>{chip('calendar', col, 24)}<View style={{flex: 1, minWidth: 0}}>
