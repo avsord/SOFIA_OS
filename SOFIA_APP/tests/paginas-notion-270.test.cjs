@@ -289,3 +289,7 @@ test('tablet Android: app mostra o proprio site, entrega a sessao do app e mante
  const run=new Function('localStorage',js.replace(/true;$/,''));const st={};run({getItem:k=>st[k]||null,setItem:(k,v)=>{st[k]=v;}});assert.equal(JSON.parse(st['sofia.secure.sofia.native.session.v1']).token,'abc"x');
  const app=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8');assert.match(app,/:tablet&&auth\?<TabletSite auth=\{auth\}\/>:!initialDataReady\?/);assert.match(app,/<NotificationProvider api=\{api\}/);
 });
+test('editar na linha do tempo: rascunho guardado ate salvar/cancelar, descricao maior, scroll nao mexe a linha; conversa selecionavel',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/const QUICK_DRAFTS = new Map/);assert.match(hb,/addEventListener\('wheel', stop/);assert.match(hb,/minHeight: 96, maxHeight: 220/);
+ const ch=fs.readFileSync(path.join(__dirname,'..','src/screens/Chat.tsx'),'utf8');assert.match(ch,/<Text selectable style=\{\{fontSize:16/);assert.match(ch,/onLongPress=\{Platform\.OS==='web'\?undefined/);
+});

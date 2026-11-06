@@ -879,18 +879,27 @@ function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
  * Compromisso sozinho: faixa de cor, nome grande, horario com a duracao, local e descricao. Varios itens: cabecalho com o
  * horario, quantos sao e "1 importante"; cada linha com a barrinha da cor, o icone do tipo e uma segunda linha dizendo o que e;
  * ao passar o mouse na linha aparecem concluir e editar. Setinha aponta para a bolinha. Mantem arrastar pelo horario (⠿). */
+// 06/11/2026 (Pedro: "arrastei a linha do tempo e saiu o que tava escrevendo; precisa continuar guardado como rascunho"):
+// o que esta sendo editado fica guardado por item ate salvar ou cancelar; reabrir o mesmo item traz o rascunho de volta.
+const QUICK_DRAFTS = new Map<string, {title: string; desc: string; at: string; prio: string}>();
 function QuickEditor({r, color, kind, priority, description, onSave, onCancel, onMore}: {r: DayRecord; color: string; kind: string; priority: string; description: string; onSave: (ch: QuickEdit) => Promise<void>; onCancel: () => void; onMore: () => void}) {
   // 05/11/2026 (Pedro): nome, descricao, data e horario por seletor e nivel de importancia
   const c = useTheme();
-  const [title, setTitle] = useState(r.title), [desc, setDesc] = useState(description), [at, setAt] = useState(new Date(r.date).toISOString()), [prio, setPrio] = useState(priority || 'none'), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const draft = QUICK_DRAFTS.get(r.id);
+  const [title, setTitle] = useState(draft?.title ?? r.title), [desc, setDesc] = useState(draft?.desc ?? description), [at, setAt] = useState(draft?.at ?? new Date(r.date).toISOString()), [prio, setPrio] = useState(draft?.prio ?? (priority || 'none')), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  useEffect(() => {const changed = title !== r.title || desc !== description || prio !== (priority || 'none') || at !== new Date(r.date).toISOString(); if (changed) QUICK_DRAFTS.set(r.id, {title, desc, at, prio}); else QUICK_DRAFTS.delete(r.id);}, [title, desc, at, prio]); // eslint-disable-line react-hooks/exhaustive-deps
+  // girar o scroll dentro da janelinha (ex.: descricao comprida) nao pode mexer a linha do tempo por baixo
+  const rootRef = useRef<any>(null);
+  useEffect(() => {const n = rootRef.current; if (!n || typeof n.addEventListener !== 'function') return; const stop = (e: any) => e.stopPropagation(); n.addEventListener('wheel', stop, {passive: true}); return () => n.removeEventListener('wheel', stop);}, []);
+  const cancel = () => {QUICK_DRAFTS.delete(r.id); onCancel();};
   const ok = !!title.trim() && Number.isFinite(Date.parse(at)) && !busy;
   const save = async () => {if (!ok) return; setBusy(true); setErr('');
-    try {await onSave({title: title.trim(), at: new Date(at), priority: prio, description: desc});} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
+    try {await onSave({title: title.trim(), at: new Date(at), priority: prio, description: desc}); QUICK_DRAFTS.delete(r.id);} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
   const field = {borderRadius: 10, backgroundColor: c.input, color: c.text, paddingHorizontal: 11, fontSize: 14, outlineStyle: 'none'} as any;
-  return <View style={{padding: 12, gap: 9}}>
+  return <View ref={rootRef} style={{padding: 12, gap: 9}}>
     <Text style={{fontSize: 11, color: c.muted}}>Editar {kind.toLowerCase()}</Text>
-    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') onCancel();}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
-    <TextInput value={desc} onChangeText={setDesc} multiline placeholder="Descrição" placeholderTextColor={c.muted} accessibilityLabel="Descrição" style={[field, {minHeight: 54, paddingVertical: 8, fontSize: 13, textAlignVertical: 'top'}]} />
+    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') cancel();}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
+    <TextInput value={desc} onChangeText={setDesc} multiline placeholder="Descrição" placeholderTextColor={c.muted} accessibilityLabel="Descrição" style={[field, {minHeight: 96, maxHeight: 220, paddingVertical: 8, fontSize: 13, lineHeight: 19, textAlignVertical: 'top'}]} />
     <DateTimeField label="Data e horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} />
     <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{TASK_PRIORITIES.map(o => {const on = prio === o.value, col = o.color || c.muted;
       return <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{checked: on}} onPress={() => setPrio(o.value)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 10, borderRadius: 9, backgroundColor: on ? tint(col, 0.2) : hovered ? c.line : c.input})}>
@@ -899,7 +908,7 @@ function QuickEditor({r, color, kind, priority, description, onSave, onCancel, o
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
       <Pressable accessibilityRole="button" onPress={onMore} style={({hovered}: any) => ({height: 32, paddingHorizontal: 10, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Text style={{fontSize: 13, color: c.muted}}>Mais opções</Text></Pressable>
       <View style={{flex: 1}} />
-      <Pressable accessibilityRole="button" onPress={onCancel} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Text style={{fontSize: 13, color: c.text}}>Cancelar</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={cancel} style={({hovered}: any) => ({height: 32, paddingHorizontal: 12, borderRadius: 9, justifyContent: 'center', backgroundColor: hovered ? c.line : c.input})}><Text style={{fontSize: 13, color: c.text}}>Cancelar</Text></Pressable>
       <Pressable accessibilityRole="button" disabled={!ok} onPress={() => void save()} style={({hovered}: any) => ({height: 32, paddingHorizontal: 14, borderRadius: 9, justifyContent: 'center', backgroundColor: color, opacity: ok ? (hovered ? 0.9 : 1) : 0.5})}><Text style={{fontSize: 13, fontWeight: '600', color: '#fff'}}>{busy ? 'Salvando…' : 'Salvar'}</Text></Pressable>
     </View>
   </View>;
