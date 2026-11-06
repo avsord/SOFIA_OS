@@ -25,7 +25,7 @@ const ROUTES = ['/inicio', '/conversa', '/paginas', '/agenda', '/avisos', '/perf
 // nunca clicar: acoes que apagam, saem, enviam ou mudam dados de verdade
 const DANGER = /apagar|excluir|remover|limpar|sair|desconectar|encerrar|enviar|salvar|concluir|tomei|pagar|paguei|recebi|arquivar|descartar|confirmar|trancar|redefinir|desfazer|marcar tudo|ler todas|restaurar|importar|conectar|instalar|atualizar o app|adiar|criar|lançar|gravar|novo|nova|adicionar|duplicar|mover|copiar|compartilhar|publicar|exportar|baixar|abrir no|ir para|ver todas|continuar|tentar/i;
 // so mudam o layout da tela (nao abrem nada): as pecas que mudam de lugar parecem "novas" para o detector
-const LAYOUT = /barra lateral|tela cheia|expandir|recolher/i;
+const LAYOUT = /barra lateral|tela cheia|expandir|recolher|dia anterior|próximo dia|^anterior$|^próximo$|^hoje$/i;
 // candidatos a abrir menus/janelas/baloes
 const OPENER = /mais|menu|op(ç|c)(õ|o)es|⋯|…|filtr|ordenar|notifica|perfil|conta|buscar|escolher|selecionar|tema|cor|ícone|icone|capa|visualiza|configura|engrenagem|ajustes|tipo|prioridade|data|hora|tag|etiqueta|pasta|área|area/i;
 
