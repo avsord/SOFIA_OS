@@ -235,3 +235,9 @@ test('rotina rapida: repetir em dias da semana escolhidos ou dia sim, dia nao; c
  const home=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');assert.match(home,/x\.rrepeat==='weekdays'\?'weekdays'/);assert.match(home,/interval_days:x\.rrepeat==='interval'\?2:1/);
  const cache=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-cache.web.ts'),'utf8');assert.match(cache,/readSecureBytes\('cover\|'\+id\)/);assert.match(cache,/writeSecureBytes\('cover\|'\+id/);
 });
+test('editor: Shift+Enter poe o cursor depois da quebra; Ctrl+Z usa o desfazer da pagina; imagem clicada e apagada com Delete; nota sem camada na linha em edicao',()=>{
+ const rich=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');assert.match(rich,/after\.setStartAfter\(br\)/);assert.match(rich,/props\.onUndo\(low==='y'\|\|e\.shiftKey\)/);assert.match(rich,/br\[data-fill\]/);
+ const pages=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(pages,/setPicked\(new Set\(\[b\.id\]\)\)/);assert.match(pages,/store\.undo\(selectedId\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','src/components/LeafEditor.tsx'),'utf8'),/typingIn!==b\.id\?linkRanges\(b\)/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','public/assets/early.js'),'utf8'),/sofia\.reload\.at/);
+});

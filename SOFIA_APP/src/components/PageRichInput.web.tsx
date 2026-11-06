@@ -10,7 +10,7 @@ import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
 
 type Props={value:string;html?:string;placeholder?:string;placeholderColor?:string;style?:any;editable?:boolean;accessibilityLabel?:string;testID?:string;
- onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onPasteImage?:(image:Blob)=>void};
+ onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i;
@@ -21,7 +21,8 @@ export function sanitizeRich(html:string):string{
  if(typeof document==='undefined')return escapeHtml(html.replace(/<[^>]*>/g,''));
  const src=document.createElement('template');src.innerHTML=String(html||'');
  const build=(node:Node,first:boolean):Node=>{
-  if(node.nodeType===Node.TEXT_NODE)return document.createTextNode(node.textContent||'');
+  // quebra de linha dentro do texto ("\n" que o navegador poe com pre-wrap) vira <br>: uma so forma de guardar linha nova
+  if(node.nodeType===Node.TEXT_NODE){const parts=String(node.textContent||'').split('\n');if(parts.length===1)return document.createTextNode(parts[0]);const f=document.createDocumentFragment();parts.forEach((t,i)=>{if(i)f.append(document.createElement('br'));if(t)f.append(document.createTextNode(t));});return f;}
   const frag=document.createDocumentFragment();
   if(node.nodeType!==Node.ELEMENT_NODE){node.childNodes.forEach(c=>frag.append(build(c,false)));return frag;}
   const el=node as HTMLElement,tag=el.tagName;
@@ -38,7 +39,11 @@ export function sanitizeRich(html:string):string{
  return target.innerHTML;
 }
 /** Texto de um trecho do editor: <br> conta como "\n" (igual ao texto guardado). */
-function textOf(node:Node):string{let out='';const walk=(n:Node)=>{if(n.nodeType===Node.TEXT_NODE){out+=n.textContent||'';return;}if(n.nodeName==='BR'){out+='\n';return;}n.childNodes.forEach(walk);};walk(node);return out;}
+function textOf(node:Node):string{let out='';const walk=(n:Node)=>{if(n.nodeType===Node.TEXT_NODE){out+=n.textContent||'';return;}if(n.nodeName==='BR'){if((n as any).dataset?.fill)return;out+='\n';return;}n.childNodes.forEach(walk);};walk(node);return out;}
+// 06/11/2026 (Pedro: "Shift+Enter nao ta quebrando linha"): no fim do texto o navegador so mostra a linha nova se houver
+// algo depois do ultimo <br>. Um <br data-fill> extra (fora do texto salvo) segura essa linha vazia na tela.
+function ensureFill(node:HTMLElement){node.querySelectorAll('br[data-fill]').forEach(b=>b.remove());if(!textOf(node).endsWith('\n'))return;const f=document.createElement('br');f.setAttribute('data-fill','1');node.appendChild(f);}
+const noFill=(html:string)=>html.replace(/<br data-fill="1">/g,'');
 function offsetOf(root:HTMLElement,container:Node,offset:number):number{try{const r=document.createRange();r.selectNodeContents(root);r.setEnd(container,offset);return textOf(r.cloneContents()).length;}catch{return textOf(root).length;}}
 function pointAt(root:HTMLElement,target:number):[Node,number]{
  let pos=0;let found:[Node,number]|null=null;
@@ -79,7 +84,7 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
  const popLeave=()=>{popKeep();popTimer.current=setTimeout(()=>setPop(null),220);};
  useImperativeHandle(ref,()=>el.current,[]);
  const desired=props.html?sanitizeRich(props.html):textToHtml(props.value||'');
- useLayoutEffect(()=>{ensureStyle();const node=el.current;if(!node)return;if(desired!==emitted.current&&node.innerHTML!==desired){node.innerHTML=desired;}emitted.current=desired;},[desired]);
+ useLayoutEffect(()=>{ensureStyle();const node=el.current;if(!node)return;if(desired!==emitted.current&&noFill(node.innerHTML)!==desired){node.innerHTML=desired;ensureFill(node);}emitted.current=desired;},[desired]);
  const attach=(node:HTMLDivElement|null)=>{el.current=node;if(!node||(node as any).__rich)return;(node as any).__rich=true;
   // o Pages.tsx conversa com o editor como se fosse o <textarea> de antes
   Object.defineProperty(node,'value',{configurable:true,get:()=>textOf(node)});
@@ -90,11 +95,11 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
   (node as any).__splitHtml=(a:number,b:number)=>{try{const [n1,o1]=pointAt(node,a),[n2,o2]=pointAt(node,b);const before=document.createRange();before.selectNodeContents(node);before.setEnd(n1,o1);const after=document.createRange();after.selectNodeContents(node);after.setStart(n2,o2);
    const wrap=(f:DocumentFragment)=>{const d=document.createElement('div');d.append(f);return sanitizeRich(d.innerHTML);};return [wrap(before.cloneContents()),wrap(after.cloneContents())];}catch{return null;}};
  };
- const emit=()=>{const node=el.current;if(!node)return;const text=textOf(node);let html=text?sanitizeRich(node.innerHTML):'';if(!text&&node.innerHTML)node.innerHTML='';
+ const emit=()=>{const node=el.current;if(!node)return;const text=textOf(node);let html=text?sanitizeRich(noFill(node.innerHTML)):'';if(!text&&node.innerHTML)node.innerHTML='';
   // sem formatação nenhuma, guarda só o texto (html vazio, como antes)
   if(html===textToHtml(text))html='';emitted.current=html?html:textToHtml(text);
   if(text&&node.querySelector('img,svg,video,iframe,div,p,[style*="position"],[class]')){const a=(node as any).selectionStart,b=(node as any).selectionEnd;node.innerHTML=emitted.current;try{if(document.activeElement===node)(node as any).setSelectionRange(a,b);}catch{}}
-  props.onChange(text,html);};
+  ensureFill(node);props.onChange(text,html);};
  const css=toCss(props.style);
  const removeLink=()=>{const a=popA.current,node=el.current;if(!a||!node||!node.contains(a))return;const parent=a.parentNode!;while(a.firstChild)parent.insertBefore(a.firstChild,a);parent.removeChild(a);popA.current=null;emit();};
  return React.createElement(React.Fragment,null,React.createElement('div',{ref:attach,contentEditable:props.editable===false?'false':'true',suppressContentEditableWarning:true,role:'textbox','aria-multiline':'true','aria-label':props.accessibilityLabel,
@@ -105,11 +110,13 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
   onKeyDown:(e:any)=>{if(composing.current||e.nativeEvent?.isComposing)return;
    const key=e.key,mod=(e.ctrlKey||e.metaKey)&&!e.altKey,low=String(key).toLowerCase();
    if(mod&&!e.shiftKey&&low==='e'){e.preventDefault();const sel=document.getSelection();const t=sel?.toString()||'';if(t)document.execCommand('insertHTML',false,'<code>'+escapeHtml(t)+'</code>');return;}
+   // 06/11/2026 (Pedro: "Ctrl+Z na pagina nao ta indo"): o desfazer do navegador se perde (o editor regrava o texto); usa o desfazer da pagina
+   if(mod&&props.onUndo&&(low==='z'||low==='y')){e.preventDefault();props.onUndo(low==='y'||e.shiftKey);return;}
    if(mod&&e.shiftKey&&low==='s'){e.preventDefault();document.execCommand('strikeThrough');return;}
    if(mod&&['b','i','u'].includes(low))return; // negrito, itálico e sublinhado do próprio navegador
    const wrapped={key,nativeEvent:{key,shiftKey:e.shiftKey,ctrlKey:e.ctrlKey,metaKey:e.metaKey,altKey:e.altKey},target:el.current,preventDefault:()=>e.preventDefault(),isDefaultPrevented:()=>e.defaultPrevented};
    props.onKeyPress?.(wrapped);
-   if(!e.defaultPrevented&&key==='Enter'){e.preventDefault();if(e.shiftKey)document.execCommand('insertLineBreak');}},
+   if(!e.defaultPrevented&&key==='Enter'){e.preventDefault();if(e.shiftKey){const node=el.current,sel=document.getSelection();if(node&&sel&&sel.rangeCount){const r=sel.getRangeAt(0);r.deleteContents();const br=document.createElement('br');r.insertNode(br);ensureFill(node);const after=document.createRange();after.setStartAfter(br);after.collapse(true);sel.removeAllRanges();sel.addRange(after);emit();}}}},
   onPaste:(e:any)=>{
    // 05/11/2026 (Pedro): imagem copiada colada no texto vira bloco de imagem
    if(props.onPasteImage){const items=[...(e.clipboardData?.items||[])] as any[];const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));const f=it?.getAsFile?.();if(f){e.preventDefault();props.onPasteImage(f);return;}}

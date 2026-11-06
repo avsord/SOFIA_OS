@@ -1,3 +1,12 @@
+/* 06/11/2026 (Pedro: "quando clico no voltar com o botao do mouse fica tudo preto"): no voltar/avancar o navegador
+ * reaproveita a pagina guardada, que pode apontar para os arquivos do app de uma publicacao anterior (ja apagados).
+ * Se um arquivo do app nao carregar, recarrega a pagina uma vez (no maximo 1 vez a cada 30 s) para pegar a versao atual. */
+(function(){try{
+ var KEY='sofia.reload.at';var again=function(){try{var last=+sessionStorage.getItem(KEY)||0;if(Date.now()-last<30000)return;sessionStorage.setItem(KEY,String(Date.now()));}catch(e){}location.reload();};
+ window.addEventListener('error',function(e){var t=e&&e.target;if(t&&(t.tagName==='SCRIPT'||t.tagName==='LINK')){var u=String(t.src||t.href||'');if(u.indexOf('/_expo/')>=0)again();}},true);
+ window.addEventListener('unhandledrejection',function(e){var m=String(e&&e.reason&&(e.reason.message||e.reason)||'');if(/Loading chunk|ChunkLoadError|dynamically imported module|Importing a module script failed|Failed to fetch dynamically/i.test(m))again();});
+ window.addEventListener('pageshow',function(e){var r=document.getElementById('root');if(e.persisted&&(!r||!r.children.length))again();});
+}catch(e){}})();
 /* 04/11/2026 (Pedro: "as paginas ja abertas antes de tudo" e "quando o texto parar, os blocos ja carregados"): pede a
  * lista de Paginas da barra lateral e as leituras dos blocos do Inicio enquanto o codigo do site ainda baixa. O app (api.ts) usa esta resposta em vez de pedir de novo; se ela
  * falhar ou o login tiver vencido, o app pede do jeito normal. So no computador e com sessao salva neste navegador. */
