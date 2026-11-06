@@ -35,7 +35,10 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
   busy.current=true;afterKeyboard(()=>{busy.current=false;smooth();setOpen(true);});
  }
  function commit(next:Date){onChange(timeOnly?pad(next.getHours())+':'+pad(next.getMinutes()):dateOnly?localDateKey(next):next.toISOString());smooth();setOpen(false);}
- const change=(part:'hours'|'minutes',n:number)=>setSelected(old=>{const d=new Date(old);part==='hours'?d.setHours(n):d.setMinutes(n);d.setSeconds(0,0);return d;});
+ // 06/11/2026 (Pedro: "alterei a data da tarefa e a tarefa nao se moveu"): no editor pequeno (compact) o dia/hora escolhido ja
+ // vale na hora; antes so valia depois de "Confirmar" e o Salvar gravava a data antiga
+ const pick=(d:Date)=>{setSelected(d);if(compact&&!dateOnly)onChange(timeOnly?pad(d.getHours())+':'+pad(d.getMinutes()):d.toISOString());};
+ const change=(part:'hours'|'minutes',n:number)=>{const d=new Date(selected);part==='hours'?d.setHours(n):d.setMinutes(n);d.setSeconds(0,0);pick(d);};
  const shown=value&&compact?new Date(value).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'}):(timeOnly?value:dateDisplay(value,dateOnly))||emptyLabel;
  return <View style={{gap:compact?4:0}}>
   <View style={compact?{flexDirection:'row',gap:20,alignItems:'center'}:undefined}>
@@ -54,7 +57,7 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
      <IconButton name="chevron" label="Próximo mês do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}/>
     </View>
     <View style={{flexDirection:'row',marginTop:4}}>{['D','S','T','Q','Q','S','S'].map((d,i)=><Text key={i} style={{width:'14.2857%',textAlign:'center',color:c.muted,fontSize:12}}>{d}</Text>)}</View>
-    <View style={{flexDirection:'row',flexWrap:'wrap',marginTop:6}}>{monthCells(month).map((d,i)=><View key={i} style={{width:'14.2857%',padding:2}}>{d?<Pressable accessibilityLabel={'Selecionar '+dateDisplay(localDateKey(d),true)} onPress={()=>{const next=new Date(d);next.setHours(selected.getHours(),selected.getMinutes(),0,0);setSelected(next);if(dateOnly)commit(next);}}
+    <View style={{flexDirection:'row',flexWrap:'wrap',marginTop:6}}>{monthCells(month).map((d,i)=><View key={i} style={{width:'14.2857%',padding:2}}>{d?<Pressable accessibilityLabel={'Selecionar '+dateDisplay(localDateKey(d),true)} onPress={()=>{const next=new Date(d);next.setHours(selected.getHours(),selected.getMinutes(),0,0);pick(next);if(dateOnly)commit(next);}}
      style={{height:36,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:localDateKey(d)===localDateKey(selected)?c.accent:'transparent',borderWidth:localDateKey(d)===localDateKey(new Date())&&localDateKey(d)!==localDateKey(selected)?1:0,borderColor:c.accent}}>
      <Text style={{color:localDateKey(d)===localDateKey(selected)?PALETTE.white:c.text,fontWeight:localDateKey(d)===localDateKey(selected)?'700':'400'}}>{d.getDate()}</Text></Pressable>:null}</View>)}</View>
    </MonthSwipe>:null}

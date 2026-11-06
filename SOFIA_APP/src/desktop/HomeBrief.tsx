@@ -14,6 +14,7 @@ import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, 
 const WEB = Platform.OS === 'web' && typeof document !== 'undefined';
 /** 03/11/2026: o Android nao entende calc()/clamp() em left/width (o item ia para a borda esquerda). No navegador continua
  * o CSS de antes; no celular a posicao vem em pixels da largura medida da linha (w). */
+const markKey = (m: {id: string; dose?: any}) => m.dose ? 'dose|' + m.dose.planId + '|' + m.dose.day + '|' + m.dose.time : 'mark|' + m.id;
 const GUIDE_LAYER: any = WEB ? {willChange: 'transform', transform: 'translateZ(0)', backfaceVisibility: 'hidden'} : {};
 const cx = (frac: number, off: number, w: number): any => WEB ? `calc(${frac * 100}% - ${off}px)` : frac * w - off;
 const clampX = (frac: number, half: number, width: number, w: number): any => WEB ? `clamp(0px, calc(${frac * 100}% - ${half}px), calc(100% - ${width}px))` : Math.max(0, Math.min(Math.max(0, w - width), frac * w - half));
@@ -426,7 +427,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // continuava no lugar antigo da lista; sem ordenar, os dois ficavam um em cima do outro sem virar grupo
   for (const r of [...withMoved(items)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
   const mpoints: Point[] = [];
-  for (const m of marks) {const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && wS && (x - p.x) * wS < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
+  for (const m0 of marks) {const mv = moved[markKey(m0)], m = mv ? {...m0, at: new Date(mv)} : m0; /* 06/11/2026 (Pedro: "arrasto as duas e uma vai, a outra fica e depois vai junto"): dose/marca arrastada fica no lugar novo ate a gravacao voltar, como os compromissos */ const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && wS && (x - p.x) * wS < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (wS) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * wS < 20)) mp.x += 22 / wS;}
   const all = [...points, ...mpoints];
@@ -500,7 +501,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       // posicao, para continuar certo se a linha rolar); antes qualquer atualizacao da tela (a Rotina atualiza todo segundo) desfazia
       const to = snapDate(d.fx), delta = to.getTime() - items[0].at.getTime(), hAbs = (to.getTime() - day0) / 3600000;
       setSettle(o => ({...o, [key]: hAbs})); setTimeout(() => setSettle(o => {const n = {...o}; delete n[key]; return n;}), 8000);
-      const keys: Record<string, string> = {}; for (const x of items) if ('rec' in x.t) keys[x.t.rec.id + '|' + x.t.rec.date] = new Date(x.at.getTime() + delta).toISOString();
+      const keys: Record<string, string> = {}; for (const x of items) {const iso = new Date(x.at.getTime() + delta).toISOString(); if ('rec' in x.t) keys[x.t.rec.id + '|' + x.t.rec.date] = iso; else if ('dose' in x.t) keys[markKey({id: '', dose: x.t.dose})] = iso; else if ('mark' in x.t) keys[markKey(x.t.mark)] = iso;}
       if (Object.keys(keys).length) {setMoved(o => ({...o, ...keys})); setTimeout(() => setMoved(o => {const n = {...o}; for (const k of Object.keys(keys)) delete n[k]; return n;}), 12000);}
       actions.onMove!(items.map(x => ({t: x.t, to: new Date(x.at.getTime() + delta)})));};
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('keydown', esc, true);
@@ -627,6 +628,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
             style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, ...(WEB ? {backgroundImage: ring} : {backgroundColor: tint(cols[0], 0.45)}), boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{openRecs(p.recs).length}</Text></View>
           </Pressable>;}
+        // 06/11/2026 (Pedro: "tarefa concluida precisa virar uma bolinha verde ticado")
+        if (isDoneRec(r)) return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + ' (concluída)').join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 8, width: 16, height: 16, marginLeft: -8, borderRadius: 8, backgroundColor: c.success, boxShadow: '0 0 0 2.5px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
+          <Icon name="check" size={11} color="#fff" />
+        </Pressable>;
         const size = isNext ? 11 : 9;
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
@@ -1016,8 +1022,13 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
         {meta ? <Text numberOfLines={1} style={{fontSize: 11, color: c.muted, marginTop: 1}}>{meta.split(' · ').map((part, n) => <Text key={n} style={{color: part === 'Importante' ? IMPORTANT_RED : c.muted}}>{(n ? ' · ' : '') + part}</Text>)}</Text> : null}
       </View>
       {action && onAction ? <Pressable accessibilityRole="button" onPress={onAction} style={({hovered: h, pressed}: any) => ({height: 28, paddingHorizontal: 11, borderRadius: 8, justifyContent: 'center', backgroundColor: h ? tint(color, 0.3) : tint(color, 0.18), transform: [{scale: pressed ? 0.97 : 1}]})}><Text style={{fontSize: 12, fontWeight: '600', color}}>{action}</Text></Pressable> : null}
-      {hovered && (onEdit || onRemove) ? <View style={{flexDirection: 'row', gap: 4}}>{onEdit ? iconBtn('edit', 'Editar ' + title, onEdit) : null}{onRemove ? iconBtn('close', 'Remover ' + title, onRemove) : null}</View>
-        : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
+      {/* 06/11/2026 (Pedro: "texto fica pulando"): o canto direito tem sempre a largura dos botoes; o horario e os botoes
+          trocam no mesmo espaco, entao o nome nao quebra outra linha ao passar o mouse */}
+      {(() => {const n = (onEdit ? 1 : 0) + (onRemove ? 1 : 0), slot = n ? n * 28 + (n - 1) * 4 : 0;
+        return <View style={{minWidth: slot, height: 28, alignItems: 'flex-end', justifyContent: 'center'}}>
+          {hovered && n ? <View style={{flexDirection: 'row', gap: 4}}>{onEdit ? iconBtn('edit', 'Editar ' + title, onEdit) : null}{onRemove ? iconBtn('close', 'Remover ' + title, onRemove) : null}</View>
+            : <Text style={{fontSize: 12, color: c.muted, fontVariant: ['tabular-nums']}}>{time}</Text>}
+        </View>;})()}
     </>}</HoverPressable>;
   const many = total > 1;
   // 05/11/2026 (Pedro: "no balao, um + para adicionar naquele horario")

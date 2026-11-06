@@ -319,11 +319,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: item arrastado para o horário de outro vira grupo na hora (antes ficavam um em cima do outro, parecendo um só, até recarregar) | conferido: Tarefa B arrastada para 05:00 agrupou com Tarefa A; testes ok |
 | 2026-11-06 | (delivery) | Criar rápido na linha do tempo (quick-create.ts): pedido de criar salvo na hora sem esperar a IA (~100 ms); padrão Tarefa; "na agenda/agendar/reunião/consulta/call" = compromisso; "me lembra/me avisa/não esquecer" = lembrete; prioridade, "descrição:", "das X até Y", "desse horário até 17h", "3 da tarde"; pergunta vai para a Sofia. Servidor também entende "até 17h" | medido 98 ms; testes app ok, servidor 420/420 |
 | 2026-11-06 | (servidor) | Lembrete repetido não ia para a próxima vez: o agendador gravava repeat_day (dia original, desde 03/11) que o tipo lembrete não tinha → BAD_FIELD a cada minuto no log (2 lembretes). Campo oculto acrescentado ao catálogo; teste lembrete-repete-bad-field-06-11 | 421+app ok; corrige no próximo minuto após o deploy |
 | 2026-11-06 | (delivery) | "Algo deu errado nesta tela" no site inteiro: em 1eb44b2 (Price Tracker) um useEffect foi posto dentro de outro em BackgroundServices (React recusa). Corrigido + teste que varre o app atrás de hook dentro de hook (hooks-aninhados-06-11). Antes: todas as telas caíam no navegador de teste; depois: nenhuma | tsc+testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: rastro embaixo ao passar o mouse (restos do rótulo "+ hora" no Chrome). Marca e rótulo em camada própria (GUIDE_LAYER: will-change/translateZ). Não reproduz no navegador de teste (sem GPU): confirmar com o Pedro | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Linha do tempo: pílula da Rotina arrastada anda inteira na hora (antes uma ia e a outra esperava a gravação); balão do grupo sem pular texto no hover; editor rápido: dia/hora escolhido vale sem "Confirmar" (antes Salvar gravava a data antiga — testado no navegador: antes 06/11, depois 10/11); tarefa feita = bolinha verde com tique | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
