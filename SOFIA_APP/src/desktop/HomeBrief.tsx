@@ -7,7 +7,6 @@ import {parseQuickCreate} from '../lib/quick-create';
 import {appAlert} from '../lib/app-alert';
 import {DateTimeField} from '../components/DateTimeField';
 import {TASK_PRIORITIES} from '../lib/task-filters';
-import {INTRO} from '../components/HomeHero';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions} from 'react-native';
 /** 03/11/2026: no Android o `window` existe (e o objeto global) mas nao tem addEventListener/innerWidth; o teste
@@ -190,9 +189,11 @@ function TimelineSettingsPanel({boxRef, s, set, plans, bills, incomes, onClose}:
  * entrar - montada atrasada, ela ja aparece no ponto certo (atraso negativo), sem recomecar nem ficar parada. */
 // 04/11/2026 (Pedro: "o esqueleto entra intercalado, mas o conteudo aparece os 3 de uma vez"): com `out`, a fileira do
 // esqueleto apaga na sua vez (mesmo intervalo da entrada) enquanto a fileira de conteudo de baixo entra
-function RowIn({i, at, out, style, children}: {i: number; at?: number; out?: number; style?: any; children: React.ReactNode}) {
-  const anim = useMemo(() => out ? {animationKeyframes: {'0%': {opacity: 1}, '100%': {opacity: 0}}, animationDuration: '480ms', animationDelay: Math.round(out + i * INTRO.rowGap + 60 - Date.now()) + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any : at ? {animationKeyframes: {'0%': {opacity: 0, transform: 'translateY(' + INTRO.rowLift + 'px)'}, '100%': {opacity: 1, transform: 'translateY(0px)'}}, animationDuration: INTRO.rowMs + 'ms', animationDelay: Math.round(at + i * INTRO.rowGap - Date.now()) + 'ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any : null, [at, out]);
-  return <View style={[style, anim]}>{children}</View>;
+// 06/11/2026 (Pedro: "tira a animacao dos blocos, a pagina ja inicia com todos eles prontos"): as fileiras aparecem prontas,
+// sem entrada; o esqueleto que saia em fade agora some na hora em que o conteudo chega
+function RowIn({out, style, children}: {i: number; at?: number; out?: number; style?: any; children: React.ReactNode}) {
+  if (out) return null;
+  return <View style={style}>{children}</View>;
 }
 export function HomeBrief(p: HomeBriefProps) {
   const c = useTheme(), now = new Date(), root = useRef<View>(null), [briefH, setBriefH] = useState(lastBrief), [tl, setTl] = useTimelineSettings(), [gear, setGear] = useState(false);
@@ -423,6 +424,12 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || holdRef.current || addingRef.current || pinRef.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current || gap > 0.1 || (WEB && document.visibilityState !== 'visible')) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, 900);} /* 05/11/2026 (Pedro: "o agora sai de onde parou e anda ate a hora"): atraso grande (voltou de outra aba) ou aba escondida = vai direto, sem deslizar */, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const allRef = useRef<Point[]>([]);
+  // 06/11/2026 (Pedro: "o usuario pode selecionar em toda essa area, nao so na linha"): a malha comeca em qualquer ponto do
+  // quadro da linha do tempo (faixa dos periodos, nomes e horas); em cima de uma bolinha o Shift/Alt+clique marca so ela
+  const marqStart = useRef<(e: any) => boolean>(() => false);
+  useEffect(() => {const el: any = box.current; if (!WEB || !el?.addEventListener) return;
+    const down = (e: MouseEvent) => {if (!(e.shiftKey || e.altKey) || e.button) return; const t = e.target as any; if (t?.closest?.('[data-tldot]')) return; if (marqStart.current(e)) e.stopPropagation();};
+    el.addEventListener('mousedown', down, true); return () => el.removeEventListener('mousedown', down, true);}, []);
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
   // 06/11/2026 (Pedro: "juntei duas bolinhas e ficou so uma; mudei a prioridade e agrupou"): o item arrastado muda de horario mas
@@ -472,6 +479,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const lo = (Math.min(cur.a, cur.b) - r.left) / r.width, hi = (Math.max(cur.a, cur.b) - r.left) / r.width; if ((hi - lo) * r.width < 4) return;
       const keys = allRef.current.filter(q => q.x >= lo && q.x <= hi && tgtOf.current[q.key]).map(q => q.key); if (keys.length) setSel(o => [...new Set([...o, ...keys])]);};
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); return true;};
+  marqStart.current = beginMarquee;
   useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [sel.length]);
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
@@ -599,7 +607,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; if (sel.length) {setSel([]); return;} if (WEB && addingRef.current) {setAdding(null); setGuide(null); return;} /* 06/11/2026 (Pedro): com a janela de criar aberta, clicar de novo na linha fecha (nao abre outra) */ const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near && !WEB) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} /* 04/11/2026 (Pedro): no computador, clicar numa bolinha cria naquele horario (a previa abre passando o mouse) */ const fx2 = near && WEB ? near.x : fx; manualAt.current = Date.now(); /* 06/11/2026 (Pedro: "clico pra criar e a linha arrasta do nada"): criando, a linha nao volta sozinha para o agora */ setPin(''); setHover(''); setGuide(null); setAdding({fx: fx2, at: snapDate(fx2)});}}
       onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
-      {...({onMouseDown: (e: any) => {beginMarquee(e);}, onMouseMove: (e: any) => {if (dragRef.current || marq) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
+      {...({onMouseMove: (e: any) => {if (dragRef.current || marq) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); if (!adding) setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
     {/* 06/11/2026 (Pedro: "quando arrasto o mouse ta criando um rastro embaixo"): a marca e o "+ hora" andam em camada propria
@@ -633,34 +641,34 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         if (picked) HITS.push(<View key={p.key + '-sel'} pointerEvents="none" testID="timeline-selected" style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, borderWidth: 2, borderColor: c.accent, backgroundColor: tint(c.accent, 0.12), zIndex: 3, opacity: drag?.live ? 0.3 : 1} as any} />);
         // 06/11/2026 (Pedro: "tem que ter a mira muito afiada pra arrastar"): no navegador o hitSlop nao vale; uma area invisivel
         // de 36 px por cima de cada ponto pega o clique, o passar do mouse e o arrastar mesmo com o mouse um pouco fora
-        if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
+        if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1', tldot: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
         const itemOp = m ? op.mark(m) : op.rec(r), extra: any = {opacity: ghost ? 0.3 * itemOp : itemOp, cursor: 'pointer', /* 0.3.343 (Pedro): passar o mouse mostra o que tem na bolinha (mãozinha de clicar, não a de pegar); arrastar continua funcionando e, ao arrastar, a prévia some */ ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
           const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
           const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
-          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
+          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
             {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName)} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
           </Pressable>;
         }
         const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1, past = !isNext && p.recs.every(x => new Date(x.date).getTime() < Date.now()); // 0.3.332: o que ja passou fica mais apagado
-        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} dataSet={{noveil: '1'}} {...hov} {...drg}
+        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
           style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
         // 0.3.332 (aprovado por foto): bolinha solta menor; agrupada do mesmo tamanho de antes, com o miolo na cor do mais
         // urgente e um anel inteiro mostrando a mistura (um pedaco por item, na cor de cada um)
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
-          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
+          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
             style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, ...(WEB ? {backgroundImage: ring} : {backgroundColor: tint(cols[0], 0.45)}), boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{openRecs(p.recs).length}</Text></View>
           </Pressable>;}
         // 06/11/2026 (Pedro: "tarefa concluida precisa virar uma bolinha verde ticado")
-        if (isDoneRec(r)) return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + ' (concluída)').join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
+        if (isDoneRec(r)) return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + ' (concluída)').join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 8, width: 16, height: 16, marginLeft: -8, borderRadius: 8, backgroundColor: c.success, boxShadow: '0 0 0 2.5px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
           <Icon name="check" size={11} color="#fff" />
         </Pressable>;
         const size = isNext ? 11 : 9;
-        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
+        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}{HITS}
       {marq && Math.abs(marq.b - marq.a) >= 4 ? <OverAll><View pointerEvents="none" testID="timeline-marquee" style={{position: 'absolute', left: Math.min(marq.a, marq.b), top: Math.min(marq.y0, marq.y1), width: Math.abs(marq.b - marq.a), height: Math.max(2, Math.abs(marq.y1 - marq.y0)), borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: tint(c.accent, 0.1), borderRadius: 3, zIndex: 50} as any} /></OverAll> : null}
