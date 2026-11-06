@@ -19,7 +19,14 @@ export async function readDirect(url: string, api: MercadoLivreApi, options: Mer
     if (options.signal?.aborted) return failed('CANCELLED', 'Leitura cancelada.');
     if (!result?.ok) return failed(result?.code || 'INVALID_RESPONSE', result?.message || 'O servidor não retornou uma leitura válida.');
     const r = result.reading;
-    if (!r || r.provider !== 'mercadolivre' || !/^MLB\d{6,16}$/.test(r.itemId) || r.identityKey !== 'mercadolivre:' + r.itemId || !/^\d{1,20}$/.test(r.seller?.id) || !r.title || !r.seller?.name || !Number.isSafeInteger(r.amountCents) || r.amountCents <= 0 || r.amountCents > 1e10 || r.currency !== 'BRL' || !Number.isFinite(Date.parse(r.observedAt)) || Date.parse(r.observedAt) > Date.now() + 60000 || !isMercadoLivreUrl(r.normalizedUrl)) return failed('INVALID_RESPONSE', 'Identidade, preço ou data inválidos; leitura descartada.');
+    // 06/11/2026 (Pedro: "esse ja esta lendo mas ta dizendo que nao esta"): a mensagem diz QUAL conferencia falhou (so o nome
+    // do campo, nunca conteudo), para achar a causa na primeira tentativa
+    const bad = !r ? ['leitura'] : [
+      r.provider !== 'mercadolivre' && 'loja', !/^MLB\d{6,16}$/.test(r.itemId) && 'anúncio', r.identityKey !== 'mercadolivre:' + r.itemId && 'identidade',
+      !/^\d{1,20}$/.test(r.seller?.id) && 'vendedor', !r.title && 'título', !r.seller?.name && 'nome do vendedor',
+      (!Number.isSafeInteger(r.amountCents) || r.amountCents <= 0 || r.amountCents > 1e10) && 'preço', r.currency !== 'BRL' && 'moeda',
+      (!Number.isFinite(Date.parse(r.observedAt)) || Date.parse(r.observedAt) > Date.now() + 60000) && 'data', !isMercadoLivreUrl(r.normalizedUrl) && 'link'].filter(Boolean);
+    if (bad.length) return failed('INVALID_RESPONSE', 'Identidade, preço ou data inválidos; leitura descartada. [' + bad.join(', ') + ']');
     if (options.expectedSellerId && options.expectedSellerId !== r.seller.id) return failed('SELLER_MISMATCH', 'O vendedor mudou; leitura descartada.');
     const best = {amount: r.amountCents / 100, currency: 'BRL', origins: ['mercadolivre:html:' + r.itemId], confidence: 1};
     return {ok: true, title: r.title, mercadoLivre: r, result: {found: true, needsConfirmation: false, best, candidates: [best]}};

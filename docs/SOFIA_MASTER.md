@@ -252,6 +252,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- Mercado Livre no site: "Identidade, preço ou data inválidos" sem causa achada (o formato do servidor passa nos testes); a mensagem agora mostra o campo entre colchetes — pedir ao Pedro o texto novo.
 - Página com senha: desenho enviado 06/11 (3 telas: ⋯ Trancar, criar senha/nível, página trancada); implementar só após o "aprovado". Falta decidir anexos/imagens (criptografar também).
 
 - **Páginas estilo Notion — o que falta (pedido do Pedro 05/11: "tudo igual ao Notion"):** feito no site: teclado, menu "/", atalhos, colar, arrastar/selecionar blocos, texto rico com barra ao selecionar, Sofia na página, subpáginas como links com prévia, janelas de ícone/capa, topo (Editada/link/favorito), barra lateral (arrastar, ⋯/+, Favoritos, Próximos eventos). Falta: Tab para recuar (blocos aninhados), alternante (toggle), imagem/arquivo como bloco no site, comentários, tooltip no +. Texto rico só no site: editar a mesma linha no celular tira a formatação dela. Favoritos ficam no navegador (não sincronizam).
@@ -322,11 +323,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | "Algo deu errado nesta tela" no site inteiro: em 1eb44b2 (Price Tracker) um useEffect foi posto dentro de outro em BackgroundServices (React recusa). Corrigido + teste que varre o app atrás de hook dentro de hook (hooks-aninhados-06-11). Antes: todas as telas caíam no navegador de teste; depois: nenhuma | tsc+testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: rastro embaixo ao passar o mouse (restos do rótulo "+ hora" no Chrome). Marca e rótulo em camada própria (GUIDE_LAYER: will-change/translateZ). Não reproduz no navegador de teste (sem GPU): confirmar com o Pedro | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: pílula da Rotina arrastada anda inteira na hora (antes uma ia e a outra esperava a gravação); balão do grupo sem pular texto no hover; editor rápido: dia/hora escolhido vale sem "Confirmar" (antes Salvar gravava a data antiga — testado no navegador: antes 06/11, depois 10/11); tarefa feita = bolinha verde com tique | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: Shift+clique seleciona várias bolinhas (anel azul); arrastar uma marcada leva todas o mesmo tanto; Esc/clique na linha limpa. Testado no navegador: 13:00 e 13:30 → 14:00 e 14:30 | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Abertura: "Boa noite pulando" = fonte do nome (itálico) chegava tarde (sem preload) e o cumprimento centralizado mudava de largura aos ~3,7 s; preload acrescentado. Véu em camada própria. Capas preparadas só após 4,5 s, uma por vez, decodificando do arquivo. 5/5 aberturas sem deslocamento tardio | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Conversa: imagem colada dava "Failed to fetch" (CSP connect-src self bloqueia fetch de blob:; confirmado no navegador). blob-registry guarda o arquivo de cada blob: e a leitura não usa fetch (anexo, foto do perfil, Biblioteca). ML: mensagem de leitura descartada agora diz qual campo falhou | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

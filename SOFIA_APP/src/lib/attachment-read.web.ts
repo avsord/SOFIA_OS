@@ -1,6 +1,8 @@
 /** 0.3.329 (site): o anexo da Conversa e lido pelo navegador (arquivo escolhido, colado ou arrastado - endereco blob: ou
  * data:). Antes o site usava o leitor do celular, que nao existe no navegador, e o anexo falhava ao enviar. */
-async function blobOf(uri:string):Promise<Blob>{const r=await fetch(uri);if(!r.ok)throw Error('O arquivo não está mais disponível. Selecione-o novamente.');return await r.blob();}
+import {readLocalBlob} from './blob-registry';
+// 06/11/2026: le o arquivo guardado do endereco blob: (fetch de blob: e bloqueado pela regra de seguranca do site)
+const blobOf=readLocalBlob;
 export async function attachmentBase64(uri:string):Promise<string>{
  if(uri.startsWith('data:')){const i=uri.indexOf(',');return uri.slice(i+1);}
  const blob=await blobOf(uri);

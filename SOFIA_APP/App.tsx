@@ -1,3 +1,4 @@
+import './src/lib/blob-registry'; // 06/11/2026: antes de tudo, para todo endereco blob: guardar o proprio arquivo (ver o arquivo)
 import {refreshUiScale} from './src/web/desktop-scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useRenderCost} from './src/lib/render-cost';

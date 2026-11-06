@@ -1,3 +1,4 @@
+import {readLocalBlob} from '../lib/blob-registry';
 import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Biblioteca redesenhada (protótipo aprovado em 31/10: docs/prototipos-2026-10-31/biblioteca-criar.html).
@@ -198,7 +199,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   async function uploadFile(entity: Entity, file: NonNullable<Draft['file']>): Promise<{file_id?: string; file_error: string}> {
     try {
       let base64 = '';
-      if (Platform.OS === 'web') { const blob: Blob = file.file || await (await fetch(file.uri)).blob(); const data: string = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error); r.readAsDataURL(blob); }); base64 = data.slice(data.indexOf(',') + 1); }
+      if (Platform.OS === 'web') { const blob: Blob = file.file || await readLocalBlob(file.uri); const data: string = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error); r.readAsDataURL(blob); }); base64 = data.slice(data.indexOf(',') + 1); }
       else { const {File} = require('expo-file-system'); base64 = await new File(file.uri).base64(); }
       if (base64.length > 34e6) throw new Error('O arquivo passa de 25 MB.');
       const att = await api.uploadAttachment(entity.id, {name: file.name, mime: file.mime || 'application/octet-stream', base64});
