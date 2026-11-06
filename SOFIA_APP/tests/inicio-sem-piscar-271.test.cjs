@@ -30,3 +30,9 @@ test('Gravador de fluidez: so no site, uma vez, envio direto (sem invalidar cach
   assert.equal((pr.match(/textContent/g)||[]).length,1);assert.ok(!/innerText|innerHTML|outerHTML/.test(pr));
   assert.ok(srv.includes("p === '/api/mobile/diag/fluidez' && m === 'POST'")&&srv.includes("rate(session, 'diag-fluidez', 6)"));
 });
+test('Inicio no site: encaixe e largura da linha do tempo medidos antes da 1a pintura (sem pulo da saudacao nem nomes atrasados)',()=>{
+  const home=read('src/screens/Home.tsx'),brief=read('src/desktop/HomeBrief.tsx');
+  assert.ok(home.includes('(homeWidth||scroller.clientWidth)<980'),'encaixe nao pode esperar a largura do onLayout');
+  assert.ok(home.includes('cc.style.zoom=String(z)'),'zoom entra no proprio quadro da medida');
+  assert.ok(brief.includes("useLayoutEffect(() => {if (!WEB || w) return; const v = (lineBox.current as any)?.offsetWidth; if (v > 0) {setW(v); setWS(v);}}, [w]);"));
+});

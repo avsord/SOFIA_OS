@@ -201,13 +201,20 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  const winKey=winW+'x'+winH,[fit,setFit]=useState<{key:string;z:number}|null>(null);
  // 04/11/2026: o encaixe guardado no navegador (rodada anterior) so diminuia e deixou o Inicio pequeno; desfeito e apagado
  useEffect(()=>{try{localStorage.removeItem(FIT_KEY);}catch{/* modo privado */}},[]);
- const fitZ=fit&&fit.key===winKey?Math.min(homeZ,fit.z):homeZ;
+ const fitZ=fit&&fit.key===winKey?Math.min(homeZ,fit.z):homeZ;const fitRef=useRef(fit);fitRef.current=fit;const homeViewRef=useRef(homeViewH);homeViewRef.current=homeViewH;
  useLayoutEffect(()=>{
-  if(Platform.OS!=='web'||typeof document==='undefined'||!desktop||homeWidth<980)return;
+  if(Platform.OS!=='web'||typeof document==='undefined'||!desktop)return;
   const box=document.getElementById('sofia-home-fit'),scroller=document.getElementById('sofia-home-scroll');
-  if(!box||!scroller)return;
+  /* 06/11/2026: a largura do onLayout so chega DEPOIS do 1o quadro; esperar por ela pintava o Inicio a 100% e encolhia no quadro
+     seguinte (o pulo do "Boa tarde"). Sem ela ainda, vale a largura real da pagina, ja medida antes da pintura. */
+  if(!box||!scroller||(homeWidth||scroller.clientWidth)<980)return;
   const measure=()=>{const view=scroller.clientHeight,applied=fitZ||1;if(!view)return;const natural=box.getBoundingClientRect().height/applied+DESK_HOME_BOTTOM;if(!(natural>DESK_HOME_BOTTOM))return;
    const need=Math.max(0.6,Math.min(homeZ,Math.floor(view/natural*200)/200));
+   /* 06/11/2026 (Pedro: "Boa tarde pulando"; relatorio [fluidez] do computador dele, tela 1762x832): o encaixe era calculado
+      certo, mas so entrava no quadro seguinte (o setFit vindo do ResizeObserver redesenha depois da pintura): um quadro a 100% e
+      o seguinte a 92%, a saudacao descia 14 px e a linha do tempo era redesenhada. Agora o zoom entra no proprio quadro da medida. */
+   const next=fitRef.current&&fitRef.current.key===winKey?(need<fitRef.current.z-0.004?need:fitRef.current.z):need,z=Math.min(homeZ,next),cc=box.parentElement as HTMLElement|null;
+   if(cc&&Math.abs(z-applied)>0.001){cc.style.zoom=String(z);if(homeViewRef.current)cc.style.minHeight=Math.floor(homeViewRef.current/z)+'px';}
    setFit(old=>old&&old.key===winKey?(need<old.z-0.004?{key:winKey,z:need}:old):{key:winKey,z:need});};
   measure();
   if(typeof ResizeObserver==='undefined')return;

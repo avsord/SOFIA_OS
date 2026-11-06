@@ -403,6 +403,10 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // numa bolinha, em que fileira vai cada nome e o tamanho dos nomes so muda quando a largura PARA de mudar; enquanto a
   // barra abre ou fecha, tudo anda junto em porcentagem da linha (antes os nomes eram em pixels de um quadro atras e as
   // bolinhas juntavam e separavam a cada quadro)
+  // 06/11/2026 (Pedro: "bolinhas piscando"; relatorio [fluidez]: 7 nomes da linha do tempo recriados ~0,2 s depois): o onLayout so
+  // informa a largura depois do 1o quadro, e os nomes esperam por ela (para nao pularem 24 px). No site a largura e lida antes da
+  // pintura: bolinhas e nomes aparecem juntos no mesmo quadro.
+  useLayoutEffect(() => {if (!WEB || w) return; const v = (lineBox.current as any)?.offsetWidth; if (v > 0) {setW(v); setWS(v);}}, [w]);
   useEffect(() => {if (!w) return; if (!wS) {setWS(w); return;} const t = setTimeout(() => setWS(w), 180); return () => clearTimeout(t);}, [w]);
   const dayKey = new Date().toDateString(), day0 = useMemo(() => {const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();}, [dayKey]); // 0.3.336: troca a meia-noite
   const pos = (d: Date) => ((d.getTime() - day0) / 3600000 - start) / SPAN;
