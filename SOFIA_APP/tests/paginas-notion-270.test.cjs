@@ -303,3 +303,6 @@ test('Price Tracker no site: preco lido pelo servidor (sem navegador invisivel) 
  const pr=fs.readFileSync(path.join(__dirname,'..','src/lib/price-reader.tsx'),'utf8');assert.match(pr,/export function setWebPriceSource/);assert.match(pr,/webSource && Platform\?\.OS === 'web' && !isMercadoLivreUrl\(url\)/);
  const bg=fs.readFileSync(path.join(__dirname,'..','src/components/BackgroundServices.tsx'),'utf8');assert.match(bg,/setWebPriceSource\(url=>api\.linkPreview\(url\)\.then\(previewToReader\)\)/);
 });
+test('linha do tempo agrupa pelo horario mesmo logo depois de arrastar (lista ordenada antes de agrupar)',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/for \(const r of \[\.\.\.withMoved\(items\)\]\.sort\(/);
+});

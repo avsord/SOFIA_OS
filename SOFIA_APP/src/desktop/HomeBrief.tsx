@@ -420,7 +420,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
-  for (const r of withMoved(items)) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
+  // 06/11/2026 (Pedro: "juntei duas bolinhas e ficou so uma; mudei a prioridade e agrupou"): o item arrastado muda de horario mas
+  // continuava no lugar antigo da lista; sem ordenar, os dois ficavam um em cima do outro sem virar grupo
+  for (const r of [...withMoved(items)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
   const mpoints: Point[] = [];
   for (const m of marks) {const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && wS && (x - p.x) * wS < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
