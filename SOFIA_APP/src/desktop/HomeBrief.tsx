@@ -2,6 +2,7 @@
 // atalhos e a linha do tempo do dia) e o resumo de tudo em blocos do mesmo tamanho. So o Price Tracker passa
 // sozinho pelos produtos; o resto fica parado no item mais importante (decisao do Pedro: menos movimento).
 // Medidas em px de computador (metro: FLUID - so o fator da tela).
+import {OverAll} from '../lib/over-all';
 import {parseQuickCreate} from '../lib/quick-create';
 import {appAlert} from '../lib/app-alert';
 import {DateTimeField} from '../components/DateTimeField';
@@ -421,6 +422,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // a meia-noite o "hoje" vira o novo dia e a linha recomeca nas 05:00
   useEffect(() => {if (dayRef.current !== 0 || dragRef.current || overLine.current || holdRef.current || addingRef.current || pinRef.current || Date.now() - manualAt.current < 180000) return; /* 0.3.350: com o mouse sobre a linha ela nao anda (a previa nao some) */ const h = homeOf(0, spanRef.current, nowHours()), gap = Math.abs(h - target.current); if (snapNext.current || gap > 0.1 || (WEB && document.visibilityState !== 'visible')) {snapNext.current = false; if (gap > 0.001) jump(h);} else if (gap > 0.02) glide(h, 900);} /* 05/11/2026 (Pedro: "o agora sai de onde parou e anda ate a hora"): atraso grande (voltou de outra aba) ou aba escondida = vai direto, sem deslizar */, [day0, Math.floor(Date.now() / 30000)]);
   // pontos: compromissos/tarefas/lembretes colados viram um ponto com numero; rotina colada vira uma pilula so; o resto separado
+  const allRef = useRef<Point[]>([]);
   const points: Point[] = [];
   const inView = (x: number) => x >= -0.01 && x <= 1.01;
   // 06/11/2026 (Pedro: "juntei duas bolinhas e ficou so uma; mudei a prioridade e agrupou"): o item arrastado muda de horario mas
@@ -431,6 +433,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (wS) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * wS < 20)) mp.x += 22 / wS;}
   const all = [...points, ...mpoints];
+  allRef.current = all;
   const nearPoint = (fx: number) => {const W0 = wS || w || 1; let best: Point | null = null, bd = 15; /* 06/11/2026 (Pedro): no vao entre as bolinhas tem que aparecer o horario + criar; so gruda na bolinha bem perto dela */ for (const q of all) {if (q.x < -0.01 || q.x > 1.01) continue; const dpx = Math.abs(q.x - fx) * W0; if (dpx < bd) {bd = dpx; best = q;}} return best;};
   useEffect(() => {setSettle(o => {const keys = Object.keys(o); if (!keys.length) return o; let ch = false; const n = {...o};
     for (const k of keys) {const pt = all.find(q => q.key === k); if (!pt || Math.abs(pt.x * SPAN + startRef.current - o[k]) < 0.05) {delete n[k]; ch = true;}} return ch ? n : o;});}, [items, marks]);
@@ -457,6 +460,18 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // 06/11/2026 (Pedro: "shift + clicar cria uma selecao; selecionar um ou varios e arrastar todos ao mesmo tempo"): Shift+clique
   // marca/desmarca bolinhas; arrastar uma marcada leva todas juntas (o mesmo tanto de tempo). Esc ou clique na linha limpa.
   const [sel, setSel] = useState<string[]>([]), tgtOf = useRef<Record<string, DragItem[]>>({});
+  // 06/11/2026 (Pedro: "abre uma malha de selecao igual no Photoshop e vai selecionando o que tiver dentro"): Shift ou Alt +
+  // arrastar num lugar vazio da linha desenha um retangulo; ao soltar, as bolinhas dentro dele ficam marcadas (somam as ja marcadas)
+  const [marq, setMarq] = useState<{a: number; b: number; y0: number; y1: number; l: number; w: number} | null>(null);
+  const beginMarquee = (e: any) => {const el: any = lineBox.current, r = el?.getBoundingClientRect?.(); if (!r?.width) return false; const ne = e?.nativeEvent || e;
+    if (!(ne.shiftKey || ne.altKey) || ne.button) return false; ne.preventDefault?.(); justDragged.current = true; /* o clique de criar nao abre ao soltar a malha */ const x0 = ne.clientX, y0 = ne.clientY; let cur = {a: x0, b: x0, y0, y1: y0, l: r.left, w: r.width}; setMarq(cur); setGuide(null); setPin(''); setHover('');
+    document.body.style.userSelect = 'none';
+    const mv = (ev: MouseEvent) => {cur = {a: x0, b: ev.clientX, y0, y1: ev.clientY, l: r.left, w: r.width}; setMarq(cur);};
+    const up = () => {window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); document.body.style.userSelect = ''; setMarq(null);
+      justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 300);
+      const lo = (Math.min(cur.a, cur.b) - r.left) / r.width, hi = (Math.max(cur.a, cur.b) - r.left) / r.width; if ((hi - lo) * r.width < 4) return;
+      const keys = allRef.current.filter(q => q.x >= lo && q.x <= hi && tgtOf.current[q.key]).map(q => q.key); if (keys.length) setSel(o => [...new Set([...o, ...keys])]);};
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); return true;};
   useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [sel.length]);
   const [settle, setSettle] = useState<Record<string, number>>({});
   // 0.3.330: adicionar clicando num lugar vazio da linha (guia "+ HH:MM" ao passar o mouse)
@@ -584,7 +599,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       onPress={(e: any) => {if (justDragged.current || dragRef.current) return; if (sel.length) {setSel([]); return;} if (WEB && addingRef.current) {setAdding(null); setGuide(null); return;} /* 06/11/2026 (Pedro): com a janela de criar aberta, clicar de novo na linha fecha (nao abre outra) */ const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; const near = nearPoint(fx);
         if (near && !WEB) {setGuide(null); setPin(k => k === near.key ? '' : near.key); return;} /* 04/11/2026 (Pedro): no computador, clicar numa bolinha cria naquele horario (a previa abre passando o mouse) */ const fx2 = near && WEB ? near.x : fx; manualAt.current = Date.now(); /* 06/11/2026 (Pedro: "clico pra criar e a linha arrasta do nada"): criando, a linha nao volta sozinha para o agora */ setPin(''); setHover(''); setGuide(null); setAdding({fx: fx2, at: snapDate(fx2)});}}
       onLongPress={actions.onAskAt ? (e: any) => {if (dragRef.current) return; const fx = fxAt(Number(e?.nativeEvent?.pageX)); if (fx == null) return; setAdding(null); setPin(''); actions.onAskAt!(snapDate(fx));} : undefined} delayLongPress={380}
-      {...({onMouseMove: (e: any) => {if (dragRef.current) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
+      {...({onMouseDown: (e: any) => {beginMarquee(e);}, onMouseMove: (e: any) => {if (dragRef.current || marq) return; const fx = fxAt(e.pageX); if (fx == null) return; const near = nearPoint(fx); /* 06/11/2026 (Pedro): criando, passar o mouse numa bolinha ainda mostra a previa dela */
         if (near) {setGuide(null); if (hover !== near.key) {enter(near.key); dotNear.current = near.key;} setNearKey(near.key);} else {if (nearKey) setNearKey(''); if (!adding) setGuide(fx);}}, onMouseLeave: () => {setGuide(null);}} as any)}
       style={{position: 'absolute', left: 0, right: 0, top: OFF - 6, height: 70, cursor: nearKey ? 'pointer' : 'copy', outlineStyle: 'none'} as any} /> : null} {/* 0.3.341 (Pedro): 'embaixo a distancia e muito curta' - a area pega ate abaixo das horas */}
     {/* 06/11/2026 (Pedro: "quando arrasto o mouse ta criando um rastro embaixo"): a marca e o "+ hora" andam em camada propria
@@ -602,16 +617,16 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
-        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; manualAt.current = Date.now(); /* 06/11/2026 (Pedro): clicar numa bolinha conta como mexer na linha - ela nao corre sozinha para o agora */ setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
+        const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; manualAt.current = Date.now(); /* 06/11/2026 (Pedro): clicar numa bolinha conta como mexer na linha - ela nao corre sozinha para o agora */ setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current && !marq) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
         // 0.3.317: da para arrastar a bolinha de um item so (compromisso, lembrete, tarefa) e a dose da Rotina sozinha
         // 0.3.318 (Pedro): tudo o que esta na linha arrasta - bolinha de um item ou de varios (andam juntos), dose ou pilula
         // com varias doses, conta, receita, fatura e encomenda (essas so mudam de lugar aqui no Inicio)
         const tgt: DragItem[] | null = !actions.onMove ? null : m ? p.marks.map(x => ({t: (x.kind === 'routine' && x.dose ? {dose: x.dose} : {mark: x}) as MoveTarget, at: x.at})) : p.recs.map(x => ({t: {rec: x} as MoveTarget, at: new Date(x.date)}));
         const xo = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, ghost = drag?.key === p.key;
         if (tgt) tgtOf.current[p.key] = tgt;
-        const picked = sel.includes(p.key);
+        const inMarq = !!marq && Math.abs(marq.b - marq.a) >= 4 && p.x >= (Math.min(marq.a, marq.b) - marq.l) / marq.w && p.x <= (Math.max(marq.a, marq.b) - marq.l) / marq.w, picked = sel.includes(p.key) || (inMarq && !!tgt);
         const drg: any = tgt ? {onPressIn: (e: any) => {const ne = e?.nativeEvent || {};
-          if (WEB && ne.shiftKey) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 300); setPin(''); setHover(''); setSel(o => o.includes(p.key) ? o.filter(x => x !== p.key) : [...o, p.key]); return;}
+          if (WEB && (ne.shiftKey || ne.altKey)) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 300); setPin(''); setHover(''); setSel(o => o.includes(p.key) ? o.filter(x => x !== p.key) : [...o, p.key]); return;}
           const group = picked && sel.length > 1 ? [...tgt!, ...sel.filter(k => k !== p.key).flatMap(k => tgtOf.current[k] || [])] : tgt!;
           if (!picked && sel.length) setSel([]);
           beginDrag(e, p.key, group, p.x, m ? markColor(m, c.danger) : r.kind === 'reminder' ? REMIND : colorOf(r, c.accent));}} : {};
@@ -648,6 +663,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}{HITS}
+      {marq && Math.abs(marq.b - marq.a) >= 4 ? <OverAll><View pointerEvents="none" testID="timeline-marquee" style={{position: 'absolute', left: Math.min(marq.a, marq.b), top: Math.min(marq.y0, marq.y1), width: Math.abs(marq.b - marq.a), height: Math.max(2, Math.abs(marq.y1 - marq.y0)), borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: tint(c.accent, 0.1), borderRadius: 3, zIndex: 50} as any} /></OverAll> : null}
       {/* 04/11/2026: os nomes so aparecem depois de medir a largura da linha (antes nasciam numa altura e pulavam 24 px) */}{all.map(p => place[p.key] == null || !wS ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: clampX(lx, lw / 2, lw, w), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 12, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums']}}> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
       </View>;})())}
