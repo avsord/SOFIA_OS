@@ -293,3 +293,6 @@ test('editar na linha do tempo: rascunho guardado ate salvar/cancelar, descricao
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/const QUICK_DRAFTS = new Map/);assert.match(hb,/addEventListener\('wheel', stop/);assert.match(hb,/minHeight: 96, maxHeight: 220/);
  const ch=fs.readFileSync(path.join(__dirname,'..','src/screens/Chat.tsx'),'utf8');assert.match(ch,/<Text selectable style=\{\{fontSize:16/);assert.match(ch,/onLongPress=\{Platform\.OS==='web'\?undefined/);
 });
+test('linha do tempo: area de pegar de 36px nos pontos (site), nao volta sozinha criando/com item aberto, previa das bolinhas enquanto cria',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/if \(WEB\) HITS\.push\(<Pressable key=\{p\.key \+ '-hit'\}/);assert.match(hb,/addingRef\.current \|\| pinRef\.current/);assert.match(hb,/\(!adding \|\| \(hover === shown\.key && pin !== shown\.key\)\)/);
+});
