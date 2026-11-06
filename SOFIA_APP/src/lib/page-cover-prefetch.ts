@@ -3,7 +3,7 @@
 // Arquivo leve (a barra lateral usa sem carregar a janela de capa).
 import {Image,Platform} from 'react-native';
 import type {SofiaApi} from './api';
-import {cachedPageCover,pageCoverDestination} from './page-cover-cache';
+import {cachedPageCover,coverBlob,pageCoverDestination} from './page-cover-cache';
 export const IMAGE_SIZES=new Map<string,{w:number;h:number}>();
 /** Imagem da capa ja decodificada (site): a pagina reaproveita este mesmo elemento e a capa aparece no 1o quadro. */
 export const DECODED=new Map<string,any>();
@@ -15,7 +15,7 @@ export async function makeBitmap(uri:string,img:any):Promise<any>{
  const g:any=globalThis;if(BITMAPS.has(uri))return BITMAPS.get(uri);if(typeof g.createImageBitmap!=='function'||!img)return null;
  try{if(!(img.complete&&img.naturalWidth>0))await new Promise<void>((ok,bad)=>{img.addEventListener('load',()=>ok(),{once:true});img.addEventListener('error',()=>bad(new Error('img')),{once:true});});
   const target=Math.round(Math.min(2400,(g.screen?.width||1920)*(g.devicePixelRatio||1))),w=img.naturalWidth,h=img.naturalHeight;
-  const bmp=w>target?await g.createImageBitmap(img,{resizeWidth:target,resizeHeight:Math.round(h*target/w),resizeQuality:'high'}):await g.createImageBitmap(img);
+  const src=coverBlob(uri)||img,bmp=w>target?await g.createImageBitmap(src,{resizeWidth:target,resizeHeight:Math.round(h*target/w),resizeQuality:'high'}):await g.createImageBitmap(src);
   BITMAPS.set(uri,bmp);return bmp;}catch{return null;}
 }
 export function peekCover(id:string):string{if(!id)return '';try{const d=pageCoverDestination(id) as any;return d?.exists&&d.uri?String(d.uri):'';}catch{return '';}}
@@ -27,13 +27,15 @@ export function prefetchPageCover(api:SofiaApi,data:Record<string,any>|undefined
 // Inicio primeiro"): logo depois que o Inicio abre, as capas de TODAS as paginas descem em segundo plano, duas por vez,
 // nos momentos livres do navegador. Ao entrar numa pagina a capa ja esta pronta (sem piscar).
 let queued=new Set<string>();
-export function prefetchAllCovers(api:SofiaApi,pages:{data?:Record<string,any>}[],delay=300):()=>void{
+// 06/11/2026 (Pedro: "o boa noite ta pulando, o fade pisca no final"): comecava 0,3 s depois de abrir, no meio da abertura,
+// duas capas por vez - preparar as fotos roubava quadros da animacao. Agora espera a abertura terminar (4,5 s) e vai uma por vez.
+export function prefetchAllCovers(api:SofiaApi,pages:{data?:Record<string,any>}[],delay=4500):()=>void{
  if(Platform.OS!=='web')return ()=>{};
  const todo=pages.map(p=>p.data).filter(d=>d?.cover_type==='attachment'&&d.cover_attachment_id&&!queued.has(String(d.cover_attachment_id))&&!peekCover(String(d.cover_attachment_id)));
  for(const d of todo)queued.add(String(d!.cover_attachment_id));
  let stop=false;const g:any=globalThis;
  const idle=(fn:()=>void)=>g.requestIdleCallback?g.requestIdleCallback(fn,{timeout:2000}):setTimeout(fn,200);
  const worker=async()=>{while(!stop&&todo.length){const d=todo.shift()!;await new Promise<void>(r=>idle(()=>r()));if(stop)break;await prefetchPageCover(api,d).catch(()=>{});}};
- const t=setTimeout(()=>{void worker();void worker();},delay);
+ const t=setTimeout(()=>{void worker();},delay);
  return ()=>{stop=true;clearTimeout(t);for(const d of todo)queued.delete(String(d!.cover_attachment_id));};
 }

@@ -22,6 +22,8 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/assets/sofia-192.png" />
+    <!-- 06/11/2026 (Pedro: "o boa noite ta pulando"): a fonte do nome (italico) tambem vem antes; sem isso ela chegava depois e o cumprimento centralizado pulava -->
+    <link rel="preload" href="/assets/fonts/SofiaDisplay-MediumItalic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/assets/fonts/SofiaSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/assets/fonts/SofiaSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/assets/fonts/SofiaSans-Medium.woff2" as="font" type="font/woff2" crossorigin />
@@ -91,7 +93,7 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
       #root { display: flex; height: 100%; flex: 1; }
       /* 04/11/2026 (Pedro: "quando abre o site, um fade rapido de toda a tela com a cor do site"): veu na cor do fundo que cobre
          a montagem e some depressa quando o app esta pronto (launch-handoff.ts); se o app nao avisar, some sozinho em 8 s */
-      #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; background: #F7F6FA; animation: sofia-veil-out 320ms ease-out 8s both; }
+      #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; will-change: opacity; transform: translateZ(0); background: #F7F6FA; animation: sofia-veil-out 320ms ease-out 8s both; }
       @media (prefers-color-scheme: dark) { #sofia-veil { background: #121017; } }
       #sofia-veil.out { animation: sofia-veil-open 800ms cubic-bezier(0.15,0,0.2,1) 0s both; }
       @keyframes sofia-veil-out { from { opacity: 1; } to { opacity: 0; } }
@@ -107,6 +109,6 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
     <div id="root"></div>
     <div id="sofia-veil"></div>
     <script src="/assets/early.js?v=5"></script>
-  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-c67be2ee45ffdc4011310e80af292783.js" defer></script><script src="/_expo/static/js/web/index-592a2438efcff9e7b24f56ce211bc1f8.js" defer></script>
+  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-c67be2ee45ffdc4011310e80af292783.js" defer></script><script src="/_expo/static/js/web/index-cefaa52d20987df03b76ebc411370247.js" defer></script>
 </body>
 </html>

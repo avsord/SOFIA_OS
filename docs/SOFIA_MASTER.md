@@ -322,11 +322,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (servidor) | Lembrete repetido não ia para a próxima vez: o agendador gravava repeat_day (dia original, desde 03/11) que o tipo lembrete não tinha → BAD_FIELD a cada minuto no log (2 lembretes). Campo oculto acrescentado ao catálogo; teste lembrete-repete-bad-field-06-11 | 421+app ok; corrige no próximo minuto após o deploy |
 | 2026-11-06 | (delivery) | "Algo deu errado nesta tela" no site inteiro: em 1eb44b2 (Price Tracker) um useEffect foi posto dentro de outro em BackgroundServices (React recusa). Corrigido + teste que varre o app atrás de hook dentro de hook (hooks-aninhados-06-11). Antes: todas as telas caíam no navegador de teste; depois: nenhuma | tsc+testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: rastro embaixo ao passar o mouse (restos do rótulo "+ hora" no Chrome). Marca e rótulo em camada própria (GUIDE_LAYER: will-change/translateZ). Não reproduz no navegador de teste (sem GPU): confirmar com o Pedro | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: pílula da Rotina arrastada anda inteira na hora (antes uma ia e a outra esperava a gravação); balão do grupo sem pular texto no hover; editor rápido: dia/hora escolhido vale sem "Confirmar" (antes Salvar gravava a data antiga — testado no navegador: antes 06/11, depois 10/11); tarefa feita = bolinha verde com tique | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Linha do tempo: Shift+clique seleciona várias bolinhas (anel azul); arrastar uma marcada leva todas o mesmo tanto; Esc/clique na linha limpa. Testado no navegador: 13:00 e 13:30 → 14:00 e 14:30 | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | Abertura: "Boa noite pulando" = fonte do nome (itálico) chegava tarde (sem preload) e o cumprimento centralizado mudava de largura aos ~3,7 s; preload acrescentado. Véu em camada própria. Capas preparadas só após 4,5 s, uma por vez, decodificando do arquivo. 5/5 aberturas sem deslocamento tardio | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
