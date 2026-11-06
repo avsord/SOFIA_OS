@@ -224,6 +224,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Criar pela linha do tempo (06/11/2026, Pedro):** pedido de criar é entendido no próprio app e salvo na hora; sem tipo = Tarefa; "agenda" = compromisso. Só pergunta/foto/texto não reconhecido vai para a IA.
 
+- **Página com senha (06/11/2026, decisões do Pedro; desenho enviado, aguardando aprovação):** dois níveis à escolha — Máxima (só a senha abre, esqueceu = perdeu, tranca ao sair da página) e Média (recuperável confirmando a senha da conta, fica aberta 5 min depois de sair). Conteúdo e subpáginas criptografados; Sofia/busca/link público não leem. Título fica visível com 🔒.
+
 ## 8. Regras que não se quebram
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
@@ -250,6 +252,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- Página com senha: desenho enviado 06/11 (3 telas: ⋯ Trancar, criar senha/nível, página trancada); implementar só após o "aprovado". Falta decidir anexos/imagens (criptografar também).
 
 - **Páginas estilo Notion — o que falta (pedido do Pedro 05/11: "tudo igual ao Notion"):** feito no site: teclado, menu "/", atalhos, colar, arrastar/selecionar blocos, texto rico com barra ao selecionar, Sofia na página, subpáginas como links com prévia, janelas de ícone/capa, topo (Editada/link/favorito), barra lateral (arrastar, ⋯/+, Favoritos, Próximos eventos). Falta: Tab para recuar (blocos aninhados), alternante (toggle), imagem/arquivo como bloco no site, comentários, tooltip no +. Texto rico só no site: editar a mesma linha no celular tira a formatação dela. Favoritos ficam no navegador (não sincronizam).
 
