@@ -255,6 +255,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Lembrete "coloquei 15 e fica 3 da manhã" (06/11):** não reproduzido (novo lembrete e servidor guardam 15:00 certo); falta saber em qual campo/tela ele vê 03:00.
 - **Tablet (06/11):** conferir num tablet real (login automático, voltar, envio de capa/arquivo pela WebView, avisos). Tocar num aviso no tablet abre a tela nativa de avisos por cima do site (ideal: abrir no site).
 - **Tarefa com fim (06/11):** falta campo de "fim" para editar à mão no editor da tarefa (hoje só pela conversa).
+- **Price Tracker no site (06/11):** conferir com KaBuM real; "buscar outras lojas" (readLinks) ainda depende do navegador invisível e não funciona no site.
 - **Links (05/11):** colar várias linhas nas Páginas ainda não preserva link; links nas notas só no site (celular segue texto).
 
 - **Railway (05/11):** cada publicação reinicia o servidor e corta a resposta da Sofia em andamento ("A chamada foi interrompida"); o app agora reenvia sozinho. Proposto ao Pedro: ligar o tempo de espera no desligamento (~30 s) — mudança de configuração do Railway, só com o OK dele. O servidor hoje cancela a resposta antes de esperar (src/server.js `stop`).
@@ -315,11 +316,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Conversa no site: texto das mensagens selecionável/copiável (segurar o mouse não entra mais no modo de selecionar mensagem; mensagem inteira pelo botão direito) | testes ok; não conferido com mensagem real no servidor de teste |
 | 2026-11-06 | (delivery) | Editar tarefa na linha do tempo: rascunho guardado ao fechar sem querer (volta ao reabrir), descrição maior (96–220 px), scroll dentro da janelinha não mexe a linha do tempo | testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: pontos pegam o mouse num raio de 18 px (hitSlop não vale no navegador); clicar para criar não faz a linha voltar sozinha ao agora; criando, passar o mouse na bolinha mostra a prévia | arrastado pegando 14 px fora: 16:00→18:10; testes ok |
 | 2026-11-06 | (delivery) | Tarefa com início e fim: coluna end_at em task_details (migration-task-end.js, não muda user_version); Sofia entende "das 6h até 7:30"/"de 14:00 a 15:30"/"6h-7h30" para tarefa e compromisso; tarefa com fim ganha a barra de duração na linha do tempo | testes: 90 min gravados; "2 a 3 pacotes" não vira horário; servidor 419/419 |
 | 2026-11-06 | (delivery) | Linha do tempo: vão entre bolinhas mostra horário + criar (grudar só a 15 px); 2º clique fecha o criar; não salta para o agora com o clique que ativa a janela nem com janela aberta | testes ok |
+| 2026-11-06 | (delivery) | Price Tracker no site: preço lido pelo servidor (leitor link-preview, JSON-LD/og:price) em vez do navegador invisível do celular, que não existe no site (dava "a loja não respondeu a tempo") | testes ok; leitura real da KaBuM não testada (rede do ambiente bloqueia a loja) |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

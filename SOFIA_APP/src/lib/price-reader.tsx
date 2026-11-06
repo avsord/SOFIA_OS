@@ -1,3 +1,4 @@
+import {Platform} from 'react-native';
 import {isMercadoLivreUrl} from './price-provider';
 import React, {useEffect, useState} from 'react';
 import {View} from 'react-native';
@@ -69,7 +70,18 @@ function cancel(job: Job, message: PriceReaderMessage | LinksReaderMessage | Dev
   finish(job, message);
 }
 
+// 06/11/2026 (Pedro: Price Tracker do site "a loja nao respondeu a tempo"): no site nao existe o navegador invisivel do
+// celular; a pagina da loja e lida pelo servidor da Sofia (mesmo leitor do link-preview) e o preco volta no mesmo formato.
+let webSource: ((url: string) => Promise<PriceReaderMessage>) | null = null;
+export function setWebPriceSource(fn: ((url: string) => Promise<PriceReaderMessage>) | null) { webSource = fn; }
+export function previewToReader(p: {title?: string; price?: number | null} | null | undefined): PriceReaderMessage {
+  const amount = Number(p?.price);
+  if (!p || !Number.isFinite(amount) || amount <= 0) return {ok: false, error: 'O servidor não achou o preço nesta página. A Sofia tenta de novo nas próximas leituras.'};
+  const best = {amount, currency: 'BRL', origins: ['servidor'], confidence: 0.8};
+  return {ok: true, title: String(p.title || ''), result: {found: true, needsConfirmation: false, best, candidates: [best]}};
+}
 export function readPrice(url: string): Promise<PriceReaderMessage> {
+  if (webSource && Platform?.OS === 'web' && !isMercadoLivreUrl(url)) return webSource(url).catch(() => ({ok: false, error: 'A loja não respondeu a tempo.'}) as PriceReaderMessage);
   if (isMercadoLivreUrl(url)) return Promise.resolve({ok: false, error: 'Mercado Livre é lido pelo servidor, nunca pela WebView.'});
   // O link guardado não muda; só o endereço aberto pelo leitor é limpo/ajustado por loja.
   const target = readerUrl(url);

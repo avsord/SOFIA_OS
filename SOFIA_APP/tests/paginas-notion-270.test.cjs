@@ -299,3 +299,7 @@ test('linha do tempo: area de pegar de 36px nos pontos (site), nao volta sozinha
 test('linha do tempo nao salta para o agora por causa de um clique (focus da janela) nem com janela aberta',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.doesNotMatch(hb,/window\.addEventListener\('focus', back\)/);assert.match(hb,/!holdRef\.current && !addingRef\.current && !pinRef\.current\) \{const h = homeOf/);assert.match(hb,/manualAt\.current = Date\.now\(\); \/\* 06\/11\/2026 \(Pedro\): clicar numa bolinha/);
 });
+test('Price Tracker no site: preco lido pelo servidor (sem navegador invisivel) no mesmo formato do leitor',()=>{
+ const pr=fs.readFileSync(path.join(__dirname,'..','src/lib/price-reader.tsx'),'utf8');assert.match(pr,/export function setWebPriceSource/);assert.match(pr,/webSource && Platform\?\.OS === 'web' && !isMercadoLivreUrl\(url\)/);
+ const bg=fs.readFileSync(path.join(__dirname,'..','src/components/BackgroundServices.tsx'),'utf8');assert.match(bg,/setWebPriceSource\(url=>api\.linkPreview\(url\)\.then\(previewToReader\)\)/);
+});

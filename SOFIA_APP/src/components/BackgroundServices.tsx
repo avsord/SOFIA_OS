@@ -1,8 +1,8 @@
 import {newFluency,queueOptional} from '../lib/fluency';
 import {useRenderCost} from '../lib/render-cost';
 import React,{useEffect,useRef} from 'react';
-import {AppState} from 'react-native';
-import {PriceReaderHost} from '../lib/price-reader';
+import {AppState,Platform} from 'react-native';
+import {PriceReaderHost,previewToReader,setWebPriceSource} from '../lib/price-reader';
 import {runCollection,cancelCollection} from '../lib/monitor-collector';
 import {registerBackgroundNotices} from '../lib/background-notify';
 import {scheduleIdleTask} from '../lib/idle-task';
@@ -16,6 +16,8 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
  // menu taps. Leave Home instantly usable from saved data; begin optional
  // read-ahead only after Home remains active and the JS thread is idle.
  useEffect(()=>{
+ // 06/11/2026: no site, o preco das lojas e lido pelo servidor (nao ha navegador invisivel)
+ React.useEffect(()=>{if(Platform.OS!=='web')return;setWebPriceSource(url=>api.linkPreview(url).then(previewToReader));return()=>setWebPriceSource(null);},[api]);
   if(!enabled||!preloadWhenIdle||started.current===api)return;
   if(newFluency()){
    if(started.current===api)return;
