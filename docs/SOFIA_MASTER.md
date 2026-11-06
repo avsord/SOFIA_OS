@@ -215,7 +215,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Compartilhar página (06/11/2026, Pedro: "tipo Notion mesmo"):** qualquer pessoa com o link vê, só leitura, sem senha, sem prazo (até desligar). Compartilhar a página leva as subpáginas; compartilhar uma subpágina mostra só ela e o que está dentro dela. Códigos em `settings.pageShares` (fora do conteúdo da página), página pública montada no servidor sem script (`src/core/page-share.js`).
 
-- **Linha do tempo do Início (06/11/2026):** a virada do dia fica só com a linha tracejada e o rótulo do dia ("sex, 6/11"). Faixas, contornos e etiquetas Hoje/Amanhã foram recusados pelo Pedro; não recolocar sem desenho aprovado.
+- **Linha do tempo do Início (06/11/2026, aprovado por imagem):** virada do dia = linha com bolinha no topo + rótulo do dia; dia futuro com listras finas (opacidade baixa) um dia sim, um não; passado escurecido um dia sim, um não. Recusados: faixas coloridas fortes, contornos e etiquetas Hoje/Amanhã. Mudança visual na linha do tempo: mandar imagem antes.
 
 ## 8. Regras que não se quebram
 
@@ -248,6 +248,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Capa por cima do Início/Agenda (05/11 noite):** não reproduzido localmente (capa enviada + voltar ao Início). Proteções aplicadas (opacidade 0 na tela escondida; texto das Páginas sem estilo de fora). Se voltar, pedir print com F12 > elemento.
 - **Compartilhar página:** só no computador por enquanto (no celular falta o botão); a página pública mostra blocos de texto, imagens, notas e tabelas (visões kanban/calendário viram tabela).
+- **Lembrete "coloquei 15 e fica 3 da manhã" (06/11):** não reproduzido (novo lembrete e servidor guardam 15:00 certo); falta saber em qual campo/tela ele vê 03:00.
 - **Links (05/11):** colar várias linhas nas Páginas ainda não preserva link; links nas notas só no site (celular segue texto).
 
 - **Railway (05/11):** cada publicação reinicia o servidor e corta a resposta da Sofia em andamento ("A chamada foi interrompida"); o app agora reenvia sozinho. Proposto ao Pedro: ligar o tempo de espera no desligamento (~30 s) — mudança de configuração do Railway, só com o OK dele. O servidor hoje cancela a resposta antes de esperar (src/server.js `stop`).
@@ -308,11 +309,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Capa (pedido repetido do Pedro): roda só não aparece para foto já preparada; qualquer outra fica escondida até carregar+decodificar+0,45 s e entra com fade (antes "carregada" pelo navegador aparecia sem roda e piscava). Página compartilhada: roda e foto entra depois; largura do texto igual ao site (960) | medido: nova → roda ~0,6 s → foto; recarga → roda → foto; preparada → na hora |
-| 2026-11-06 | (delivery) | RAIZ da capa roxa ao abrir outra página: o navegador descarta a foto decodificada fora da tela e decodifica de novo (1-3 quadros de fundo, sem roda, em fotos grandes). Agora cada capa vira ImageBitmap (largura da tela) e é pintada num canvas antes do 1º quadro; capa não preparada segue com roda + tempo mínimo | medido: troca de página → canvas já pintado no 1º quadro; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: virada do dia mais clara — dia seguinte com fundo próprio, linha mais forte, "Hoje ←" antes, etiqueta "→ Amanhã · sex 6/11" quando cabe e rótulo de baixo "Amanhã, 6/11" | conferido em captura às 22:45; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: contorno em cima de cada dia (chave) com o nome fixo — "Hoje · qui 5/11", "Amanhã · sex 6/11"; em trecho estreito encurta, nunca some (pedido do Pedro) | conferido em captura com a virada na borda e no meio; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: desfeitas as marcações da virada do dia (faixa, Hoje/Amanhã, contorno) a pedido do Pedro ("ficou horrível, deixa como tava") — volta a linha tracejada com "sex, 6/11" | HomeBrief.tsx restaurado da versão af3b9de; testes ok |
+| 2026-11-06 | (delivery) | Linha do tempo: opção 2 aprovada por imagem (marco com bolinha, futuro listrado um dia sim um não, passado escurecido, opacidade baixa); meia-noite não some mais perto do "agora" | capturas enviadas ao Pedro antes; testes ok |
+| 2026-11-06 | (delivery) | Lembrete com várias datas ou que repete: Feito pergunta "parar de lembrar" (todas) ou "só desta vez" (esta data sai; repetição vai para a próxima) | teste: data 8/11 foi para 8/12, outras seguem ativas |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

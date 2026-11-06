@@ -263,3 +263,9 @@ test('capa ja preparada e pintada de um ImageBitmap num canvas antes do 1o quadr
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/function BitmapCover/);assert.match(pa,/if\(bmp\)return <View style=\{StyleSheet\.absoluteFill\}><BitmapCover/);
  const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/createImageBitmap\(img/);assert.doesNotMatch(pre,/await fetch\(uri\)/,'sem fetch de blob: (CSP)');
 });
+test('lembrete com outras datas ou que repete: Feito pergunta "parar de lembrar" ou "so desta vez" (continua avisando)',()=>{
+ const r=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');assert.match(r,/Feito — parar de lembrar/);assert.match(r,/async function doneOnce/);assert.match(r,/else askDone\(item,e\)/);
+});
+test('linha do tempo (opcao 2 aprovada): marco com bolinha, futuro com listras um dia sim um nao, passado escurecido; meia-noite nunca some',()=>{
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/n >= 1 && n % 2 === 1/);assert.match(hb,/tint\(c\.accent, 0\.06\)/);assert.match(hb,/!isMid && nowX >= 0/);
+});

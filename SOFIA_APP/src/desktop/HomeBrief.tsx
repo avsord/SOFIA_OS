@@ -618,16 +618,28 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     {/* 0.3.317 (Pedro): o botao "agora" volta para a posicao de inicio do dia (07:00), deslizando; fica no cabecalho do
         cartao, ao lado da engrenagem, para nao cobrir as marcas da ponta da linha */}
     {/* escala: horas cheias de 4 em 4 (07, 11, 15, 19, 23...), andando junto quando a linha desliza */}
-    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; if (x < -0.001 || x > 1.001 || (nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 60)) return null;
-      if (side && wS && (side === 'left' ? x * wS < 86 : (1 - x) * wS < 86)) return null; // a hora que ficaria embaixo do botao "agora" some
+    {(SPAN <= 7 ? Array.from({length: Math.ceil(SPAN) + 2}, (_, k) => Math.ceil(start) + k) : Array.from({length: Math.ceil(SPAN / 3) + 2}, (_, k) => Math.ceil(start / 3) * 3 + k * 3)).map(h => {const x = (h - start) / SPAN; const isMid = new Date(day0 + h * 3600000).getHours() === 0 && new Date(day0 + h * 3600000).getMinutes() === 0;
+      // a meia-noite nunca some (antes sumia perto do "agora" e do botao)
+      if (x < -0.001 || x > 1.001 || (!isMid && nowX >= 0 && nowX <= 1 && wS && Math.abs(x - nowX) * wS < 60)) return null;
+      if (!isMid && side && wS && (side === 'left' ? x * wS < 86 : (1 - x) * wS < 86)) return null; // a hora que ficaria embaixo do botao "agora" some
       const end = x > 0.96, beg = x < 0.04;
       // 05/11/2026 (Pedro: "aqui e a divisao de um dia para o outro, crie uma forma de entender"): na meia-noite, uma linha tracejada
       // atravessa a faixa e o rotulo mostra o dia que comeca (ex.: "sex, 6/11") em vez de so 00:00
       const md = new Date(day0 + h * 3600000), midnight = md.getHours() === 0 && md.getMinutes() === 0;
       if (midnight) {const dayName = md.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ', ' + md.getDate() + '/' + (md.getMonth() + 1);
+        // 06/11/2026 (Pedro aprovou a opcao 2 com opacidade menor; "futuro: cor sim, cor nao"): o dia que comeca nesta meia-noite (n)
+        // ganha listras finas se for futuro e impar (amanha, depois de 2 dias...); o dia que termina aqui (n-1) fica escurecido se for
+        // passado e impar (ontem, anteontem de 2 em 2). Assim cada virada fica marcada sem pintar tudo.
+        const t0 = new Date();t0.setHours(0, 0, 0, 0);const n = Math.round((md.getTime() - t0.getTime()) / 86400000);
+        const future = n >= 1 && n % 2 === 1, past = n <= 0 && Math.abs(n - 1) % 2 === 1;
+        const xr = Math.min(1, (h + 24 - start) / SPAN), xl = Math.max(0, (h - 24 - start) / SPAN);
         return <React.Fragment key={h}>
-          <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, width: 0, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: tint(c.accent, 0.55)} as any} />
-          <Text style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent} as any}>{dayName}</Text>
+          {/* virada do dia: marco com bolinha, listras no futuro (um dia sim, um nao) e passado escurecido (um dia sim, um nao) */}
+          {future ? <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, width: (Math.max(0, xr - x) * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, backgroundImage: 'repeating-linear-gradient(135deg, ' + tint(c.accent, 0.06) + ' 0 6px, transparent 6px 14px)', zIndex: 2} as any} /> : null}
+          {past ? <View pointerEvents="none" style={{position: 'absolute', left: (xl * 100 + '%') as any, width: (Math.max(0, x - xl) * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, backgroundColor: 'rgba(0,0,0,0.18)', zIndex: 2}} /> : null}
+          <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, width: 1.5, marginLeft: -0.75, backgroundColor: tint(c.accent, 0.8), zIndex: 3} as any} />
+          <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 38, width: 9, height: 9, marginLeft: -4.5, borderRadius: 5, backgroundColor: c.accent, zIndex: 3} as any} />
+          <Text style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent, zIndex: 3} as any}>{dayName}</Text>
         </React.Fragment>;}
       return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}

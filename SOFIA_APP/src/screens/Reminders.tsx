@@ -1,9 +1,9 @@
 import {useDraft} from '../lib/draft-bus';
-import {REPEATS,agendaTags,readRepeat,type Repeat} from '../lib/agenda-recurrence';
+import {REPEATS,agendaTags,occurrences,readRepeat,type Repeat} from '../lib/agenda-recurrence';
 import {dpx} from '../lib/content-width';
 import {useDesktop} from '../lib/desktop';
 import React,{useEffect,useMemo,useState} from 'react';
-import {contextMenu} from '../components/ContextMenu';
+import {contextMenu,openContextMenu} from '../components/ContextMenu';
 import {PALETTE} from '../lib/palette';
 import {tap} from '../lib/desktop';
 import {Alert,Pressable,Text,TextInput,View} from 'react-native';
@@ -85,10 +85,28 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
    setEditing(null);setExtras([]);
   }catch(e){setError(errorText(e));}finally{setBusy(false);}
  }
+ // 06/11/2026 (Pedro: "se clicar que fez, pare de lembrar mesmo se ainda tiver lembretes; mas pode querer marcar que fez e
+ // ainda ser alertado"): lembrete com outras datas ou que repete pergunta: "Feito — parar de lembrar" (todas as datas e a
+ // repeticao) ou "Feito só desta vez" (esta data sai; as outras / a proxima repeticao continuam avisando).
+ const hasMore=(item:Entity)=>membersOf(item).filter(m=>m.state==='active').length>1||readRepeat(item).frequency!=='none';
+ async function doneOnce(item:Entity){if(busy)return;setBusy(true);setError('');try{
+   const others=membersOf(item).filter(m=>m.state==='active'&&m.id!==item.id);
+   if(readRepeat(item).frequency!=='none'){const cur=Date.parse(String(item.data?.remind_at||''));const next=occurrences(item as any,new Date(cur+60000),new Date(cur+400*86400000)).map(o=>Date.parse(String((o as any).data?.remind_at||'')))
+     .filter(t=>Number.isFinite(t)&&t>cur).sort((a,b)=>a-b)[0];
+    if(next){records.merge(await api.saveEntity({...item,revision:item.revision,data:{...item.data,remind_at:new Date(next).toISOString()}}));return;}}
+   if(others.length||readRepeat(item).frequency==='none')records.merge(await api.saveEntity({...item,state:'done',revision:item.revision}));
+ }catch(e){setError(errorText(e));}finally{setBusy(false);}}
+ function askDone(item:Entity,e?:any){
+  if(!hasMore(item)){void setState(item,'done');return;}
+  const r=e?.currentTarget?.getBoundingClientRect?.();
+  const items=[{label:'Feito — parar de lembrar',icon:'check' as const,run:()=>{void setState(item,'done');}},{label:'Feito só desta vez (continua avisando)',icon:'repeat' as const,run:()=>{void doneOnce(item);}}];
+  if(desk&&r){openContextMenu(r.left,r.bottom+4,items);return;}
+  appAlert('Marcar como feito',readRepeat(item).frequency!=='none'?'Este lembrete se repete.':'Este lembrete tem outras datas.',[{text:'Cancelar',style:'cancel'},{text:'Só desta vez',onPress:()=>{void doneOnce(item);}},{text:'Parar de lembrar',onPress:()=>{void setState(item,'done');}}]);
+ }
  async function setState(item:Entity,state:string){if(busy)return;setBusy(true);setError('');try{for(const m of membersOf(item).filter(m=>m.state===item.state))records.merge(await api.saveEntity({...m,state,revision:m.revision}));}catch(e){setError(errorText(e));}finally{setBusy(false);}}
  function remove(item:Entity){appAlert('Excluir lembrete?',`“${item.title}” será removido.`,[{text:'Cancelar'},{text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);Promise.all(membersOf(item).map(m=>api.deleteEntity(m.id))).then(()=>{void records.load(false,true);setEditing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
- const row=(item:Entity,late=false,done=false)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Editar lembrete '+item.title} onPress={()=>open(item)} {...contextMenu(()=>[{label:'Abrir',icon:'edit',run:()=>open(item)},{label:done?'Reativar':'Concluir',icon:done?'undo':'check',run:()=>{void setState(item,done?'active':'done');}},{label:'Apagar',icon:'trash',danger:true,run:()=>remove(item)}])} style={({pressed,hovered}:any)=>(desk?{paddingHorizontal:14,paddingVertical:11,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:hovered?c.input:'transparent',borderTopWidth:1,borderColor:c.line,marginTop:-1}:{minHeight:72,borderRadius:22,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:done?c.surface:c.card,borderWidth:1,borderColor:late?c.danger:c.line,opacity:pressed?0.85:1})}>
-  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:done}} accessibilityLabel={(done?'Reativar ':'Concluir ')+item.title} onPress={e=>{e.stopPropagation();void setState(item,done?'active':'done');}} style={{width:30,height:30,borderRadius:15,borderWidth:2,borderColor:done?c.accent:late?c.danger:c.muted,backgroundColor:done?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{done?<Icon name="check" size={16} color={PALETTE.white}/>:null}</Pressable>
+ const row=(item:Entity,late=false,done=false)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Editar lembrete '+item.title} onPress={()=>open(item)} {...contextMenu(()=>[{label:'Abrir',icon:'edit',run:()=>open(item)},...(done?[{label:'Reativar',icon:'undo' as const,run:()=>{void setState(item,'active');}}]:hasMore(item)?[{label:'Feito — parar de lembrar',icon:'check' as const,run:()=>{void setState(item,'done');}},{label:'Feito só desta vez',icon:'repeat' as const,run:()=>{void doneOnce(item);}}]:[{label:'Concluir',icon:'check' as const,run:()=>{void setState(item,'done');}}]),{label:'Apagar',icon:'trash',danger:true,run:()=>remove(item)}])} style={({pressed,hovered}:any)=>(desk?{paddingHorizontal:14,paddingVertical:11,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:hovered?c.input:'transparent',borderTopWidth:1,borderColor:c.line,marginTop:-1}:{minHeight:72,borderRadius:22,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:done?c.surface:c.card,borderWidth:1,borderColor:late?c.danger:c.line,opacity:pressed?0.85:1})}>
+  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:done}} accessibilityLabel={(done?'Reativar ':'Concluir ')+item.title} onPress={(e:any)=>{e.stopPropagation();if(done)void setState(item,'active');else askDone(item,e);}} style={{width:30,height:30,borderRadius:15,borderWidth:2,borderColor:done?c.accent:late?c.danger:c.muted,backgroundColor:done?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{done?<Icon name="check" size={16} color={PALETTE.white}/>:null}</Pressable>
   <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={{fontSize:16,fontWeight:'600',color:done?c.muted:c.text,textDecorationLine:done?'line-through':'none'}}>{item.title}</Text><Text style={{fontSize:11,color:late?c.danger:c.muted}}>{groupOf(item)?membersOf(item).filter(m=>m.state===item.state).sort((a,b)=>Date.parse(String(a.data?.remind_at))-Date.parse(String(b.data?.remind_at))).map(m=>remindLabel(m.data?.remind_at)).join(' e '):remindLabel(item.data?.remind_at)}{readRepeat(item).frequency!=='none'?' · '+REPEATS.find(r=>r.value===readRepeat(item).frequency)!.label.toLowerCase():''}</Text>{item.data?.message?<Text numberOfLines={1} style={{fontSize:11,color:c.muted}}>{String(item.data.message)}</Text>:null}</View>
   <Icon name="bell" size={18} color={done?c.muted:c.accent}/>
  </Pressable>;
