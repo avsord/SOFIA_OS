@@ -141,6 +141,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   guarda rotas da Home; o restante hidrata por `api.hydrate()`.
 
 ## 7. Decisões fechadas
+- (06/11, Pedro) **E-mail da Sofia (sofiaos.core@gmail.com) é do app**: só manda os e-mails do sistema ao usuário. **O e-mail do usuário é da conta dele**: Drive, Gmail, Agenda e tudo dele. Nunca misturar.
 
 - 05/11/2026 (Pedro): **áreas só existem se a pessoa criar** ("isso nunca foi criado pelo usuário... essas áreas têm que ser criadas pelo próprio usuário"). A lista vem de `userAreas` (configurações; começa só com "Pessoal"), cria-se no próprio seletor ("Criar …") e o × tira da lista; a IA não cria área nova (nome fora da lista vira o padrão) e os apps não gravam mais áreas prontas (Lembretes, Encomendas, Notas, Biblioteca). Registros antigos mantêm a área que tinham.
 
@@ -257,7 +258,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
-- **E-mail da Sofia pelo Google (06/11):** código pronto e publicado; falta o Pedro ir em Perfil → Conexões → "Religar o Google" e clicar em Permitir (permissão gmail.send). Depois, conferir no registro do Railway que não aparece mais "[login] codigo do segundo passo nao enviado" / "[e-mail] Google nao enviou". Atenção: com o envio funcionando, entrar num navegador novo passa a pedir o código por e-mail.
+- **E-mail da Sofia como remetente (06/11):** publicado. Falta o Pedro ir em Perfil → Conexões → "E-mail da Sofia" → "Ligar o e-mail da Sofia", entrar com sofiaos.core@gmail.com (NÃO a conta pessoal) e Permitir. Depois conferir no Railway que não aparece "[e-mail] Google nao enviou" nem "[login] codigo ... nao enviado". Com o envio funcionando, entrar num navegador novo passa a pedir o código por e-mail.
 - Ferramentas de compilação do app (Expo CLI) com 13 avisos de segurança: não chegam ao usuário; resolver na próxima atualização do Expo, não rebaixando versão.
 - Perguntar ao Pedro se alguma dose/compromisso dele "mudou de horário sozinho" (defeito do arrasto pendurado, corrigido 06/11): pode haver registros movidos sem ele perceber (tag `sofia-move-v1:` nos itens).
 - Avisos "locais" (doses da Rotina, tarefa/rotina atrasada) gerados no aparelho (`bell-inbox.ts`): o "limpar" fica só naquele navegador/celular (IndexedDB) e se perde ao sair da conta — limpar no celular não limpa no site e vice-versa. Pedro (06/11): "cliquei pra limpar e não limpou"; aqui o X e "Tomei" funcionam no mesmo navegador. Confirmar com ele qual botão/onde; provável solução: guardar os avisos locais dispensados no servidor.
@@ -335,11 +336,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: seleção de bolinhas sai clicando fora do quadro (Esc já tirava). Nova varredura `SOFIA_APP/tools/ux-sweep.cjs`: percorre as 17 telas do site num servidor de teste e acusa erros, pulos, rolagem lateral, botões sem nome e menus/janelas que não fecham com Esc ou clique fora | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Varredura achou: clique simples numa bolinha deixava o arrasto pendurado — a bolinha seguia o mouse SEM botão e era gravada no próximo clique (moveu dose e reunião para 00:00 nos testes). Cancelado quando o mouse anda sem botão. Esc fecha o balão com o mouse em cima. Varredura agora confere dados antes/depois | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Raiz do arrasto pendurado: num clique rápido o "apertou" chegava depois do "soltou"; o arrasto era preparado com o botão já solto e segurava o Esc (balão não fechava). Agora não prepara com botão solto e só segura Esc em arrasto de verdade. Varredura do Início: 0 achados reais | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Checkup geral: 635 respostas 502 na semana, todas no minuto de publicações (volume único = servidor desliga antes de ligar o novo) → leituras do app tentam até 3x; dependências do servidor sem falhas (body-parser/qs); Páginas da barra lateral não pulam mais (Próximos eventos reserva espaço). E-mail do servidor bloqueado (SMTP) | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | E-mails da Sofia (redefinir senha, código do login) saem pela conta Google ligada (gmail.send), já que o Railway bloqueia SMTP; SMTP fica como 2ª opção. Perfil → Conexões mostra "Religar o Google" até a permissão ser dada. Ao liberar, o código do 2º passo passa a valer de verdade | testes ok; [manual-apk] |
+| 2026-11-06 | (delivery) | E-mail da Sofia (sofiaos.core) é o remetente do app (redefinir senha, código do login), ligado só para envio e só aceitando essa conta; a conta Google do usuário fica só com Agenda/Drive/Gmail. Perfil → Conexões → "E-mail da Sofia" | testes ok; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

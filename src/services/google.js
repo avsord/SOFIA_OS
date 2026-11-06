@@ -25,9 +25,11 @@ function cleanData(kind, data) {
 }
 
 const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.readonly'];
-// 06/11/2026 (Pedro: "nao consegue fazer enviar uma redefinicao pra o email do usuario?"): o Railway bloqueia SMTP; os e-mails
-// da propria Sofia (redefinir senha, codigo do login) saem pela conta Google ligada (gmail.send = so enviar, nao le nada a mais)
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send'];
+// 06/11/2026 (Pedro: "EMAIL DA SOFIA ENVIA PARA O USUARIO, NAO O MEU EMAIL"): os e-mails da propria Sofia (redefinir senha,
+// codigo do login) saem do E-MAIL DA SOFIA por uma ligacao so de envio, separada da conta Google pessoal (que nao muda).
+// O Railway bloqueia SMTP; pela API do Gmail (HTTPS) passa. SEND_SCOPES = so enviar, nao le nada.
+const SEND_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send'];
+const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
@@ -192,6 +194,7 @@ class GoogleService {
     if (!row || Date.now() - Date.parse(row.created_at) > 15 * 60000) return {ok: false, message: 'Este link de autorização expirou. Volte ao app e toque em Conectar de novo.'};
     this.db.prepare('DELETE FROM google_oauth_state WHERE state=?').run(state);
     if (state.replace(/^a\./, '').startsWith('m~')) return this.mailCallback(state, code);
+    if (state.replace(/^a\./, '').startsWith('S~')) return this.senderCallback(code);
     const tokens = await this.tokenRequest({code, grant_type: 'authorization_code', redirect_uri: this.redirectUri()});
     if (!tokens.refresh_token) return {ok: false, message: 'O Google não devolveu a permissão permanente. Remova a Sofia em myaccount.google.com/permissions e conecte de novo.'};
     let email = '';
@@ -225,7 +228,7 @@ class GoogleService {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (data.error === 'invalid_grant' && scope.mailAccount) { this.db.prepare('DELETE FROM google_mail_link WHERE account_id=?').run(scope.mailAccount); throw new AppError('GMAIL_NOT_LINKED', 'O Google revogou o acesso desta caixa. Toque em Entrar com Google de novo.', 409); }
-      if (data.error === 'invalid_grant' && !scope.mail) { const l = this.link(); if (l) this.saveLink({...l, refresh: '', last_error: 'O Google revogou o acesso. Conecte de novo.'}); }
+      if (data.error === 'invalid_grant' && !scope.mail && !scope.sender) { const l = this.link(); if (l) this.saveLink({...l, refresh: '', last_error: 'O Google revogou o acesso. Conecte de novo.'}); }
       throw new AppError('GOOGLE_TOKEN', 'O Google recusou a autorização (' + (data.error || res.status) + ').', 502);
     }
     return data;
@@ -265,14 +268,53 @@ class GoogleService {
     }
     return out;
   }
-  /** Pode enviar e-mail pela conta Google ligada (permissao gmail.send concedida). */
-  canSendMail() { const l = this.link(); return !!(l && l.refresh && /gmail\.send/.test(l.scopes || '')); }
-  /** Envia uma mensagem pronta (cabecalhos + corpo) pela conta Google ligada. */
+  // ---------- remetente da Sofia (so envio) ----------
+  /** Endereco que a Sofia usa para mandar e-mails (o mesmo do SMTP configurado no servidor). */
+  senderAddress() { return String(this.config?.smtpUser || this.config?.smtpFrom || '').replace(/^.*<([^>]+)>.*$/, '$1').trim().toLowerCase(); }
+  senderLink() { return this.kvGet('google.sender.v1'); }
+  senderConnectUrl(options = {}) {
+    if (!this.configured()) throw new AppError('GOOGLE_NOT_CONFIGURED', 'A conexão Google ainda não foi configurada no servidor.', 503);
+    const state = (options.app ? 'a.' : '') + 'S~' + crypto.randomBytes(24).toString('base64url');
+    this.db.prepare('DELETE FROM google_oauth_state WHERE created_at<?').run(new Date(Date.now() - 15 * 60000).toISOString());
+    this.db.prepare('INSERT INTO google_oauth_state VALUES(?,?)').run(state, now());
+    const q = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: this.redirectUri(), response_type: 'code', scope: SEND_SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state});
+    const want = this.senderAddress(); if (want) q.set('login_hint', want);
+    return {url: AUTH + '?' + q.toString(), address: want};
+  }
+  async senderCallback(code) {
+    const tokens = await this.tokenRequest({code, grant_type: 'authorization_code', redirect_uri: this.redirectUri()}, {sender: true});
+    const revoke = async () => { try { await this.fetch(REVOKE + '?token=' + encodeURIComponent(tokens.refresh_token || tokens.access_token || ''), {method: 'POST'}); } catch { /* cortesia */ } };
+    if (!tokens.refresh_token) return {ok: false, message: 'O Google não devolveu a permissão permanente. Tente de novo.'};
+    let got = ''; try { got = String(JSON.parse(Buffer.from(String(tokens.id_token || '').split('.')[1] || '', 'base64url').toString('utf8')).email || '').toLowerCase(); } catch { /* sem e-mail */ }
+    const want = this.senderAddress();
+    if (want && got !== want) { await revoke(); return {ok: false, message: 'Você entrou com ' + (got || 'outra conta') + '. Para a Sofia mandar e-mails, entre com o e-mail da Sofia: ' + want + '.'}; }
+    if (!/gmail\.send/.test(String(tokens.scope || ''))) { await revoke(); return {ok: false, message: 'O Google não liberou o envio de e-mails. Tente de novo e clique em Permitir.'}; }
+    this.kvSet('google.sender.v1', {refresh: this.seal(tokens.refresh_token), email: got, connected_at: now()});
+    this.senderAccess = {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000};
+    return {ok: true, message: 'Pronto: a Sofia agora manda e-mails de ' + got + '. Pode voltar para a Sofia.'};
+  }
+  /** Pode enviar e-mail pelo remetente da Sofia. */
+  canSendMail() { const l = this.senderLink(); return !!(l && l.refresh); }
+  senderEmail() { return this.senderLink()?.email || this.senderAddress(); }
+  async senderToken(force = false) {
+    if (!force && this.senderAccess && this.senderAccess.exp > Date.now()) return this.senderAccess.token;
+    const l = this.senderLink(); if (!l || !l.refresh) throw new AppError('SENDER_NOT_CONNECTED', 'O e-mail da Sofia ainda não foi ligado para envio.', 409);
+    const body = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: this.env.GOOGLE_CALENDAR_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token: this.open(l.refresh)});
+    const res = await this.fetch(TOKEN, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body.toString()});
+    const t = await res.json().catch(() => ({}));
+    if (!res.ok) { if (t.error === 'invalid_grant') this.kvSet('google.sender.v1', null); throw new AppError('SENDER_TOKEN', 'O Google recusou o envio pelo e-mail da Sofia (' + (t.error || res.status) + ').', 502); }
+    this.senderAccess = {token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 3000) * 1000 - 60000};
+    return this.senderAccess.token;
+  }
+  /** Envia uma mensagem pronta (cabecalhos + corpo) pelo e-mail da Sofia. */
   async sendRawMail(message) {
-    if (!this.canSendMail()) throw new AppError('GOOGLE_NO_SEND', 'A conta Google ligada não permite enviar e-mail.', 409);
     const raw = Buffer.from(message, 'utf8').toString('base64url');
-    await this.call('POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {raw});
-    return {from: this.link()?.email || ''};
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {method: 'POST', headers: {Authorization: 'Bearer ' + await this.senderToken(attempt > 0), 'Content-Type': 'application/json'}, body: JSON.stringify({raw})});
+      if (res.status === 401 && attempt === 0) continue;
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new AppError('SENDER_SEND', 'Gmail não enviou (' + (d.error?.message || res.status) + ').', 502); }
+      return {from: this.senderEmail()};
+    }
   }
   async status() {
     const l = this.link(), base = {configured: this.configured(), connected: !!(l && l.refresh)};
@@ -286,7 +328,7 @@ class GoogleService {
     if (calendars.some(c => c.id !== (cal?.id) && c.selected)) warnings.push('Os outros calendários visíveis no seu Google também aparecem na Sofia, somente para leitura.');
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], item_errors: l.item_errors || [], history: (l.history || []).slice(0, 10),
-      gmail: {connected: /gmail\.readonly/.test(l.scopes || ''), can_send: /gmail\.send/.test(l.scopes || '')},
+      gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
       drive: {...this.driveState(l), portable: {configured: String(process.env.SOFIA_BACKUP_PASSPHRASE || '').length >= 12, at: l.drive?.portable_at || '', error: l.drive?.portable_error || ''}, last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: this.hiddenOn(l) ? 'área oculta da Sofia no seu Drive' : 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
   select(calendarId) {
