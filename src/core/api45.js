@@ -22,6 +22,9 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
  // qualquer registro (inclusive as que a IA inventou ao criar coisas). Agora so as areas que a pessoa criou; os registros
  // antigos continuam com a area que tinham.
  if(m==='GET'&&p==='/api/catalog')return send({catalog:CATALOG,areas:store.userAreas()});
+ // 06/11/2026: compartilhar pagina (link publico so leitura, tipo Notion)
+ match=p.match(/^\/api\/pages\/([\w-]+)\/share$/);if(match&&runtime.pageShares){const key=validId(match[1]);if(m==='GET')return send(runtime.pageShares.status(key));if(m==='POST'){const b=await body();return send(runtime.pageShares.set(key,{on:!!b.on,regenerate:!!b.regenerate}));}}
+ if(m==='GET'&&p==='/api/pages/shared'&&runtime.pageShares)return send({pages:runtime.pageShares.list()});
  if(m==='GET'&&p==='/api/areas')return send({areas:store.userAreas()});
  if(m==='POST'&&p==='/api/areas'){const b=await body();const now=store.userAreas();let next=now;
   if(typeof b.add==='string'&&b.add.trim())next=[...now,b.add.trim()];

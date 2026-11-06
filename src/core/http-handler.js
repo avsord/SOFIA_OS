@@ -126,6 +126,8 @@ function limitNumber(value, fallback,max=100){if(value===null)return fallback;co
 function decorateMessages(store,messages){const route=store.db.prepare('SELECT requested_mode,route,reason,context_used,protected,created_at FROM route_decisions WHERE message_id=? ORDER BY rowid DESC LIMIT 1'),voices=store.voiceForMessages(messages);return messages.map(m=>{const decision=route.get(m.id),privacy=store.privacyOf('message',m.id),voice=voices.get(m.id);return {...m,privacy:privacy||null,route_decision:decision||null,voice:voice?{mime:voice.mime,duration_ms:voice.duration_ms,languages:voice.languages,bytes:voice.bytes,audio_url:'/api/messages/'+encodeURIComponent(m.id)+'/audio'}:null};});}
 function createHandler(runtime) {
   const {store,core,backups,config,usageService,audioService}=runtime;
+  // 06/11/2026: paginas publicadas na web (link secreto, so leitura) - ver page-share.js
+  const pageShare=require('./page-share');if(!runtime.pageShares)runtime.pageShares=pageShare.makePageShares(store,runtime.workspace);
   const extra=require('./api45').makeApi45(runtime,{bodyJson,json});
   const chatSync=require('../services/chat-sync').makeChatSyncApi(store,{bodyJson,json,client:'web',decorateRows:rows=>decorateMessages(store,rows)});
   const token=crypto.randomBytes(32).toString('hex');
@@ -194,6 +196,7 @@ function createHandler(runtime) {
       if(m==='GET'&&p==='/google/oauth/callback'&&runtime.google){publicHeaders(res,p);const r=await runtime.google.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/stores/mercadolivre/oauth/callback'&&runtime.stores){publicHeaders(res,p);const r=await runtime.stores.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local',task_description_format:true,selected_task_context:true,agenda_priority:true,persistent_sessions:true,unrestricted_chat_text:true,unrestricted_audio_duration:true});
+      if(p.startsWith('/p/')&&await pageShare.servePublicPage(req,res,p,m,{shares:runtime.pageShares,workspace:runtime.workspace,google:runtime.google}))return;
       if(m==='GET'&&p==='/privacy')return plain(res,200,privacyPage(),'text/html; charset=utf-8');
       if(m==='GET'&&webAppPath(p)){const full=webAppFile(config.root,p);if(full){res.setHeader('Content-Type',WEB_TYPES[path.extname(full)]||'application/octet-stream');if(p.startsWith('/_expo/')||p.startsWith('/assets/'))res.setHeader('Cache-Control','public, max-age=31536000, immutable');else res.setHeader('Cache-Control',/\.html?$/.test(full)?'no-store':'no-cache');/* 06/11/2026: a pagina do site nunca fica guardada (no voltar o navegador reabria uma versao velha apontando para arquivos ja apagados) */res.end(compressedWeb(req,res,full));return;}
         if(p==='/favicon.ico'||p==='/metadata.json'||p.startsWith('/_expo/')||p.startsWith('/assets/'))throw new AppError('NOT_FOUND','Arquivo do site não encontrado.',404);}

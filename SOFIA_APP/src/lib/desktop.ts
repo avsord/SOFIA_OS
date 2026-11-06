@@ -80,6 +80,8 @@ export const createdPage=store<Entity|null>(null);
 const FAV_KEY='sofia.desktop.favorite-pages';
 function readFavorites():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(FAV_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}
 export const favoritePages=store<string[]>(readFavorites());
+/** 06/11/2026: paginas publicadas na web (sinal na barra lateral e no botao Compartilhar). */
+export const sharedPages=store<string[]>([]);
 export function toggleFavoritePage(id:string){const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}
 export function samePages(a:Entity[]|null,b:Entity[]):boolean{

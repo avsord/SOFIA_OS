@@ -24,6 +24,7 @@ import type {Caret} from '../lib/page-block-keys';
 import {flushNow} from '../lib/flush-sync';
 import {useHoverHold,useHoverKey} from '../lib/hover-hold';
 import {PageRichInput,textToHtml} from '../components/PageRichInput';
+import {PageShareButton} from '../components/PageSharePanel';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
 import {PageRefreshGuard} from '../lib/page-gesture';
@@ -622,6 +623,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     {desktop?<>
      <Text testID="page-edited" numberOfLines={1} style={{color:c.muted,fontSize:12,marginRight:6}}>{flash||(selected.updated_at?editedLabel(String(selected.updated_at)):'')}</Text>
+     <PageShareButton api={api} pageId={selected.id} pageTitle={selected.title}/>
      <IconButton name="link" label="Copiar link da página" size={34} onPress={()=>copyPageLink(selected.id)}/>
      <Pressable testID="page-favorite" accessibilityRole="button" accessibilityLabel={favorites.includes(selected.id)?'Tirar dos favoritos':'Adicionar aos favoritos'} onPress={()=>toggleFavoritePage(selected.id)} style={({hovered}:any)=>({width:34,height:34,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Icon name="star" size={18} color={favorites.includes(selected.id)?'#E9B949':c.muted} weight={favorites.includes(selected.id)?'fill':undefined}/></Pressable>
     </>:null}

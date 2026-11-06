@@ -348,7 +348,7 @@ function makeMobileApi(runtime, deps) {
     // Reuse web workspace operations only AFTER bearer auth. Never bridge admin/credentials/restore endpoints.
     if (p.startsWith('/api/mobile/workspace/')) {
       const suffix = p.slice('/api/mobile/workspace/'.length);
-      const allowed = /^(?:catalog|areas|panorama|ui\/(?:home|pages)|entities(?:\/[\w-]+(?:\/(?:versions|observations|attachments|calendar|action))?)?|attachments\/[\w-]+|relations|timeline|integrations|vault\/(?:status|setup|confirm|unlock|recover|lock|entries|chat|discuss))$/;
+      const allowed = /^(?:catalog|areas|panorama|pages\/shared|pages\/[\w-]+\/share|ui\/(?:home|pages)|entities(?:\/[\w-]+(?:\/(?:versions|observations|attachments|calendar|action))?)?|attachments\/[\w-]+|relations|timeline|integrations|vault\/(?:status|setup|confirm|unlock|recover|lock|entries|chat|discuss))$/;
       if (!allowed.test(suffix)) fail('NOT_FOUND', 'Esta operação não está disponível no app.', 404);
       if (m !== 'GET') rate(session, 'workspace-write', 60);
       if (suffix.startsWith('vault/')) {

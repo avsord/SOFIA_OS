@@ -19,11 +19,12 @@ import {appAlert} from '../lib/app-alert';
 import {systemChanged,subscribeSystemChanged} from '../lib/system-events';
 import {useHoverHold} from '../lib/hover-hold';
 import {prefetchAllCovers,prefetchPageCover} from '../lib/page-cover-prefetch';
+import {refreshSharedPages} from '../components/PageSharePanel';
 import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,appModuleTitle,createdPage,favoritePages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,appModuleTitle,createdPage,favoritePages,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -87,6 +88,8 @@ const EXPANDED_KEY='sofia.desktop.tree.expanded';
 function readExpanded():Set<string>{try{return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY)||'[]'));}catch{return new Set();}}
 
 function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi}){
+ // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
+ const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
  const newChild=async(parent:Entity)=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent.id,node_type:'page',blocks_json:'[]'}});
   setExpanded(prev=>{const n=new Set(prev);n.add(parent.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});createdPage.set(saved);onOpen(saved.id);}catch(e){appAlert('Não foi possível criar a subpágina',e instanceof Error?e.message:String(e));}};
@@ -116,7 +119,7 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
-  rows.push(<Row key={p.id} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>{if(!justDragged.current)onOpen(p.id);}} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:null} dimmed={drag?.id===p.id}/>);
+  rows.push(<Row key={p.id} trailing={shared.includes(p.id)?'🌐':undefined} testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>{if(!justDragged.current)onOpen(p.id);}} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:null} dimmed={drag?.id===p.id}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);

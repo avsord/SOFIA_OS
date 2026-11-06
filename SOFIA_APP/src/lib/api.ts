@@ -335,6 +335,10 @@ export class SofiaApi {
   deleteProfilePhoto() { return this.request<{ok: boolean}>('/profile/photo', undefined, 'DELETE'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
   /** 05/11/2026: áreas criadas pela pessoa (criar, tirar da lista, renomear). Os registros antigos mantêm a área que têm. */
+  /** 06/11/2026: compartilhar pagina na web (link secreto, so leitura; subpaginas vao junto). */
+  pageShare(id:string) { return this.request<{token:string|null}>('/workspace/pages/'+encodeURIComponent(id)+'/share'); }
+  setPageShare(id:string,body:{on:boolean;regenerate?:boolean}) { return this.request<{token:string|null}>('/workspace/pages/'+encodeURIComponent(id)+'/share', body, 'POST'); }
+  sharedPages() { return this.request<{pages:string[]}>('/workspace/pages/shared'); }
   areaChange(body:{add?:string;remove?:string;rename?:{from:string;to:string}}) { return this.request<{areas:string[]}>('/workspace/areas', body, 'POST'); }
   async entities(kind: string, q = '', offset = 0) { const path='/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset,generation=this.cacheGeneration;const result=await this.request<{items:Entity[]}>(path);if(kind!=='user_page')return result;const decorated={...result,items:await this.md.decorate(result.items)};
     // 0.3.255: a copia guardada para abrir rapido ja vai na ordem que a pessoa escolheu neste aparelho. Antes ela ficava
