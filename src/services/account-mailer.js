@@ -7,7 +7,7 @@ function dotStuff(text){return String(text).replace(/(^|\r?\n)\./g,'$1..').repla
 
 class AccountMailer {
   /** options.google: conexao Google (google.js). 06/11/2026: o Railway bloqueia SMTP, entao os e-mails da Sofia saem primeiro
-   * pela conta Google ligada (permissao "enviar"); o SMTP continua como segunda opcao (computador local, outro servidor). */
+   * pelo E-MAIL DA SOFIA ligado so para envio (Gmail por HTTPS); o SMTP continua como segunda opcao (computador local). */
   constructor(config,options={}){this.config=config;this.google=options.google||null;}
   smtpConfigured(){return Boolean(this.config.smtpHost&&this.config.smtpPort&&this.config.smtpUser&&this.config.smtpPass&&this.config.smtpFrom);}
   googleReady(){try{return Boolean(this.google&&this.google.canSendMail&&this.google.canSendMail());}catch{return false;}}
@@ -16,7 +16,7 @@ class AccountMailer {
   async _deliver({to,subject,body}){
     const head=from=>['From: '+smtpLine(from),'To: '+smtpLine(to),'Subject: '+encodeSubject(subject),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: 8bit','',body].join('\r\n');
     let googleError=null;
-    if(this.googleReady()){try{const from=this.google.link?.()?.email||this.config.smtpFrom||'';await this.google.sendRawMail(head(from?'Sofia OS <'+from+'>':'Sofia OS'));return {via:'google'};}catch(e){googleError=e;console.warn('[e-mail] Google nao enviou:',String(e.message||e).slice(0,160));}}
+    if(this.googleReady()){try{const from=(this.google.senderEmail&&this.google.senderEmail())||this.config.smtpFrom||'';await this.google.sendRawMail(head(from?'Sofia OS <'+from+'>':'Sofia OS'));return {via:'google'};}catch(e){googleError=e;console.warn('[e-mail] Google nao enviou:',String(e.message||e).slice(0,160));}}
     if(this.smtpConfigured()&&this.config.smtpSecure){await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message:head(this.config.smtpFrom)});return {via:'smtp'};}
     throw googleError||new Error('Envio de e-mail ainda não configurado.');
   }
