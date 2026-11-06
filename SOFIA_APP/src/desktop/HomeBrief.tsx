@@ -458,7 +458,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
-  useEffect(() => {if (!WEB || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setPin('');}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
+  useEffect(() => {if (!WEB || !pin) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {setPin(''); setHover('');} /* 06/11/2026 (varredura): com o mouse ainda na bolinha o balao continuava pelo hover */}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
   // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
@@ -518,7 +518,10 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     const tickEdge = () => {if (!edge || !dragRef.current) {edgeRaf = null; return;} glide(target.current + edge * 0.08); const d = {...dragRef.current, fx: fxOf(lastX)}; dragRef.current = d; setDrag(d); edgeRaf = requestAnimationFrame(tickEdge);};
     const stop = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('keydown', esc, true); edge = 0; if (edgeRaf) cancelAnimationFrame(edgeRaf);
       document.body.style.userSelect = ''; document.body.style.cursor = ''; const d = dragRef.current; dragRef.current = null; setDrag(null); return d;};
-    const move = (ev: PointerEvent) => {lastX = ev.pageX; const live = dragRef.current?.live || Math.abs(ev.pageX - sx) > 4; if (!live) return;
+    // 06/11/2026 (achado pela varredura): o "soltar" do clique simples numa bolinha as vezes se perdia (o balao abre no meio);
+    // o arrasto ficava pendurado e a bolinha seguia o mouse SEM botao apertado, gravando onde fosse o proximo clique.
+    // Mouse se movendo sem botao = nao ha arrasto: cancela sem gravar.
+    const move = (ev: PointerEvent) => {if (ev.pointerType === 'mouse' && ev.buttons === 0) {const d = stop(); if (d?.live) {justDragged.current = true; setTimeout(() => {justDragged.current = false;}, 60);} return;} lastX = ev.pageX; const live = dragRef.current?.live || Math.abs(ev.pageX - sx) > 4; if (!live) return;
       if (!dragRef.current?.live) {setPin(''); setHover(''); document.body.style.userSelect = 'none'; document.body.style.cursor = 'grabbing';}
       // 0.3.333 (aprovado por foto): ima - perto (ate 10 min) do comeco ou do fim de outro item, encosta nele e diz o motivo
       let fx = fxOf(ev.pageX), snap = ''; const ids = new Set(items.map(x => (x.t as any).rec?.id).filter(Boolean)), h = startRef.current + fx * spanRef.current; let best = 10 / 60;

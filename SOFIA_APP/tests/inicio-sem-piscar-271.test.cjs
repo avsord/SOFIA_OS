@@ -48,3 +48,9 @@ test('Linha do tempo: selecao sai com Esc e clicando fora do quadro',()=>{
   assert.ok(s.includes("document.addEventListener('pointerdown', out, true)")&&s.includes("if (e.key === 'Escape') setSel([]);"));
   assert.ok(fs.existsSync(path.join(__dirname,'..','tools','ux-sweep.cjs')),'varredura de coerencia do site');
 });
+test('Linha do tempo: arrasto pendurado (mouse sem botao) e cancelado sem gravar; Esc fecha o balao mesmo com o mouse em cima',()=>{
+  const s=read('src/desktop/HomeBrief.tsx');
+  assert.ok(s.includes("if (ev.pointerType === 'mouse' && ev.buttons === 0) {const d = stop();"),'bolinha nao pode seguir o mouse sem botao');
+  assert.ok(s.includes("if (e.key === 'Escape') {setPin(''); setHover('');}"));
+  const sw=read('tools/ux-sweep.cjs');assert.ok(sw.includes('dado-mudou-sem-pedir'),'varredura confere dados antes/depois');
+});

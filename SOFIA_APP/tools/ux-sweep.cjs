@@ -50,6 +50,13 @@ const add = (route, kind, detail) => { findings.push({route, kind, detail}); };
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput && e.value > 0.002) window.__shifts.push({t: Math.round(e.startTime), v: e.value, src: (e.sources || []).slice(0, 2).map(s => { const n = s.node && (s.node.nodeType === 1 ? s.node : s.node.parentElement); let id = ''; for (let x = n, i = 0; x && i < 6; x = x.parentElement, i++) { const t = x.getAttribute && x.getAttribute('data-testid'); if (t) { id = t; break; } } return (id || (n && n.tagName) || '?') + ' ' + Math.round(s.previousRect.y) + '→' + Math.round(s.currentRect.y) + 'px'; })}); }).observe({type: 'layout-shift', buffered: true}); } catch (e) {}
   });
 
+  // fotografia dos dados: a varredura so clica em botoes que nao apagam/salvam; se algum registro mudar, um clique
+  // "inocente" alterou dado (foi assim que apareceu a dose que seguia o mouse depois de um clique, 06/11/2026)
+  const login = await (await fetch(base + '/api/mobile/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password, device_name: 'ux-sweep'})})).json();
+  const snap = async () => { const out = {}; if (!login.token) return out; const h = {Authorization: 'Bearer ' + login.token};
+    for (let off = 0; off < 5000; off += 100) { const r = await (await fetch(base + '/api/mobile/workspace/entities?limit=100&offset=' + off, {headers: h})).json(); for (const e of r.items || []) out['e:' + e.id] = e.title + '|' + JSON.stringify(e.data) + '|' + JSON.stringify(e.tags) + '|' + e.state; if (!r.items || r.items.length < 100) break; }
+    const t = await (await fetch(base + '/api/mobile/tasks', {headers: h})).json(); for (const x of t.items || []) out['t:' + x.id] = x.title + '|' + x.state + '|' + x.due_at + '|' + x.start_at; return out; };
+  const dataBefore = await snap();
   const only = opt.only ? opt.only.split(',') : null;
   for (const r of ROUTES) {
     if (only && !only.includes(r)) continue;
@@ -77,6 +84,8 @@ const add = (route, kind, detail) => { findings.push({route, kind, detail}); };
     }
   }
   await browser.close();
+  const dataAfter = await snap();
+  for (const k of new Set([...Object.keys(dataBefore), ...Object.keys(dataAfter)])) if (dataBefore[k] !== dataAfter[k]) add('(dados)', 'dado-mudou-sem-pedir', k + ': ' + String(dataBefore[k] || '(nao existia)').slice(0, 120) + ' -> ' + String(dataAfter[k] || '(sumiu)').slice(0, 120));
   // relatorio
   const byKind = {};
   for (const f of findings) (byKind[f.kind] = byKind[f.kind] || []).push(f);
@@ -92,11 +101,11 @@ async function overlays(page) {
 }
 
 /** Das pecas novas, fica com as que nao ocupam a tela inteira (o fundo escurecido acompanha a janela). */
-function pick(list) { const full = k => { const [x, y, wh] = k.split(','); const [w, h] = wh.split('x'); return +w >= 1700 && +h >= 800; }; const part = list.filter(k => !full(k)); return part.length ? part : list; }
+function pick(list) { const full = k => { const [x, y, wh] = k.split(','); const [w, h] = wh.split('x'); return +w >= 1700 && +h >= 800; }; list = list.filter(k => { const [x, y, wh] = k.split(','); const [w] = wh.split('x'); return full(k) || +w < 1762 * 0.7; }); /* largo e nao tela cheia = a propria tela mudou (outra visao), nao um menu */ const part = list.filter(k => !full(k)); return part.length ? part : list; }
 async function probeOverlay(page, url, o) {
   const before = new Set(await overlays(page));
   const urlBefore = page.url();
-  await page.mouse.click(o.x, o.y); await page.waitForTimeout(500);
+  await page.mouse.click(o.x, o.y); await page.waitForTimeout(1200);
   if (page.url() !== urlBefore) { probeOverlay.last = 'navegou'; await page.goto(url); await page.waitForTimeout(2500); return null; } // era navegacao
   const opened = pick((await overlays(page)).filter(k => !before.has(k)));
   if (!opened.length) { probeOverlay.last = 'nada abriu'; await page.keyboard.press('Escape'); await page.waitForTimeout(200); return null; }
