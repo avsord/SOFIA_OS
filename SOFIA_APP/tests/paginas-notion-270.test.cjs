@@ -267,7 +267,7 @@ test('lembrete com outras datas ou que repete: Feito pergunta "parar de lembrar"
  const r=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');assert.match(r,/Feito — parar de lembrar/);assert.match(r,/async function doneOnce/);assert.match(r,/else askDone\(item,e\)/);
 });
 test('linha do tempo (opcao 2 aprovada): marco com bolinha, futuro com listras um dia sim um nao, passado escurecido; meia-noite nunca some',()=>{
- const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/n >= 1 && n % 2 === 1/);assert.match(hb,/tint\(c\.accent, 0\.06\)/);assert.match(hb,/!isMid && nowX >= 0/);
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/timeline-future/);assert.match(hb,/timeline-past/);assert.match(hb,/tint\(c\.accent, 0\.06\)/);assert.match(hb,/!isMid && nowX >= 0/);
 });
 test('linha do tempo: faixas e simbolos de manha/tarde/noite em qualquer dia visivel (nao so hoje, amanha e depois)',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/function visibleDays\(start: number, span: number\)/);assert.doesNotMatch(hb,/\{\[0, 24, 48\]\.flatMap/);

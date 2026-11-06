@@ -215,7 +215,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Compartilhar página (06/11/2026, Pedro: "tipo Notion mesmo"):** qualquer pessoa com o link vê, só leitura, sem senha, sem prazo (até desligar). Compartilhar a página leva as subpáginas; compartilhar uma subpágina mostra só ela e o que está dentro dela. Códigos em `settings.pageShares` (fora do conteúdo da página), página pública montada no servidor sem script (`src/core/page-share.js`).
 
-- **Linha do tempo do Início (06/11/2026, aprovado por imagem):** virada do dia = linha com bolinha no topo + rótulo do dia; dia futuro com listras finas (opacidade baixa) um dia sim, um não; passado escurecido um dia sim, um não. Recusados: faixas coloridas fortes, contornos e etiquetas Hoje/Amanhã. Mudança visual na linha do tempo: mandar imagem antes.
+- **Linha do tempo do Início (06/11/2026, aprovado por imagem):** virada do dia = linha com bolinha no topo + rótulo do dia; tudo depois da meia-noite de hoje com listras finas (opacidade baixa) contínuas até o fim da linha; tudo antes do começo de hoje escurecido contínuo (Pedro: "tem que ir ao infinito, não apagar"). Recusados: faixas coloridas fortes, contornos e etiquetas Hoje/Amanhã. Mudança visual na linha do tempo: mandar imagem antes.
 
 - **Linha do tempo do Início — alcance (06/11/2026):** 1 mês para trás e 1 mês para frente a partir de hoje (decisão do Pedro).
 
@@ -311,11 +311,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo: desfeitas as marcações da virada do dia (faixa, Hoje/Amanhã, contorno) a pedido do Pedro ("ficou horrível, deixa como tava") — volta a linha tracejada com "sex, 6/11" | HomeBrief.tsx restaurado da versão af3b9de; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: opção 2 aprovada por imagem (marco com bolinha, futuro listrado um dia sim um não, passado escurecido, opacidade baixa); meia-noite não some mais perto do "agora" | capturas enviadas ao Pedro antes; testes ok |
 | 2026-11-06 | (delivery) | Lembrete com várias datas ou que repete: Feito pergunta "parar de lembrar" (todas) ou "só desta vez" (esta data sai; repetição vai para a próxima) | teste: data 8/11 foi para 8/12, outras seguem ativas |
 | 2026-11-06 | (delivery) | Linha do tempo: faixas e símbolos de manhã/tarde/noite agora em qualquer dia visível (antes só hoje, amanhã e depois — em "Ontem" e dias além sumiam) | capturas: Ontem e Domingo 8/11 com faixas; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo do Início: de hoje − 1 mês até hoje + 1 mês (pedido do Pedro), mês anterior carregado junto | conferido: limites 5/10 e 5/12 (hoje 5/11); testes ok |
+| 2026-11-06 | (delivery) | Linha do tempo: listras do futuro e escurecido do passado agora contínuos (uma faixa só a partir da meia-noite de amanhã / até o começo de hoje), não apagam mais de um dia para o outro; aprovado por imagem | capturas de amanhã, domingo e ontem; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
