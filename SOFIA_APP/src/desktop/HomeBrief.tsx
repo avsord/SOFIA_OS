@@ -632,11 +632,24 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         return <React.Fragment key={h}>
           <View pointerEvents="none" testID="timeline-next-day" style={{position: 'absolute', left: (x * 100 + '%') as any, width: (Math.max(0, xr - x) * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, backgroundColor: tint(c.accent, 0.07), borderTopRightRadius: 10}} />
           <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, width: 0, borderLeftWidth: 2, borderColor: tint(c.accent, 0.75)} as any} />
-          {x > 0.06 ? <Text numberOfLines={1} style={{position: 'absolute', top: OFF - 30, left: (x * 100 + '%') as any, transform: [{translateX: -104}], width: 96, textAlign: 'right', fontSize: 11, fontWeight: '600', color: c.muted} as any}>{before + ' ←'}</Text> : null}
-          {wS && (xr - x) * wS >= 130 ? <View pointerEvents="none" style={{position: 'absolute', top: OFF - 31, left: (x * 100 + '%') as any, transform: [{translateX: 8}], flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, height: 18, borderRadius: 9, backgroundColor: tint(c.accent, 0.18)} as any}><Text numberOfLines={1} style={{fontSize: 11, fontWeight: '700', color: c.accent}}>{'→ ' + after + ' · ' + dayName}</Text></View> : null}
+
           <Text style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent} as any}>{(after === 'Amanhã' || after === 'Hoje' ? after : dayName.split(',')[0]) + ', ' + md.getDate() + '/' + (md.getMonth() + 1)}</Text>
         </React.Fragment>;}
       return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
+    {/* 06/11/2026 (Pedro: "uma especie de contorno em cima; nao pode sumir"): cada dia visivel ganha um contorno por cima
+        (chave) com o nome fixo nele - "Hoje · qui 5/11", "Amanha · sex 6/11". Em trecho estreito o nome encurta, nunca some. */}
+    {(() => {const out: React.ReactNode[] = [];const t0 = new Date();t0.setHours(0, 0, 0, 0);
+      for (let k = Math.floor(start / 24); k * 24 < start + SPAN && k < Math.floor(start / 24) + 4; k++) {
+        const a = Math.max(start, k * 24), z = Math.min(start + SPAN, (k + 1) * 24), x1 = (a - start) / SPAN, x2 = (z - start) / SPAN;if (x2 - x1 <= 0.001) continue;
+        const d = new Date(day0 + (k * 24 + 12) * 3600000), rk = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - t0.getTime()) / 86400000);
+        const word = rk === 0 ? 'Hoje' : rk === 1 ? 'Amanhã' : rk === -1 ? 'Ontem' : d.toLocaleDateString('pt-BR', {weekday: 'long'}).replace(/^./, ch => ch.toUpperCase());
+        const date = d.toLocaleDateString('pt-BR', {weekday: 'short'}).replace('.', '') + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
+        const px = wS ? (x2 - x1) * wS : 999, text = px >= 150 ? word + ' · ' + date : word, isToday = rk === 0, col = isToday ? c.accent : c.muted;
+        const startsAtMidnight = a === k * 24, endsAtMidnight = z === (k + 1) * 24, narrowAtEnd = px < 90 && x2 >= 0.999;
+        out.push(<View key={'day' + k} pointerEvents="none" testID={'timeline-day-' + word} style={{position: 'absolute', left: (x1 * 100 + '%') as any, width: ((x2 - x1) * 100 + '%') as any, top: OFF - 43, height: 9, borderTopWidth: 1.5, borderLeftWidth: startsAtMidnight ? 1.5 : 0, borderRightWidth: endsAtMidnight ? 1.5 : 0, borderColor: tint(col, isToday ? 0.7 : 0.5), borderTopLeftRadius: startsAtMidnight ? 6 : 0, borderTopRightRadius: endsAtMidnight ? 6 : 0, marginLeft: startsAtMidnight ? 2 : 0, marginRight: endsAtMidnight ? 2 : 0}}>
+          <View style={{position: 'absolute', top: -9, ...(narrowAtEnd ? {right: 4} : {left: startsAtMidnight ? 8 : 4}), paddingHorizontal: 6, height: 16, borderRadius: 8, justifyContent: 'center', backgroundColor: c.surface}}><Text numberOfLines={1} style={{fontSize: 11, fontWeight: '700', color: col}}>{text}</Text></View>
+        </View>);}
+      return out;})()}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
     {drag?.live ? <View pointerEvents="none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 6}}>
       <View style={{position: 'absolute', left: (WEB ? `calc(${drag.fx * 100}% - ${dpx(9)})` : drag.fx * w - 9) as any, top: 29 + OFF - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: drag.color, borderWidth: 3, borderColor: c.surface, boxShadow: '0 0 0 4px ' + tint(drag.color, 0.28) + ', 0 6px 16px rgba(0,0,0,0.45)'} as any} />
