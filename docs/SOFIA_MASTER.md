@@ -215,6 +215,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Compartilhar página (06/11/2026, Pedro: "tipo Notion mesmo"):** qualquer pessoa com o link vê, só leitura, sem senha, sem prazo (até desligar). Compartilhar a página leva as subpáginas; compartilhar uma subpágina mostra só ela e o que está dentro dela. Códigos em `settings.pageShares` (fora do conteúdo da página), página pública montada no servidor sem script (`src/core/page-share.js`).
 
+- **Linha do tempo do Início (06/11/2026):** a virada do dia fica só com a linha tracejada e o rótulo do dia ("sex, 6/11"). Faixas, contornos e etiquetas Hoje/Amanhã foram recusados pelo Pedro; não recolocar sem desenho aprovado.
+
 ## 8. Regras que não se quebram
 
 - Site: telas fora de vista NUNCA com display:none (o navegador mede tudo como 0 e o que guarda medida volta achatado). DesktopPages usa visibility hidden + pointerEvents none.
@@ -306,11 +308,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Barra lateral: página sem subpáginas não mostra a seta de abrir (só o espaço, para alinhar) | conferido: sem filhas sem seta; com filha mostra; testes ok |
 | 2026-11-06 | (delivery) | Capa (pedido repetido do Pedro): roda só não aparece para foto já preparada; qualquer outra fica escondida até carregar+decodificar+0,45 s e entra com fade (antes "carregada" pelo navegador aparecia sem roda e piscava). Página compartilhada: roda e foto entra depois; largura do texto igual ao site (960) | medido: nova → roda ~0,6 s → foto; recarga → roda → foto; preparada → na hora |
 | 2026-11-06 | (delivery) | RAIZ da capa roxa ao abrir outra página: o navegador descarta a foto decodificada fora da tela e decodifica de novo (1-3 quadros de fundo, sem roda, em fotos grandes). Agora cada capa vira ImageBitmap (largura da tela) e é pintada num canvas antes do 1º quadro; capa não preparada segue com roda + tempo mínimo | medido: troca de página → canvas já pintado no 1º quadro; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: virada do dia mais clara — dia seguinte com fundo próprio, linha mais forte, "Hoje ←" antes, etiqueta "→ Amanhã · sex 6/11" quando cabe e rótulo de baixo "Amanhã, 6/11" | conferido em captura às 22:45; testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: contorno em cima de cada dia (chave) com o nome fixo — "Hoje · qui 5/11", "Amanhã · sex 6/11"; em trecho estreito encurta, nunca some (pedido do Pedro) | conferido em captura com a virada na borda e no meio; testes ok |
+| 2026-11-06 | (delivery) | Linha do tempo: desfeitas as marcações da virada do dia (faixa, Hoje/Amanhã, contorno) a pedido do Pedro ("ficou horrível, deixa como tava") — volta a linha tracejada com "sex, 6/11" | HomeBrief.tsx restaurado da versão af3b9de; testes ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

@@ -263,6 +263,3 @@ test('capa ja preparada e pintada de um ImageBitmap num canvas antes do 1o quadr
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/function BitmapCover/);assert.match(pa,/if\(bmp\)return <View style=\{StyleSheet\.absoluteFill\}><BitmapCover/);
  const pre=fs.readFileSync(path.join(__dirname,'..','src/lib/page-cover-prefetch.ts'),'utf8');assert.match(pre,/createImageBitmap\(img/);assert.doesNotMatch(pre,/await fetch\(uri\)/,'sem fetch de blob: (CSP)');
 });
-test('linha do tempo: virada do dia com faixa do dia seguinte, "Hoje" antes e "Amanha" depois',()=>{
- const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/timeline-next-day/);assert.match(hb,/timeline-day-/);assert.ok(hb.includes("px >= 150 ? word + ' · ' + date : word"),'nome encurta em trecho estreito');assert.match(hb,/after === 'Amanhã' \|\| after === 'Hoje'/);
-});
