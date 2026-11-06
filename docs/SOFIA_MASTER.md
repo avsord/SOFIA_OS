@@ -314,11 +314,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Linha do tempo do Início: de hoje − 1 mês até hoje + 1 mês (pedido do Pedro), mês anterior carregado junto | conferido: limites 5/10 e 5/12 (hoje 5/11); testes ok |
 | 2026-11-06 | (delivery) | Linha do tempo: listras do futuro e escurecido do passado agora contínuos (uma faixa só a partir da meia-noite de amanhã / até o começo de hoje), não apagam mais de um dia para o outro; aprovado por imagem | capturas de amanhã, domingo e ontem; testes ok |
 | 2026-11-06 | (delivery) | Próximos eventos (lateral): quadradinho na cor da importância do compromisso, igual à Agenda | conferido: importante em vermelho; testes ok |
 | 2026-11-06 | (delivery) | Páginas: marca-texto como no Kindle — linha "Marcar" na barra de formatação com amarelo, azul, rosa, laranja e ✕ (um clique) | aprovado por imagem; testado marcando duas frases; testes ok |
 | 2026-11-06 | (delivery) | APK tablet: no Android com tela de tablet (lado menor ≥ 600 dp) o app mostra o próprio site em tela cheia (WebView), já logado com a sessão do app; avisos e serviços de fundo continuam no app; voltar do Android volta no site; links externos no navegador. Celular sem mudança | testes ok; falta conferir num tablet de verdade |
+| 2026-11-06 | (delivery) | Tarefa criada pela conversa/linha do tempo agora grava a descrição (content da ação ou "Descrição: ..." da mensagem); antes só o título | teste novo tarefa-descricao-ia; servidor 418/418 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
