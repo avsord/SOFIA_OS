@@ -134,6 +134,10 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
 /** Próximos eventos (agenda) na barra lateral, como no Notion: título, horário e "Ver todos". */
 function UpcomingEvents({api,onOpen}:{api:SofiaApi;onOpen:()=>void}){
  const c=useTheme(),[items,setItems]=useState<{id:string;title:string;when:string;at:number;color?:string}[]|null>(null);
+ // 06/11/2026 (relatorio [fluidez] do computador do Pedro, tela 1762x832): a secao chegava ~0,15 s depois de abrir com ate 6
+ // linhas e empurrava as Paginas 238 px para baixo (para fora da tela). Guarda so QUANTAS linhas havia (um numero, nenhum
+ // titulo) e ja abre com esse espaco reservado.
+ const EVENTS_N='sofia.side.events.n',[reserve]=useState(()=>{try{return Math.max(0,Math.min(6,Number(globalThis.localStorage?.getItem(EVENTS_N))||0));}catch{return 0;}});
  useEffect(()=>{let alive=true;const load=async()=>{try{const now=new Date(),month=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),next=new Date(now.getFullYear(),now.getMonth()+1,1);
    const lists=await Promise.all([api.agenda(month(now)),api.agenda(month(next)).catch(()=>({items:[]}))]);const seen=new Set<string>(),out:{id:string;title:string;when:string;at:number;color?:string}[]=[];
    // mesma leitura da Agenda e do Início: repetições expandidas e dia inteiro pela data (sem virar 03:00/21:00 pelo fuso)
@@ -142,8 +146,9 @@ function UpcomingEvents({api,onOpen}:{api:SofiaApi;onOpen:()=>void}){
     const end=it.data?.end_at?new Date(it.data.end_at):null,hm=(d:Date)=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),today=t.toDateString()===now.toDateString();
     const when=allDay?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t)+(end&&!Number.isNaN(end.getTime())?' – '+hm(end):''):t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
     out.push({id:key,title:it.title||'Sem título',when,at:allDay?t.getTime()-12*3600000:t.getTime(),color:agendaPriority(it as any).color||''});}
-   out.sort((a,b)=>a.at-b.at);if(alive)setItems(out.slice(0,6));}catch{if(alive)setItems([]);}};
+   out.sort((a,b)=>a.at-b.at);if(alive){setItems(out.slice(0,6));try{globalThis.localStorage?.setItem(EVENTS_N,String(Math.min(6,out.length)));}catch{/* sem armazenamento */}}}catch{if(alive)setItems([]);}};
   void load();const off=subscribeSystemChanged(owner=>{if(owner===api)void load();});const timer=setInterval(()=>void load(),5*60000);return()=>{alive=false;off();clearInterval(timer);};},[api]);
+ if(items===null&&reserve)return <Section title="Próximos eventos"><View testID="sidebar-events-reserve" style={{height:(reserve+1)*28}}/></Section>;
  if(!items||!items.length)return null;
  return <Section title="Próximos eventos">
   {items.map(it=><Pressable key={it.id} testID={'sidebar-event-'+it.id} accessibilityRole="button" accessibilityLabel={it.title+', '+it.when} onPress={onOpen} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:28,paddingHorizontal:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}>

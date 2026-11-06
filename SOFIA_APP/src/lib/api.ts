@@ -175,7 +175,12 @@ export class SofiaApi {
       if(method==='GET'&&!signal?.aborted&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT'||(e.code==='NETWORK'&&interrupted))){
         await waitForActive();
         await new Promise(r=>setTimeout(r,interrupted?300:1200));
-        try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}catch(again){noteApiFailure(path,method,again as ApiError,Date.now()-started);throw again;}
+        // 06/11/2026 (checkup: 635 respostas 502 na semana, todas no minuto de uma publicacao - o servidor fica fora enquanto a
+        // versao nova liga): servidor reiniciando ganha mais 2 tentativas espacadas antes de mostrar erro; outros erros, como antes
+        for(let attempt=0;;attempt++){
+          try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}
+          catch(again){const a=again as ApiError;if(attempt<2&&!signal?.aborted&&(a.status===502||a.status===503||a.status===504||a.code==='NETWORK')){await waitForActive();await new Promise(r=>setTimeout(r,attempt?8000:4000));continue;}noteApiFailure(path,method,a,Date.now()-started);throw again;}
+        }
       }
       noteApiFailure(path,method,e,Date.now()-started);throw error;
     }

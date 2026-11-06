@@ -59,3 +59,9 @@ test('Linha do tempo: clique rapido nao prepara arrasto com botao ja solto; Esc 
   assert.ok(s.includes("if (typeof ne.buttons === 'number' && ne.buttons === 0 && (ne.pointerType === 'mouse'"));
   assert.ok(s.includes("if (!dragRef.current?.live) {stop(); return;}"));
 });
+test('Checkup 06/11: leituras insistem durante a troca de versao; Proximos eventos reserva o espaco (Paginas nao pulam)',()=>{
+  const api=read('src/lib/api.ts'),shell=read('src/desktop/DesktopShell.tsx');
+  assert.ok(api.includes("if(attempt<2&&!signal?.aborted&&(a.status===502||a.status===503||a.status===504||a.code==='NETWORK'))"));
+  assert.ok(shell.includes("EVENTS_N='sofia.side.events.n'")&&shell.includes('testID="sidebar-events-reserve"'));
+  assert.ok(!/setItem\(EVENTS_N,[^)]*title/.test(shell),'so a quantidade, nunca titulos');
+});
