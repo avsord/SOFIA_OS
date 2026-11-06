@@ -75,7 +75,11 @@ export function coverPosition(data:Record<string,any>):number{const raw=data?.co
 // 05/11/2026 (Pedro: "capas piscando ao entrar na pagina"): um <img> novo, mesmo com o arquivo ja baixado, levava 1-2
 // quadros para ser desenhado. Agora a capa usa o MESMO elemento que foi decodificado em segundo plano (DECODED) e
 // e colocada antes do primeiro desenho da pagina; o elemento fica guardado para a proxima visita.
-function WebCoverImg({uri,position,onError}:{uri:string;position:number;onError:()=>void}){
+// 06/11/2026 (Pedro: "alguns so piscam por carregar rapido; da uma atrasadinha pra vir o circulo primeiro"): quando a roda
+// aparece, ela fica pelo menos MIN_SPIN ms antes da foto entrar. Capa ja pronta continua sem roda.
+const MIN_SPIN=450;
+const now=()=>(globalThis as any).performance?.now?.()??Date.now();
+function WebCoverImg({uri,position,onError,since=0}:{uri:string;position:number;onError:()=>void;since?:number}){
  const host=useRef<any>(null),err=useRef(onError);err.current=onError;const c=useTheme();
  // 06/11/2026 (Pedro: "o fundo roxo aparece primeiro, depois a foto; se nao resolver, uma roda de carregando"): enquanto a
  // foto nao esta desenhada fica o fundo neutro com a roda (igual a capa que ainda baixa) e a foto entra por cima.
@@ -85,11 +89,11 @@ function WebCoverImg({uri,position,onError}:{uri:string;position:number;onError:
   pic.alt='';pic.draggable=false;pic.onerror=()=>err.current();
   Object.assign(pic.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',objectPosition:'50% '+position+'%',display:'block',userSelect:'none',pointerEvents:'none'});
   // capa que ainda nao estava pronta entra com um fade curto (antes: aparecia de golpe sobre o fundo)
-  if(!(pic.complete&&pic.naturalWidth>0)){pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';setReady(false);const show=()=>{const go=()=>{requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>setReady(true),200);});};if(pic.decode)pic.decode().then(go,go);else go();};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';setReady(true);}
+  if(!(pic.complete&&pic.naturalWidth>0)){const start=since||now();pic.style.opacity='0';pic.style.transition='opacity 180ms ease-out';setReady(false);const show=()=>{const go=()=>{const wait=Math.max(0,MIN_SPIN-(now()-start));setTimeout(()=>requestAnimationFrame(()=>{pic.style.opacity='1';setTimeout(()=>setReady(true),200);}),wait);};if(pic.decode)pic.decode().then(go,go);else go();};pic.addEventListener('load',show,{once:true});}else{pic.style.transition='';pic.style.opacity='1';setReady(true);}
   box.appendChild(pic);return()=>{pic.onerror=null;if(pic.parentNode===box)box.removeChild(pic);};},[uri,position]);
  return <View style={StyleSheet.absoluteFill}>{ready?null:<View testID="page-cover-loading" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>}{React.createElement('div',{ref:host,style:{position:'absolute',inset:0}})}</View>;
 }
-function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
+function CoverImage({uri,position,repositioning=false,onPosition,onError,since=0}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void;since?:number}){
  const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(()=>IMAGE_SIZES.get(uri)||null),[pos,setPos]=useState(position);
  const live=useRef({pos:position,start:position,extra:0,editing:repositioning,onPosition});
  useEffect(()=>{if(!repositioning)setPos(position);live.current.pos=position;},[position,repositioning]);
@@ -109,7 +113,7 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
  // 05/11/2026 (Pedro: "ao clicar na pagina a capa flica, aparece uma imagem por tras"): no site a capa era desenhada
  // primeiro centralizada e, depois de medir a imagem, pulava para a posicao escolhida. Fora do reposicionar ela agora e
  // um <img> com object-fit/object-position: ja nasce no lugar certo, sem medir.
- if(Platform.OS==='web'&&!repositioning)return <View testID="page-cover-image" style={StyleSheet.absoluteFill}><WebCoverImg uri={uri} position={position} onError={onError}/></View>;
+ if(Platform.OS==='web'&&!repositioning)return <View testID="page-cover-image" style={StyleSheet.absoluteFill}><WebCoverImg uri={uri} position={position} onError={onError} since={since}/></View>;
  return <View testID="page-cover-image" style={StyleSheet.absoluteFill} {...(repositioning?pan.panHandlers:{})} onLayout={e=>{const {width:w,height:h}=e.nativeEvent.layout;if(Math.abs(w-box.w)>.5||Math.abs(h-box.h)>.5)setBox({w,h});}}>
   {scale?<Image source={{uri}} onError={onError} style={{position:'absolute',width,height,left:-(width-box.w)/2,top:-extra*(repositioning?pos:position)/100}}/>:<Image source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={onError}/>}
  </View>;
@@ -117,9 +121,10 @@ function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:s
 export function PageCover({data,api,repositioning=false,onPosition}:{data:Record<string,any>;api:SofiaApi;repositioning?:boolean;onPosition?:(n:number)=>void}){
  const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=localPreview(String(data.cover_local_uri||'')),gradientId='cover'+React.useId().replace(/[^a-zA-Z0-9]/g,'');
  const [uri,setUri]=useState(()=>preview||peekCover(attachment)),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
- const retry=useRef<()=>void>(()=>{});
+ const retry=useRef<()=>void>(()=>{}),spinSince=useRef(0);
+ if(!uri&&!spinSince.current)spinSince.current=now();
  useEffect(()=>{
-  let live=true,count=0;setFailed(false);setAttempt(0);const ready=preview||peekCover(attachment);setUri(ready);
+  let live=true,count=0;setFailed(false);setAttempt(0);const ready=preview||peekCover(attachment);setUri(ready);if(ready)spinSince.current=0;
   async function load(force=false){
    if(!attachment)return;
    count++;setAttempt(count);
@@ -133,7 +138,7 @@ export function PageCover({data,api,repositioning=false,onPosition}:{data:Record
  if(data.cover_type==='attachment'&&attachment){
   if(failed)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input,padding:16}]}><Text style={{fontSize:12,color:c.muted,textAlign:'center'}}>{tap('Não foi possível abrir esta capa. Toque na capa para escolher novamente.')}</Text></View>;
   if(!uri)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>;
-  return <CoverImage key={attachment+':'+attempt+':'+uri} uri={uri} position={coverPosition(data)} repositioning={repositioning} onPosition={onPosition} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
+  return <CoverImage key={attachment+':'+attempt+':'+uri} since={spinSince.current} uri={uri} position={coverPosition(data)} repositioning={repositioning} onPosition={onPosition} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
  }
  const colors=String(data.cover_value||'').match(/#[0-9a-fA-F]{6}\b/g)||[c.accentSoft,c.accentSoft];
  // 0.3.267: id único por capa (no site todas as miniaturas usavam o 1º degradê com o mesmo id "cover")

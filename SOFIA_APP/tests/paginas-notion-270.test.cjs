@@ -249,3 +249,6 @@ test('capa carregando: fundo neutro com roda ate a foto estar desenhada (sem fun
  const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/page-cover-loading/);assert.match(pa,/setTimeout\(\(\)=>setReady\(true\),200\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8'),/hasCover\?\(imageCover\?c\.input:c\.accentSoft\)/);
 });
+test('capa: quando a roda aparece, fica um tempo minimo (nao pisca em carga rapida)',()=>{
+ const pa=fs.readFileSync(path.join(__dirname,'..','src/components/PageAppearance.tsx'),'utf8');assert.match(pa,/const MIN_SPIN=450/);assert.match(pa,/MIN_SPIN-\(now\(\)-start\)/);
+});
