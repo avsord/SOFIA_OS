@@ -29,7 +29,7 @@ test('Media: esqueci a senha com a chave guardada no servidor -> senha nova abre
 
 test('trancada em outra aba ou rascunho velho: copia aberta e descartada e o texto aberto nao fica no disco (07/11/2026)', () => {
   const p = require('fs').readFileSync(require('path').join(__dirname, '../src/screens/Pages.tsx'), 'utf8');
-  assert.ok(p.includes('if(h&&isOpen(h.kid))store.rebase(p);else{store.forget(p.id);store.open(p);}'), 'copia velha descartada');
+  assert.ok(p.includes('if(open)store.rebase(p);else{store.forget(p.id);store.open(p);}') && p.includes('if(was||(first&&open))continue;'), 'copia velha descartada so quando a pagina passa a ser trancada');
   assert.ok(p.includes('return !(r&&isLocked(r)&&!isLocked(e.base));'), 'versao trancada do servidor vence');
   assert.ok(p.includes("persist:all=>{const items=all.filter(it=>!isLocked(it.base)&&!isLocked(pagesRef.current.find(x=>x.id===it.base.id)));"), 'rascunho trancado fora do disco');
   const ed = require('fs').readFileSync(require('path').join(__dirname, '../src/lib/page-editor.ts'), 'utf8');

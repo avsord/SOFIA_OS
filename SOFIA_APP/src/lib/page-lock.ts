@@ -14,7 +14,14 @@ export const MEDIUM_OPEN_MS = 5 * 60000;
 const ITER = 310000;
 const OPEN = new Map<string, Open>();
 /** Texto aberto por pagina (so enquanto destrancada), para a tela mostrar sem esperar. */
-const PLAIN = new Map<string, {kid: string; blocks: string; ct: string}>();
+// 07/11/2026 (Pedro: Shift+Enter na pagina trancada recarregava): guarda o texto das ultimas versoes cifradas da pagina.
+// Uma resposta atrasada do servidor (versao anterior, de dois salvamentos seguidos) nao obriga a decifrar e redesenhar.
+const PLAIN = new Map<string, {kid: string; blocks: string; ct: string; hist: Map<string, string>}>();
+function keep(id: string, kid: string, blocks: string, ct: string) {
+  const old = PLAIN.get(id), hist = old && old.kid === kid ? old.hist : new Map<string, string>();
+  hist.delete(ct); hist.set(ct, blocks); while (hist.size > 12) hist.delete(hist.keys().next().value as string);
+  PLAIN.set(id, {kid, blocks, ct, hist});
+}
 const HEADERS = new Map<string, Omit<LockHeader, 'iv' | 'ct'>>();
 const listeners = new Set<() => void>();
 export function onLockChange(fn: () => void) {listeners.add(fn); return () => {listeners.delete(fn);};}
@@ -41,7 +48,9 @@ export function forget(kid: string) {if (!OPEN.delete(kid)) return; for (const [
 export function entered(kid: string) {const o = OPEN.get(kid); if (o) o.leftAt = null;}
 /** Saiu da pagina: Maxima tranca na hora; Media comeca a contar 5 minutos. */
 export function left(kid: string, now = Date.now()) {const o = OPEN.get(kid); if (!o) return; if (o.level === 'max') forget(kid); else {o.leftAt = now; const t: any = setTimeout(() => isOpen(kid), MEDIUM_OPEN_MS + 1000); t?.unref?.();}}
-export function plainOf(id: string, h: {kid: string; ct: string}) {const p = PLAIN.get(id); return p && p.kid === h.kid && p.ct === h.ct && isOpen(h.kid) ? p.blocks : null;}
+export function plainOf(id: string, h: {kid: string; ct: string}) {const p = PLAIN.get(id); if (!p || p.kid !== h.kid || !isOpen(h.kid)) return null; return p.ct === h.ct ? p.blocks : p.hist.get(h.ct) ?? null;}
+/** Ja tem algum texto decifrado desta pagina (para nao mostrar "abrindo" de novo a cada salvamento). */
+export function hasPlain(id: string, kid: string) {const p = PLAIN.get(id); return !!p && p.kid === kid && isOpen(kid);}
 export function headerFor(kid: string) {return HEADERS.get(kid) || null;}
 
 async function kek(password: string, salt: Uint8Array, iter: number) {
@@ -93,14 +102,14 @@ export function rawKey(kid: string) {const o = OPEN.get(kid); return o ? b64(o.r
 export async function seal(id: string, kid: string, blocks: string): Promise<string> {
   const o = OPEN.get(kid), h = HEADERS.get(kid); if (!o || !h) throw Error('Página trancada: abra com a senha para salvar.');
   const iv = rand(12), ct = b64(await subtle().encrypt({name: 'AES-GCM', iv}, o.key, enc.encode(blocks)));
-  PLAIN.set(id, {kid, blocks, ct});
+  keep(id, kid, blocks, ct);
   return JSON.stringify({...h, iv: b64(iv), ct});
 }
 /** Decifra os blocos de uma pagina (precisa da chave aberta). */
 export async function openBlocks(id: string, h: LockHeader): Promise<string> {
   const o = OPEN.get(h.kid); if (!o) throw Error('Página trancada.');
   const blocks = dec.decode(await subtle().decrypt({name: 'AES-GCM', iv: unb64(h.iv)}, o.key, unb64(h.ct)));
-  PLAIN.set(id, {kid: h.kid, blocks, ct: h.ct}); changed(); HEADERS.set(h.kid, HEADERS.get(h.kid) || {v: 1, kid: h.kid, level: h.level, salt: h.salt, iter: h.iter, wiv: h.wiv, wk: h.wk});
+  keep(id, h.kid, blocks, h.ct); changed(); HEADERS.set(h.kid, HEADERS.get(h.kid) || {v: 1, kid: h.kid, level: h.level, salt: h.salt, iter: h.iter, wiv: h.wiv, wk: h.wk});
   return blocks;
 }
 /** Pagina como a tela deve ver: trancada e aberta -> com os blocos decifrados; senao igual. */

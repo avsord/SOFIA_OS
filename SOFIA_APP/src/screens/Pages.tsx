@@ -52,7 +52,7 @@ import {appAlert} from '../lib/app-alert';
 import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,sharedPages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
 import {pageUrlPath} from '../lib/web-route';
 import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
-import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
+import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,hasPlain,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
 import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
 import {SECRET_OK_TAG} from '../lib/page-editor';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
@@ -170,7 +170,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 07/11/2026 (Pedro: "tranquei a pagina mas ficou assim" - texto aberto, 'Nao salvo', 'abra com a senha para salvar'): a copia
  // do editor era a de ANTES de trancar (rascunho guardado no navegador ou outra aba). Se o servidor diz que a pagina esta
  // trancada e a copia nao: com a chave aberta, junta na versao trancada; fechada, descarta a copia velha (a tela pede a senha).
- useEffect(()=>{for(const p of pages){if(!isLocked(p))continue;const e=store.get(p.id);if(!e||isLocked(e.base))continue;const h=lockHeader(p);if(h&&isOpen(h.kid))store.rebase(p);else{store.forget(p.id);store.open(p);}}},[pages,store]);
+ const lockSeen=useRef<Set<string>|null>(null);
+ // 07/11/2026 (Pedro: Shift+Enter na pagina destrancada recarregava): so age quando a pagina PASSA a ser trancada (aqui ou
+ // em outro aparelho). Pagina ja trancada e aberta com a senha salva normalmente; antes cada salvamento voltava a base
+ // criptografada para o editor e a pagina recarregava.
+ useEffect(()=>{const first=!lockSeen.current,seen=lockSeen.current||new Set<string>(),now=new Set<string>();for(const p of pages){if(!isLocked(p))continue;now.add(p.id);const was=seen.has(p.id);const e=store.get(p.id);if(!e||isLocked(e.base))continue;const h=lockHeader(p),open=!!h&&isOpen(h.kid);if(was||(first&&open))continue;if(open)store.rebase(p);else{store.forget(p.id);store.open(p);}}lockSeen.current=now;},[pages,store]);
  useEffect(()=>{if(selRaw&&needsOpen(selRaw)){const h=lockHeader(selRaw)!;void openBlocks(selRaw.id,h).then(()=>store.rebase(selRaw)).catch(e=>setError(errorText(e)));}},[selRaw?.id,selRaw?.revision,lockTick]); // eslint-disable-line react-hooks/exhaustive-deps
  // 0.3.250 (computador): a barra lateral mostra a arvore destas paginas e abre uma pagina daqui; o caminho
  // da pagina aberta vai para a barra de cima. No celular nada disso roda.
@@ -688,7 +692,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada
- const lk=isLocked(selected)?lockHeader(selected):null,lockedNow=!!lk&&!isOpen(lk.kid),decrypting=!!lk&&!lockedNow&&!!selRaw&&needsOpen(selRaw);
+ const lk=isLocked(selected)?lockHeader(selected):null,lockedNow=!!lk&&!isOpen(lk.kid),decrypting=!!lk&&!lockedNow&&!!selRaw&&needsOpen(selRaw)&&!hasPlain(selRaw.id,lk.kid);
  const family=(kid:string)=>pagesRef.current.filter(x=>isLocked(x)&&lockHeader(x)?.kid===kid);
  const descendants=(id:string)=>{const out:Entity[]=[];const walk=(i:string)=>{for(const ch of children.get(i)||[]){out.push(ch);walk(ch.id);}};walk(id);return out;};
  const putSaved=(saved:Entity)=>{store.rebase(saved);setPages(prev=>prev.map(x=>x.id===saved.id?saved:x));};
