@@ -76,7 +76,7 @@ async function runDriveSelfTest(g, {base, log = console.log} = {}) {
 }
 
 /** Uma vez por versao publicada (commit do Railway), 90 s depois de ligar, se o Drive do usuario estiver ligado. */
-function scheduleDriveSelfTest(runtime, {dataDir, port, version = process.env.RAILWAY_GIT_COMMIT_SHA || ''} = {}) {
+function scheduleDriveSelfTest(runtime, {dataDir, port, publicBaseUrl = '', version = process.env.RAILWAY_GIT_COMMIT_SHA || ''} = {}) {
   if (!version || process.env.SOFIA_DRIVE_SELFTEST === '0') return;
   const mark = path.join(dataDir, 'drive-selftest.json');
   setTimeout(async () => {
@@ -86,7 +86,8 @@ function scheduleDriveSelfTest(runtime, {dataDir, port, version = process.env.RA
       const g = runtime.google; const l = g && g.link && g.link();
       if (!l || !g.fullDriveOn || !g.fullDriveOn(l)) { console.log('[drive-teste] pulado: Drive do usuario sem a permissao completa'); return; }
       fs.writeFileSync(mark, JSON.stringify({version, at: new Date().toISOString()}));
-      await runDriveSelfTest(g, {base: 'http://127.0.0.1:' + port});
+      // pelo endereco publico, como o navegador (o servidor recusa outro endereco por seguranca)
+      await runDriveSelfTest(g, {base: String(publicBaseUrl || '').replace(/\/$/, '') || 'http://127.0.0.1:' + port});
     } catch (e) { console.log('[drive-teste] erro: ' + String(e && e.message || e).slice(0, 200)); }
   }, 90000).unref();
 }
