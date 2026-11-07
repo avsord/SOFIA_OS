@@ -106,3 +106,9 @@ test('Drive: Google Drive inteiro - listas, varios selecionados, envio grande po
   assert.ok(a.includes("'/api/mobile/md/sofiadrive/upload/start'")&&a.includes("'&mime='"),'envio por partes e tipo na query');
   assert.ok(u.includes('webkitGetAsEntry')&&u.includes('readBytes'),'pastas soltas e leitura em pedacos no celular');
 });
+
+test('telas que baixam depois mostram o esqueleto enquanto o arquivo chega (nunca so o fundo)', () => {
+  const s = require('fs').readFileSync(require('path').join(__dirname, '../src/lib/screen-loader.web.tsx'), 'utf8');
+  assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name}/>"), 'Suspense com esqueleto');
+  assert.ok(!s.includes('fallback={null}>'), 'sem fallback vazio');
+});

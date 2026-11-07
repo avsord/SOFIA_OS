@@ -30,10 +30,10 @@ export function Spinner({size = 22, color, stroke = 2}: {size?: number; color?: 
 /** 0.3.268 (site): no computador as telas ja estao carregadas; o esqueleto so aparece se a espera passar de ~300 ms.
  * Antes ele piscava por alguns milissegundos (e no canto, com o desenho do celular) a cada troca de menu. No celular
  * nada muda: o esqueleto continua aparecendo no mesmo toque. */
-export const WEB_SKELETON_DELAY = 300;
+export const WEB_SKELETON_DELAY = 0; // 07/11/2026: o Pedro via so o fundo nos primeiros 300 ms; o esqueleto agora aparece na hora
 export function useSkeletonDelay(): boolean {
   const web = Platform.OS === 'web';
-  const [show, setShow] = useState(!web);
+  const [show, setShow] = useState(!web || WEB_SKELETON_DELAY <= 0);
   useEffect(() => { if (!web) return; const t = setTimeout(() => setShow(true), WEB_SKELETON_DELAY); return () => clearTimeout(t); }, [web]);
   return show;
 }

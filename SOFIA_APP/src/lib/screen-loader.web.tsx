@@ -1,6 +1,7 @@
 import {perfSync} from './fluency-metrics';
 import React from 'react';
 import {ScreenBoundary} from '../components/ScreenBoundary';
+import {ScreenSkeleton} from '../components/ScreenSkeleton';
 
 type Screen=React.ComponentType<any>;
 const cache=new Map<string,Screen>();
@@ -13,11 +14,13 @@ function once(name:string,load:()=>Screen):Screen{
 /** 0.3.263 (fase 4 — velocidade): versao do SITE (Metro escolhe este arquivo no web). As telas que nao sao a primeira
  * viram arquivos separados (import() dinamico) e so baixam quando abertas: o arquivo principal fica menor. O app do
  * celular usa screen-loader.tsx (require de sempre: tudo ja esta no aparelho). */
+/** 07/11/2026: enquanto o arquivo da tela baixa, mostra o esqueleto (antes era so o fundo vazio). */
+const SKELETON_TABS=new Set(['chat','pages','agenda','apps','profile']);
 const webLazy=new Map<string,Screen>();
 function lazyScreen(name:string,load:()=>Promise<Screen>):Screen{
  const existing=webLazy.get(name);if(existing)return existing;
  const Lazy=React.lazy(()=>load().then(component=>({default:component})));
- const Wrapped=(props:any)=><ScreenBoundary name={name}><React.Suspense fallback={null}><Lazy {...props}/></React.Suspense></ScreenBoundary>;
+ const Wrapped=(props:any)=><ScreenBoundary name={name}><React.Suspense fallback={SKELETON_TABS.has(name)?<ScreenSkeleton tab={name}/>:null}><Lazy {...props}/></React.Suspense></ScreenBoundary>;
  const component=React.memo(Wrapped) as unknown as Screen;webLazy.set(name,component);return component;
 }
 /** Literal requires stay inside loaders so Metro/Hermes does not execute the

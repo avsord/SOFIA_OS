@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('site: esqueleto so depois de 300 ms, app abre no mesmo clique e telas baixadas em segundo plano',()=>{
-  const l=read('src/components/Loading.tsx');assert.ok(l.includes('WEB_SKELETON_DELAY = 300')&&l.includes('useSkeletonDelay()'));
+  const l=read('src/components/Loading.tsx');assert.ok(l.includes('WEB_SKELETON_DELAY = 0')&&l.includes('useSkeletonDelay()'));
   assert.ok(read('src/components/ScreenSkeleton.tsx').includes('useSkeletonDelay()'));
   assert.ok(/if \(Platform\.OS === 'web'\) return true;/.test(read('src/components/ModuleSkeleton.tsx')));
   assert.ok(read('src/lib/screen-loader.web.tsx').includes('export function prefetchWebScreens')&&read('App.tsx').includes('prefetchWebScreens()'));
