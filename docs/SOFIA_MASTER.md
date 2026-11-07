@@ -337,11 +337,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | Raiz do arrasto pendurado: num clique rápido o "apertou" chegava depois do "soltou"; o arrasto era preparado com o botão já solto e segurava o Esc (balão não fechava). Agora não prepara com botão solto e só segura Esc em arrasto de verdade. Varredura do Início: 0 achados reais | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | Checkup geral: 635 respostas 502 na semana, todas no minuto de publicações (volume único = servidor desliga antes de ligar o novo) → leituras do app tentam até 3x; dependências do servidor sem falhas (body-parser/qs); Páginas da barra lateral não pulam mais (Próximos eventos reserva espaço). E-mail do servidor bloqueado (SMTP) | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | E-mails da Sofia (redefinir senha, código do login) saem pela conta Google ligada (gmail.send), já que o Railway bloqueia SMTP; SMTP fica como 2ª opção. Perfil → Conexões mostra "Religar o Google" até a permissão ser dada. Ao liberar, o código do 2º passo passa a valer de verdade | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | E-mail da Sofia (sofiaos.core) é o remetente do app (redefinir senha, código do login), ligado só para envio e só aceitando essa conta; a conta Google do usuário fica só com Agenda/Drive/Gmail. Perfil → Conexões → "E-mail da Sofia" | testes ok; [manual-apk] |
 | 2026-11-07 | (delivery) | Início só com a saudação (print do Pedro, monitor 4K): o prazo de 8 s recomeçava a cada dado. Agora fixo + alarme `inicio-incompleto` com a leitura que faltou (testado travando a agenda: blocos em 8,5 s, alarme certo). Portão `tools/release-check.cjs` obrigatório (MASTER §8) | portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Página compartilhada (/p/…) branca no notebook do Pedro: seguia o tema do sistema de quem abre. Agora segue a aparência escolhida na Sofia (escuro/claro/horário de Brasília); o app manda a escolha em PATCH /api/mobile/appearance | portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

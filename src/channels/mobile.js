@@ -567,6 +567,13 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'link', 60); const b = await bodyJson(req, 4096);
       return send(await require('../services/link-preview').linkPreview(String(b.url || '').slice(0, 2000)));
     }
+    // 07/11/2026: aparencia escolhida na Sofia, para a pagina compartilhada ter a mesma cara (nao o tema de quem abre)
+    if (p === '/api/mobile/appearance' && m === 'PATCH') {
+      rate(session, 'write', 40); const b = await bodyJson(req, 1024); const hm = v => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined;
+      if (!['system', 'light', 'dark', 'schedule'].includes(b.appearance)) fail('BAD_FIELD', 'Aparência inválida.');
+      const shares = runtime.pageShares || deps.pageShares; if (shares && shares.setAppearance) shares.setAppearance({appearance: b.appearance, lightAt: hm(b.lightAt), darkAt: hm(b.darkAt)});
+      return send({ok: true});
+    }
     if (p === '/api/mobile/profile' && m === 'PATCH') {
       rate(session, 'write', 40); const b = await bodyJson(req, 2048);
       store.updateSettings({ profileName: cleanText(b.name, 'Nome', 80) }); return send({ profile: profile() });

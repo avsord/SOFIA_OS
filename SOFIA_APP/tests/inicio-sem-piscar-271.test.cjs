@@ -75,3 +75,7 @@ test('Inicio: prazo fixo para mostrar os blocos (nao recomeca) e alarme de qual 
   assert.ok(h.includes('if(!deskDeadline.current)deskDeadline.current=Date.now()+8000;')&&h.includes("alert:'inicio-incompleto'"));
   assert.ok(fs.existsSync(path.join(__dirname,'..','tools','release-check.cjs')));
 });
+test('Aparencia escolhida vai para o servidor (pagina compartilhada com a mesma cara)',()=>{
+  const app=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8'),api=read('src/lib/api.ts');
+  assert.ok(app.includes('api.saveAppearance({appearance:prefs.appearance'));assert.ok(api.includes("this.fetchRequest<{ok: boolean}>('/appearance'"));
+});

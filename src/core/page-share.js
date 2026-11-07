@@ -15,6 +15,10 @@ const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]{3,20})$/i;
 function makePageShares(store,workspace){
  const read=()=>{const v=store.settings().pageShares;return v&&typeof v==='object'&&!Array.isArray(v)?v:{};};
  const write=map=>store.db.prepare('INSERT OR REPLACE INTO settings VALUES (?,?)').run('pageShares',JSON.stringify(map));
+ // 07/11/2026 (Pedro: "no meu notebook o fundo ficou branco"): a pagina compartilhada segue a APARENCIA ESCOLHIDA NA SOFIA
+ // (escuro, claro ou por horario), nao o tema do sistema de quem abre. O app manda a escolha em /api/mobile/appearance.
+ const getAppearance=()=>{try{const r=store.db.prepare('SELECT value FROM settings WHERE key=?').get('ownerAppearanceV1');const v=r?JSON.parse(r.value):null;return v&&typeof v==='object'?v:null;}catch{return null;}};
+ const setAppearance=a=>store.db.prepare('INSERT OR REPLACE INTO settings VALUES (?,?)').run('ownerAppearanceV1',JSON.stringify(a));
  // 06/11/2026: pagina trancada com senha nunca aparece no link publico (nem como subpagina)
  const locked=e=>(e.tags||[]).includes('sofia-lock-v1');
  const page=id=>{try{const e=workspace.get(id);return e&&e.kind==='user_page'&&e.state!=='archived'&&!locked(e)?e:null;}catch{return null;}};
@@ -34,7 +38,7 @@ function makePageShares(store,workspace){
   /** Paginas publicas (para o sinal na barra lateral). */
   list(){return Object.values(read()).map(x=>x.page);},
   resolve(token,subId){if(!TOKEN_RE.test(String(token||'')))return null;const entry=read()[token];if(!entry)return null;const root=page(entry.page);if(!root)return null;
-   if(!subId)return {root,current:root};if(!/^[\w-]{1,80}$/.test(subId)||!inside(root.id,subId))return null;return {root,current:page(subId)};},
+   if(!subId)return {root,current:root};if(!/^[\w-]{1,80}$/.test(subId)||!inside(root.id,subId))return null;return {getAppearance,setAppearance,root,current:page(subId)};},
   attachmentAllowed(token,attId){const r=this.resolve(token);if(!r||!/^[\w-]{1,80}$/.test(attId))return false;let a;try{a=workspace.attachment(attId);}catch{return false;}
    if(!inside(r.root.id,a.entity_id))return false;const owner=page(a.entity_id);if(!owner)return false;const d=owner.data||{};
    return d.cover_attachment_id===attId||String(d.blocks_json||'').includes(attId);},
@@ -95,6 +99,14 @@ function blocksHtml(blocks,{token,linkable,imgUrl}){
 }
 const PALETTE={bg:'#131218',text:'#F2EEFA',muted:'#9A95A8',line:'#2A2833',soft:'#1D1B24',accent:'#B9A6FF'};
 const LIGHT={bg:'#FFFFFF',text:'#1F1D24',muted:'#6E6A78',line:'#E7E4EC',soft:'#F6F4F9',accent:'#6B4FD8'};
+/** 'dark' | 'light' | null (null = segue o sistema de quem abre). Por horario: conta no horario de Brasilia. */
+function shareTheme(a,now=new Date()){
+ if(!a)return null;if(a.appearance==='dark'||a.appearance==='light')return a.appearance;if(a.appearance!=='schedule')return null;
+ const ok=t=>typeof t==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(t),min=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
+ const light=ok(a.lightAt)?min(a.lightAt):300,dark=ok(a.darkAt)?min(a.darkAt):1140;
+ const hm=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now),cur=min(hm);
+ return light<dark?(cur>=light&&cur<dark?'light':'dark'):(cur>=light||cur<dark?'light':'dark');
+}
 function renderSharedPage({root,current,shares,token}){
  const base='/p/'+encodeURIComponent(token);
  const href=id=>id===root.id?base:base+'/'+encodeURIComponent(id);
@@ -111,9 +123,10 @@ function renderSharedPage({root,current,shares,token}){
  const rawPos=d.cover_position,pos=rawPos!==''&&rawPos!=null&&Number.isFinite(Number(rawPos))?Math.max(0,Math.min(100,Number(rawPos))):50;
  const icon=isEmoji(d.icon)?String(d.icon):'';
  const title=current.title||'Sem título';
+ const theme=shareTheme(shares.getAppearance&&shares.getAppearance());
  const css=(p)=>`--bg:${p.bg};--text:${p.text};--muted:${p.muted};--line:${p.line};--soft:${p.soft};--accent:${p.accent};`;
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title>
-<style>:root{${css(PALETTE)}color-scheme:dark}@media (prefers-color-scheme:light){:root{${css(LIGHT)}color-scheme:light}}
+<style>${theme==='dark'?`:root{${css(PALETTE)}color-scheme:dark}`:theme==='light'?`:root{${css(LIGHT)}color-scheme:light}`:`:root{${css(PALETTE)}color-scheme:dark}@media (prefers-color-scheme:light){:root{${css(LIGHT)}color-scheme:light}}`}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:13px;color:var(--muted);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
 .top a{color:var(--muted);text-decoration:none}.top a:hover{color:var(--text)}.top .sep{opacity:.5}
@@ -166,4 +179,4 @@ async function servePublicPage(req,res,p,m,{shares,workspace,google}){
  if(!r||!r.current){res.statusCode=404;res.end(NOT_FOUND_PAGE);return true;}
  res.statusCode=200;res.end(m==='HEAD'?undefined:renderSharedPage({root:r.root,current:r.current,shares,token}));return true;
 }
-module.exports={makePageShares,servePublicPage,renderSharedPage,richHtml};
+module.exports={makePageShares,servePublicPage,renderSharedPage,richHtml,shareTheme};

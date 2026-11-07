@@ -245,6 +245,9 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:!!auth);return()=>s.remove();},[tab,workspaceDepth,pagesDepth,auth]);
  const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
+ // 07/11/2026 (Pedro: pagina compartilhada branca no notebook): a aparencia escolhida vai para o servidor, que desenha a pagina
+ // compartilhada com a mesma cara. Ao abrir (ja logado) e a cada mudanca; falha silenciosa (so aparencia).
+ useEffect(()=>{if(!auth)return;const t=setTimeout(()=>{void api.saveAppearance({appearance:prefs.appearance,lightAt:prefs.lightAt,darkAt:prefs.darkAt}).catch(()=>{});},3000);return()=>clearTimeout(t);},[auth,api,prefs.appearance,prefs.lightAt,prefs.darkAt]);
  const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();await wipeEncryptedStorage().catch(()=>{});let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{appAlert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)appAlert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
  const profile=useCallback((p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev),[]);
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);

@@ -51,3 +51,10 @@ test('conta do usuario nunca fica com o e-mail da Sofia (ajuste na inicializacao
   createRuntime({...g.config,userEmail:'usuario@exemplo.com'},{store:g.store,provider:g.provider,secureDir:path.join(g.dir,'secure2')});
   assert.equal(g.store.settings().profileEmail,'outro@exemplo.com','e-mail pessoal ja definido nao e trocado');
 });
+test('pagina compartilhada segue a aparencia escolhida na Sofia (nao o tema de quem abre)',()=>{
+  const {shareTheme}=require('../src/core/page-share');
+  assert.equal(shareTheme({appearance:'dark'}),'dark');assert.equal(shareTheme({appearance:'light'}),'light');assert.equal(shareTheme({appearance:'system'}),null);assert.equal(shareTheme(null),null);
+  const at=h=>new Date(Date.UTC(2026,10,7,h+3,0)); // Brasilia = UTC-3
+  assert.equal(shareTheme({appearance:'schedule',lightAt:'05:00',darkAt:'19:00'},at(12)),'light');
+  assert.equal(shareTheme({appearance:'schedule',lightAt:'05:00',darkAt:'19:00'},at(21)),'dark');
+});
