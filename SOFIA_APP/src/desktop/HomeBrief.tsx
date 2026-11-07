@@ -715,7 +715,11 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
           {/* virada do dia: marco com bolinha, listras no futuro (um dia sim, um nao) e passado escurecido (um dia sim, um nao) */}
           <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 34, height: 34 + 29 + 6, width: 1.5, marginLeft: -0.75, backgroundColor: tint(c.accent, 0.8), zIndex: 3} as any} />
           <View pointerEvents="none" style={{position: 'absolute', left: (x * 100 + '%') as any, top: OFF - 38, width: 9, height: 9, marginLeft: -4.5, borderRadius: 5, backgroundColor: c.accent, zIndex: 3} as any} />
-          <Text style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent, zIndex: 3} as any}>{dayName}</Text>
+          {/* 07/11/2026 (robo do site): com o botao "agora" na mesma ponta, o nome do dia ficava embaixo dele ("sex, 6/11" x "‹ agora");
+              agora ele passa para o lado do botao */}
+          {(() => { const under = !!side && !!wS && (side === 'left' ? x * wS < 86 : (1 - x) * wS < 86);
+            const tx = under ? (side === 'left' ? 86 - x * wS : -96 - (86 - (1 - x) * wS)) : beg ? 0 : end ? -96 : -48;
+            return <Text testID="timeline-day-label" style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: tx}], width: 96, textAlign: under ? (side === 'left' ? 'left' : 'right') : beg ? 'left' : end ? 'right' : 'center', fontSize: 11, fontWeight: '700', color: c.accent, zIndex: 3} as any}>{dayName}</Text>; })()}
         </React.Fragment>;}
       return <Text key={h} style={{position: 'absolute', top: 42 + OFF, left: (x * 100 + '%') as any, transform: [{translateX: beg ? 0 : end ? -96 : -48}], width: 96, textAlign: beg ? 'left' : end ? 'right' : 'center', fontSize: 11, color: c.muted, fontVariant: ['tabular-nums']}}>{label(h)}</Text>;})}
     {/* 0.3.317: o que esta sendo arrastado - bolinha e horario seguindo o mouse */}
