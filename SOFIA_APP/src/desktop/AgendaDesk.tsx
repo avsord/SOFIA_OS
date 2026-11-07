@@ -125,8 +125,9 @@ function MonthView({x, m}: {x: Ctx; m: Date}) {
               <Text style={{alignSelf: 'flex-start', marginLeft: t ? -7 : 0, paddingHorizontal: t ? 7 : 0, borderRadius: 8, overflow: 'hidden', fontSize: 13, fontWeight: t ? '700' : '500', color: t ? c.onAccent : c.muted, backgroundColor: t ? c.accent : 'transparent', opacity: out ? 0.4 : 1, fontVariant: ['tabular-nums']}}>{day.getDate()}</Text>
             </View>
             {x.p.compact ? (list.length ? <View style={{flexDirection: 'row', gap: 3, paddingLeft: 6}}>{list.slice(0, 3).map(i => <View key={i.id + (i as any).occurrence_start} style={{width: 5, height: 5, borderRadius: 3, backgroundColor: colorOf(i, c.accent)}} />)}</View> : null) : <>
-            {list.slice(0, 3).map(i => <Chip x={x} key={i.id + (i as any).occurrence_start} i={i} />)}
-            {list.length > 3 ? <Text style={{fontSize: 11, color: c.muted, paddingLeft: 6}}>+{list.length - 3} mais</Text> : null}</>}
+            {/* 07/11/2026 (revisao): com 3 pilulas o "+N mais" ficava fora da celula; com mais de 3, mostra 2 e o "+N mais" */}
+            {list.slice(0, list.length > 3 ? 2 : 3).map(i => <Chip x={x} key={i.id + (i as any).occurrence_start} i={i} />)}
+            {list.length > 3 ? <Text testID="agenda-more" style={{fontSize: 11, fontWeight: '600', color: c.accent, paddingLeft: 6}}>+{list.length - 2} mais</Text> : null}</>}
           </Pressable>;
         })}
       </View>)}

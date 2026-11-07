@@ -368,10 +368,11 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
   const header = <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
     {!desktop ? <IconButton name="back" label={inGroup ? 'Voltar para ' + L.name : 'Voltar aos apps'} onPress={() => inGroup ? setGfilter('all') : onBack()} /> : inGroup ? <IconButton name="back" label={'Voltar para ' + L.name} onPress={() => setGfilter('all')} /> : null}
     <View style={{flex: 1, minWidth: 0}}>
-      <Text accessibilityRole="header" numberOfLines={1} style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1, flexShrink: 1}}>{desktop ? (inGroup ? gname(gfilter) : L.name) : 'Listas'}</Text>{/* 03/11/2026: no celular o titulo e sempre o nome do app */}
+      <Text accessibilityRole="header" numberOfLines={1} style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1, flexShrink: 1}}>Listas</Text>{/* 07/11/2026 (revisao + desenho aprovado: "titulo = nome do app, sempre; nunca o nome do item aberto") */}
+      {desktop ? <Text testID="lists-current" numberOfLines={1} style={{color: c.text, fontSize: 16, fontWeight: '600', marginTop: 2}}>{inGroup ? gname(gfilter) : L.name}</Text> : null}
       {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { /* 0.3.275: a frase da Sofia no lugar dos numeros emendados */
         const open = (L.model === 'shopping' && !inGroup ? mine : todo).filter(i => !i.done), tot = open.reduce((s, i) => s + (i.price || 0), 0);
-        if (!open.length) return done.length ? 'Tudo no carrinho. É só finalizar a compra.' : 'Lista vazia. Escreva no campo abaixo e aperte Enter.';
+        if (!open.length) return done.length ? 'Tudo no carrinho. É só finalizar a compra.' : 'Nada na lista ainda.'; // 07/11 (revisao): a instrucao ja aparece no meio da tela (antes repetia, com "abaixo" e "acima")
         if (L.model === 'simple') return open.length === 1 ? 'Falta uma coisa: ' + open[0].name + '.' : 'Faltam ' + open.length + ' coisas; a primeira é ' + open[0].name + '.';
         return (open.length === 1 ? 'Falta comprar ' + open[0].name : 'Faltam ' + open.length + ' itens') + (tot ? ', uns ' + brl(tot) + ' no total.' : '.') + (done.length ? ' ' + done.length + ' já ' + (done.length === 1 ? 'está' : 'estão') + ' no carrinho.' : '');
       })()}</Text> : <Text style={{color: c.muted, fontSize: 13}}>{L.model === 'shopping' && !inGroup ? myGroups.length + (myGroups.length === 1 ? ' grupo' : ' grupos') + ' · ' + mine.filter(i => !i.done).length + ' para comprar' : todo.length + (todo.length === 1 ? ' item ' : ' itens ') + (L.model === 'simple' ? 'a fazer' : 'para comprar') + (done.length ? ' · ' + done.length + (done.length === 1 ? ' ticado' : ' ticados') : '')}</Text>}

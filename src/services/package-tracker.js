@@ -60,6 +60,15 @@ function parseShip24(json) {
     trackerId: t.tracker && t.tracker.trackerId || '', estimated: t.shipment && t.shipment.delivery && t.shipment.delivery.estimatedDeliveryDate || '' };
 }
 class PackageTracker {
+  /** 07/11/2026 (revisao do site): o usuario via "fetch failed" (erro tecnico, em ingles). Traduz para o que aconteceu. */
+  static friendly(e) {
+    const m = String(e && e.message || e || '');
+    if (/fetch failed|ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|network|socket|aborted|timeout/i.test(m)) return 'Não consegui falar com a transportadora agora. Tento de novo sozinha em alguns minutos.';
+    if (/429|rate|limit/i.test(m)) return 'A transportadora pediu um tempo entre as consultas. Tento de novo mais tarde.';
+    if (/^[\x00-\x7F]*$/.test(m) && !/[áéíóúãõç]/i.test(m) && /[a-z]{4,} [a-z]{3,}/i.test(m)) return 'Não consegui consultar o rastreio agora. Tento de novo mais tarde.';
+    return m.slice(0, 160);
+  }
+
   constructor(workspace, options = {}) { this.w = workspace; this.fetch = options.fetchImpl || global.fetch; this.timer = null; this.timeoutMs = options.timeoutMs || 15000; this.env = options.env || process.env; this.token = null; }
   officialConfigured() { return !!(this.env.CORREIOS_API_USER && this.env.CORREIOS_API_KEY); }
   ship24Configured() { return !!this.env.SHIP24_API_KEY; }
@@ -116,7 +125,7 @@ class PackageTracker {
   async refresh(item) {
     const d = { ...(item.data || {}) }, code = normalizeCode(d.code), carrier = d.carrier || detectCarrier(code);
     let result, error = '', blocked = false;
-    try { result = await this.lookup(carrier, code, d); } catch (e) { error = String(e && e.message || e).slice(0, 160); blocked = !!(e && e.blocked); }
+    try { result = await this.lookup(carrier, code, d); } catch (e) { error = PackageTracker.friendly(e); blocked = !!(e && e.blocked); }
     const now = new Date().toISOString();
     if (!result) {
       const saved = this.w.save({ ...item, data: { ...d, carrier, checked_at: now, error, blocked_until: blocked ? new Date(Date.now() + 24 * 3600000).toISOString() : '' } }, item.id);

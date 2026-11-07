@@ -38,7 +38,8 @@ export function classify(e: Entity): Pack {
   const fee = !delivered && !d.fee_paid && (!!d.fee || FEE.test(status));
   const problem = !delivered && (ms === 'exception' || ms === 'failed_attempt');
   const out = ms === 'out_for_delivery' || OUT.test(status);
-  const step = delivered ? 3 : out || pickup ? 2 : events.length || ['in_transit', 'info_received'].includes(ms) ? 1 : 0;
+  // 07/11/2026 (revisao): o texto dizia "Objeto em transito" e a barra ficava em "Postado" - o status escrito tambem conta
+  const step = delivered ? 3 : out || pickup ? 2 : events.length || ['in_transit', 'info_received'].includes(ms) || /tr[aâ]nsito|encaminhad|transfer|em rota|a caminho/i.test(status) ? 1 : 0;
   const amount = typeof d.fee_amount === 'number' ? d.fee_amount : (() => { const m = status.match(/R\$\s*([\d.]+,\d{2})/); return m ? parseMoney(m[1]) : null; })();
   return {id: e.id, e, title: e.title, code: String(d.code || ''), carrier: String(d.carrier || detectCarrier(String(d.code || ''))), status: status || (d.error ? 'Consulta indisponível' : 'Aguardando a primeira consulta'), local: String(top?.local || ''), at: String(d.last_event_at || top?.at || e.updated_at || ''), events, delivered, step, needs: fee ? 'fee' : pickup ? 'pickup' : problem ? 'problem' : '', feeAmount: amount, feePaid: !!d.fee_paid, estimated: String(d.estimated || ''), error: String(d.error || '')};
 }

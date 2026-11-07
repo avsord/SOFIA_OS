@@ -267,7 +267,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
-- **Robô do site todo (pedido 07/11):** cobrir todas as telas e apps (computador e celular) com uso real + conferência de estética/alinhamento/diagramação; entrar no portão.
+- **Revisão do site (07/11):** `docs/qualidade/revisao-2026-11-07.md` (robô `SOFIA_APP/tools/site-robot` + 4 revisores visuais). Lote 1 feito (ver diário). Faltam: Biblioteca/Notas com abas recusadas pelo desenho (trocar por [Área ⌄] [Filtros ⌄]), Páginas (3 bordas, cartões recentes, árvore), Finanças (cartões de larguras diferentes, seletores empilhados), Rotina (linhas de alturas diferentes), Notificações (520px, rótulos), Conversa (dois cabeçalhos), painéis laterais de larguras/títulos diferentes, rótulo ÁREA em maiúsculas, celular e tela do Pedro (rodar o robô com as regras novas).
 - 07/11 01:07–01:10: o site do Pedro tentou 5x salvar o registro 01960187-… e o servidor recusou (400) sem motivo no log. Agora há `[recusado] <rota> <código> <motivo>` no Railway: ler na próxima sessão e corrigir a causa.
 - **E-mail da Sofia (remetente) LIGADO em 07/11:** sofiaos.core@gmail.com autorizou só envio (gmail.send) via /setup/email-sofia (rota interna, sem tela; recusa outra conta). Token guardado no volume (md_kv google.sender.v1). Os e-mails do sistema (redefinir senha, código do login) saem dele pela API do Gmail, grátis, apesar do bloqueio de SMTP do Railway. SOFIA_SMTP_USER no Railway está com o e-mail PESSOAL do usuário (configuração antiga) e não é mais usado como remetente. Falta: confirmar o 1º envio real no log.
 - Ferramentas de compilação do app (Expo CLI) com 13 avisos de segurança: não chegam ao usuário; resolver na próxima atualização do Expo, não rebaixando versão.
@@ -347,11 +347,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Drive 100% por método: laboratório (tools/drive-lab: Google Drive fiel + servidor real) com 48 sondas e robô de 49 passos (computador e celular) no portão; ~60 defeitos corrigidos (proteção pastas "Sofia OS", PDF/Word em branco no site, duplo clique/arrastar mortos, envio >50 MB, Docs não baixavam etc.) | portão 14/14; [manual-apk] |
 | 2026-11-07 | (delivery) | Drive: um clique já abre arquivo e pasta (Pedro: "por que tenho que apertar duas vezes"); selecionar por caixinha ao passar o mouse, Ctrl ou Shift; robô 52 passos | portão 14/14; [manual-apk] |
 | 2026-11-07 | (delivery) | Drive: seleção arrastando o mouse num lugar vazio (retângulo, Ctrl/Shift soma, rola sozinho); lista de controle contra a Ajuda oficial do Google (docs/drive/matriz-google-drive.md: 85 TEM, 23 PARCIAL, 116 FALTA, 11 N/A) | robô 53/53, portão 14/14 |
 | 2026-11-07 | (delivery) | Drive desligado pelo Pedro ("não existe mais"; código guardado, lib/features.ts DRIVE_APP=false; sem escopo drive nem teste no Google). Início: sem a abertura animada — véu com bolinha de carregamento até o Início ter os dados e fade de 0,22 s | portão 13/13; [manual-apk] |
 | 2026-11-07 | (delivery) | Início todo estático (Pedro): sem bolinha, sem fade, sem animação da saudação/data/frase, do brilho oval e do pulso do agora | portão 13/13; [manual-apk] |
+| 2026-11-07 | (delivery) | Revisão do site (robô + 4 revisores, docs/qualidade/revisao-2026-11-07.md, ~200 pontos). Lote 1: + igual em todos os apps, título Listas, painel da tarefa 520px com rodapé fixo, janela de lembrete sem cobrir o topo e com fundo, Price Tracker/E-mails vazios, Encomendas (etapa e erro em português), estrelas, +N mais na Agenda, +1 da linha do tempo | portão 13/13; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

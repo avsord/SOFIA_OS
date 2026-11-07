@@ -82,26 +82,26 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
             
             <View><Text style={{fontSize: 28, fontWeight: '600', letterSpacing: -1, color: c.text}}>Price Tracker</Text>{deskNoBack ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{!products?.length ? 'Cole o link de um produto e a Sofia acompanha o preço para você.' : null}{(() => { if (!products?.length) return ''; const low = products.filter(p => p.atLow); return low.length ? (low.length === 1 ? low[0].monitor.title + ' está no menor preço já visto.' : low.length + ' produtos estão no menor preço já visto.') : 'Nenhum produto no menor preço agora. A Sofia avisa quando cair.'; })()}</Text> : null}</View>
           </View>
-          {deskNoBack ? <Button title="Acompanhar produto" onPress={() => setAdding(true)} /> : <IconButton name="plus" label="Adicionar produto" onPress={() => setAdding(true)} />}
+          <IconButton name="plus" label="Acompanhar produto" onPress={() => setAdding(true)} />{/* 07/11/2026 (revisao + desenho aprovado): so o + tambem no computador */}
         </View>
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16, ...pad(18)}}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void runCollection(api, {force: true, scope})} />}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Atualizar preços agora" disabled={col.running} onPress={() => void runCollection(api, {force: true, scope})}
+          {products && products.length ? <Pressable accessibilityRole="button" accessibilityLabel="Atualizar preços agora" disabled={col.running} onPress={() => void runCollection(api, {force: true, scope})}
             style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6}}>
             {col.running ? <ActivityIndicator size="small" color={c.accent} /> : <Icon name="refresh" size={14} color={c.accent} />}
             <Text style={{fontSize: 12, color: c.text}} numberOfLines={1}>
-              {col.running ? (col.total ? `Lendo ${col.label} (${Math.min(col.done + 1, col.total)}/${col.total})` : 'Conferindo o que precisa ser lido…') : `Lido ${since(lastRead)} · atualizar agora`}
+              {col.running ? (col.total ? `Lendo ${col.label} (${Math.min(col.done + 1, col.total)}/${col.total})` : 'Conferindo o que precisa ser lido…') : lastRead ? `Atualizado ${since(lastRead)} · Atualizar` : 'Ler os preços agora'} {/* 07/11/2026 (revisao): era "Lido ainda não lido · atualizar agora" */}
             </Text>
-          </Pressable>
+          </Pressable> : null}
 
           {error ? <Text style={{color: c.danger, fontSize: 13}}>{error}</Text> : null}
           {products === null ? <View style={{gap: 6}}><LoadingCaption label="Carregando produtos" /><LoadingLines rows={4} /></View> : !products.length ? (
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 40, paddingHorizontal: 10}}>
-              <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="monitor" size={38} color={c.accent} /></View>
+              <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="tag" size={38} color={c.accent} /></View>
               <Text style={{fontSize: 20, fontWeight: '600', color: c.text, textAlign: 'center'}}>Acompanhe o preço do que você quer comprar</Text>
               <Text style={{fontSize: 14, lineHeight: 21, color: c.muted, textAlign: 'center'}}>Cole o link de um produto. A Sofia lê o preço, encontra o mesmo item em outras lojas, desenha o histórico e te avisa quando valer a pena.</Text>
-              <View style={{alignSelf: 'stretch', marginTop: 8}}><Button title="Adicionar meu primeiro produto" onPress={() => setAdding(true)} /></View>
+              <View style={{alignSelf: 'center', marginTop: 8}} /* 07/11/2026 (revisao): o botao ficava colado a esquerda, embaixo do texto centralizado */><Button title="Adicionar meu primeiro produto" onPress={() => setAdding(true)} /></View>
             </View>
           ) : (
             <>

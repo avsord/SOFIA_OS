@@ -306,7 +306,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
             </View>
             {desktop && curType && !curType.area ? <GhostButton icon="edit" label="Editar tipo" onPress={() => setTypeDialog({edit: curType})} /> : null}
             {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
-            {desktop ? <PrimaryButton testID="lib-add" icon="plus" label="Adicionar" onPress={() => setAdding({type: curType?.id})} /> : <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} />}
+            {desktop ? <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} /> /* 07/11/2026: so o + */ : <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} />}
           </View>
           {desktop ? <NavTabs nav={mobileNav} /> : null}
           {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca') + (desktop ? ' (N adiciona; Ctrl+V cola um link)' : '')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View></View> : null}
@@ -377,7 +377,7 @@ function DragTypes({types, view, count, onSelect, onReorder, menu}: {types: Type
 }
 
 function Stars({value, onChange}: {value: number; onChange: (v: number) => void}) {
-  return <View style={{flexDirection: 'row', gap: 4}}>{[1, 2, 3, 4, 5].map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={'Nota ' + n} onPress={() => onChange(value === n ? 0 : n)} hitSlop={4}><Text style={{fontSize: 20, color: n <= value ? PALETTE.amber : '#d6d2de'}}>★</Text></Pressable>)}</View>;
+  return <View style={{flexDirection: 'row', gap: 4}}>{[1, 2, 3, 4, 5].map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={'Nota ' + n} onPress={() => onChange(value === n ? 0 : n)} hitSlop={4}><Text style={{fontSize: 20, color: n <= value ? PALETTE.amber : 'rgba(150,140,170,0.55)'}}>{n <= value ? '★' : '☆'}</Text>{/* 07/11/2026 (revisao): sem nota, estrelas vazias em contorno (antes 5 estrelas claras cheias pareciam nota 5) */}</Pressable>)}</View>;
 }
 function TagEditor({tags, options, onChange}: {tags: string[]; options: string[]; onChange: (t: string[]) => void}) {
   const c = useTheme(), [txt, setTxt] = useState(''), [adding, setAdding] = useState(false);

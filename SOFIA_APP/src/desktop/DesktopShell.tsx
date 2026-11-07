@@ -143,8 +143,8 @@ function UpcomingEvents({api,onOpen}:{api:SofiaApi;onOpen:()=>void}){
    // mesma leitura da Agenda e do Início: repetições expandidas e dia inteiro pela data (sem virar 03:00/21:00 pelo fuso)
    const base=[...new Map(lists.flatMap(l=>l.items||[]).map(i=>[i.id,i])).values()];
    for(const it of expandForHome(base)){const start=eventStart(it),key=it.id+'|'+start;if(!start||seen.has(key)||it.state==='done'||it.state==='archived')continue;seen.add(key);const allDay=!!it.data?.calendar_all_day||/^\d{4}-\d{2}-\d{2}$/.test(start);const t=allDay?new Date(start.slice(0,10)+'T12:00:00'):new Date(start);if(Number.isNaN(t.getTime())||(allDay?t.getTime()+12*3600000<Date.now():t.getTime()<Date.now()-30*60000))continue;
-    const end=it.data?.end_at?new Date(it.data.end_at):null,hm=(d:Date)=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),today=t.toDateString()===now.toDateString();
-    const when=allDay?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t)+(end&&!Number.isNaN(end.getTime())?' – '+hm(end):''):t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
+    const hm=(d:Date)=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),today=t.toDateString()===now.toDateString();
+    const when=allDay?(today?'hoje':t.toLocaleDateString('pt-BR',{weekday:'short'})):today?hm(t) /* 07/11/2026 (revisao): so o inicio; o intervalo cortava o nome do evento */:t.toLocaleDateString('pt-BR',{weekday:'short'})+' '+hm(t);
     out.push({id:key,title:it.title||'Sem título',when,at:allDay?t.getTime()-12*3600000:t.getTime(),color:agendaPriority(it as any).color||''});}
    out.sort((a,b)=>a.at-b.at);if(alive){setItems(out.slice(0,6));try{globalThis.localStorage?.setItem(EVENTS_N,String(Math.min(6,out.length)));}catch{/* sem armazenamento */}}}catch{if(alive)setItems([]);}};
   void load();const off=subscribeSystemChanged(owner=>{if(owner===api)void load();});const timer=setInterval(()=>void load(),5*60000);return()=>{alive=false;off();clearInterval(timer);};},[api]);

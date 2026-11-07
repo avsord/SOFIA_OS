@@ -17,6 +17,12 @@ import {appAlert} from '../lib/app-alert';
 // acompanha: o servidor consulta a transportadora e avisa quando o status muda.
 export type PackageEvent={at:string;status:string;local?:string};
 export const normalizeCode=(code:string)=>code.replace(/[\s.-]/g,'').toUpperCase();
+/** 07/11/2026 (revisao do site): erro tecnico em ingles ("fetch failed") vira uma frase que a pessoa entende. */
+export function friendlyTrackError(m: string): string {
+  if (/fetch failed|ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|network|socket|aborted|timeout/i.test(m)) return 'não consegui falar com a transportadora. Tento de novo sozinha em alguns minutos.';
+  if (/^[\x00-\x7F]*$/.test(m) && /[a-z]{4,} [a-z]{3,}/i.test(m) && !/[áéíóúãõç]/i.test(m)) return 'não consegui consultar o rastreio agora. Tento de novo mais tarde.';
+  return m;
+}
 export function detectCarrier(code:string){const c=normalizeCode(code);if(/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(c))return 'correios';if(/^\d{14}$/.test(c))return 'jadlog';if(/^(LP|CNBR|SYRM|YT|CNB)\w{8,}$/.test(c))return 'cainiao';if(/^BR\d{12,}[A-Z]?$/.test(c))return 'shopee';return 'outro';}
 export const CARRIER_LABEL:Record<string,string>={correios:'Correios',jadlog:'Jadlog',cainiao:'Cainiao / AliExpress',shopee:'Shopee (SPX)',outro:'Outra transportadora'};
 export function officialUrl(carrier:string,code:string){const c=encodeURIComponent(normalizeCode(code));if(carrier==='correios')return 'https://rastreamento.correios.com.br/app/index.php?objetos='+c;if(carrier==='jadlog')return 'https://www.jadlog.com.br/siteInstitucional/tracking.jad?cte='+c;if(carrier==='cainiao')return 'https://global.cainiao.com/newDetail.htm?mailNoList='+c;if(carrier==='shopee')return 'https://spx.com.br/track?'+c;return 'https://www.google.com/search?q='+c;}
@@ -85,7 +91,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
     {viewing.data?.milestone_label?<View style={{alignSelf:'flex-start',paddingHorizontal:10,paddingVertical:5,borderRadius:99,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'700',fontSize:12}}>{String(viewing.data.milestone_label)}</Text></View>:null}
     {viewing.data?.fee?<View style={{padding:12,borderRadius:12,backgroundColor:c.danger+'1f',gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Icon name="coins" size={16} color={c.danger}/><Text style={{color:c.danger,fontWeight:'600'}}>Taxa a pagar</Text></View><Text style={{color:c.text,fontSize:13}}>{tap('A encomenda está esperando o pagamento de taxa/imposto. Toque em "Abrir rastreio oficial" para pagar.')}</Text></View>:null}
     {viewing.data?.estimated&&viewing.state!=='delivered'?<Text style={{color:c.muted,fontSize:12}}>Previsão de entrega: {String(viewing.data.estimated).slice(8,10)+'/'+String(viewing.data.estimated).slice(5,7)}</Text>:null}
-    {viewing.data?.error?<Text style={{color:c.danger,fontSize:12}}>Última consulta falhou: {String(viewing.data.error)}</Text>:null}
+    {viewing.data?.error?<Text style={{color:c.danger,fontSize:12}}>Última consulta falhou: {friendlyTrackError(String(viewing.data.error))}</Text>:null}
     {viewing.data?.ok_at?<Text style={{color:c.muted,fontSize:11}}>Última atualização com sucesso: {whenLabel(String(viewing.data.ok_at))}</Text>:<Text style={{color:c.muted,fontSize:11}}>Ainda sem nenhuma atualização com sucesso.</Text>}
     {viewing.data?.checked_at?<Text style={{color:c.muted,fontSize:11}}>Última tentativa: {whenLabel(String(viewing.data.checked_at))}</Text>:null}
     <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:360}} contentContainerStyle={{gap:10}}>
