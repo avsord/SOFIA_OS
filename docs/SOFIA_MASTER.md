@@ -260,6 +260,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **App Drive (07/11):** precisa da permissão `drive` (Drive inteiro) na conta Google do usuário — o Drive mostra o botão "Permitir acesso ao meu Google Drive" (religa a conta uma vez). Se o Google bloquear ("app não verificado"/escopo restrito), incluir `https://www.googleapis.com/auth/drive` em Google Cloud → Tela de consentimento → Escopos e o Pedro como usuário de teste. Testado só com Drive simulado: conferir com a conta real (listar, enviar, visualizar Word/Excel, vídeo). No celular: vídeo/áudio abrem no player do sistema; visualizador completo é no site.
 - 07/11 01:07–01:10: o site do Pedro tentou 5x salvar o registro 01960187-… e o servidor recusou (400) sem motivo no log. Agora há `[recusado] <rota> <código> <motivo>` no Railway: ler na próxima sessão e corrigir a causa.
 - **E-mail da Sofia (remetente) LIGADO em 07/11:** sofiaos.core@gmail.com autorizou só envio (gmail.send) via /setup/email-sofia (rota interna, sem tela; recusa outra conta). Token guardado no volume (md_kv google.sender.v1). Os e-mails do sistema (redefinir senha, código do login) saem dele pela API do Gmail, grátis, apesar do bloqueio de SMTP do Railway. SOFIA_SMTP_USER no Railway está com o e-mail PESSOAL do usuário (configuração antiga) e não é mais usado como remetente. Falta: confirmar o 1º envio real no log.
 - Ferramentas de compilação do app (Expo CLI) com 13 avisos de segurança: não chegam ao usuário; resolver na próxima atualização do Expo, não rebaixando versão.
@@ -339,11 +340,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-06 | (delivery) | E-mails da Sofia (redefinir senha, código do login) saem pela conta Google ligada (gmail.send), já que o Railway bloqueia SMTP; SMTP fica como 2ª opção. Perfil → Conexões mostra "Religar o Google" até a permissão ser dada. Ao liberar, o código do 2º passo passa a valer de verdade | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | E-mail da Sofia (sofiaos.core) é o remetente do app (redefinir senha, código do login), ligado só para envio e só aceitando essa conta; a conta Google do usuário fica só com Agenda/Drive/Gmail. Perfil → Conexões → "E-mail da Sofia" | testes ok; [manual-apk] |
 | 2026-11-07 | (delivery) | Início só com a saudação (print do Pedro, monitor 4K): o prazo de 8 s recomeçava a cada dado. Agora fixo + alarme `inicio-incompleto` com a leitura que faltou (testado travando a agenda: blocos em 8,5 s, alarme certo). Portão `tools/release-check.cjs` obrigatório (MASTER §8) | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Página compartilhada (/p/…) branca no notebook do Pedro: seguia o tema do sistema de quem abre. Agora segue a aparência escolhida na Sofia (escuro/claro/horário de Brasília); o app manda a escolha em PATCH /api/mobile/appearance | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | "Continua na mesma": a aba aberta do Pedro seguia com a versão antiga (nunca mandou a aparência). Agora a aba recarrega sozinha ao voltar para ela se houver versão nova (não no meio da digitação); página compartilhada sem escolha registrada usa o padrão por horário (Brasília); gravação recusada passa a ter motivo no log ([recusado]) | portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | App Drive (site e app, Apps → Drive, /apps/drive): Google Drive INTEIRO do usuário dentro da Sofia — pastas, enviar (arrastar ou botão), mover (arrastar ou Mover para…), renomear, lixeira, visualizar imagem/PDF/Word/Excel/PowerPoint (convertidos em PDF), player de vídeo/áudio próprio por streaming; itens da Sofia (área oculta, sofia_cat, pastas antigas) escondidos e travados | portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

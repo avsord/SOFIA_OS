@@ -105,6 +105,25 @@ import * as PWallet from 'phosphor-react-native/src/icons/Wallet';
 import * as PWarning from 'phosphor-react-native/src/icons/Warning';
 import * as PWrench from 'phosphor-react-native/src/icons/Wrench';
 import * as PX from 'phosphor-react-native/src/icons/X';
+import * as PFolder_ from 'phosphor-react-native/src/icons/Folder';
+import * as PFolderPlus_ from 'phosphor-react-native/src/icons/FolderPlus';
+import * as PFile_ from 'phosphor-react-native/src/icons/File';
+import * as PFilePdf_ from 'phosphor-react-native/src/icons/FilePdf';
+import * as PFileDoc_ from 'phosphor-react-native/src/icons/FileDoc';
+import * as PFileXls_ from 'phosphor-react-native/src/icons/FileXls';
+import * as PFilePpt_ from 'phosphor-react-native/src/icons/FilePpt';
+import * as PFileAudio_ from 'phosphor-react-native/src/icons/FileAudio';
+import * as PFileVideo_ from 'phosphor-react-native/src/icons/FileVideo';
+import * as PFileImage_ from 'phosphor-react-native/src/icons/FileImage';
+import * as PFileZip_ from 'phosphor-react-native/src/icons/FileZip';
+import * as PFileText_ from 'phosphor-react-native/src/icons/FileText';
+import * as PUploadSimple_ from 'phosphor-react-native/src/icons/UploadSimple';
+import * as PDownloadSimple_ from 'phosphor-react-native/src/icons/DownloadSimple';
+import * as PHardDrives_ from 'phosphor-react-native/src/icons/HardDrives';
+import * as PPencilSimple_ from 'phosphor-react-native/src/icons/PencilSimple';
+import * as PArrowsOutCardinal_ from 'phosphor-react-native/src/icons/ArrowsOutCardinal';
+import * as PListBullets_ from 'phosphor-react-native/src/icons/ListBullets';
+import * as PSquaresFour_ from 'phosphor-react-native/src/icons/SquaresFour';
 
 /** 0.3.259 (rodada premium, fase 1): icones de um conjunto profissional (Phosphor, licenca MIT), no mesmo grid e no
  * mesmo traco. Dois estados: contorno (regular) e preenchido quando `active` (ex.: aba atual do menu), como nos apps
@@ -126,6 +145,26 @@ const ICONS = {
  settings: PGearSix.GearSixIcon,
  undo: PArrowCounterClockwise.ArrowCounterClockwiseIcon,
  redo: PArrowClockwise.ArrowClockwiseIcon,
+/* 07/11/2026: Sofia Drive */
+ folder: PFolder_.FolderIcon,
+ folderPlus: PFolderPlus_.FolderPlusIcon,
+ file: PFile_.FileIcon,
+ filePdf: PFilePdf_.FilePdfIcon,
+ fileDoc: PFileDoc_.FileDocIcon,
+ fileXls: PFileXls_.FileXlsIcon,
+ filePpt: PFilePpt_.FilePptIcon,
+ fileAudio: PFileAudio_.FileAudioIcon,
+ fileVideo: PFileVideo_.FileVideoIcon,
+ fileImage: PFileImage_.FileImageIcon,
+ fileZip: PFileZip_.FileZipIcon,
+ fileText: PFileText_.FileTextIcon,
+ upload: PUploadSimple_.UploadSimpleIcon,
+ download: PDownloadSimple_.DownloadSimpleIcon,
+ drive: PHardDrives_.HardDrivesIcon,
+ rename: PPencilSimple_.PencilSimpleIcon,
+ moveTo: PArrowsOutCardinal_.ArrowsOutCardinalIcon,
+ listView: PListBullets_.ListBulletsIcon,
+ gridView: PSquaresFour_.SquaresFourIcon,
  image: PImage.ImageIcon,
  copy: PCopy.CopyIcon,
  home: PHouse.HouseIcon,

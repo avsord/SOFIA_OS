@@ -21,7 +21,7 @@ if (/railway\.app|sofiaos\./.test(base) && !opt.force) { console.error('recusado
 
 const ROUTES = ['/inicio', '/conversa', '/paginas', '/agenda', '/avisos', '/perfil', '/apps',
   '/apps/tarefas', '/apps/financas', '/apps/price-tracker', '/apps/emails', '/apps/rotina', '/apps/lembretes',
-  '/apps/encomendas', '/apps/listas', '/apps/biblioteca', '/apps/notas'];
+  '/apps/encomendas', '/apps/listas', '/apps/biblioteca', '/apps/notas', '/apps/drive'];
 // nunca clicar: acoes que apagam, saem, enviam ou mudam dados de verdade
 const DANGER = /apagar|excluir|remover|limpar|sair|desconectar|encerrar|enviar|salvar|concluir|tomei|pagar|paguei|recebi|arquivar|descartar|confirmar|trancar|redefinir|desfazer|marcar tudo|ler todas|restaurar|importar|conectar|instalar|atualizar o app|adiar|criar|lançar|gravar|novo|nova|adicionar|duplicar|mover|copiar|compartilhar|publicar|exportar|baixar|abrir no|ir para|ver todas|continuar|tentar/i;
 // so mudam o layout da tela (nao abrem nada): as pecas que mudam de lugar parecem "novas" para o detector
@@ -38,7 +38,9 @@ const add = (route, kind, detail) => { findings.push({route, kind, detail}); };
   const ctx = await browser.newContext({viewport: {width: 1762, height: 832}, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR'});
   const page = await ctx.newPage();
   let route = '';
-  page.on('console', m => { if (m.type() === 'error' && !/favicon|cdp\.expo\.dev|ERR_CONNECTION|net::ERR/.test(m.text())) add(route, 'erro-console', m.text().slice(0, 200)); });
+  page.on('console', m => { if (m.type() === 'error' && !/favicon|cdp\.expo\.dev|ERR_CONNECTION|net::ERR|Failed to load resource/.test(m.text())) add(route, 'erro-console', m.text().slice(0, 200)); });
+  // pedido que falhou: anota QUAL endereco e o que o servidor respondeu (a mensagem do console nao diz)
+  page.on('response', async r => { const st = r.status(); if (st < 400 || !r.url().includes('/api/')) return; if (st === 401 && /auth|bootstrap/.test(r.url())) return; let body = ''; try { body = (await r.text()).slice(0, 160); } catch { /* sem corpo */ } add(route, 'pedido-falhou', st + ' ' + r.request().method() + ' ' + r.url().replace(base, '').replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/g, 'ID').slice(0, 120) + ' ' + body); });
   page.on('pageerror', e => add(route, 'erro-pagina', String(e.message || e).slice(0, 200)));
 
   // login pelo formulario, como uma pessoa

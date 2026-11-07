@@ -153,6 +153,9 @@ function makeMobileApi(runtime, deps) {
       if (!step.ok) return send({ ok: false, need_code: true, ...step.need });
       clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile(), ...(step.trust ? {trust: step.trust} : {}) });
     }
+    // 07/11/2026: player de video/audio do Drive - a tag <video> nao manda login; o link e assinado e vale 2 h
+    { const sm = p.match(/^\/api\/mobile\/md\/sofiadrive\/stream\/([A-Za-z0-9_-]{6,200})$/);
+      if (sm && m === 'GET') { if (!runtime.google.sdStreamValid(sm[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do vídeo expirou. Abra de novo.', 403); await runtime.google.sdStream(req, res, sm[1]); return true; } }
     const session = mobileSessions.require(req);
     if (p.startsWith('/api/mobile/chat-sync')) {
       if (m !== 'GET') rate(session, 'chat-sync-write', 30);
@@ -304,14 +307,19 @@ function makeMobileApi(runtime, deps) {
     }
     // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
     if (p.startsWith('/api/mobile/md/sofiadrive/')) {
-      const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length);
-      if (sd === 'list' && m === 'GET') { rate(session, 'sofiadrive', 120); return send(await g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || ''))); }
+      const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm0;
+      if (sd === 'list' && m === 'GET') { rate(session, 'sofiadrive', 120); try { return send({connected: true, ...(await g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || '')))}); } catch (e) { if (e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION') return send({connected: false, code: e.code, reason: e.message}); throw e; } }
+      mm0 = sd.match(/^items\/([A-Za-z0-9_-]+)\/stream-link$/);
+      if (mm0 && m === 'GET') { rate(session, 'sofiadrive', 120); await g.sdPath(mm0[1]); const t = g.sdStreamToken(mm0[1]); return send({url: '/api/mobile/md/sofiadrive/stream/' + mm0[1] + '?exp=' + t.exp + '&sig=' + encodeURIComponent(t.sig)}); }
       if (sd === 'folder' && m === 'POST') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdCreateFolder(String(b.parent || 'root'), b.name)}); }
       if (sd === 'upload' && m === 'POST') {
-        rate(session, 'sofiadrive-write', 60); const MAX = 50 * 1024 * 1024, chunks = []; let size = 0;
+        rate(session, 'sofiadrive-write', 60); const MAX = 70 * 1024 * 1024, chunks = []; let size = 0;
         await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
+        const ctype = String(req.headers['content-type'] || '').split(';')[0].trim();
+        // celular: JSON {name, mime, base64}; site: o proprio arquivo no corpo, nome na query
+        if (ctype === 'application/json') { let b; try { b = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { fail('BAD_JSON', 'Envio inválido.'); } return send({item: await g.sdUpload(String(b.parent || 'root'), String(b.name || 'arquivo'), String(b.mime || ''), Buffer.from(String(b.base64 || ''), 'base64'))}); }
         const name = decodeURIComponent(String(url.searchParams.get('name') || 'arquivo'));
-        return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), name, String(req.headers['content-type'] || '').split(';')[0], Buffer.concat(chunks))});
+        return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), name, ctype, Buffer.concat(chunks))});
       }
       let mm = sd.match(/^items\/([A-Za-z0-9_-]+)$/);
       if (mm && m === 'PATCH') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdUpdate(mm[1], {name: b.name === undefined ? undefined : b.name, parent: b.parent === undefined ? undefined : String(b.parent)})}); }

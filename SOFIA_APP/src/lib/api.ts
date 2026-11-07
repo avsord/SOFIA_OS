@@ -82,6 +82,8 @@ export function currentApi() { return activeApi; }
 export type ProfilePhoto = {mime: string; base64: string; updated_at: string};
 export type CatalogHit = {type: string; title: string; year: number | null; creator: string; cover: string; genre: string; source: string};
 export type LinkPreview = {url: string; title: string; site: string; image: string; price: number | null; description: string; type?: string; read: boolean};
+export type SdItem = {id: string; name: string; mime: string; folder: boolean; size: number | null; modified: string};
+export type SdListing = {connected?: boolean; code?: string; reason?: string; folder: {id: string; name: string}; path: {id: string; name: string}[]; items: SdItem[]};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
@@ -313,6 +315,31 @@ export class SofiaApi {
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
   /** 06/11/2026: relatorio do gravador de fluidez do Inicio (fluency-probe.ts). Envio direto: nao invalida caches nem dispara releituras. */
+  // ===== Sofia Drive (07/11/2026): arquivos do usuario no Drive dele, com a cara do Google Drive =====
+  sdList(folder = 'root', q = '') { return this.request<SdListing>('/md/sofiadrive/list?folder=' + encodeURIComponent(folder) + (q ? '&q=' + encodeURIComponent(q) : '')); }
+  sdCreateFolder(parent: string, name: string) { return this.request<{item: SdItem}>('/md/sofiadrive/folder', {parent, name}, 'POST'); }
+  sdUpdate(id: string, patch: {name?: string; parent?: string}) { return this.request<{item: SdItem}>('/md/sofiadrive/items/' + encodeURIComponent(id), patch, 'PATCH'); }
+  sdTrash(id: string) { return this.request<{ok: boolean}>('/md/sofiadrive/items/' + encodeURIComponent(id), undefined, 'DELETE'); }
+  /** Envia um arquivo. No site: o proprio arquivo (Blob); no celular: base64. */
+  async sdUpload(parent: string, file: {name: string; mime: string; blob?: Blob; base64?: string}) {
+    const headers: Record<string, string> = {Accept: 'application/json', ...(this.token ? {Authorization: 'Bearer ' + this.token} : {})};
+    const url = SITE + '/api/mobile/md/sofiadrive/upload?parent=' + encodeURIComponent(parent) + '&name=' + encodeURIComponent(file.name);
+    const res = file.blob ? await fetch(url, {method: 'POST', headers: {...headers, 'Content-Type': file.mime || 'application/octet-stream'}, body: file.blob})
+      : await fetch(url, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify({parent, name: file.name, mime: file.mime, base64: file.base64 || ''})});
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(data.error || 'Não consegui enviar o arquivo (' + res.status + ').', data.code || 'HTTP_ERROR', res.status, data);
+    systemChanged(this); return data as {item: SdItem};
+  }
+  /** Endereco do arquivo (conteudo, visualizacao em PDF ou download) e o cabecalho de acesso. */
+  sdFileUrl(id: string, kind: 'content' | 'preview' | 'download' = 'content') { return SITE + '/api/mobile/md/sofiadrive/items/' + encodeURIComponent(id) + '/' + kind; }
+  /** Link do player (video/audio): assinado no servidor, vale 2 h, sem precisar do login no cabecalho. */
+  async sdStreamUrl(id: string) { const r = await this.request<{url: string}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/stream-link'); return SITE + r.url; }
+  sdAuthHeaders(): Record<string, string> { return this.token ? {Authorization: 'Bearer ' + this.token} : {}; }
+  async sdBlob(id: string, kind: 'content' | 'preview' | 'download' = 'content') {
+    const res = await fetch(this.sdFileUrl(id, kind), {headers: this.sdAuthHeaders()});
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new ApiError(d.error || 'Não consegui abrir o arquivo (' + res.status + ').', d.code || 'HTTP_ERROR', res.status, d); }
+    return res.blob();
+  }
   /** 07/11/2026: a aparencia escolhida (escuro/claro/horario) vale tambem para as paginas compartilhadas. Envio direto, sem invalidar caches. */
   saveAppearance(p: {appearance: string; lightAt?: string; darkAt?: string}) { return this.fetchRequest<{ok: boolean}>('/appearance', {appearance: p.appearance, lightAt: p.lightAt, darkAt: p.darkAt}, 'PATCH', 10000); }
   diagFluidez(body: unknown) { return this.fetchRequest<{ok: boolean}>('/diag/fluidez', body, 'POST', 10000); }

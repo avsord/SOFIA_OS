@@ -75,6 +75,7 @@ export const modules:{id:string;title:string;caption:string;icon:IconName;kinds?
  {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'tag'},
  {id:'finance',title:'Finanças',caption:'Contas, cartões e orçamentos',icon:'wallet'},
  {id:'mail',title:'E-mails',caption:'A Sofia de olho no que importa',icon:'mail'},
+ {id:'drive',title:'Drive',caption:'Seus arquivos e pastas',icon:'drive'},
  {id:'knowledge',title:'Notas',caption:'Conhecimento da sua Sofia',icon:'edit',group:'knowledge'},
  {id:'all',title:'Todos os registros',caption:'Tudo o que você já registrou',icon:'grid'}
 ];

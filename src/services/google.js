@@ -29,7 +29,9 @@ const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.r
 // codigo do login) saem do E-MAIL DA SOFIA por uma ligacao so de envio, separada da conta Google pessoal (que nao muda).
 // O Railway bloqueia SMTP; pela API do Gmail (HTTPS) passa. SEND_SCOPES = so enviar, nao le nada.
 const SEND_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send'];
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
+// 07/11/2026 (Pedro): app Drive da Sofia = o Google Drive INTEIRO do usuario (permissao drive); a area da Sofia (appDataFolder,
+// oculta) nunca aparece nem pode ser mexida.
+const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/drive'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
@@ -1223,35 +1225,40 @@ class GoogleService {
   // Um "Google Drive dentro da Sofia": os arquivos ficam no DRIVE DO PROPRIO USUARIO, numa pasta "Sofia Drive" que aparece
   // tambem no Google Drive dele. Permissao drive.file (a Sofia so ve o que ela mesma criou). Toda operacao confere que o item
   // esta dentro dessa pasta.
+  /** Drive inteiro liberado (permissao 'drive', nao so 'drive.file'). */
+  fullDriveOn(l = this.link()) { return !!(l?.refresh && /(^|\s)https:\/\/www\.googleapis\.com\/auth\/drive(\s|$)/.test(l.scopes || '')); }
   async sdRoot() {
-    const l = this.link(); if (!this.visibleOn(l)) throw new AppError('DRIVE_NOT_CONNECTED', 'Ligue sua conta Google em Perfil → Conexões para usar o Drive.', 409);
-    let id = l.sofia_drive_root || '';
-    if (id) { try { const f = await this.call('GET', DRIVE + '/files/' + encodeURIComponent(id) + '?fields=id,trashed'); if (f.trashed) id = ''; } catch { id = ''; } }
-    if (!id) { id = (await this.call('POST', DRIVE + '/files?fields=id', {name: 'Sofia Drive', mimeType: 'application/vnd.google-apps.folder'})).id; this.saveLink({...this.link(), sofia_drive_root: id}); }
-    return id;
+    const l = this.link();
+    if (!l || !l.refresh) throw new AppError('DRIVE_NOT_CONNECTED', 'Ligue sua conta Google para usar o Drive.', 409);
+    if (!this.fullDriveOn(l)) throw new AppError('DRIVE_NEEDS_PERMISSION', 'Permita que a Sofia veja o seu Google Drive.', 409);
+    if (!this.sdRootId) this.sdRootId = (await this.call('GET', DRIVE + '/files/root?fields=id')).id;
+    return this.sdRootId;
   }
+  /** Itens da propria Sofia (area oculta e pastas antigas dela): nunca aparecem nem podem ser mexidos pelo Drive. */
+  sdProtected(f) { if (!f) return false; if (f.appProperties && f.appProperties.sofia_cat) return true; const folders = this.link()?.drive?.folders || {}; return Object.values(folders).includes(f.id) || (f.spaces || []).includes('appDataFolder'); }
   static sdId(id) { if (!/^[A-Za-z0-9_-]{6,200}$/.test(String(id || ''))) throw new AppError('BAD_FILE', 'Item inválido.', 400); return String(id); }
   /** Caminho do item ate a raiz do Sofia Drive (lanca erro se estiver fora). */
   async sdPath(id) {
     const root = await this.sdRoot(); if (!id || id === 'root' || id === root) return {root, path: [], meta: {id: root, name: 'Meu Drive', mimeType: 'application/vnd.google-apps.folder'}};
     const path = []; let cur = GoogleService.sdId(id), meta = null;
     for (let i = 0; i < 40; i++) {
-      let f; try { f = await this.call('GET', DRIVE + '/files/' + cur + '?fields=id,name,mimeType,parents,trashed,size,modifiedTime'); } catch { throw new AppError('NOT_FOUND', cur === id ? 'Item não encontrado.' : 'Esse item não está no Sofia Drive.', 404); }
+      let f; try { f = await this.call('GET', DRIVE + '/files/' + cur + '?fields=id,name,mimeType,parents,trashed,size,modifiedTime,appProperties,spaces'); } catch { throw new AppError('NOT_FOUND', cur === id ? 'Item não encontrado.' : 'Esse item não está no seu Drive.', 404); }
+      if (this.sdProtected(f)) throw new AppError('NOT_FOUND', 'Esse item é da Sofia e não pode ser mexido pelo Drive.', 404);
       if (!meta) meta = f;
       if (f.trashed) throw new AppError('NOT_FOUND', 'Esse item foi para a lixeira.', 404);
       if (cur !== id) path.unshift({id: f.id, name: f.name});
       const up = (f.parents || [])[0]; if (!up) break; if (up === root) return {root, path, meta};
       cur = up;
     }
-    throw new AppError('NOT_FOUND', 'Esse item não está no Sofia Drive.', 404);
+    throw new AppError('NOT_FOUND', 'Esse item não está no seu Drive.', 404);
   }
   async sdList(folder = 'root', q = '') {
     const at = await this.sdPath(folder), id = at.meta.id;
     if (at.meta.mimeType !== 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Isso não é uma pasta.', 400);
     const files = []; let page = '';
     for (let i = 0; i < 10; i++) {
-      const r = await this.call('GET', DRIVE + '/files?q=' + encodeURIComponent("'" + id + "' in parents and trashed=false" + (q ? " and name contains '" + String(q).replace(/['\\]/g, ' ').slice(0, 80) + "'" : '')) + '&orderBy=folder,name_natural&pageSize=200&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,iconLink,hasThumbnail)' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
-      files.push(...(r.files || [])); page = r.nextPageToken || ''; if (!page) break;
+      const r = await this.call('GET', DRIVE + '/files?q=' + encodeURIComponent("'" + id + "' in parents and trashed=false" + (q ? " and name contains '" + String(q).replace(/['\\]/g, ' ').slice(0, 80) + "'" : '')) + '&orderBy=folder,name_natural&pageSize=200&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,appProperties,spaces)' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+      files.push(...(r.files || []).filter(f => !this.sdProtected(f))); page = r.nextPageToken || ''; if (!page) break;
     }
     return {folder: {id: id === at.root ? 'root' : id, name: at.meta.name}, path: at.path, items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
   }
@@ -1259,6 +1266,7 @@ class GoogleService {
   static sdName(name) { const n = String(name || '').replace(/[\u0000-\u001f\\/]/g, ' ').trim().slice(0, 200); if (!n) throw new AppError('BAD_FIELD', 'Dê um nome.', 400); return n; }
   async sdCreateFolder(parent, name) { const p = await this.sdParent(parent); const f = await this.call('POST', DRIVE + '/files?fields=id,name,mimeType,modifiedTime', {name: GoogleService.sdName(name), mimeType: 'application/vnd.google-apps.folder', parents: [p]}); return {id: f.id, name: f.name, mime: f.mimeType, folder: true, size: null, modified: f.modifiedTime || ''}; }
   async sdUpload(parent, name, mime, bytes) {
+    if (!bytes || !bytes.length) throw new AppError('BAD_FILE', 'Arquivo vazio.', 400); if (bytes.length > 50 * 1024 * 1024) throw new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413);
     const p = await this.sdParent(parent), type = /^[\w.+-]+\/[\w.+-]+$/.test(String(mime || '')) ? String(mime) : 'application/octet-stream';
     const {body, type: ct} = GoogleService.multipart({name: GoogleService.sdName(name), parents: [p], mimeType: type}, type, bytes);
     const f = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,name,mimeType,size,modifiedTime', body, {'Content-Type': ct});
@@ -1278,6 +1286,21 @@ class GoogleService {
   }
   async sdTrash(id) { const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não vai para a lixeira.', 400); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: true}); return {ok: true}; }
   async sdContent(id) { const at = await this.sdPath(id); return this.driveContent(at.meta.id); }
+  /** Link temporario (2 h) para o player de video/audio: o navegador nao manda o login numa tag <video>. */
+  sdStreamToken(id, ttlMs = 2 * 3600000) { const exp = Date.now() + ttlMs, sig = crypto.createHmac('sha256', this.key()).update('sd:' + id + ':' + exp).digest('base64url'); return {exp, sig}; }
+  sdStreamValid(id, exp, sig) { const e = Number(exp); if (!Number.isFinite(e) || e < Date.now()) return false; const want = crypto.createHmac('sha256', this.key()).update('sd:' + id + ':' + e).digest('base64url'); try { return crypto.timingSafeEqual(Buffer.from(String(sig)), Buffer.from(want)); } catch { return false; } }
+  /** Repassa o arquivo em pedacos (Range): o video toca e pula para qualquer ponto sem baixar tudo. */
+  async sdStream(req, res, id) {
+    const at = await this.sdPath(id), meta = at.meta;
+    const range = /^bytes=\d*-\d*$/.test(String(req.headers.range || '')) ? String(req.headers.range) : '';
+    const r = await this.fetch(DRIVE + '/files/' + meta.id + '?alt=media', {headers: {Authorization: 'Bearer ' + await this.token(), ...(range ? {Range: range} : {})}});
+    if (!r.ok && r.status !== 206) throw new AppError('GOOGLE_API', 'Não consegui abrir o arquivo (' + r.status + ').', 502);
+    res.statusCode = r.status === 206 ? 206 : 200;
+    res.setHeader('Content-Type', String(meta.mimeType || 'application/octet-stream')); res.setHeader('Accept-Ranges', 'bytes'); res.setHeader('Cache-Control', 'private, max-age=600');
+    for (const h of ['content-range', 'content-length']) { const v = r.headers.get(h); if (v) res.setHeader(h, v); }
+    if (r.body && typeof r.body.getReader === 'function') { const rd = r.body.getReader(); req.on('close', () => { rd.cancel().catch(() => {}); }); for (;;) { const {done, value} = await rd.read(); if (done) break; if (!res.write(Buffer.from(value))) await new Promise(ok => res.once('drain', ok)); } res.end(); }
+    else res.end(Buffer.from(await r.arrayBuffer()));
+  }
   /** Word/Excel/PowerPoint e afins: o Google converte uma copia temporaria e exporta em PDF para ver na Sofia. */
   async sdPreview(id) {
     const at = await this.sdPath(id), mime = String(at.meta.mimeType || ''), name = String(at.meta.name || '');
@@ -1290,7 +1313,7 @@ class GoogleService {
       return {meta: {name: name + '.pdf', mimeType: 'application/pdf'}, res};
     }
     if (!kind) throw new AppError('BAD_FILE', 'Esse tipo de arquivo não tem visualização; baixe para abrir.', 415);
-    const copy = await this.call('POST', DRIVE + '/files/' + at.meta.id + '/copy?fields=id', {name: 'Sofia - visualizacao temporaria', mimeType: 'application/vnd.google-apps.' + kind, parents: [at.root]});
+    const copy = await this.call('POST', DRIVE + '/files/' + at.meta.id + '/copy?fields=id', {name: 'Sofia - visualizacao temporaria (some sozinho)', mimeType: 'application/vnd.google-apps.' + kind, parents: [at.root], appProperties: {sofia_cat: 'preview_tmp'}});
     try {
       const res = await this.fetch(DRIVE + '/files/' + copy.id + '/export?mimeType=application/pdf', {headers: {Authorization: 'Bearer ' + await this.token()}});
       if (!res.ok) throw new AppError('GOOGLE_API', 'O Google não converteu o arquivo (' + res.status + ').', 502);

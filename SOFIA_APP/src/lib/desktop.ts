@@ -50,6 +50,7 @@ export const APP_SHORTCUTS:{id:string;title:string;icon:IconName}[]=[
  {id:'finance',title:'Finanças',icon:'wallet'},
  {id:'monitor',title:'Price Tracker',icon:'tag'},
  {id:'mail',title:'E-mails',icon:'mail'},
+ {id:'drive',title:'Drive',icon:'drive'}, /* 07/11/2026: Sofia Drive */
  {id:'capsules',title:'Rotina',icon:'cycle'},
  {id:'reminders',title:'Lembretes',icon:'bell'},
  {id:'packages',title:'Encomendas',icon:'box'},
