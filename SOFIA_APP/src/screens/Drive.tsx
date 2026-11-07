@@ -19,6 +19,7 @@ import {contextMenu, type MenuItem} from '../components/ContextMenu';
 import {DrivePreview, KIND, cachedBlobUrl, driveKind, openNative, viewable} from '../components/DrivePreview';
 import {driveDiagInit, note, trackedDriveApi} from '../lib/drive-diag';
 import {droppedSources, fromBrowserFile, fromNativeAsset, isFileDrag, type UploadSource} from '../lib/drive-upload';
+import {DriveLock, driveLockedNow, isDriveLocked} from '../components/DriveLock';
 export {driveKind} from '../components/DrivePreview';
 
 const WEB = Platform.OS === 'web';
@@ -51,7 +52,21 @@ function Thumb({api, item, h}: {api: SofiaApi; item: SdItem; h: number}) {
   return url ? <Image source={{uri: url}} style={{width: '100%', height: h, backgroundColor: c.input}} resizeMode="cover" /> : icon;
 }
 
-export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+const listCache = new Map<string, any>(), prefetching = new Map<string, Promise<any>>();
+/** Mudou algo no Drive (enviar, renomear, mover, lixeira): as listas guardadas deixam de valer. */
+export function bustDriveLists() {listCache.clear(); prefetching.clear();}
+const busted = <T,>(x: T): T => {bustDriveLists(); return x;};
+// 07/11/2026 (Pedro: senha do Drive, aberto 10 min): a porta pede a senha; qualquer chamada do Drive que voltar
+// "trancado" (passaram os 10 minutos) fecha a porta de novo.
+function lockAware(api: SofiaApi): SofiaApi {
+  return new Proxy(api, {get(t: any, k: any) { const v = t[k]; if (typeof v !== 'function' || !String(k).startsWith('sd')) return typeof v === 'function' ? v.bind(t) : v;
+    return (...a: any[]) => { const r = v.apply(t, a); return r && typeof r.catch === 'function' ? r.catch((e: any) => { if (isDriveLocked(e)) driveLockedNow(); throw e; }) : r; }; }}) as SofiaApi;
+}
+export function Drive(props: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+  const api = useMemo(() => lockAware(props.api), [props.api]);
+  return <DriveLock api={props.api} active={props.active}><DriveInner {...props} api={api} /></DriveLock>;
+}
+function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boolean; onBack?: () => void}) {
   const api = useMemo(() => { driveDiagInit(rawApi); return trackedDriveApi(rawApi); }, [rawApi]);
   const c = useTheme(), {width} = useWindowDimensions(), wide = width >= 900, touchWeb = WEB && !wide;
   const [view, setView] = useState<View_>('drive'), [folder, setFolder] = useState('root');
@@ -69,10 +84,15 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
   const say = (msg: string, undo?: () => void) => { clearTimeout(toastT.current); setToast({msg, undo}); toastT.current = setTimeout(() => setToast(null), undo ? 7000 : 3500); };
 
   // ---------- carregar (sem corrida: so vale a resposta do ultimo pedido) ----------
+  // 07/11/2026 (Pedro: "deixa o drive mais rapido, estava com delay"): pasta ja vista aparece na hora (e atualiza por tras);
+  // as subpastas da tela sao carregadas antes do clique.
   const load = useCallback(async (v: View_ = here.current.view, f: string = here.current.folder, quiet = false) => {
-    const my = ++seq.current; if (!quiet) setLoading(true); setError(''); if (!quiet) setCode('');
+    const my = ++seq.current, hit = v === 'drive' ? listCache.get(f) : undefined;
+    if (hit) {setData(hit); setViewItems(null); setCode(''); quiet = true;}
+    if (!quiet) setLoading(true); setError(''); if (!quiet) setCode('');
     try {
-      if (v === 'drive') { const r = await api.sdList(f); if (my !== seq.current) return; if (r.connected === false) { setCode(r.code || 'DRIVE_NOT_CONNECTED'); setData(null); return; } setData(r); setViewItems(null); }
+      if (v === 'drive') { const r = await (prefetching.get(f) || api.sdList(f)); prefetching.delete(f); if (my !== seq.current) return; if (r.connected === false) { setCode(r.code || 'DRIVE_NOT_CONNECTED'); setData(null); return; } listCache.set(f, r); setData(r); setViewItems(null);
+        const subs = (r.items || []).filter((x: any) => x.folder).slice(0, 12); subs.forEach((x: any, i: number) => setTimeout(() => {if (listCache.has(x.id) || prefetching.has(x.id)) return; const p = api.sdList(x.id).then((res: any) => {if (res && res.connected !== false) listCache.set(x.id, res); return res;}); prefetching.set(x.id, p); p.catch(() => prefetching.delete(x.id));}, 150 + i * 120)); }
       else { const r = await api.sdView(v); if (my !== seq.current) return; if (r.connected === false) { setCode(r.code || 'DRIVE_NOT_CONNECTED'); setViewItems(null); return; } setViewItems(r.items); }
       if (!quiet) { setSel([]); setLimit(300); }
     } catch (e: any) { if (my === seq.current) { setError(errorText(e)); setCode(String(e?.code || '')); } }
@@ -125,7 +145,7 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
     } catch (e) { appAlert('Não consegui baixar', errorText(e)); }
   }
   const openItem = (it: SdItem) => {
-    if (trashView) { appAlert('Está na lixeira', '“' + it.name + '” está na lixeira. Restaure para abrir.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Restaurar', onPress: () => void act(() => api.sdRestore(it.id), 'Restaurado')}]); return; }
+    if (trashView) { appAlert('Está na lixeira', '“' + it.name + '” está na lixeira. Restaure para abrir.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Restaurar', onPress: () => void act(() => busted(api).sdRestore(it.id), 'Restaurado')}]); return; }
     if (it.folder) { go('drive', it.id); return; }
     const k = driveKind(it);
     if (!viewable(k)) { void download(it); return; }
@@ -134,13 +154,13 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
   };
   const trash = (list: SdItem[]) => { if (!list.length) return;
     const label = list.length === 1 ? '“' + list[0].name + '”' : list.length + ' itens';
-    void act(async () => { for (const it of list) await api.sdTrash(it.id); setSel([]); }, label + (list.length === 1 ? ' foi' : ' foram') + ' para a lixeira', async () => { for (const it of list) await api.sdRestore(it.id); }); };
-  const restore = (list: SdItem[]) => void act(async () => { for (const it of list) await api.sdRestore(it.id); setSel([]); }, list.length === 1 ? 'Restaurado' : list.length + ' itens restaurados');
-  const star = (list: SdItem[], on: boolean) => void act(async () => { for (const it of list) await api.sdUpdate(it.id, {starred: on}); }, on ? 'Estrela adicionada' : 'Estrela removida');
+    void act(async () => { for (const it of list) await busted(api).sdTrash(it.id); setSel([]); }, label + (list.length === 1 ? ' foi' : ' foram') + ' para a lixeira', async () => { for (const it of list) await busted(api).sdRestore(it.id); }); };
+  const restore = (list: SdItem[]) => void act(async () => { for (const it of list) await busted(api).sdRestore(it.id); setSel([]); }, list.length === 1 ? 'Restaurado' : list.length + ' itens restaurados');
+  const star = (list: SdItem[], on: boolean) => void act(async () => { for (const it of list) await busted(api).sdUpdate(it.id, {starred: on}); }, on ? 'Estrela adicionada' : 'Estrela removida');
   const moveTo = (list: SdItem[], dest: string, destName: string) => { const from = view === 'drive' ? folder : '';
     const real = list.filter(it => it.id !== dest); if (!real.length) return;
-    void act(async () => { for (const it of real) await api.sdUpdate(it.id, {parent: dest}); setSel([]); }, (real.length === 1 ? '“' + real[0].name + '”' : real.length + ' itens') + ' movido' + (real.length === 1 ? '' : 's') + ' para “' + destName + '”',
-      from ? async () => { for (const it of real) await api.sdUpdate(it.id, {parent: from}); } : undefined); };
+    void act(async () => { for (const it of real) await busted(api).sdUpdate(it.id, {parent: dest}); setSel([]); }, (real.length === 1 ? '“' + real[0].name + '”' : real.length + ' itens') + ' movido' + (real.length === 1 ? '' : 's') + ' para “' + destName + '”',
+      from ? async () => { for (const it of real) await busted(api).sdUpdate(it.id, {parent: from}); } : undefined); };
   const rename = (it: SdItem) => setNaming({mode: 'rename', item: it, value: it.name});
   const menu = (it: SdItem): MenuItem[] => { const many = sel.includes(it.id) && sel.length > 1 ? selItems : [it];
     if (trashView) return [{label: many.length > 1 ? 'Restaurar ' + many.length + ' itens' : 'Restaurar', icon: 'restore', run: () => restore(many)}];
@@ -166,13 +186,13 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
     const rows: Upload[] = list.filter(f => f.name).map(f => ({key: 'u' + (++uploadSeq), name: (f.dirs.length ? f.dirs.join('/') + '/' : '') + f.name, sent: 0, total: f.size, state: 'waiting', ctl: new AbortController()}));
     setUploads(u => [...u.filter(x => x.state === 'sending' || x.state === 'waiting'), ...rows]);
     const dirOf = async (dirs: string[]) => { let cur = parent; for (let i = 0; i < dirs.length; i++) { const key = parent + '/' + dirs.slice(0, i + 1).join('/'); let id = createdDirs.current.get(key);
-      if (!id) { id = (await api.sdCreateFolder(cur, dirs[i])).item.id; createdDirs.current.set(key, id); } cur = id; } return cur; };
+      if (!id) { id = (await busted(api).sdCreateFolder(cur, dirs[i])).item.id; createdDirs.current.set(key, id); } cur = id; } return cur; };
     for (const f of list.filter(x => !x.name)) await dirOf(f.dirs).catch(() => {}); // pastas vazias
     const real = list.filter(f => f.name); let next = 0;
     const patch = (key: string, p: Partial<Upload>) => setUploads(u => u.map(x => x.key === key ? {...x, ...p} : x));
     await Promise.all(Array.from({length: 3}, async () => { while (next < real.length) { const i = next++, f = real[i], row = rows[i];
       if (row.ctl!.signal.aborted) continue; patch(row.key, {state: 'sending'});
-      try { const dest = await dirOf(f.dirs); await api.sdUploadAny(dest, f, (sent, total) => patch(row.key, {sent, total}), row.ctl!.signal); patch(row.key, {state: 'done', sent: f.size}); }
+      try { const dest = await dirOf(f.dirs); await busted(api).sdUploadAny(dest, f, (sent, total) => patch(row.key, {sent, total}), row.ctl!.signal); patch(row.key, {state: 'done', sent: f.size}); }
       catch (e: any) { patch(row.key, row.ctl!.signal.aborted ? {state: 'canceled'} : {state: 'error', msg: errorText(e)}); }
     } }));
     createdDirs.current.clear();
@@ -439,8 +459,8 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
     {preview ? <DrivePreview api={api} item={preview} list={viewList} onGo={it => { setPreview(it); setSel([it.id]); }} onClose={() => setPreview(null)} onDownload={() => void download(preview)} /> : null}
   </View>;
   function submitName() { const n = naming; if (!n || !n.value.trim()) return; setNaming(null);
-    if (n.mode === 'folder') void act(() => api.sdCreateFolder(folder, n.value.trim()), 'Pasta “' + n.value.trim() + '” criada');
-    else if (n.item && n.value.trim() !== n.item.name) { const old = n.item.name, id = n.item.id; void act(() => api.sdUpdate(id, {name: n.value.trim()}), 'Renomeado para “' + n.value.trim() + '”', () => api.sdUpdate(id, {name: old})); } }
+    if (n.mode === 'folder') void act(() => busted(api).sdCreateFolder(folder, n.value.trim()), 'Pasta “' + n.value.trim() + '” criada');
+    else if (n.item && n.value.trim() !== n.item.name) { const old = n.item.name, id = n.item.id; void act(() => busted(api).sdUpdate(id, {name: n.value.trim()}), 'Renomeado para “' + n.value.trim() + '”', () => busted(api).sdUpdate(id, {name: old})); } }
 }
 
 function NameInput({initial, folder, onChange, onSubmit}: {initial: string; folder: boolean; onChange: (v: string) => void; onSubmit: () => void}) {

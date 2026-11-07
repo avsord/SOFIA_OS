@@ -1245,6 +1245,17 @@ class GoogleService {
   // toda operacao passa por sdPath, que confere o item e cada pasta acima dele ate a raiz.
   /** Drive inteiro liberado (permissao 'drive', nao so 'drive.file'). */
   fullDriveOn(l = this.link()) { return !!(l?.refresh && /(^|\s)https:\/\/www\.googleapis\.com\/auth\/drive(\s|$)/.test(l.scopes || '')); }
+  /** 07/11/2026 (Pedro: "o drive estava lento, com delay"): dados de pasta/arquivo guardados por 2 min (o caminho ate a raiz
+   * era pedido ao Google pasta por pasta a cada clique). Qualquer mudanca no Drive limpa tudo (sdBust). */
+  async sdMeta(id) {
+    this.sdMetaMemo = this.sdMetaMemo || new Map(); const hit = this.sdMetaMemo.get(id);
+    if (hit && hit.at > Date.now() - 120000) return hit.f;
+    const f = await this.call('GET', DRIVE + '/files/' + id + '?fields=' + GoogleService.SD_FIELDS);
+    this.sdMetaMemo.set(id, {f, at: Date.now()}); if (this.sdMetaMemo.size > 3000) this.sdMetaMemo.delete(this.sdMetaMemo.keys().next().value);
+    return f;
+  }
+  /** Lista de pasta guardada por 20 s (voltar/abrir de novo e na hora); mudanca limpa. */
+  sdBust() { if (this.sdMetaMemo) this.sdMetaMemo.clear(); if (this.sdListMemo) this.sdListMemo.clear(); }
   async sdRoot() {
     const l = this.link();
     if (!l || !l.refresh) throw new AppError('DRIVE_NOT_CONNECTED', 'Ligue sua conta Google para usar o Drive.', 409);
@@ -1279,7 +1290,7 @@ class GoogleService {
     const root = await this.sdRoot(); if (!id || id === 'root' || id === root) return {root, path: [], meta: {id: root, name: 'Meu Drive', mimeType: GoogleService.SD_FOLDER}};
     const path = []; let cur = GoogleService.sdId(id), meta = null, child = null;
     for (let i = 0; i < 60; i++) {
-      let f; try { f = await this.call('GET', DRIVE + '/files/' + cur + '?fields=' + GoogleService.SD_FIELDS); }
+      let f; try { f = await this.sdMeta(cur); }
       catch (e) { if (e.googleStatus && ![403, 404].includes(e.googleStatus) || /rateLimit/i.test(e.googleReason || '')) throw new AppError('GOOGLE_BUSY', 'O Google demorou para responder. Tente de novo em instantes.', 503);
         if (child && child.ownedByMe === false) return {root, path, meta, shared: true}; throw new AppError('NOT_FOUND', cur === id ? 'Item não encontrado.' : 'Esse item não está no seu Drive.', 404); }
       if (this.sdProtected(f)) throw new AppError('NOT_FOUND', 'Esse item é da Sofia e não pode ser mexido pelo Drive.', 404);
@@ -1304,6 +1315,12 @@ class GoogleService {
     return out;
   }
   async sdList(folder = 'root', q = '') {
+    this.sdListMemo = this.sdListMemo || new Map(); const mk = folder + '|' + q, mh = this.sdListMemo.get(mk);
+    if (mh && mh.at > Date.now() - 20000) return mh.v;
+    const v = await this.sdListFresh(folder, q); this.sdListMemo.set(mk, {v, at: Date.now()}); if (this.sdListMemo.size > 300) this.sdListMemo.delete(this.sdListMemo.keys().next().value);
+    return v;
+  }
+  async sdListFresh(folder = 'root', q = '') {
     const at = await this.sdResolve(folder), id = at.meta.id;
     if (at.meta.mimeType !== GoogleService.SD_FOLDER) throw new AppError('BAD_FILE', 'Isso não é uma pasta.', 400);
     const files = await this.sdPages("'" + GoogleService.sdQ(id) + "' in parents and trashed=false" + (q ? " and name contains '" + GoogleService.sdQ(String(q).slice(0, 100)) + "'" : ''), {max: 25, pageSize: 400});
@@ -1344,16 +1361,16 @@ class GoogleService {
   async sdParent(parent) { const at = await this.sdResolve(parent); if (at.meta.mimeType !== GoogleService.SD_FOLDER) throw new AppError('BAD_FILE', 'Destino não é uma pasta.', 400); return at.meta.id; }
   static sdName(name) { const n = String(name || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 250); if (!n) throw new AppError('BAD_FIELD', 'Dê um nome.', 400); return n; }
   static sdMime(m) { return /^[\w.+-]+\/[\w.+-]+$/.test(String(m || '')) ? String(m) : 'application/octet-stream'; }
-  async sdCreateFolder(parent, name) { const p = await this.sdParent(parent); const f = await this.call('POST', DRIVE + '/files?fields=' + GoogleService.SD_FIELDS, {name: GoogleService.sdName(name), mimeType: GoogleService.SD_FOLDER, parents: [p]}); return this.sdItem(f); }
+  async sdCreateFolder(parent, name) { this.sdBust(); const p = await this.sdParent(parent); const f = await this.call('POST', DRIVE + '/files?fields=' + GoogleService.SD_FIELDS, {name: GoogleService.sdName(name), mimeType: GoogleService.SD_FOLDER, parents: [p]}); return this.sdItem(f); }
   /** Envio pequeno de uma vez (ate 5 MB; arquivo vazio vale, como no Google Drive). */
-  async sdUpload(parent, name, mime, bytes) {
+  async sdUpload(parent, name, mime, bytes) { this.sdBust();
     bytes = bytes || Buffer.alloc(0); if (bytes.length > 5 * 1024 * 1024) throw new AppError('TOO_LARGE', 'Use o envio por partes para arquivos grandes.', 413);
     const p = await this.sdParent(parent), type = GoogleService.sdMime(mime);
     const {body, type: ct} = GoogleService.multipart({name: GoogleService.sdName(name), parents: [p], mimeType: type}, type, bytes);
     return this.sdItem(await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=' + GoogleService.SD_FIELDS, body, {'Content-Type': ct}));
   }
   /** Envio grande por partes (como o Google Drive): abre a sessao e devolve um codigo; as partes vem uma a uma. Ate 10 GB. */
-  async sdUploadStart(parent, name, mime, size) {
+  async sdUploadStart(parent, name, mime, size) { this.sdBust();
     const total = Number(size); if (!Number.isFinite(total) || total < 0 || total > 10 * 1024 ** 3) throw new AppError('TOO_LARGE', 'Arquivo maior que 10 GB.', 413);
     const p = await this.sdParent(parent), type = GoogleService.sdMime(mime);
     const r = await this.fetch(UPLOAD + '/files?uploadType=resumable&fields=' + encodeURIComponent(GoogleService.SD_FIELDS), {method: 'POST', headers: {Authorization: 'Bearer ' + await this.token(), 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(total)}, body: JSON.stringify({name: GoogleService.sdName(name), parents: [p], mimeType: type})});
@@ -1361,7 +1378,7 @@ class GoogleService {
     this.sdUploads = this.sdUploads || new Map(); for (const [k, v] of this.sdUploads) if (v.exp < Date.now()) this.sdUploads.delete(k);
     const sid = crypto.randomBytes(18).toString('base64url'); this.sdUploads.set(sid, {loc, total, got: 0, type, exp: Date.now() + 24 * 3600000}); return {upload: sid, total};
   }
-  async sdUploadChunk(sid, start, buf) {
+  async sdUploadChunk(sid, start, buf) { this.sdBust();
     const up = this.sdUploads?.get(String(sid || '')); if (!up) throw new AppError('NOT_FOUND', 'Esse envio expirou. Envie o arquivo de novo.', 404);
     if (Number(start) !== up.got) return {next: up.got};
     const end = up.got + buf.length - 1; if (end + 1 > up.total) throw new AppError('BAD_FILE', 'Parte maior que o arquivo.', 400);
@@ -1371,7 +1388,7 @@ class GoogleService {
     if (!r.ok) { const t = await r.text().catch(() => ''); throw new AppError('GOOGLE_API', 'O Google recusou uma parte do envio (' + r.status + '). ' + t.slice(0, 120), 502); }
     this.sdUploads.delete(sid); return {item: this.sdItem(await r.json())};
   }
-  async sdUpdate(id, {name, parent, starred} = {}) {
+  async sdUpdate(id, {name, parent, starred} = {}) { this.sdBust();
     const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não muda.', 400);
     let url = DRIVE + '/files/' + at.meta.id + '?fields=' + GoogleService.SD_FIELDS;
     if (parent !== undefined) {
@@ -1383,8 +1400,8 @@ class GoogleService {
     const body = {}; if (name !== undefined) body.name = GoogleService.sdName(name); if (starred !== undefined) body.starred = !!starred;
     return this.sdItem(await this.call('PATCH', url, body));
   }
-  async sdTrash(id) { const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não vai para a lixeira.', 400); if (at.meta.ownedByMe === false) throw new AppError('FORBIDDEN', 'Esse item é de outra pessoa: só o dono pode mandar para a lixeira.', 403); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: true}); return {ok: true}; }
-  async sdRestore(id) { const at = await this.sdPath(id, {allowTrashed: true}); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: false}); return {ok: true}; }
+  async sdTrash(id) { this.sdBust(); const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não vai para a lixeira.', 400); if (at.meta.ownedByMe === false) throw new AppError('FORBIDDEN', 'Esse item é de outra pessoa: só o dono pode mandar para a lixeira.', 403); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: true}); return {ok: true}; }
+  async sdRestore(id) { this.sdBust(); const at = await this.sdPath(id, {allowTrashed: true}); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: false}); return {ok: true}; }
   static SD_EXPORT = {'application/vnd.google-apps.document': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx'], 'application/vnd.google-apps.spreadsheet': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'], 'application/vnd.google-apps.presentation': ['application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pptx'], 'application/vnd.google-apps.drawing': ['image/png', '.png']};
   async sdExport(meta, mime, ext) {
     const res = await this.fetch(DRIVE + '/files/' + meta.id + '/export?mimeType=' + encodeURIComponent(mime), {headers: {Authorization: 'Bearer ' + await this.token()}});

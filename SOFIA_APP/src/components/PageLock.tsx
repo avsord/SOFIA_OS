@@ -7,13 +7,13 @@ import {Icon} from './Icon';
 import {OverAll} from '../lib/over-all';
 import type {LockLevel} from '../lib/page-lock';
 
-function Field({value, onChange, placeholder, onSubmit, testID, autoFocus}: {value: string; onChange: (v: string) => void; placeholder: string; onSubmit?: () => void; testID?: string; autoFocus?: boolean}) {
+export function Field({value, onChange, placeholder, onSubmit, testID, autoFocus}: {value: string; onChange: (v: string) => void; placeholder: string; onSubmit?: () => void; testID?: string; autoFocus?: boolean}) {
   const c = useTheme(), [f, setF] = useState(false);
   return <TextInput testID={testID} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry autoFocus={autoFocus} autoCapitalize="none" autoCorrect={false}
     onFocus={() => setF(true)} onBlur={() => setF(false)} onSubmitEditing={onSubmit} accessibilityLabel={placeholder}
     style={{height: 40, borderRadius: 9, borderWidth: 1, borderColor: f ? c.accent : c.line, backgroundColor: c.input, color: c.text, paddingHorizontal: 12, fontSize: 14, outlineStyle: 'none'} as any} />;
 }
-function Btn({title, onPress, primary, danger, busy, disabled, testID}: {title: string; onPress: () => void; primary?: boolean; danger?: boolean; busy?: boolean; disabled?: boolean; testID?: string}) {
+export function Btn({title, onPress, primary, danger, busy, disabled, testID}: {title: string; onPress: () => void; primary?: boolean; danger?: boolean; busy?: boolean; disabled?: boolean; testID?: string}) {
   const c = useTheme();
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} disabled={disabled || busy} onPress={onPress}
     style={({hovered}: any) => ({height: 36, paddingHorizontal: 14, borderRadius: 9, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1, backgroundColor: primary ? (hovered ? c.accent : c.accent + 'E6') : hovered ? c.line : 'transparent'})}>

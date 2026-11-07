@@ -11,6 +11,8 @@ const OWNER = 'owner-local';
 const MAX_AUDIO = 64 * 1024 * 1024, MAX_MESSAGE_BODY = 8 * 1024 * 1024;
 const fail = (code, message, status = 400) => { throw new AppError(code, message, status); };
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const DRIVE_OPEN_MS = 10 * 60 * 1000, driveOpen = new Map();
+const driveHashOk = (pw, rec) => { try { if (!pw || pw.length > 200 || !rec?.salt) return false; const a = crypto.scryptSync(pw, rec.salt, 32), b = Buffer.from(String(rec.hash), 'hex'); return b.length === a.length && crypto.timingSafeEqual(a, b); } catch { return false; } };
 function checkMobileOrigin(req, config) {
   let host; try { host = new URL('http://' + req.headers.host).host; } catch { fail('HOST_INVALID', 'Host inválido.', 403); }
   const allowed = new URL(config.publicBaseUrl || 'https://sofiaos.up.railway.app');
@@ -364,8 +366,33 @@ function makeMobileApi(runtime, deps) {
       if (action === 'backup') return send(await g.backupToDrive(true));
       fail('NOT_FOUND', 'Operação desconhecida.', 404);
     }
+    // 07/11/2026 (Pedro: "coloca senha pra acessar o drive, fica aberto por 10 minutos"): senha propria do Drive (sal + scrypt,
+    // guardada no banco). Aberto vale 10 min por sessao (memoria do servidor; reinicio fecha). Esqueceu: troca com a senha da conta.
+    if (p.startsWith('/api/mobile/md/drive-lock')) {
+      const g = runtime.google, rec = g.kvGet('driveLock'), k = session.token_hash, left = () => Math.max(0, (driveOpen.get(k) || 0) - Date.now());
+      const status = () => ({locked: !!rec && !left(), hasPassword: !!rec, openMs: rec ? left() : 0});
+      if (p === '/api/mobile/md/drive-lock' && m === 'GET') return send(status());
+      if (m !== 'POST') fail('NOT_FOUND', 'Operação desconhecida.', 404);
+      rate(session, 'drive-lock', 20); const b = await bodyJson(req, 4096), pw = String(b.password || '');
+      if (p === '/api/mobile/md/drive-lock/open') {
+        if (!rec) return send(status());
+        if (!driveHashOk(pw, rec)) fail('PASSWORD_INVALID', 'Senha do Drive incorreta.', 403);
+        driveOpen.set(k, Date.now() + DRIVE_OPEN_MS); return send(status());
+      }
+      if (p === '/api/mobile/md/drive-lock/set') {
+        // trocar: senha atual do Drive OU a senha da conta (esqueci). Primeira vez: so a nova.
+        const cur = String(b.current || ''), acct = String(b.accountPassword || '');
+        if (rec && !(cur && driveHashOk(cur, rec)) && !(acct && acct.length <= 200 && ownerAuth.verifyPassword(acct))) fail('PASSWORD_INVALID', acct ? 'A senha da conta está incorreta.' : 'Senha do Drive incorreta.', 403);
+        if (b.remove === true) { if (!rec) return send(status()); g.kvSet('driveLock', null); driveOpen.clear(); return send({locked: false, hasPassword: false, openMs: 0}); }
+        if (pw.length < 4 || pw.length > 200) fail('PASSWORD_WEAK', 'Use pelo menos 4 caracteres.');
+        const salt = crypto.randomBytes(16).toString('hex'); g.kvSet('driveLock', {salt, hash: crypto.scryptSync(pw, salt, 32).toString('hex')});
+        driveOpen.clear(); driveOpen.set(k, Date.now() + DRIVE_OPEN_MS); return send({locked: false, hasPassword: true, openMs: DRIVE_OPEN_MS});
+      }
+      fail('NOT_FOUND', 'Operação desconhecida.', 404);
+    }
     // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
     if (p.startsWith('/api/mobile/md/sofiadrive/')) {
+      { const rec = runtime.google.kvGet('driveLock'); if (rec && !((driveOpen.get(session.token_hash) || 0) > Date.now())) fail('DRIVE_LOCKED', 'O Drive está trancado. Digite a senha do Drive.', 423); }
       const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm;
       const notLinked = e => e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION' || e.code === 'GOOGLE_NOT_CONNECTED';
       const read = async run => { rate(session, 'sofiadrive', 240); try { return send({connected: true, ...(await run())}); } catch (e) { if (notLinked(e)) return send({connected: false, code: e.code, reason: e.message, items: []}); throw e; } };

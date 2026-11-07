@@ -60,5 +60,21 @@ const out = []; const ok = (c, m, extra = '') => { out.push((c ? 'OK   ' : 'FALH
   r = await api('recent'); ok(r.st === 200, 'lista "Recentes" existe', 'status ' + r.st);
   r = await api('items/' + mine.id + '/restore', {method: 'POST'}); ok(r.st === 200, 'restaurar da lixeira', 'status ' + r.st);
   r = await api('about'); ok(r.st === 200, 'espaco usado do Drive', 'status ' + r.st);
+  // 07/11/2026 (Pedro: senha do Drive, aberto 10 min)
+  const lk = async (p, json, h = H) => { const q = await fetch(B + '/api/mobile/md/drive-lock' + p, {method: json ? 'POST' : 'GET', headers: {...h, 'content-type': 'application/json'}, body: json ? JSON.stringify(json) : undefined}); return {st: q.status, j: await q.json().catch(() => ({}))}; };
+  r = await lk(''); ok(r.st === 200 && r.j.hasPassword === false, 'Drive sem senha no comeco');
+  r = await lk('/set', {password: 'abc'}); ok(r.st === 400 || r.st === 422, 'senha curta recusada', 'status ' + r.st);
+  r = await lk('/set', {password: 'drive-123'}); ok(r.st === 200 && r.j.locked === false && r.j.openMs > 9 * 60000, 'criar senha deixa aberto 10 min', JSON.stringify(r.j));
+  r = await api('list?folder=root'); ok(r.st === 200, 'quem criou a senha continua usando o Drive', 'status ' + r.st);
+  const lg2 = await (await fetch(B + '/api/mobile/auth/login', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({email: 'lab@sofia.local', password: 'senha-do-laboratorio-123', device_name: 'sonda2'})})).json();
+  const H2 = {Authorization: 'Bearer ' + lg2.token};
+  r = await fetch(B + '/api/mobile/md/sofiadrive/list?folder=root', {headers: H2}); ok(r.status === 423, 'outra sessao: Drive trancado (423)', 'status ' + r.status);
+  r = await lk('/open', {password: 'errada'}, H2); ok(r.st === 403, 'senha errada recusada', 'status ' + r.st);
+  r = await lk('/set', {password: 'nova-1234', accountPassword: 'conta-errada'}, H2); ok(r.st === 403, 'esqueci: senha da conta errada recusada', 'status ' + r.st);
+  r = await lk('/open', {password: 'drive-123'}, H2); ok(r.st === 200 && r.j.locked === false, 'senha certa abre', JSON.stringify(r.j));
+  r = await fetch(B + '/api/mobile/md/sofiadrive/list?folder=root', {headers: H2}); ok(r.status === 200, 'depois de abrir, lista o Drive', 'status ' + r.status);
+  r = await lk('/set', {password: 'nova-1234', accountPassword: 'senha-do-laboratorio-123'}, H2); ok(r.st === 200, 'esqueci: senha da conta cria senha nova', 'status ' + r.st);
+  r = await lk('/open', {password: 'drive-123'}, H2); ok(r.st === 403, 'senha antiga deixa de valer', 'status ' + r.st);
+  r = await lk('/set', {remove: true, current: 'nova-1234'}, H2); ok(r.st === 200 && r.j.hasPassword === false, 'tirar a senha (limpa para o robo)', 'status ' + r.st);
   console.log(out.join('\n')); console.log('\n' + out.filter(l => l.startsWith('FALHA')).length + ' falha(s) de ' + out.length);
 })().catch(e => { console.error('sonda quebrou:', e); process.exit(1); });

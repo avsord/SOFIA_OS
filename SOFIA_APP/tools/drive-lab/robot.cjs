@@ -23,7 +23,14 @@ async function until(fn, ms = 6000, step = 150) { const end = Date.now() + ms; l
 async function login(page) {
   await page.goto(B + '/apps/drive'); await page.waitForTimeout(1200);
   if (await page.getByPlaceholder('Seu e-mail cadastrado').count()) { await page.getByPlaceholder('Seu e-mail cadastrado').fill(EMAIL); await page.getByPlaceholder('Senha da sua conta').fill(PASS); await page.getByText('Entrar', {exact: true}).last().click(); await page.waitForTimeout(2500); }
-  await page.goto(B + '/apps/drive'); await page.getByTestId('sofia-drive').waitFor({timeout: 15000}); await page.waitForTimeout(1500);
+  await page.goto(B + '/apps/drive'); await driveDoor(page); await page.getByTestId('sofia-drive').waitFor({timeout: 15000}); await page.waitForTimeout(1500);
+}
+// 07/11/2026 (Pedro: senha do Drive, aberto 10 min): primeira vez cria a senha; depois digita
+const DRIVE_PW = 'robo-drive-1';
+async function driveDoor(page) {
+  const door = await until(async () => (await page.getByTestId('sofia-drive').count()) ? 'open' : (await page.getByTestId('drive-lock-new').count()) ? 'new' : (await page.getByTestId('drive-lock-pw').count()) ? 'pw' : '', 15000);
+  if (door === 'new') { await page.getByTestId('drive-lock-new').fill(DRIVE_PW); await page.getByTestId('drive-lock-new2').fill(DRIVE_PW); await page.getByTestId('drive-lock-save').click(); }
+  if (door === 'pw') { await page.getByTestId('drive-lock-pw').fill('errada'); await page.getByTestId('drive-lock-go').click(); await page.getByTestId('drive-lock-error').waitFor({timeout: 6000}); await page.getByTestId('drive-lock-pw').fill(DRIVE_PW); await page.getByTestId('drive-lock-go').click(); }
 }
 const names = page => page.evaluate(() => [...document.querySelectorAll('[data-testid^="drive-item-"]')].map(e => (e.getAttribute('aria-label') || '').replace(/^Pasta /, '')));
 const item = (page, name) => page.locator('[data-testid^="drive-item-"][aria-label="' + name.replace(/"/g, '\\"') + '"], [data-testid^="drive-item-"][aria-label="Pasta ' + name.replace(/"/g, '\\"') + '"]').first();

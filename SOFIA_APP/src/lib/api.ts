@@ -64,6 +64,7 @@ export async function readPrefs(): Promise<Prefs> {
   catch { return { appearance: 'schedule', enterToSend: false, autoSendVoice: true, lightAt:'05:00', darkAt:'19:00' }; }
 }
 export function savePrefs(p: Prefs) { invalidateStartupPrefs(); return AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
+export type DriveLockState = {locked: boolean; hasPassword: boolean; openMs: number};
 export class ApiError extends Error {
   constructor(message: string, public code: string, public status: number, public data?: Record<string, unknown>) { super(message); this.name = 'ApiError'; }
 }
@@ -317,6 +318,10 @@ export class SofiaApi {
   /** 06/11/2026: relatorio do gravador de fluidez do Inicio (fluency-probe.ts). Envio direto: nao invalida caches nem dispara releituras. */
   // ===== Drive (07/11/2026): o Google Drive do usuario dentro da Sofia =====
   sdSearch(q: string) { return this.request<{connected?: boolean; items: SdItem[]}>('/md/sofiadrive/search?q=' + encodeURIComponent(q), undefined, 'GET', 40000); }
+  // 07/11/2026 (Pedro: senha do Drive, aberto por 10 minutos)
+  driveLock() { return this.request<DriveLockState>('/md/drive-lock', undefined, 'GET'); }
+  driveLockOpen(password: string) { return this.request<DriveLockState>('/md/drive-lock/open', {password}); }
+  driveLockSet(body: {password?: string; current?: string; accountPassword?: string; remove?: boolean}) { return this.request<DriveLockState>('/md/drive-lock/set', body); }
   sdList(folder = 'root', q = '') { return this.request<SdListing>('/md/sofiadrive/list?folder=' + encodeURIComponent(folder) + (q ? '&q=' + encodeURIComponent(q) : ''), undefined, 'GET', 40000); }
   /** Listas como as do Google Drive: compartilhados comigo, recentes, com estrela e lixeira. */
   sdView(view: 'shared' | 'recent' | 'starred' | 'trash') { return this.request<{connected?: boolean; code?: string; items: SdItem[]}>('/md/sofiadrive/' + view, undefined, 'GET', 40000); }

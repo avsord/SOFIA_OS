@@ -21,7 +21,7 @@ const {startServer} = require(path.join(ROOT, 'src/server.js'));
   const link = () => rt.google.saveLink({refresh: rt.google.seal('lab-refresh'), email: 'usuario@gmail.com', scopes: 'openid email https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive', connected_at: new Date().toISOString(), calendar_id: 'primary', sync: {}, last_error: '', conflicts: [], drive: {folders: {root: 'pastaSofiaAntiga01'}}});
   link(); rt.google.stop?.();
   http.createServer((req, res) => {
-    if (req.url === '/reset') { google = createFakeGoogle(); rt.google.access = null; rt.google._sdRoot = null; link(); res.end('ok'); return; }
+    if (req.url === '/reset') { google = createFakeGoogle(); rt.google.access = null; rt.google._sdRoot = null; rt.google.sdBust?.(); link(); res.end('ok'); return; }
     if (req.url === '/state') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({files: [...google.files.values()], sofia: google.SOFIA_IDS(), log: google.log.slice(-400)})); return; }
     res.statusCode = 404; res.end();
   }).listen(PORT + 1, '127.0.0.1', () => console.log('laboratorio pronto em http://127.0.0.1:' + PORT + ' (estado em :' + (PORT + 1) + ')'));
