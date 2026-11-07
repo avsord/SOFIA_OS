@@ -21,6 +21,6 @@ export function useEditorColors(): [EditorColors, () => void] {
 }
 function isDark(hex: string) {const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); if (!m) return false; const n = parseInt(m[1], 16); return ((n >> 16) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) < 128;}
 export function ThemeToggle({k, colors, toggle}: {k?: string; colors: EditorColors; toggle: () => void}) {
-  return h('button', {key: k || 'theme', type: 'button', title: colors.dark ? 'Tema claro' : 'Tema escuro', 'aria-label': colors.dark ? 'Usar tema claro' : 'Usar tema escuro', onMouseDown: (e: any) => {e.preventDefault(); toggle();},
+  return h('button', {key: k || 'theme', type: 'button', title: colors.dark ? 'Tema claro' : 'Tema escuro', 'aria-label': colors.dark ? 'Usar tema claro' : 'Usar tema escuro', onMouseDown: (e: any) => e.preventDefault(), onClick: (e: any) => {e.preventDefault(); e.stopPropagation(); toggle();},
     style: {height: 28, minWidth: 28, padding: '0 8px', border: '1px solid ' + colors.line, borderRadius: 6, background: colors.field, color: colors.text, cursor: 'pointer', fontSize: 13}}, colors.dark ? '☀ Claro' : '☾ Escuro');
 }

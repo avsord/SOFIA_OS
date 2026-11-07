@@ -210,6 +210,9 @@ jobs:
         trap 'cp /tmp/sofia-seed-App.tsx App.tsx; cp /tmp/sofia-seed-build.gradle android/app/build.gradle; rm -f ProductionApp.tsx' EXIT
         cp App.tsx ProductionApp.tsx
         cp tests/fixtures/calendar-performance.tsx.fixture App.tsx
+        # o contador de desempenho redesenha a tela a cada 200 ms: a tela nunca fica parada e o leitor do teste falha
+        sed -i 's/setTick(x=>x+1),200)/setTick(x=>x+1),3600000)/' App.tsx
+        grep -q 'setTick(x=>x+1),3600000)' App.tsx
         npm run check
         sed -i -E "s/versionCode [0-9]+/versionCode $((BASE_CODE-1))/" android/app/build.gradle
         grep -q "versionCode $((BASE_CODE-1))" android/app/build.gradle
