@@ -426,6 +426,8 @@ export class SofiaApi {
   uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
   /** 0.3.199: miniatura minuscula da foto (o chat mostra desfocada sem baixar o original do Drive). */
   attachmentThumb(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?thumb=1',headers:{Authorization:'Bearer '+this.token}}; }
+  /** 07/11/2026: link assinado (2 h) para abrir o arquivo da pagina num quadro/player (que nao mandam login). */
+  async attachmentLink(id:string) { const r=await this.request<{url:string;name:string;mime:string;bytes:number}>('/workspace/attachments/'+encodeURIComponent(id)+'/link');return {...r,url:SITE+r.url}; }
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   async libraryOrganization(){const items:Entity[]=[];for(let offset=0;;offset+=100){const page=await this.request<{items:Entity[]}>('/workspace/entities?group=library&limit=100&offset='+offset);items.push(...page.items);if(page.items.length<100)return {items};}}

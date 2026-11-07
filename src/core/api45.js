@@ -45,7 +45,7 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
   if(m==='GET'&&action==='observations')return send({items:w.observations(key)});
   if(m==='POST'&&action==='observations')return send(w.observe(key,await body()),201);
   if(m==='GET'&&action==='attachments')return send({items:w.attachmentList(key)});
-  if(m==='POST'&&action==='attachments')return send(w.attach(key,await bodyJson(req,15*1024*1024)),201);
+  if(m==='POST'&&action==='attachments')return send(w.attach(key,await bodyJson(req,36*1024*1024)),201); /* 07/11/2026: ate 25 MB por arquivo */
   if(m==='GET'&&action==='calendar'){res.setHeader('Content-Type','text/calendar; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="Sofia_compromisso.ics"');res.end(calendar(w.get(key)));return true;}
   if(m==='POST'&&action==='action'){const b=await body(),e=w.get(key);if(b.revision!==undefined&&b.revision!==e.revision)throw new AppError('REVISION_CONFLICT','Reabra o registro.',409);
     if(b.action==='recipe_fragment')return send(w.recipeFragment(key,b.text));
@@ -67,7 +67,7 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
   if(!t){const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob||[]);t=makeThumb(bytes,a.mime);if(t)w.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t,a.id);}
   if(!t)throw new AppError('NOT_FOUND','Sem miniatura para este anexo.',404);
   res.setHeader('Content-Type','image/jpeg');res.setHeader('Cache-Control','private, max-age=31536000, immutable');res.setHeader('Content-Length',String(t.length));res.end(t);return true;}
- if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1';res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob);res.setHeader('Content-Length',String(bytes.length));res.end(bytes);return true;}
+ if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1'&&require('./workspace').inlineSafe(a.mime);res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob);res.setHeader('Content-Length',String(bytes.length));res.end(bytes);return true;}
  if(m==='POST'&&p==='/api/relations')return send({items:w.link(await body())},201);
  if(m==='GET'&&p==='/api/relations')return send({items:w.links(url.searchParams.get('type'),validId(url.searchParams.get('id')))});
  if(m==='GET'&&p==='/api/timeline')return send({items:w.timeline({area:url.searchParams.get('area')||'',limit:Number(url.searchParams.get('limit')||100),offset:Number(url.searchParams.get('offset')||0)})});

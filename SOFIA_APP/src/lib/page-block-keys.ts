@@ -64,6 +64,7 @@ export const SLASH_ITEMS:SlashItem[]=[
  {type:'code',label:'Código',hint:'Texto monoespaçado',icon:'</>',keys:'codigo code'},
  {type:'divider',label:'Divisor',hint:'Linha de separação',icon:'—',keys:'divisor linha separador hr'},
  {type:'subpage',label:'Subpágina',hint:'Nova página dentro desta',icon:'▤',keys:'pagina subpagina nova page'},
+ {type:'file',label:'Arquivo',hint:'PDF, Word, imagem, vídeo, áudio…',icon:'📎',keys:'arquivo anexo anexar pdf docx word excel imagem foto video audio upload enviar'},
 ];
 const fold=(v:string)=>v.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[̀-ͯ]/g,'');
 /** Busca do menu "/" sem acento: "tit" acha os Títulos; quem começa com a busca vem primeiro. */

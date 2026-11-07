@@ -1,5 +1,11 @@
 'use strict';
 const crypto=require('node:crypto');
+// 07/11/2026: anexos das Paginas. Ate 25 MB por arquivo; ate 200 MB guardados aqui antes de irem para o Google Drive.
+const ATTACH_MAX=25*1024*1024,LOCAL_ATTACH_MAX=200*1024*1024;
+/** Tipo do arquivo como fica guardado: os que o navegador executaria (pagina, SVG, script) viram arquivo comum. */
+function attachmentMime(mime){const m=String(mime||'').toLowerCase().trim();if(!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(m))return 'application/octet-stream';if(/^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml)$|javascript|ecmascript|\/x-sh$|x-msdownload/.test(m))return 'application/octet-stream';return m;}
+/** Pode abrir dentro do navegador (imagem, PDF, audio, video, texto simples); o resto so baixa. */
+function inlineSafe(mime){const m=String(mime||'');return /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(m)||m==='application/pdf'||/^(audio|video)\//.test(m)||m==='text/plain';}
 const {CATALOG}=require('./catalog');
 const mlIdentity=require('../services/mercado-livre-identity');
 const {OWNER}=require('../memory/store');
@@ -342,10 +348,10 @@ class Workspace {
    return {created,notice:'Lista gerada das quantidades informadas. Confira o que já tem em casa; nenhum estoque foi presumido.'};
  }
  checkout(key){const e=this.get(key);if(e.kind!=='checkout')throw new AppError('BAD_KIND','Selecione uma saída.');const a=(e.data.items||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean),b=(e.data.returned_items||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);return {original:a,returned:b,pending_confirmation:a.filter(x=>!b.some(y=>normalize(y)===normalize(x))),note:'Itens não confirmados não são classificados automaticamente como perdidos.'};}
- attach(key,{name,mime,base64}){this.get(key);name=cleanText(name,'Nome',160);if(/[\\/]/.test(name))throw new AppError('BAD_NAME','Use só o nome do arquivo.');if(!['audio/mpeg','audio/ogg','audio/wav','audio/mp4','audio/webm','application/pdf','application/json','application/zip','image/png','image/jpeg','image/webp','image/gif','text/plain','text/markdown','text/csv'].includes(mime))throw new AppError('BAD_MIME','Formato não permitido.');if(typeof base64!=='string'||base64.length>14*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw new AppError('BAD_ATTACHMENT','Arquivo inválido ou maior que 10 MB.');let bytes=Buffer.from(base64,'base64');if(!bytes.length||bytes.length>10*1024*1024)throw new AppError('BAD_ATTACHMENT','Use arquivo de 1 byte a 10 MB.');
+ attach(key,{name,mime,base64}){this.get(key);name=cleanText(name,'Nome',160);if(/[\\/]/.test(name))throw new AppError('BAD_NAME','Use só o nome do arquivo.');mime=attachmentMime(mime);/* 07/11/2026 (Pedro: arrastar qualquer arquivo para a Pagina): qualquer tipo; os que o navegador executaria (HTML, SVG, script) ficam guardados como arquivo comum */if(typeof base64!=='string'||base64.length>Math.ceil(ATTACH_MAX/3)*4+8||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw new AppError('BAD_ATTACHMENT','Arquivo inválido ou maior que 25 MB.');let bytes=Buffer.from(base64,'base64');if(!bytes.length||bytes.length>ATTACH_MAX)throw new AppError('BAD_ATTACHMENT','Use arquivo de 1 byte a 25 MB.');
    // 0.3.200: capa de pagina (JPEG largo) e reduzida para 1600 px: de 1 a 2 MB vira algo em torno de 150 a 400 KB
    if(mime==='image/jpeg'&&/^capa\./.test(name)&&this.get(key).kind==='user_page'){const small=require('../services/thumb').shrinkJpeg(bytes);if(small)bytes=small;}
-   const total=(()=>{try{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments WHERE drive_id IS NULL').get().n;}catch{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments').get().n;}})();if(total+bytes.length>50*1024*1024)throw new AppError('MEDIA_LIMIT','Limite local de anexos desta versão: 50 MB. Use referências externas para acervos maiores.');
+   const total=(()=>{try{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments WHERE drive_id IS NULL').get().n;}catch{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments').get().n;}})();if(total+bytes.length>LOCAL_ATTACH_MAX)throw new AppError('MEDIA_LIMIT','O espaço de anexos ainda não enviados ao Google Drive está cheio (200 MB). Conecte o Google Drive em Perfil › Conexões ou aguarde o envio dos anexos.');
    const a=id();this.db.prepare('INSERT INTO attachments(id,entity_id,name,mime,bytes,sha256,blob,created_at) VALUES(?,?,?,?,?,?,?,?)').run(a,key,name,mime,bytes.length,crypto.createHash('sha256').update(bytes).digest('hex'),bytes,now());this.event('entity',key,'attachment',this.get(key).area,'Original anexado localmente');return this.attachmentList(key).find(x=>x.id===a);
  }
  attachmentList(key){this.get(key);return this.db.prepare('SELECT id,entity_id,name,mime,bytes,sha256,created_at FROM attachments WHERE entity_id=? ORDER BY created_at').all(key);}
@@ -384,4 +390,4 @@ class Workspace {
  context(query,limit=5,{route='private'}={}){const allowed=e=>(route==='shared'?e.privacy==='shared':e.privacy!=='local')&&!(e.kind==='user_page'&&(e.tags||[]).some(t=>t==='sofia-secret-ok-v1'||t==='sofia-lock-v1'));return this.list({limit:500}).filter(e=>allowed(e)&&!['contact','payment','invoice','approval','recipe_session'].includes(e.kind)&&e.state!=='archived').map(e=>({...e,rank:normalize(query).split(/\W+/).filter(t=>t.length>2&&normalize(e.title+' '+e.content+' '+e.tags.join(' ')+' '+JSON.stringify(e.data)).includes(t)).length})).filter(e=>e.rank>0).sort((a,b)=>b.rank-a.rank).slice(0,limit).map(e=>({id:e.id,kind:e.kind,title:e.title,content:e.content,data:e.data,tags:e.tags,area:e.area,privacy:e.privacy}));}
  contextSensitivity(query){const hits=this.context(query,8,{route:'private'});if(hits.some(e=>e.privacy==='private'))return 'private';if(hits.some(e=>e.privacy==='shared'))return 'shared';return 'none';}
 }
-module.exports={Workspace,AREAS,dateISO,dateTime,tags,url};
+module.exports={Workspace,AREAS,dateISO,dateTime,tags,url,inlineSafe,attachmentMime};

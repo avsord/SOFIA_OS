@@ -1460,6 +1460,32 @@ class GoogleService {
     } finally { this.call('DELETE', DRIVE + '/files/' + copy.id).catch(() => {}); }
   }
 
+  /** 07/11/2026 (Pedro: arquivos nas Paginas): Word/Excel/PowerPoint anexado a uma pagina -> PDF para ver na janela flutuante.
+   * O Google converte uma copia temporaria (apagada logo depois; a varredura apaga sobras). Guarda os ultimos 20. */
+  async attachmentPdf(a) {
+    const name = String(a.name || ''), mime = String(a.mime || '');
+    const kind = /wordprocessingml|msword|opendocument\.text|rtf/.test(mime) || /\.(docx?|odt|rtf)$/i.test(name) ? 'document'
+      : /spreadsheetml|ms-excel|opendocument\.spreadsheet|^text\/csv$/.test(mime) || /\.(xlsx?|ods|csv)$/i.test(name) ? 'spreadsheet'
+      : /presentationml|ms-powerpoint|opendocument\.presentation/.test(mime) || /\.(pptx?|odp)$/i.test(name) ? 'presentation' : '';
+    if (!kind) throw new AppError('BAD_FILE', 'Esse tipo de arquivo não tem visualização; baixe para abrir.', 415);
+    if (!this.driveOn()) throw new AppError('NO_DRIVE', 'Para ver Word, Excel e PowerPoint aqui, conecte o Google em Perfil › Conexões.', 409);
+    this.attPdfMemo = this.attPdfMemo || new Map(); const hit = this.attPdfMemo.get(a.id); if (hit) return hit;
+    const job = (async () => {
+      const bytes = await this.attachmentBytes(a);
+      const {body, type} = GoogleService.multipart({name: 'Sofia - visualizacao temporaria (some sozinho)', mimeType: 'application/vnd.google-apps.' + kind, appProperties: {sofia_cat: 'preview_tmp'}}, mime || 'application/octet-stream', bytes);
+      const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': type});
+      try {
+        const res = await this.fetch(DRIVE + '/files/' + up.id + '/export?mimeType=application/pdf', {headers: {Authorization: 'Bearer ' + await this.token()}});
+        if (!res.ok) throw new AppError('GOOGLE_API', 'O Google não converteu o arquivo (' + res.status + ').', 502);
+        return Buffer.from(await res.arrayBuffer());
+      } finally { this.call('DELETE', DRIVE + '/files/' + up.id).catch(() => {}); }
+    })();
+    this.attPdfMemo.set(a.id, job); job.catch(() => this.attPdfMemo.delete(a.id));
+    while (this.attPdfMemo.size > 20) this.attPdfMemo.delete(this.attPdfMemo.keys().next().value);
+    this.sdPreviewSweep().catch(() => {});
+    return job;
+  }
+
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
     const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };

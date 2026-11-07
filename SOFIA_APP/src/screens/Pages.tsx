@@ -1,4 +1,5 @@
 import {PagesLoadingBody} from '../components/ScreenSkeleton';
+import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime} from '../components/PageFiles';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
@@ -220,6 +221,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function applyCaret(r:Caret|null){if(!r||!selectedId)return false;const blocks=r.blocks;flushNow(()=>{edit(d=>({...d,blocks}));setSlash(null);setFocus(r.focus);});placeCaret(r.focus,r.caret);return true;}
  function chooseSlash(b:PageBlock,type:string){const sl=slash;setSlash(null);if(!sl||sl.id!==b.id||!entry)return;
   if(type==='subpage'){void createSubpageHere(b,sl);return;}
+  if(type==='file'){applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,'text'));pickFiles(b);return;} /* 07/11/2026: "/arquivo" escolhe arquivos do computador */
   applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,type));}
  function insertWithSlash(b:PageBlock){const blocks=currentBlocks(),i=blocks.findIndex(x=>x.id===b.id);if(i<0)return;const empty=b.type==='text'&&!String(b.text||'').trim();
   const target=empty?b:{...newBlock(),text:'/'};const next=blocks.slice();if(empty)next[i]={...b,text:'/',html:''};else next.splice(i+1,0,target);
@@ -370,6 +372,26 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===b.id);const empty=b.type==='text'&&!String(b.text||'').trim();if(i<0)blocks.push(block);else if(empty)blocks.splice(i,1,block);else blocks.splice(i+1,0,block);if(blocks[blocks.length-1].id===block.id)blocks.push(newBlock());return {...d,blocks};});
   try{const id=await uploadPageImage(api,pageId,img);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===block.id?{...x,data:{attachment_id:id,caption:''}}:x)}));void store.flush(pageId);}
   catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==block.id)}));setError(errorText(e));}}
+ // 07/11/2026 (Pedro: "arrastar um docx, pdf, o que for, ele fica uma linha com o tipo e o nome"): cada arquivo vira um bloco
+ // 'file' logo depois do bloco onde caiu (ou no lugar dele, se estiver vazio); imagem, video e audio ja aparecem na pagina.
+ async function dropFiles(after:PageBlock|null,files:File[]){if(!selectedId||!files.length)return;const pageId=selectedId,cur=store.get(pageId);
+  if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
+  const made=files.map(f=>({...newBlock('file'),text:'',data:{uploading:true,name:f.name,size:f.size,mime:guessMime(f)}}));
+  edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
+   if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
+  await Promise.all(files.map(async(f,n)=>{const blk=made[n];try{const up=await uploadPageFile(api,pageId,f);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...up,view:defaultView(fileKind(up.mime,up.name))}}:x)}));}
+   catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
+  void store.flush(pageId);}
+ function pickFiles(after:PageBlock|null){if(Platform.OS!=='web')return;const input=document.createElement('input');input.type='file';input.multiple=true;input.onchange=()=>{const list=[...(input.files||[])] as File[];if(list.length)void dropFiles(after,list);};input.click();}
+ const editorDrop=useRef<any>(null),[fileOver,setFileOver]=useState(false);
+ const dropRef=useRef(dropFiles);dropRef.current=dropFiles;const currentBlocksRef=useRef(currentBlocks);currentBlocksRef.current=currentBlocks;const focusRef=useRef<string|null>(null);focusRef.current=focus;
+ useEffect(()=>{const el=editorDrop.current as HTMLElement|null;if(Platform.OS!=='web'||!el?.addEventListener)return;
+  const hasFiles=(e:DragEvent)=>[...(e.dataTransfer?.types||[])].includes('Files');let leave:any=null;
+  const over=(e:DragEvent)=>{if(!hasFiles(e))return;e.preventDefault();clearTimeout(leave);setFileOver(true);};
+  const out=()=>{clearTimeout(leave);leave=setTimeout(()=>setFileOver(false),80);};
+  const drop=(e:DragEvent)=>{setFileOver(false);if(!hasFiles(e)||e.defaultPrevented||(e.target as HTMLElement)?.closest?.('[contenteditable="true"]'))return; /* caiu no texto: o proprio campo cuida */e.preventDefault();const list=[...(e.dataTransfer?.files||[])] as File[];const blocks=currentBlocksRef.current();const at=blocks.find(x=>x.id===focusRef.current)||blocks[blocks.length-1]||null;void dropRef.current(at,list);};
+  el.addEventListener('dragover',over);el.addEventListener('dragleave',out);el.addEventListener('drop',drop);
+  return()=>{el.removeEventListener('dragover',over);el.removeEventListener('dragleave',out);el.removeEventListener('drop',drop);clearTimeout(leave);};},[selectedId]);
  const htmlOfBlock=(x:PageBlock)=>x.html?String(x.html):textToHtml(String(x.text||''));
  // juntar linhas com Backspace leva a formatação das duas
  function keepHtmlOnMerge(blocks:PageBlock[],r:Caret,id:string):Caret{const i=blocks.findIndex(x=>x.id===id),cur=blocks[i],prev=blocks[i-1];
@@ -506,6 +528,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(b.type==='image'&&b.data?.attachment_id&&desktop)return <Pressable key={b.id} accessible={false} onPress={()=>{setFocus(b.id);/* 06/11/2026 (Pedro: "tentando apagar isso e nao ta indo"): clicar na imagem a seleciona como no Notion; Delete/Backspace apaga, Esc solta */if(desktop){try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id||picked.has(b.id)?c.accent:'transparent',alignSelf:'flex-start',maxWidth:'100%'}}><PageAttachmentImage api={api} id={String(b.data.attachment_id)} caption={b.data.caption?String(b.data.caption):''}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
   if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
+  if(b.type==='file'&&Platform.OS==='web')return <View key={b.id} testID={'page-block-'+b.id}><PageFileBlock api={api} data={(b.data||{}) as any} selected={focus===b.id||picked.has(b.id)} onSelect={()=>{setFocus(b.id);try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}} onChange={data=>updateBlock(b,{data})} onRemove={()=>removeBlock(b.id)}/></View>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text>{(()=>{const link=String((b as any).url||'').trim()||(String(b.text||'').match(/https?:\/\/\S+/)||[''])[0];if(!link)return null;
    // 0.3.269: link numa Pagina vira item da Biblioteca (uma das entradas do fluxo de criar)
    return <Pressable accessibilityRole="button" testID={'page-link-to-library-'+b.id} onPress={()=>{void api.linkPreview(link).catch(()=>null).then(pv=>api.saveEntity({kind:'library_item',title:(pv?.title||String(b.text||'').replace(link,'').trim()||link).slice(0,240),content:'',area:'Pessoal',privacy:'private',state:'saved',tags:[],data:{type:'reference',status:'0',url:pv?.url||link,site:pv?.site||'',cover_url:pv?.image||''}})).then(()=>appAlert('Biblioteca','Guardado na Biblioteca, em Referências.')).catch(e=>setError(errorText(e)));}} style={{alignSelf:'flex-start',marginTop:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Guardar na Biblioteca</Text></Pressable>;})()}</Pressable>;
@@ -524,7 +547,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     value={b.text||''} html={b.html||''} placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderColor={placeholderColor}
     onChange={(text:string,html:string)=>onBlockText(b,text,html)} onKeyPress={preview?undefined:(e:any)=>onBlockKey(e,b)} onFocus={()=>setFocus(b.id)}
     onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}}
-    onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)}
+    onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)} onDropFiles={(files:File[])=>void dropFiles(b,files)}
     onPasteText={(pasted:string,a:number,z:number)=>{if(!pasted.includes('\n'))return false;const before=String(b.text||'');return applyCaret(pastedLines(currentBlocks(),b.id,before,before.slice(0,a)+pasted+before.slice(z)));}}
     style={{flex:1,minHeight:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
    :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
@@ -641,7 +664,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
- if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}</View>;
+ if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada
  const lk=isLocked(selected)?lockHeader(selected):null,lockedNow=!!lk&&!isOpen(lk.kid),decrypting=!!lk&&!lockedNow&&!!selRaw&&needsOpen(selRaw);
@@ -668,7 +691,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
- const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
+ const editor=<View ref={editorDrop} style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
+  {fileOver?<View pointerEvents="none" testID="page-file-drop" style={{position:'absolute',top:10,left:10,right:10,bottom:10,zIndex:80,borderRadius:16,borderWidth:2,borderStyle:'dashed',borderColor:c.accent,backgroundColor:c.bg+'cc',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="upload" size={30} color={c.accent}/><Text style={{color:c.text,fontSize:16,fontWeight:'600'}}>Solte para anexar à página</Text><Text style={{color:c.muted,fontSize:12}}>Qualquer arquivo até 25 MB · PDF, Word, Excel, imagem, vídeo, áudio…</Text></View>:null}
   {/* 0.3.263 (fase 3 — Paginas no computador): o caminho e o titulo ja estao na barra de cima; aqui fica uma faixa fina so com o
       estado (salvo, salvando) e as ferramentas, sem fundo de cartao - o documento ocupa a cena, como no Notion. */}
   <View style={desktop?{zIndex:20,minHeight:40,flexDirection:'row',alignItems:'center',paddingHorizontal:16}:{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
@@ -732,7 +756,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <KeyboardViewport>{editor}</KeyboardViewport>
-  {createPicker}
+  {createPicker}<FileWindowHost/>
  </View>;
 }
 

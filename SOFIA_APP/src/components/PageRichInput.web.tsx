@@ -10,7 +10,7 @@ import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
 
 type Props={value:string;html?:string;placeholder?:string;placeholderColor?:string;style?:any;editable?:boolean;accessibilityLabel?:string;testID?:string;
- onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
+ onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i;
@@ -129,8 +129,9 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
   onMouseOver:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement|null;if(!a||!el.current?.contains(a))return;popKeep();if(popA.current===a&&pop)return;popA.current=a;const r=a.getBoundingClientRect();setPop({url:a.getAttribute('href')||'',x:r.left,y:r.bottom});},
   onMouseOut:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]');if(a)popLeave();},
   onClick:(e:any)=>{const a=(e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement|null;if(!a||!el.current?.contains(a))return;const sel=document.getSelection();if(sel&&!sel.isCollapsed)return;e.preventDefault();openUrl(a.getAttribute('href')||'');},
-  onDragOver:(e:any)=>{if(props.onPasteImage&&[...(e.dataTransfer?.items||[])].some((x:any)=>x.kind==='file'))e.preventDefault();},
-  onDrop:(e:any)=>{const f=[...(e.dataTransfer?.files||[])].find((x:any)=>/^image\//.test(x.type));if(f&&props.onPasteImage){e.preventDefault();props.onPasteImage(f as Blob);return;}
+  onDragOver:(e:any)=>{if((props.onPasteImage||props.onDropFiles)&&[...(e.dataTransfer?.items||[])].some((x:any)=>x.kind==='file'))e.preventDefault();},
+  onDrop:(e:any)=>{const all=[...(e.dataTransfer?.files||[])] as File[];if(all.length&&props.onDropFiles){e.preventDefault();props.onDropFiles(all);return;} /* 07/11/2026: qualquer arquivo vira bloco de arquivo */
+   const f=all.find((x:any)=>/^image\//.test(x.type));if(f&&props.onPasteImage){e.preventDefault();props.onPasteImage(f as Blob);return;}
    // arrastar algo de outro site: entra so o texto (com os links), nunca o HTML com o estilo de la
    const dt=e.dataTransfer;if(!dt||(dt.files&&dt.files.length))return;const text=dt.getData('text/plain')||dt.getData('text/uri-list')||'';e.preventDefault();if(!text.trim())return;
    const d:any=document;const pos=d.caretRangeFromPoint?.(e.clientX,e.clientY);if(pos){const sel=document.getSelection();sel?.removeAllRanges();sel?.addRange(pos);}

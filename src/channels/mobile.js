@@ -59,6 +59,24 @@ function makeMobileApi(runtime, deps) {
     return {ok: false, need: {challenge: id, sent_to: masked}};
   }
   const extra = makeApi45(runtime, { bodyJson, json });
+  const fileKey = crypto.randomBytes(32);
+  const fileSig = (id, exp) => crypto.createHmac('sha256', fileKey).update('file:' + id + ':' + exp).digest('base64url');
+  const fileLink = id => { const exp = Date.now() + 2 * 3600000; return '/api/mobile/file-stream/' + id + '?exp=' + exp + '&sig=' + fileSig(id, exp); };
+  const fileLinkValid = (id, exp, sig) => { const e = Number(exp); if (!e || e < Date.now() || typeof sig !== 'string') return false; const want = Buffer.from(fileSig(id, e)), got = Buffer.from(sig); return want.length === got.length && crypto.timingSafeEqual(want, got); };
+  async function sendAttachment(req, res, id, as) {
+    const a0 = workspace.attachment(validId(id)), pdf = as === 'pdf';
+    const bytes = pdf ? await runtime.google.attachmentPdf(a0) : runtime.google && runtime.google.attachmentBytes ? await runtime.google.attachmentBytes(a0) : Buffer.from(a0.blob || []);
+    const a = pdf ? {...a0, mime: 'application/pdf', name: String(a0.name || 'arquivo').replace(/\.[^.]+$/, '') + '.pdf'} : a0;
+    const inline = as !== 'download' && require('../core/workspace').inlineSafe(a.mime), total = bytes.length;
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; object-src 'self'"); res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    let start = 0, end = total - 1; const r = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
+    res.setHeader('Accept-Ranges', 'bytes'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Content-Type', inline ? a.mime : 'application/octet-stream'); res.setHeader('Content-Disposition', (inline ? 'inline' : 'attachment') + "; filename*=UTF-8''" + encodeURIComponent(a.name));
+    if (r && total) { if (r[1] === '') start = Math.max(0, total - Number(r[2] || 0)); else { start = Number(r[1]); if (r[2] !== '') end = Math.min(total - 1, Number(r[2])); }
+      if (start > end || start >= total) { res.statusCode = 416; res.setHeader('Content-Range', 'bytes */' + total); res.end(); return; }
+      res.statusCode = 206; res.setHeader('Content-Range', 'bytes ' + start + '-' + end + '/' + total); } else res.statusCode = 200;
+    res.setHeader('Content-Length', String(total ? end - start + 1 : 0)); if (req.method === 'HEAD') { res.end(); return; } res.end(bytes.subarray(start, end + 1));
+  }
   const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
   const mercadoLivre = require('../services/mercado-livre').makeMercadoLivreReader({workspace, stores: runtime.stores, ...runtime.mercadoLivreOptions});
@@ -153,6 +171,10 @@ function makeMobileApi(runtime, deps) {
       if (!step.ok) return send({ ok: false, need_code: true, ...step.need });
       clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile(), ...(step.trust ? {trust: step.trust} : {}) });
     }
+    // 07/11/2026 (Pedro: arquivos nas Paginas): PDF/video/audio da pagina abre na janela flutuante. O quadro e o player nao
+    // mandam login: link assinado (chave sorteada a cada partida do servidor), vale 2 h. Video pula para frente (Range).
+    { const am = p.match(/^\/api\/mobile\/file-stream\/([A-Za-z0-9_-]{6,80})$/);
+      if (am && (m === 'GET' || m === 'HEAD')) { if (!fileLinkValid(am[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await sendAttachment(req, res, am[1], ['download', 'pdf'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''); return true; } }
     // 07/11/2026: player de video/audio do Drive - a tag <video> nao manda login; o link e assinado e vale 2 h
     { const sm = p.match(/^\/api\/mobile\/md\/sofiadrive\/stream\/([A-Za-z0-9_-]{6,200})$/);
       if (sm && (m === 'GET' || m === 'HEAD')) { if (!runtime.google.sdStreamValid(sm[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await runtime.google.sdStream(req, res, sm[1], {as: ['preview', 'download'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''}); return true; } }
@@ -402,6 +424,8 @@ function makeMobileApi(runtime, deps) {
       fail('NOT_FOUND','Operação de Cápsulas não disponível.',404);
     }
     // Reuse web workspace operations only AFTER bearer auth. Never bridge admin/credentials/restore endpoints.
+    { const lm = p.match(/^\/api\/mobile\/workspace\/attachments\/([A-Za-z0-9_-]{6,80})\/link$/);
+      if (lm && m === 'GET') { rate(session, 'file-link', 600); const a = workspace.attachment(validId(lm[1])); return send({url: fileLink(a.id), name: a.name, mime: a.mime, bytes: a.bytes}); } }
     if (p.startsWith('/api/mobile/workspace/')) {
       const suffix = p.slice('/api/mobile/workspace/'.length);
       const allowed = /^(?:catalog|areas|panorama|pages\/shared|pages\/lock-(?:key|recover)|pages\/[\w-]+\/share|ui\/(?:home|pages)|entities(?:\/[\w-]+(?:\/(?:versions|observations|attachments|calendar|action))?)?|attachments\/[\w-]+|relations|timeline|integrations|vault\/(?:status|setup|confirm|unlock|recover|lock|entries|chat|discuss))$/;

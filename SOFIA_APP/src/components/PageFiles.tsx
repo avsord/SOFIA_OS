@@ -1,0 +1,189 @@
+// 07/11/2026 (Pedro): "quero poder arrastar um docx, pdf, o que for, ele ficar uma linha com o tipo de arquivo e o nome; quando
+// clico eu posso visualizar, assim com imagem, video, audio. Imagem tem a opcao de visualizacao (mexer na escala) ou anexo. A
+// janela e flutuante, igual as janelas do tablet, que voce move e usa de referencia ao lado. Para todo tipo de conteudo."
+// - Bloco 'file' da pagina: modo "anexo" (linha com icone do tipo, nome e tamanho) ou "visualizacao" (imagem, video, audio,
+//   PDF e Office direto na pagina, com a escala ajustavel).
+// - Clicar abre a JANELA FLUTUANTE: arrasta pelo topo, muda o tamanho pelo canto, varias abertas ao mesmo tempo, ficam por cima
+//   enquanto voce escreve. PDF e Office (convertido em PDF pelo Google no servidor) num quadro; imagem com zoom; video e audio
+//   com o player do navegador; texto em letra fixa.
+// Os arquivos abrem por LINK ASSINADO do proprio site (a protecao da pagina bloqueia quadros com blob:).
+import React, {useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {Platform, Pressable, Text, View} from 'react-native';
+import type {SofiaApi} from '../lib/api';
+import {useTheme} from '../lib/theme';
+import {Icon} from './Icon';
+import {Spinner} from './Loading';
+import {driveKind, KIND, type Kind} from './DrivePreview';
+import {OverAll} from '../lib/over-all';
+import {errorText} from '../lib/chat-model';
+
+const WEB = Platform.OS === 'web';
+const h = React.createElement as any;
+export const FILE_MAX = 25 * 1024 * 1024;
+export type PageFileData = {attachment_id?: string; name?: string; mime?: string; size?: number; view?: 'attach' | 'preview'; scale?: number; uploading?: boolean; progress?: string};
+
+export const fileKind = (mime?: string, name?: string): Kind => driveKind({mime: String(mime || ''), name: String(name || ''), folder: false} as any);
+const OFFICE = (k: Kind) => k === 'doc' || k === 'sheet' || k === 'slides';
+/** Pode aparecer dentro da pagina (modo visualizacao). */
+export const inlineCapable = (k: Kind) => k === 'image' || k === 'video' || k === 'audio' || k === 'pdf' || OFFICE(k);
+/** Abre na janela (o resto: so baixar). */
+const windowCapable = (k: Kind, name: string) => inlineCapable(k) || k === 'text' || /\.(txt|md|csv|json|log)$/i.test(name);
+export const defaultView = (k: Kind): 'attach' | 'preview' => (k === 'image' || k === 'video' || k === 'audio' ? 'preview' : 'attach');
+export function sizeLabel(n?: number) {if (!n) return ''; if (n < 1024) return n + ' B'; if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + ' KB'; return (n / 1048576).toFixed(n < 10 * 1048576 ? 1 : 0).replace('.', ',') + ' MB';}
+const ext = (name?: string) => {const m = /\.([a-z0-9]{1,5})$/i.exec(String(name || '')); return m ? m[1].toUpperCase() : '';};
+const GUESS: Record<string, string> = {pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet', odp: 'application/vnd.oasis.opendocument.presentation', csv: 'text/csv', txt: 'text/plain', md: 'text/markdown', json: 'application/json', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', zip: 'application/zip', rtf: 'application/rtf'};
+export const guessMime = (f: {type?: string; name?: string}) => String(f.type || '') || GUESS[ext(f.name).toLowerCase()] || 'application/octet-stream';
+
+/** Envia o arquivo como anexo da pagina. Devolve id, nome, tipo e tamanho. */
+export async function uploadPageFile(api: SofiaApi, pageId: string, file: File): Promise<Required<Pick<PageFileData, 'attachment_id' | 'name' | 'mime' | 'size'>>> {
+  if (!file.size) throw new Error('O arquivo “' + file.name + '” está vazio.');
+  if (file.size > FILE_MAX) throw new Error('“' + file.name + '” tem ' + sizeLabel(file.size) + '. O limite por arquivo é 25 MB.');
+  const data: string = await new Promise((ok, bad) => {const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error); r.readAsDataURL(file);});
+  const mime = guessMime(file), name = String(file.name || 'arquivo').replace(/[\\/]/g, '_').slice(0, 160);
+  const a = await api.uploadAttachment(pageId, {name, mime, base64: data.slice(data.indexOf(',') + 1)});
+  return {attachment_id: a.id, name, mime, size: file.size};
+}
+
+/** Links assinados (valem 2 h no servidor; aqui 90 min). */
+const links = new Map<string, {url: string; until: number}>();
+async function signedUrl(api: SofiaApi, id: string, as: '' | 'pdf' | 'download' = '') {
+  const hit = links.get(id); let url = hit && hit.until > Date.now() ? hit.url : '';
+  if (!url) {url = (await api.attachmentLink(id)).url; links.set(id, {url, until: Date.now() + 90 * 60000});}
+  return url + (as ? '&as=' + as : '');
+}
+function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '') {
+  const [state, setState] = useState<{url: string; error: string}>({url: '', error: ''});
+  useEffect(() => {let live = true; setState({url: '', error: ''}); if (!id) return;
+    (async () => {const url = await signedUrl(api, id, as);
+      if (as === 'pdf') {const r = await fetch(url, {method: 'HEAD'}); if (!r.ok) {const j = await fetch(url).then(x => x.json()).catch(() => null); throw new Error(j?.error || 'Não consegui abrir este arquivo (' + r.status + ').');}}
+      return url;})().then(url => {if (live) setState({url, error: ''});}).catch(e => {if (live) setState({url: '', error: errorText(e)});});
+    return () => {live = false;};}, [api, id, as]);
+  return state;
+}
+export async function downloadPageFile(api: SofiaApi, id: string) {
+  const url = await signedUrl(api, id, 'download'); const a = document.createElement('a'); a.href = url; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------------- Janelas flutuantes ----------------
+type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean};
+let wins: Win[] = [], topZ = 1;
+const subs = new Set<() => void>();
+const emit = () => subs.forEach(f => f());
+const setWins = (next: Win[]) => {wins = next; emit();};
+export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string}) {
+  const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, z: ++topZ} : w)); return;}
+  const W = window.innerWidth, H = window.innerHeight, w = Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = Math.min(H - 110, 720), n = wins.length;
+  setWins([...wins, {key: f.id + ':' + Date.now(), api, id: f.id, name: f.name, mime: f.mime, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false}]);
+}
+const closeWin = (key: string) => setWins(wins.filter(w => w.key !== key));
+const patchWin = (key: string, p: Partial<Win>) => setWins(wins.map(w => w.key === key ? {...w, ...p} : w));
+
+/** Fica montado na tela de Paginas: as janelas abertas aparecem por cima de tudo (e continuam ao trocar de pagina). */
+export function FileWindowHost() {
+  const list = useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
+  useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) closeWin(top.key);}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
+  if (!WEB || !list.length) return null;
+  return <OverAll>{list.map(w => <FileWindow key={w.key} win={w} />)}</OverAll>;
+}
+
+function FileWindow({win}: {win: Win}) {
+  const c = useTheme(), k = fileKind(win.mime, win.name), meta = KIND[k], [zoom, setZoom] = useState(0), [moving, setMoving] = useState(false);
+  const drag = (mode: 'move' | 'size') => (e: any) => {
+    if (e.button != null && e.button !== 0) return; if (mode === 'move' && (e.target as HTMLElement)?.closest?.('[data-win-btn]')) return;
+    e.preventDefault(); try {window.getSelection()?.removeAllRanges();} catch {} const sx = e.clientX, sy = e.clientY, o = {...win}, bodyStyle = document.body.style, oldSel = bodyStyle.userSelect; bodyStyle.userSelect = 'none'; setMoving(true); patchWin(win.key, {z: ++topZ});
+    const mv = (ev: PointerEvent) => {const dx = ev.clientX - sx, dy = ev.clientY - sy, W = window.innerWidth, H = window.innerHeight;
+      if (mode === 'move') patchWin(win.key, {max: false, x: Math.min(W - 80, Math.max(-o.w + 120, o.x + dx)), y: Math.min(Math.max(0, H - o.hgt - 4), Math.max(0, o.y + dy))});
+      else patchWin(win.key, {w: Math.max(300, Math.min(W - o.x - 4, o.w + dx)), hgt: Math.max(220, Math.min(H - o.y - 4, o.hgt + dy))});};
+    const up = () => {bodyStyle.userSelect = oldSel; setMoving(false); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  };
+  const box = win.max ? {left: 12, top: 12, width: 'calc(100vw - 24px)', height: 'calc(100vh - 24px)'} : {left: win.x, top: win.y, width: win.w, height: win.hgt};
+  const btn = (icon: any, label: string, run: () => void) => <Pressable key={label} {...({dataSet: {winBtn: '1'}} as any)} accessibilityLabel={label} onPress={run} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Icon name={icon} size={15} color={c.muted} /></Pressable>;
+  return h('div', {'data-testid': 'file-window', role: 'dialog', 'aria-label': win.name, onPointerDown: () => {if (wins.find(w => w.key === win.key)?.z !== topZ) patchWin(win.key, {z: ++topZ});},
+    style: {position: 'absolute', ...box, zIndex: win.z, pointerEvents: 'auto', background: c.surface, borderRadius: 12, border: '1px solid ' + c.line, overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column'}},
+    h('div', {onPointerDown: drag('move'), onDoubleClick: () => patchWin(win.key, {max: !win.max}), style: {height: 40, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingRight: 6, borderBottom: '1px solid ' + c.line, cursor: moving ? 'grabbing' : 'grab', userSelect: 'none'}},
+      <><Icon name={meta.icon} size={16} color={meta.color} />
+      <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
+      {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
+      {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
+      {btn('external', win.max ? 'Restaurar tamanho' : 'Ocupar a tela', () => patchWin(win.key, {max: !win.max}))}
+      {btn('close', 'Fechar', () => closeWin(win.key))}</>
+    ),
+    <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
+      <FileBody api={win.api} id={win.id} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} />
+      {moving ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
+    </View>,
+    win.max ? null : h('div', {onPointerDown: drag('size'), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize'}},
+      h('div', {style: {position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}})));
+}
+
+function FileBody({api, id, name, mime, zoom, onZoom}: {api: SofiaApi; id: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void}) {
+  const c = useTheme(), k = fileKind(mime, name), {url, error} = useSigned(api, id, OFFICE(k) ? 'pdf' : ''), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
+  useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
+  const textual = !inlineCapable(k) && windowCapable(k, name);
+  useEffect(() => {if (!textual || !url) return; let live = true; fetch(url).then(r => r.text()).then(t => {if (live) setText(t.slice(0, 400000));}).catch(() => {if (live) setText('');}); return () => {live = false;};}, [url, textual]);
+  if (error) return <Center><Icon name="warning" size={22} color={c.muted} /><Text style={{color: c.text, fontSize: 13, textAlign: 'center', maxWidth: 320}}>{error}</Text><DownloadButton api={api} id={id} /></Center>;
+  if (!windowCapable(k, name)) return <Center><Icon name={KIND[k].icon} size={30} color={KIND[k].color} /><Text style={{color: c.text, fontSize: 13}}>Este tipo de arquivo não tem visualização.</Text><DownloadButton api={api} id={id} /></Center>;
+  if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
+  if (k === 'image') return h('div', {style: {width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: zoom ? 'flex-start' : 'center', justifyContent: zoom ? 'flex-start' : 'center'},
+    onWheel: (e: any) => {if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); onZoom(Math.max(25, Math.min(400, (zoom || 100) + (e.deltaY < 0 ? 15 : -15))));}},
+    h('img', {src: url, alt: name, draggable: false, style: zoom ? {width: zoom + '%', maxWidth: 'none'} : {maxWidth: '100%', maxHeight: '100%', objectFit: 'contain'}}));
+  if (k === 'video') return h('video', {src: url, controls: true, style: {width: '100%', height: '100%', background: '#000'}});
+  if (k === 'audio') return <Center><Icon name="fileAudio" size={34} color={KIND.audio.color} /><Text numberOfLines={2} style={{color: c.text, fontSize: 13, textAlign: 'center'}}>{name}</Text>{h('audio', {src: url, controls: true, style: {width: '90%'}})}</Center>;
+  if (k === 'pdf' || OFFICE(k)) return <View style={{flex: 1}}>{h('iframe', {src: url, title: name, onLoad: () => setLoaded(true), style: {width: '100%', height: '100%', border: 0, background: '#fff'}})}{loaded ? null : <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg}}><Spinner size={18} /></View>}</View>;
+  if (text == null) return <Center><Spinner size={18} /></Center>;
+  return h('pre', {style: {margin: 0, padding: 14, width: '100%', height: '100%', overflow: 'auto', boxSizing: 'border-box', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.5, color: c.text, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'}}, text);
+}
+const Center = ({children}: {children: React.ReactNode}) => <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20}}>{children}</View>;
+function DownloadButton({api, id}: {api: SofiaApi; id: string}) {
+  const c = useTheme();
+  return <Pressable accessibilityRole="button" onPress={() => void downloadPageFile(api, id)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 32, borderRadius: 8, borderWidth: 1, borderColor: c.line, backgroundColor: hovered ? c.line : c.surface})}><Icon name="download" size={14} color={c.text} /><Text style={{color: c.text, fontSize: 12, fontWeight: '600'}}>Baixar</Text></Pressable>;
+}
+
+// ---------------- Bloco da pagina ----------------
+/** Arquivo dentro da pagina: linha (anexo) ou visualizacao com escala. Barra ao passar o mouse. */
+export function PageFileBlock({api, data, selected, onSelect, onChange, onRemove}: {api: SofiaApi; data: PageFileData; selected: boolean; onSelect: () => void; onChange: (d: PageFileData) => void; onRemove: () => void}) {
+  const c = useTheme(), [hover, setHover] = useState(false), k = fileKind(data.mime, data.name), meta = KIND[k], id = data.attachment_id || '';
+  const view = data.view || defaultView(k), preview = view === 'preview' && inlineCapable(k) && !!id, scale = Math.max(15, Math.min(100, data.scale || (k === 'image' ? 70 : 100)));
+  const wrap = useRef<any>(null);
+  const open = () => {if (id) openFileWindow(api, {id, name: data.name || 'arquivo', mime: data.mime || ''});};
+  if (data.uploading) return <View testID="page-file-uploading" style={{marginVertical: 6, height: 52, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12}}>
+    <Spinner size={16} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name || 'Arquivo'}</Text><Text style={{color: c.muted, fontSize: 11}}>Enviando… {sizeLabel(data.size)}</Text></View>;
+  const resize = (e: any) => {e.preventDefault(); e.stopPropagation(); const el = wrap.current as HTMLElement | null, col = el?.parentElement?.getBoundingClientRect?.(); if (!el || !col) return; const sx = e.clientX, w0 = el.getBoundingClientRect().width;
+    const mv = (ev: PointerEvent) => onChange({...data, scale: Math.round(Math.max(15, Math.min(100, (w0 + ev.clientX - sx) / col.width * 100)))});
+    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);}; window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);};
+  const tool = (icon: any, label: string, run: () => void, on = false) => <Pressable key={label} accessibilityLabel={label} onPress={(e: any) => {e?.stopPropagation?.(); run();}} style={({hovered}: any) => ({height: 26, minWidth: 26, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: on ? c.accentSoft : hovered ? c.line : 'transparent'})}><Icon name={icon} size={14} color={on ? c.accent : c.muted} /></Pressable>;
+  const seg = (label: string, v: 'attach' | 'preview') => <Pressable key={v} accessibilityRole="radio" accessibilityState={{checked: view === v}} onPress={(e: any) => {e?.stopPropagation?.(); onChange({...data, view: v});}} style={({hovered}: any) => ({height: 24, paddingHorizontal: 9, borderRadius: 6, justifyContent: 'center', backgroundColor: view === v ? c.surface : hovered ? c.line : 'transparent', boxShadow: view === v ? '0 1px 2px rgba(0,0,0,.12)' : undefined} as any)}><Text style={{fontSize: 11, fontWeight: view === v ? '600' : '500', color: view === v ? c.text : c.muted}}>{label}</Text></Pressable>;
+  const bar = (hover || selected) && id ? <View style={{position: 'absolute', top: 6, right: 6, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 3, borderRadius: 9, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 4px 14px rgba(0,0,0,.12)'} as any}>
+    {inlineCapable(k) ? <View style={{flexDirection: 'row', padding: 2, borderRadius: 8, backgroundColor: c.input, marginRight: 2}}>{seg('Anexo', 'attach')}{seg('Visualização', 'preview')}</View> : null}
+    {preview ? <>{tool('zoomOut', 'Diminuir', () => onChange({...data, scale: Math.max(15, scale - 10)}))}<Text style={{color: c.muted, fontSize: 11, minWidth: 32, textAlign: 'center'}}>{scale}%</Text>{tool('zoomIn', 'Aumentar', () => onChange({...data, scale: Math.min(100, scale + 10)}))}</> : null}
+    {tool('external', 'Abrir em janela', open)}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
+  </View> : null;
+  const hoverDiv = (child: React.ReactNode) => h('div', {onMouseEnter: () => setHover(true), onMouseMove: () => {if (!hover) setHover(true);}, onMouseLeave: () => setHover(false), style: {position: 'relative'}}, child);
+  if (!preview) return hoverDiv(<Pressable testID="page-file-row" accessibilityRole="button" accessibilityLabel={'Abrir ' + (data.name || 'arquivo')} onPress={() => {onSelect(); open();}}
+    style={({hovered}: any) => ({marginVertical: 4, minHeight: 52, borderRadius: 10, borderWidth: selected ? 2 : 1, borderColor: selected ? c.accent : c.line, backgroundColor: hovered ? c.input : c.surface, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 10, paddingRight: 12, position: 'relative'})}>
+    <View style={{width: 34, height: 34, borderRadius: 8, backgroundColor: meta.color + '1f', alignItems: 'center', justifyContent: 'center'}}><Icon name={meta.icon} size={18} color={meta.color} /></View>
+    <View style={{flex: 1, minWidth: 0, gap: 2}}><Text numberOfLines={1} style={{color: c.text, fontSize: 14, fontWeight: '600'}}>{data.name || 'Arquivo'}</Text>
+      <Text numberOfLines={1} style={{color: c.muted, fontSize: 11}}>{[ext(data.name) || meta.label, sizeLabel(data.size)].filter(Boolean).join(' · ')}</Text></View>
+    {bar}
+  </Pressable>);
+  return hoverDiv(<View style={{marginVertical: 6, position: 'relative'}}>
+    <View ref={wrap} testID="page-file-preview" style={{width: (scale + '%') as any, maxWidth: '100%', position: 'relative', borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: selected ? c.accent : 'transparent'}}>
+      {h('div', {onClick: onSelect, onDoubleClick: open}, <InlineMedia api={api} id={id} kind={k} name={data.name || ''} />)}
+      {k !== 'audio' ? h('div', {onPointerDown: resize, 'aria-label': 'Arraste para mudar o tamanho', style: {position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover || selected ? 1 : 0}}, h('div', {style: {width: 4, height: 38, borderRadius: 2, background: 'rgba(255,255,255,.9)', boxShadow: '0 0 0 1px rgba(0,0,0,.25)'}})) : null}
+      {bar}
+    </View>
+    {k !== 'image' ? <Text numberOfLines={1} style={{color: c.muted, fontSize: 11, marginTop: 4}}>{data.name}{data.size ? ' · ' + sizeLabel(data.size) : ''}</Text> : null}
+  </View>);
+}
+
+function InlineMedia({api, id, kind, name}: {api: SofiaApi; id: string; kind: Kind; name: string}) {
+  const c = useTheme(), {url, error} = useSigned(api, id, OFFICE(kind) ? 'pdf' : '');
+  if (!WEB) return <View style={{height: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12}}>{name}</Text></View>;
+  if (error) return <View style={{minHeight: 80, padding: 14, gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{error}</Text></View>;
+  if (!url) return <View style={{height: kind === 'audio' ? 54 : 200, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Spinner size={16} /></View>;
+  if (kind === 'image') return h('img', {src: url, alt: name, draggable: false, style: {display: 'block', width: '100%', height: 'auto'}});
+  if (kind === 'video') return h('video', {src: url, controls: true, preload: 'metadata', style: {display: 'block', width: '100%', maxHeight: 520, background: '#000'}});
+  if (kind === 'audio') return h('audio', {src: url, controls: true, preload: 'metadata', style: {display: 'block', width: '100%'}});
+  return h('iframe', {src: url, title: name, style: {display: 'block', width: '100%', height: 560, border: 0, background: '#fff'}});
+}
