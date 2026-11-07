@@ -1,3 +1,4 @@
+import {PagesLoadingBody} from '../components/ScreenSkeleton';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
@@ -629,7 +630,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </View>:null}
   </>}
   footer={<>
-  {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
+  {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80}}>{/* 07/11/2026 (Pedro: esqueleto na estrutura real): Recentes + lista, igual ao esqueleto da aba */}<PagesLoadingBody/></View>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Um lugar para ideias, roteiros e anotações. Toque em + para começar.")}/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}

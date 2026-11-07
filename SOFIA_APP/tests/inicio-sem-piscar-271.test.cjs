@@ -112,3 +112,12 @@ test('telas que baixam depois mostram o esqueleto enquanto o arquivo chega (nunc
   assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name}/>"), 'Suspense com esqueleto');
   assert.ok(!s.includes('fallback={null}>'), 'sem fallback vazio');
 });
+
+test('esqueleto de cada aba na estrutura real da tela (Pedro 07/11/2026)', () => {
+  const s = fs.readFileSync(path.join(__dirname, '../src/components/ScreenSkeleton.tsx'), 'utf8');
+  for (const f of ['function AgendaSkeleton', 'function ChatSkeleton', 'function PagesSkeleton', 'function AppsSkeleton', 'function ProfileSkeleton']) assert.ok(s.includes(f), f);
+  assert.ok(s.includes('<AgendaDesk compact={!desktop}') && s.includes(' loading items={[]}'), 'Agenda usa a propria grade carregando');
+  assert.ok(!s.includes('DeskPageSkeleton'), 'sem o esqueleto generico igual para todas');
+  const g = fs.readFileSync(path.join(__dirname, '../src/components/AppGrid.tsx'), 'utf8');
+  assert.ok(g.includes('cols=w?gridColumns(w):COLS,rows=Math.ceil(Math.max(1,count)/cols)'), 'grade de apps com as colunas reais');
+});

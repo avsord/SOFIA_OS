@@ -9,7 +9,8 @@ test('anel fino (3/4 de círculo, cinza) e linhas finas no lugar dos blocos',()=
 });
 test('abertura dos apps, abas, páginas, apps internos e entrada usam o novo carregamento',()=>{
  assert.ok(read('src/components/ModuleSkeleton.tsx').includes('<PageLoading testID="module-skeleton"'));
- for(const f of ['src/components/ScreenSkeleton.tsx','src/screens/Pages.tsx','src/screens/Monitoring.tsx','src/screens/Finance.tsx','src/screens/Mail.tsx'])assert.ok(read(f).includes('<LoadingLines'),f);
+ assert.ok(read('src/screens/Pages.tsx').includes('<PagesLoadingBody/>'),'Paginas: esqueleto na estrutura real (07/11/2026)');
+ for(const f of ['src/components/ScreenSkeleton.tsx','src/screens/Monitoring.tsx','src/screens/Finance.tsx','src/screens/Mail.tsx'])assert.ok(read(f).includes('<LoadingLines'),f);
  assert.ok(read('App.tsx').includes('{booting?<Spinner size={26}/>:null}'));
  assert.ok(!read('src/components/PageAppearance.tsx').includes('<ActivityIndicator color={c.accent}/></View>;'),'capa sem a rodinha grossa');
 });
