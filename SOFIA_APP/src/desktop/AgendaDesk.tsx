@@ -3,6 +3,7 @@
 // px de computador: o arquivo passa so pelo fator da tela (metro: FLUID), nao pela conversao celular->computador.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Animated, Easing, Platform, Pressable, ScrollView, Text, View, useWindowDimensions} from 'react-native';
+import {ShimmerBlock, ShimmerGroup} from '../components/Loading';
 import type {AgendaItem} from '../lib/types';
 import type {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -28,7 +29,7 @@ const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d
 const tint = (hex: string, a: number) => {const h = hex.replace('#', ''); if (h.length !== 6) return hex; const n = parseInt(h, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;};
 
 export type AgendaDeskProps = {
-  api: SofiaApi; active: boolean; items: AgendaItem[]; month: Date; setMonth: (d: Date) => void;
+  api: SofiaApi; active: boolean; items: AgendaItem[]; month: Date; setMonth: (d: Date) => void; loading?: boolean;
   selected: Date; setSelected: (d: Date) => void; start: (i: AgendaItem) => string;
   onOpen: (i: AgendaItem) => void; onToggle: (i: AgendaItem) => void; onCreate: (d: Date, exact?: boolean) => void;
   /** 03/11/2026 (Pedro: "na agenda seria legal a funcionalidade e ate a animacao que a gente ja tem na agenda do site"):
@@ -128,7 +129,9 @@ function MonthView({x, m}: {x: Ctx; m: Date}) {
             <View style={{height: 20, justifyContent: 'center', paddingLeft: 6, marginBottom: 2}}>
               <Text style={{alignSelf: 'flex-start', marginLeft: t ? -7 : 0, paddingHorizontal: t ? 7 : 0, borderRadius: 8, overflow: 'hidden', fontSize: 13, fontWeight: t ? '700' : '500', color: t ? c.onAccent : c.muted, backgroundColor: t ? c.accent : 'transparent', opacity: out ? 0.4 : 1, fontVariant: ['tabular-nums']}}>{day.getDate()}</Text>
             </View>
-            {x.p.compact ? (list.length ? <View style={{flexDirection: 'row', gap: 3, paddingLeft: 6}}>{list.slice(0, 3).map(i => <View key={i.id + (i as any).occurrence_start} style={{width: 5, height: 5, borderRadius: 3, backgroundColor: colorOf(i, c.accent)}} />)}</View> : null) : <>
+            {x.p.compact ? (list.length ? <View style={{flexDirection: 'row', gap: 3, paddingLeft: 6}}>{list.slice(0, 3).map(i => <View key={i.id + (i as any).occurrence_start} style={{width: 5, height: 5, borderRadius: 3, backgroundColor: colorOf(i, c.accent)}} />)}</View> : x.p.loading && !out ? <ShimmerGroup><View style={{paddingLeft: 6}}><ShimmerBlock width={16} height={5} radius={3} /></View></ShimmerGroup> : null) : <>
+            {/* 07/11/2026 (Pedro: "agenda ta sem" esqueleto): carregando o mes, pilulas em shimmer no lugar dos compromissos */}
+            {x.p.loading && !out && !list.length ? <ShimmerGroup><View style={{gap: 3, paddingHorizontal: 2}}><ShimmerBlock width={'82%' as any} height={14} radius={5} />{(day.getDate() + day.getMonth()) % 3 === 0 ? <ShimmerBlock width={'60%' as any} height={14} radius={5} /> : null}</View></ShimmerGroup> : null}
             {/* 07/11/2026 (revisao): com 3 pilulas o "+N mais" ficava fora da celula; com mais de 3, mostra 2 e o "+N mais" */}
             {list.slice(0, list.length > 3 ? 2 : 3).map(i => <Chip x={x} key={i.id + (i as any).occurrence_start} i={i} />)}
             {list.length > 3 ? <Text testID="agenda-more" style={{fontSize: 11, fontWeight: '600', color: c.accent, paddingLeft: 6}}>+{list.length - 2} mais</Text> : null}</>}
