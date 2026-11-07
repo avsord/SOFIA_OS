@@ -235,7 +235,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Senha escrita numa página (06/11/2026, Pedro):** a página pergunta se quer trancar com senha; se "não", salva normalmente (marca sofia-secret-ok-v1) e fica fora do que a IA lê.
 - **Drive — clique (07/11, Pedro):** um clique abre arquivo e pasta, no computador também (não o duplo clique do Google Drive). Selecionar: caixinha ao passar o mouse, Ctrl/Shift + clique, Ctrl+A.
 - **Drive desligado (07/11, Pedro):** "acho a função do Drive ruim, tira ela" / "o Drive não existe mais". Fora do menu, da lista de apps e do endereço; escopo `drive` não é mais pedido; teste no Google dele desligado. Código guardado (DRIVE_APP em `SOFIA_APP/src/lib/features.ts`, DRIVE_APP_ON em `src/services/drive-selftest.js`). Não mexer no Drive sem pedido dele.
-- **Abertura do Início (07/11, Pedro, substitui a aprovada em 04/11):** TUDO ESTÁTICO — "tira a roda de loading e tira o fade", "o círculo oval também fica sem animação e o lettering também, tudo estático". Véu na cor do site só cobre a montagem e some de uma vez quando o Início tem os dados (máx. 6 s); sem bolinha, sem fade, sem saudação subindo, sem fileiras entrando, sem brilho animado, sem pulso da bolinha do agora (NO_INTRO em Home.tsx, fadeIn vazio em HomeHero.tsx, NOW_PULSE/ENTER vazios em HomeBrief.tsx). Não recolocar animação no Início sem pedido dele.
+- **Abertura do Início (07/11, Pedro, última palavra):** véu na cor do fundo por cima de tudo, que some num FADE RÁPIDO (0,18 s) quando o Início tem os dados (máx. 6 s); SEM bolinha. O resto do Início é ESTÁTICO: sem saudação subindo, fileiras, brilho animado, pulso do agora, fade de texto (NO_INTRO em Home.tsx, fadeIn vazio em HomeHero.tsx, NOW_PULSE/ENTER vazios em HomeBrief.tsx). Não mudar sem pedido dele.
+- **Esqueleto em todas as telas (07/11, Pedro):** toda tela que carrega dados mostra shimmer/esqueleto (nunca texto "Carregando…", bolinha girando, tela em branco ou "0 de 0"). Conferir com o servidor lento (atrasar /api 3 s) antes de publicar tela nova.
 - **Grade de blocos do Início (07/11, Pedro: "isso não"):** fica como está. Não mudar para 4 colunas iguais nem pôr a Agenda na largura toda (proposta da revisão recusada).
 
 ## 8. Regras que não se quebram
@@ -348,11 +349,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Drive: seleção arrastando o mouse num lugar vazio (retângulo, Ctrl/Shift soma, rola sozinho); lista de controle contra a Ajuda oficial do Google (docs/drive/matriz-google-drive.md: 85 TEM, 23 PARCIAL, 116 FALTA, 11 N/A) | robô 53/53, portão 14/14 |
 | 2026-11-07 | (delivery) | Drive desligado pelo Pedro ("não existe mais"; código guardado, lib/features.ts DRIVE_APP=false; sem escopo drive nem teste no Google). Início: sem a abertura animada — véu com bolinha de carregamento até o Início ter os dados e fade de 0,22 s | portão 13/13; [manual-apk] |
 | 2026-11-07 | (delivery) | Início todo estático (Pedro): sem bolinha, sem fade, sem animação da saudação/data/frase, do brilho oval e do pulso do agora | portão 13/13; [manual-apk] |
 | 2026-11-07 | (delivery) | Revisão do site (robô + 4 revisores, docs/qualidade/revisao-2026-11-07.md, ~200 pontos). Lote 1: + igual em todos os apps, título Listas, painel da tarefa 520px com rodapé fixo, janela de lembrete sem cobrir o topo e com fundo, Price Tracker/E-mails vazios, Encomendas (etapa e erro em português), estrelas, +N mais na Agenda, +1 da linha do tempo | portão 13/13; [manual-apk] |
 | 2026-11-07 | (delivery) | Revisão do site, lotes 2–5: Biblioteca/Notas sem abas recusadas, Notificações, Páginas alinhada, Agenda Ano no celular, tarefa atrasada vermelha, Apps alinhado, Finanças/Rotina/Encomendas/filtros | portão verde em cada lote; [manual-apk] |
+| 2026-11-07 | (delivery) | Esqueleto em Finanças (computador), Lembretes, Tarefas (celular) e Conversa; Perfil no celular sem rótulo em pé; foto do perfil aparece no 1º quadro (cópia de 96 px guardada; sem iniciais trocando); Início com fade rápido do véu de novo | portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

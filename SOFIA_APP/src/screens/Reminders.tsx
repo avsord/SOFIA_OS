@@ -16,6 +16,7 @@ import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
 import {DateTimeField} from '../components/DateTimeField';
 import {Sheet} from '../components/Sheet';
+import {LoadingLines} from '../components/Loading';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle,forms} from '../components/UI';
 import {Icon} from '../components/Icon';
 import {appAlert} from '../lib/app-alert';
@@ -121,7 +122,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
    {section('Hoje',groups.upcoming.filter(i=>{const t=Date.parse(String(i.data?.remind_at||''));return !!t&&new Date(t).toDateString()===new Date().toDateString();}))}
    {section('Próximos',groups.upcoming.filter(i=>!(i=>{const t=Date.parse(String(i.data?.remind_at||''));return !!t&&new Date(t).toDateString()===new Date().toDateString();})(i)))}
    {section('Feitos',groups.done,false,true)}
-   {!records.loaded&&!records.error?<Text style={{color:c.muted,padding:18}}>Carregando lembretes…</Text>:null}
+   {!records.loaded&&!records.error?<View testID="reminders-loading" style={{paddingVertical:8}}><LoadingLines rows={4}/></View>:null}{/* 07/11/2026 (Pedro: "shimmer e esqueleto em todas as paginas"): era so um texto */}
    {records.loaded&&!records.items.length?<Empty icon="bell" title="Seu primeiro lembrete" body="Ex.: ligar para o dentista às 15h, pagar o condomínio amanhã, tirar a roupa da máquina."/>:null}
    <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>{tap('O celular avisa no horário escolhido, mesmo com o app fechado. Os lembretes também aparecem na Agenda.')}</Text>
   </ScrollView>

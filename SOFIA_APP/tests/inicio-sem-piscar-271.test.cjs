@@ -19,7 +19,7 @@ test('Inicio estatico (07/11, Pedro: "tudo estatico"): sem pulso do agora, sem f
   const nb=b.slice(b.indexOf('function NowBeacon('),b.indexOf('\n}\n',b.indexOf('function NowBeacon(')));
   assert.ok(!nb.includes('Animated.loop')&&!b.includes("animationIterationCount: 'infinite'"),'pulso voltou');
   assert.ok(h.includes('const fadeIn = (_delay: number) => ({} as any);')&&m.includes('const NO_INTRO=true;'),'texto animado voltou');
-  assert.ok(!i.includes('class="spin"')&&i.includes('#sofia-veil.out { display: none; }')&&l.includes('veil.remove();'),'bolinha ou fade voltou');
+  assert.ok(!i.includes('class="spin"')&&i.includes('#sofia-veil.out { animation: sofia-veil-open 180ms')&&l.includes("veil.classList.add('out')"),'sem bolinha; so o fade rapido do veu');
 });
 test('Gravador de fluidez: so no site, uma vez, envio direto (sem invalidar caches) e sem conteudo do usuario',()=>{
   const pr=read('src/lib/fluency-probe.ts'),api=read('src/lib/api.ts'),home=read('src/screens/Home.tsx'),srv=fs.readFileSync(path.join(__dirname,'..','..','src/channels/mobile.js'),'utf8');
@@ -40,7 +40,7 @@ test('Foto do perfil no site: pedida junto com a pagina (early.js) e o avatar ja
   const early=read('public/assets/early.js'),cloud=read('src/lib/profile-photo-cloud.web.ts'),av=read('src/components/ProfileAvatar.tsx'),ev=read('src/lib/profile-photo-events.ts');
   assert.ok(early.includes("'/md/capabilities','/profile/photo']")&&early.includes('window.__sofiaPhoto='));
   assert.ok(cloud.includes("__sofiaEarly?.['/profile/photo']"),'usa a resposta antecipada sem esperar o login');
-  assert.ok(av.includes('useState(()=>photoPreview(scope)||earlyPhoto())'));
+  assert.ok(av.includes('useState(()=>photoPreview(scope)||earlyPhoto()||cachedThumb(scope))')&&ev.includes('function storeThumb'),'nasce com a foto (ou a copia pequena guardada)');
   assert.ok(ev.includes("v.startsWith('data:image/')"),'so aceita imagem');
 });
 test('Linha do tempo: selecao sai com Esc e clicando fora do quadro',()=>{

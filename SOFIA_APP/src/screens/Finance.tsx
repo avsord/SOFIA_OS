@@ -33,6 +33,7 @@ import {Icon, type IconName} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines, ShimmerBlock, ShimmerGroup,LoadingCaption} from '../components/Loading';
+import {AppSkeleton} from '../components/AppKit';
 import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
@@ -183,7 +184,8 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
       <View style={{flex: 1, backgroundColor: c.bg}}>
         {/* 0.3.253: no computador o cabecalho, a linha conta/mes e as abas se alinham a coluna de leitura */}
         {/* 0.3.269: no SITE (computador) Finanças tem a estrutura nova (lateral, extrato no centro, mês valendo para tudo); o celular segue igual */}
-        {desktop && d && d.accounts.length ? <FinanceDesk api={api} d={scoped || d} full={d} month={month} setMonth={setMonth} accountId={accountId} isPrimary={isPrimary} account={account} onPickAccount={() => setAccountPicker(true)} reload={reload} onTx={setEditing} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow(t !== 'new' && t.kind === 'income' ? 'income' : 'expense'); setBillCard(''); setBillEditor(t); }} onNewBill={flow => { setBillScope('series'); setBillFlow(flow); setBillCard(''); setBillEditor('new'); }} onManage={() => setManage(true)} view={deskView} setView={setDeskView} pendingSide={pendingSide} setPendingSide={setPendingSide} warning={notificationWarning} /> : <>
+        {/* 07/11/2026 (Pedro: "shimmer e esqueleto em todas as paginas"): no computador a tela ficava so com o titulo enquanto carregava */}
+        {desktop && !d && !error ? <AppSkeleton label="Carregando suas finanças" /> : desktop && d && d.accounts.length ? <FinanceDesk api={api} d={scoped || d} full={d} month={month} setMonth={setMonth} accountId={accountId} isPrimary={isPrimary} account={account} onPickAccount={() => setAccountPicker(true)} reload={reload} onTx={setEditing} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow(t !== 'new' && t.kind === 'income' ? 'income' : 'expense'); setBillCard(''); setBillEditor(t); }} onNewBill={flow => { setBillScope('series'); setBillFlow(flow); setBillCard(''); setBillEditor('new'); }} onManage={() => setManage(true)} view={deskView} setView={setDeskView} pendingSide={pendingSide} setPendingSide={setPendingSide} warning={notificationWarning} /> : <>
         <View style={pad(0)}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />

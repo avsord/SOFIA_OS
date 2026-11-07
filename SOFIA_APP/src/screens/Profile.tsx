@@ -11,7 +11,7 @@ import {ConnectionsSettings} from '../components/ConnectionsSettings';
 import {MotionModal} from '../components/MotionModal';
 import {ProfilePhotoEditor} from '../components/ProfilePhotoEditor';
 import React,{useState} from 'react';
-import {View,Text,ScrollView,TextInput,Switch,Pressable,Linking,Alert,NativeModules} from 'react-native';
+import {View,Text,ScrollView,TextInput,Switch,Pressable,Linking,Alert,NativeModules,useWindowDimensions} from 'react-native';
 import {SofiaApi,SITE} from '../lib/api';
 import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
@@ -25,7 +25,9 @@ import {StoreConnections} from '../components/StoreConnections';
 import {appAlert} from '../lib/app-alert';
 /** Pecas do Perfil no computador (03/11/2026). Fora do componente: assim o campo do nome nao perde o foco a cada letra. */
 function DeskHead({title,desc}:{title:string;desc?:string}){const c=useTheme();return <View style={{paddingTop:16,paddingBottom:10,gap:3}}><Text style={{color:c.text,fontSize:16,fontWeight:'700'}}>{title}</Text>{desc?<Text style={{color:c.muted,fontSize:13,lineHeight:18}}>{desc}</Text>:null}</View>;}
-function DeskRow({title,desc,children}:{title:string;desc?:string;children?:React.ReactNode}){const c=useTheme();return <View style={{flexDirection:'row',alignItems:'center',gap:16,paddingVertical:14,borderTopWidth:1,borderColor:c.line}}><View style={{flex:1,minWidth:0,gap:3}}><Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{title}</Text>{desc?<Text style={{color:c.muted,fontSize:13,lineHeight:18}}>{desc}</Text>:null}</View>{children}</View>;}
+// 07/11/2026 (Pedro, celular): com o campo de 240 px ao lado, o rotulo ficava com poucos px e saia uma letra por linha;
+// em tela estreita a linha empilha (rotulo em cima, campo embaixo)
+function DeskRow({title,desc,children}:{title:string;desc?:string;children?:React.ReactNode}){const c=useTheme(),narrow=useWindowDimensions().width<640;return <View style={{flexDirection:narrow?'column':'row',alignItems:narrow?'stretch':'center',gap:narrow?10:16,paddingVertical:14,borderTopWidth:1,borderColor:c.line}}><View style={{flex:narrow?undefined:1,minWidth:0,gap:3}}><Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{title}</Text>{desc?<Text style={{color:c.muted,fontSize:13,lineHeight:18}}>{desc}</Text>:null}</View>{children}</View>;}
 function DeskBtn({label,onPress,danger=false,primary=false,disabled=false}:{label:string;onPress:()=>void;danger?:boolean;primary?:boolean;disabled?:boolean}){const c=useTheme();return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({hovered}:any)=>({height:32,paddingHorizontal:14,borderRadius:9,justifyContent:'center',opacity:disabled?0.45:1,borderWidth:primary?0:1,borderColor:c.line,backgroundColor:primary?c.accent:hovered?c.input:'transparent'})}><Text style={{fontSize:13,fontWeight:'600',color:primary?c.onAccent:danger?c.danger:c.text}}>{label}</Text></Pressable>;}
 export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckUpdate,onChatHistoryCleared}:{api:SofiaApi;bootstrap:Bootstrap;prefs:Prefs;onPrefs:(p:Prefs)=>Promise<void>;onProfile:(p:UserProfile)=>void;onLogout:()=>Promise<void>;onCheckUpdate:()=>Promise<void>;onChatHistoryCleared:()=>void}){useRenderCost('profile');
  const [perfOpen,setPerfOpen]=useState(false);

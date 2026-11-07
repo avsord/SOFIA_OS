@@ -34,7 +34,7 @@ test('055 profile editor propagates avatar edits to Home',()=>{
  const editor=read('src/components/ProfilePhotoEditor.tsx'),avatar=read('src/components/ProfileAvatar.tsx');
  assert.ok(editor.includes('photoChanged(scope,saved)'));
  assert.ok(editor.includes("photoChanged(scope,'')"));
- assert.ok(avatar.includes('subscribeProfilePhoto(scope,setUri)'));
+ assert.ok(avatar.includes('subscribeProfilePhoto(scope,got)')&&avatar.includes('storeThumb(scope,value)'),'avatar escuta as trocas e guarda a copia pequena');
 });
 test('055 new Home appointment sends selected priority and shared area without opening Agenda',()=>{
  const src=read('src/components/HomeCommitmentEditor.tsx');

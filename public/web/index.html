@@ -96,7 +96,7 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
       #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; will-change: opacity; transform: translateZ(0); background: #F7F6FA; animation: sofia-veil-out 1ms linear 8s both; }
       /* 07/11/2026 (Pedro: "tira a roda de loading e tira o fade"): o veu so cobre a montagem e sai de uma vez, sem bolinha e sem fade */
       @media (prefers-color-scheme: dark) { #sofia-veil { background: #121017; } }
-      #sofia-veil.out { display: none; }
+      #sofia-veil.out { animation: sofia-veil-open 180ms ease-out 0s both; } /* 07/11/2026 (Pedro): fade rapido na cor do fundo, por cima de tudo */
       @keyframes sofia-veil-out { from { opacity: 1; } to { opacity: 0; } }
       @keyframes sofia-veil-open { from { opacity: 1; } to { opacity: 0; } }
       ::selection { background: rgba(114, 88, 232, 0.28); }
@@ -110,6 +110,6 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
     <div id="root"></div>
     <div id="sofia-veil"></div>
     <script src="/assets/early.js?v=6"></script>
-  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-8ef961d5fcd2de4fe4ff1fb9260e9e95.js" defer></script><script src="/_expo/static/js/web/index-8d16a6533248c899f262eae767bcf670.js" defer></script>
+  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-a0b940791c1b2dc664bc35d31b8d4b26.js" defer></script><script src="/_expo/static/js/web/index-612a14dda661ec3ccdba92b955bc338b.js" defer></script>
 </body>
 </html>
