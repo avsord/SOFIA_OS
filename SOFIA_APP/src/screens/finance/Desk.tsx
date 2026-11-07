@@ -202,8 +202,8 @@ export function FinanceDesk(p: Props) {
   let body: React.ReactNode;
   if (view === 'home') body = <View style={{gap: 16}}>
     <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
-      <Card_ testID="fin-card-saldo" tone label="Saldo" value={show(past ? controlSaldo : total)} sub={past ? 'No fim de ' + monthLabel(month).split(' ')[0] : 'O que está na conta agora'} />
-      <Card_ testID="fin-card-previsto" label={'Previsto até ' + short(forecast.end)} value={show(forecast.left)} sub="O que sobra depois de tudo pago · ver conta" onPress={() => setForecastOpen(true)} />
+      <Card_ testID="fin-card-saldo" tone icon="wallet" label="Saldo" value={show(past ? controlSaldo : total)} sub={past ? 'No fim de ' + monthLabel(month).split(' ')[0] : 'O que está na conta agora'} />
+      <Card_ testID="fin-card-previsto" icon="calendar" label={'Previsto até ' + short(forecast.end)} value={show(forecast.left)} sub="O que sobra depois de tudo pago" onPress={() => setForecastOpen(true)} />
       <Card_ icon="piggy" label="Guardado" value={show(split?.saved || 0)} sub={goalPct != null ? goalPct + '% da meta' : 'Fora do saldo'} onPress={() => setView('reserve')} />
       <Card_ icon="card" label="Faturas abertas" value={show(invoices.reduce((s, i) => s + i.total - i.paid, 0))} sub={invoices.map(i => i.card.name).join(' · ') || 'Nenhuma'} onPress={() => setView('cards')} />
     </View>
@@ -307,7 +307,7 @@ export function FinanceDesk(p: Props) {
   </View>;
 }
 const Card_ = ({label, value, sub, tone, onPress, icon, testID}: {label: string; value: string; sub: string; tone?: boolean; onPress?: () => void; icon?: IconName; testID?: string}) => { const c = useTheme(); return <Pressable testID={testID} disabled={!onPress} onPress={onPress} accessibilityRole={onPress ? 'button' : undefined}
-    style={({hovered}: any) => ({flex: tone ? 1.25 : 1, minWidth: 180, gap: 6, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: hovered && onPress ? c.accent + '66' : c.line, backgroundColor: tone ? c.accentSoft : c.surface})}>
+    style={({hovered}: any) => ({flex: 1, minWidth: 180, /* 07/11/2026 (revisao): 4 cartoes da mesma largura (o Saldo era mais largo e a grade ficava torta) */ gap: 6, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: hovered && onPress ? c.accent + '66' : c.line, backgroundColor: tone ? c.accentSoft : c.surface})}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{icon ? <Icon name={icon} size={14} color={c.muted} /> : null}<Text style={{color: c.muted, fontSize: 13}}>{label}</Text></View>
     <Text style={{color: tone ? c.accent : c.text, fontSize: tone ? 28 : 24, fontWeight: '700', fontVariant: ['tabular-nums']}}>{value}</Text>
     <Text style={{color: c.muted, fontSize: 12}}>{sub}</Text>

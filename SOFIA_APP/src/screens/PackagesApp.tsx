@@ -135,7 +135,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
     <View style={{flex: 1}} />{quotaNode}
   </View>;
   const mobileNav = <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flexGrow: 0}} contentContainerStyle={{gap: 8, paddingHorizontal: 16, paddingVertical: 10}}>
-    {Object.keys(TITLES).map(k => <Chip key={k} label={TITLES[k]} count={(k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length || undefined} selected={view === k} onPress={() => setView(k)} />)}
+    {Object.keys(TITLES).filter(k => k === 'all' || k === view || (k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length > 0).map(k => <Chip key={k} label={TITLES[k]} count={(k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length || undefined} selected={view === k} onPress={() => setView(k)} />)}
   </ScrollView>;
   function Card({p, first}: {p: Pack; first?: boolean}) {
     const tone = p.needs === 'fee' || p.needs === 'problem' ? c.danger : p.needs === 'pickup' ? c.warn : null;
@@ -170,7 +170,7 @@ export function PackagesApp({api, active, onBack}: {api: SofiaApi; active: boole
           </View>
           {/* 03/11/2026 (desenho 32): no celular os filtros ficam EMBAIXO do titulo */}
           {!desktop ? <View style={{marginHorizontal: -16, marginTop: 8}}>{mobileNav}</View> : null}
-          {desktop ? <DeskTabs value={view} onChange={setView} options={(['all', 'needs', 'way', 'transit', 'out', 'pickup', 'done'] as const).map(k => ({value: k, label: TITLES[k], count: (k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length}))} /> : null}
+          {desktop ? <DeskTabs value={view} onChange={setView} options={(['all', 'needs', 'way', 'transit', 'out', 'pickup', 'done'] as const).map(k => ({value: k, label: TITLES[k], count: (k === 'way' ? lists.way.filter(p => !p.delivered) : lists[k]).length})).filter(o => o.value === 'all' || o.value === view || o.count > 0) /* 07/11/2026 (revisao): sem abas com 0 (eram 7 abas, 4 vazias) */} /> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
             <Icon name="plus" size={16} color={c.muted} />
             <TextInput testID="pk-add" accessibilityLabel="Código de rastreio" value={raw} onChangeText={setRaw} placeholder="Cole o código de rastreio e, se quiser, um nome. Ex.: AA123456789BR Fone" placeholderTextColor={c.muted} autoCapitalize="characters" submitBehavior="submit"
