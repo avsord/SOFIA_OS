@@ -70,3 +70,8 @@ test('E-mail da Sofia e estrutura do app: nenhuma tela de usuario pede conexao d
   assert.ok(!p.includes('MailSender')&&!api.includes('mail-sender'),'nada de remetente na tela do usuario');
   assert.ok(!g.includes('can_send'),'a conta pessoal nao pede envio');
 });
+test('Inicio: prazo fixo para mostrar os blocos (nao recomeca) e alarme de qual leitura faltou; portao de qualidade existe',()=>{
+  const h=read('src/screens/Home.tsx');
+  assert.ok(h.includes('if(!deskDeadline.current)deskDeadline.current=Date.now()+8000;')&&h.includes("alert:'inicio-incompleto'"));
+  assert.ok(fs.existsSync(path.join(__dirname,'..','tools','release-check.cjs')));
+});
