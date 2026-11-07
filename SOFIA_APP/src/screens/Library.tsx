@@ -296,7 +296,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const kbd = (k: string) => <Text style={{color: c.muted, fontSize: 11, borderWidth: 1, borderColor: c.line, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1}}>{k}</Text>;
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={desktop ? mobileNav : undefined}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={undefined} /* 07/11/2026 (revisao + desenho aprovado): [Área ⌄] [Filtros ⌄] e a ordem tambem no computador; sem as abas recusadas */>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 60, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
@@ -308,15 +308,14 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
             {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
             {desktop ? <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} /> /* 07/11/2026: so o + */ : <IconButton name="plus" label="Adicionar à Biblioteca" onPress={() => setAdding({type: curType?.id})} />}
           </View>
-          {desktop ? <NavTabs nav={mobileNav} /> : null}
           {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar na Biblioteca" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + (curType ? curType.name : 'Biblioteca') + (desktop ? ' (N adiciona; Ctrl+V cola um link)' : '')} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View></View> : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 2}}>
-            {!desktop ? <BarPill testID="lib-area" label={curType ? curType.name : 'Tudo'} open={drop === 'area'} onPress={() => setDrop(d => d === 'area' ? '' : 'area')} /> : null}
+            {true ? <BarPill testID="lib-area" label={curType ? curType.name : 'Tudo'} open={drop === 'area'} onPress={() => setDrop(d => d === 'area' ? '' : 'area')} /> : null}
             <BarPill testID="lib-filter" label="Filtros" count={tagList.length + (filter.rating ? 1 : 0)} open={drop === 'filter'} onPress={() => setDrop(d => d === 'filter' ? '' : 'filter')} />
-            {!desktop ? <><View style={{flex: 1}} /><Pressable testID="lib-order" accessibilityRole="button" accessibilityLabel="Ordem da lista" accessibilityState={{expanded: drop === 'order'}} onPress={() => setDrop(d => d === 'order' ? '' : 'order')} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{order === 'recent' ? 'Recentes' : order === 'az' ? 'A a Z' : 'Nota'} ⌄</Text></Pressable></> : null}
+            {true ? <><View style={{flex: 1}} /><Pressable testID="lib-order" accessibilityRole="button" accessibilityLabel="Ordem da lista" accessibilityState={{expanded: drop === 'order'}} onPress={() => setDrop(d => d === 'order' ? '' : 'order')} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{order === 'recent' ? 'Recentes' : order === 'az' ? 'A a Z' : 'Nota'} ⌄</Text></Pressable></> : null}
           </View>
-          {drop === 'order' && !desktop ? <DropPanel onClose={() => setDrop('')} title="Ordem">{([['recent', 'Recentes'], ['az', 'A a Z'], ['rating', 'Maior nota']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={order === k} onPress={() => { setOrder(k); setDrop(''); }} />)}</DropPanel> : null}
-          {drop === 'area' && !desktop ? <DropPanel onClose={() => setDrop('')} title="Áreas" action={{label: 'Organizar', onPress: () => { setDrop(''); setOrganize(true); }}} footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setDrop(''); setTypeDialog({edit: null}); }} />}>
+          {drop === 'order' ? <DropPanel onClose={() => setDrop('')} title="Ordem">{([['recent', 'Recentes'], ['az', 'A a Z'], ['rating', 'Maior nota']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={order === k} onPress={() => { setOrder(k); setDrop(''); }} />)}</DropPanel> : null}
+          {drop === 'area' ? <DropPanel onClose={() => setDrop('')} title="Áreas" action={{label: 'Organizar', onPress: () => { setDrop(''); setOrganize(true); }}} footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setDrop(''); setTypeDialog({edit: null}); }} />}>
             <PanelRow label="Tudo" count={items.length} on={view === 'all'} onPress={() => { setView('all'); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />
             {types.map(t => <PanelRow key={t.id} label={t.name} count={count(t)} on={view === t.id} onPress={() => { setView(t.id); setFilter({status: '', rating: 0, tag: ''}); setDrop(''); }} />)}
           </DropPanel> : null}

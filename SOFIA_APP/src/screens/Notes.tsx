@@ -206,7 +206,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
   if (!notesE) return <AppSkeleton label="Carregando notas…" />;
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
-      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={desktop ? mobileNav : undefined}>
+      <AppFrame tabsOnTop sidebar={sidebar} mobileNav={undefined} /* 07/11/2026 (revisao + desenho aprovado): no computador tambem a barra [Área ⌄] e a ordem, sem abas */>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
@@ -218,23 +218,22 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}
             {!desktop ? <IconButton name="search" label="Buscar nas notas" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
           </View>
-          {!desktop ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          {true ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
             <BarPill testID="notes-area" label={view === 'all' ? 'Todas as áreas' : title} dot={curTag?.color} open={areaOpen} onPress={() => {setOrderOpen(false); setAreaOpen(v => !v);}} />
             <View style={{flex: 1}} />
             <Pressable accessibilityRole="button" accessibilityLabel="Ordem e notas fixadas ou arquivadas" accessibilityState={{expanded: orderOpen}} onPress={() => {setAreaOpen(false); setOrderOpen(v => !v);}} style={{height: 38, justifyContent: 'center'}}><Text style={{color: c.muted, fontSize: 13}}>{sort === 'recent' ? 'Editadas' : sort === 'created' ? 'Criadas' : 'A a Z'} ⌄</Text></Pressable>
           </View> : null}
-          {!desktop && areaOpen ? <DropPanel onClose={() => setAreaOpen(false)} title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
+          {areaOpen ? <DropPanel onClose={() => setAreaOpen(false)} title="Áreas" footer={<PanelRow kind="plain" icon="plus" label="Nova área" on={false} onPress={() => { setAreaOpen(false); setTagDialog({tag: null}); }} />}>
             <PanelRow label="Todas as áreas" count={notes.filter(n => !n.archived && !n.lockTag).length} on={view === 'all'} onPress={() => { go('all'); setAreaOpen(false); }} />
             {tags.map(t => <PanelRow key={t.key} label={t.name + (t.lock ? ' · com senha' : '')} dot={t.color} count={notes.filter(n => !n.archived && (n.tags.some(x => tagKey(x) === t.key) || tagKey(n.lockTag) === t.key)).length} on={view === 'tag:' + t.key} onPress={() => { go('tag:' + t.key); setAreaOpen(false); }} />)}
           </DropPanel> : null}
           {/* 03/11/2026 (desenho 24): Fixadas e Arquivadas sairam da lista de areas (recusado misturar); ficam aqui, com a ordem */}
-          {!desktop && orderOpen ? <DropPanel onClose={() => setOrderOpen(false)} title="Ordem">
+          {orderOpen ? <DropPanel onClose={() => setOrderOpen(false)} title="Ordem">
             {([['recent', 'Editadas por último'], ['created', 'Criadas por último'], ['az', 'A a Z']] as const).map(([k, label]) => <PanelRow key={k} label={label} on={sort === k} onPress={() => { setSort(k as any); setOrderOpen(false); }} />)}
             <PanelRow kind="plain" icon="pin" label={'Fixadas · ' + notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go(view === 'pinned' ? 'all' : 'pinned'); setOrderOpen(false); }} />
             <PanelRow kind="plain" icon="box" label={'Arquivadas · ' + notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go(view === 'archived' ? 'all' : 'archived'); setOrderOpen(false); }} />
           </DropPanel> : null}
           {!desktop ? <ResultLine text={visible.length + (visible.length === 1 ? ' nota' : ' notas') + (view === 'pinned' ? ' fixadas' : view === 'archived' ? ' arquivadas' : '')} onClear={view === 'pinned' || view === 'archived' ? () => go('all') : undefined} /> : null}
-          {desktop ? <NavTabs nav={mobileNav} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {lockedView ? <LockScreen tag={curTag!} count={notes.filter(n => tagKey(n.lockTag) === curTag!.key).length} onUnlock={async pw => { const k = await unlock(pw, curTag!.lock!); if (!k) return false; keys.current.set(curTag!.key, k); await decryptAll(curTag!.key, k); bump(x => x + 1); touch(); return true; }} /> : <>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
@@ -245,7 +244,6 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             </View>
             {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}>
               <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar em Notas" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + title} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View>
-              {desktop ? <GhostButton icon="filter" label={sort === 'recent' ? 'Editadas recentemente' : sort === 'created' ? 'Criadas recentemente' : 'A a Z'} onPress={() => setSort(s => s === 'recent' ? 'created' : s === 'created' ? 'az' : 'recent')} /> : null}
             </View> : null}
             {pinned.length ? <View style={{gap: 8}}><Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Fixadas <Text style={{fontWeight: '400', color: c.muted}}>{pinned.length}</Text></Text>{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{pinned.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : pinned.map(n => <Card key={n.id} n={n} />)}</View> : null}
             {rest.length ? <View style={{gap: 8}}>{pinned.length ? <Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Notas <Text style={{fontWeight: '400', color: c.muted}}>{rest.length}</Text></Text> : null}{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{rest.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : rest.map(n => <Card key={n.id} n={n} />)}</View> : null}
