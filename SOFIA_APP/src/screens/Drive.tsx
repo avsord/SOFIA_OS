@@ -69,7 +69,7 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
     finally { setLoading(false); }
   }, [api, folder]);
   useEffect(() => { if (active) void load(folder); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
-  const open = (id: string) => void load(id);
+  const open = (id: string) => { setQuery(''); void load(id); };
   const setViewSaved = (v: 'grid' | 'list') => { setView(v); try { globalThis.localStorage?.setItem(VIEW_KEY, v); } catch { /* sem armazenamento */ } };
 
   // ---------- envio ----------
@@ -98,6 +98,13 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
     return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
   });
 
+  // clicar fora de um item (area vazia, cabecalho) tira a selecao
+  useEffect(() => {
+    if (!WEB || !active) return; const el: HTMLElement | null = dropRef.current; if (!el) return;
+    const down = (e: MouseEvent) => { if (e.button !== 0) return; const t = e.target as HTMLElement; if (!t?.closest?.('[data-testid^="drive-item-"]')) setSelected(''); };
+    el.addEventListener('mousedown', down); return () => el.removeEventListener('mousedown', down);
+  }, [active]);
+
   // ---------- acoes ----------
   async function act(run: () => Promise<unknown>, reload = true) { try { await run(); if (reload) await load(folder); } catch (e) { appAlert('Não deu certo', errorText(e)); } }
   async function download(it: SdItem) {
@@ -120,13 +127,45 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
       onDrop: (e: any) => { const d = dragging.current; if (!d || d.id === it.id) return; e.preventDefault(); e.stopPropagation(); setDragTarget(''); dragging.current = null; void act(() => api.sdUpdate(d.id, {parent: it.id})); }} : {})} : {};
   const crumbDrop = (id: string) => WEB ? {onDragOver: (e: any) => { if (dragging.current) { e.preventDefault(); setDragTarget('crumb:' + id); } }, onDragLeave: () => setDragTarget(''), onDrop: (e: any) => { const d = dragging.current; if (!d) return; e.preventDefault(); setDragTarget(''); dragging.current = null; void act(() => api.sdUpdate(d.id, {parent: id})); }} : {};
 
-  const items = useMemo(() => { const q = query.trim().toLowerCase(); const all = data?.items || []; return q ? all.filter(i => i.name.toLowerCase().includes(q)) : all; }, [data, query]);
+  // pesquisa: filtra na hora o que ja esta na tela e, depois de uma pausa na digitacao, busca no Drive inteiro
+  const [found, setFound] = useState<{q: string; items: SdItem[]} | null>(null), [searching, setSearching] = useState(false);
+  useEffect(() => { const q = query.trim(); if (q.length < 2) { setFound(null); setSearching(false); return; } setSearching(true); let alive = true;
+    const t = setTimeout(() => { void api.sdSearch(q).then(r => { if (alive) setFound({q, items: r.items || []}); }).catch(() => { if (alive) setFound(null); }).finally(() => { if (alive) setSearching(false); }); }, 350);
+    return () => { alive = false; clearTimeout(t); }; }, [api, query]);
+  const [sort, setSort] = useState<{key: 'name' | 'modified' | 'size'; dir: 1 | -1}>(() => { try { const v = JSON.parse(globalThis.localStorage?.getItem(VIEW_KEY + '.sort') || 'null'); if (v && ['name', 'modified', 'size'].includes(v.key)) return {key: v.key, dir: v.dir === -1 ? -1 : 1}; } catch { /* padrao */ } return {key: 'name', dir: 1}; });
+  const sortBy = (key: 'name' | 'modified' | 'size') => setSort(o => { const n = {key, dir: (o.key === key ? -o.dir : key === 'name' ? 1 : -1) as 1 | -1}; try { globalThis.localStorage?.setItem(VIEW_KEY + '.sort', JSON.stringify(n)); } catch { /* sem armazenamento */ } return n; });
+  const items = useMemo(() => { const q = query.trim().toLowerCase();
+    const all = found && found.q.toLowerCase() === q ? found.items : (data?.items || []).filter(i => !q || i.name.toLowerCase().includes(q));
+    const cmp = (a: SdItem, b: SdItem) => sort.key === 'name' ? a.name.localeCompare(b.name, 'pt-BR', {numeric: true, sensitivity: 'base'}) * sort.dir
+      : sort.key === 'size' ? ((a.size ?? -1) - (b.size ?? -1)) * sort.dir || a.name.localeCompare(b.name, 'pt-BR') : (Date.parse(a.modified || '0') - Date.parse(b.modified || '0')) * sort.dir || a.name.localeCompare(b.name, 'pt-BR');
+    return [...all].sort((a, b) => (Number(b.folder) - Number(a.folder)) || cmp(a, b)); }, [data, query, found, sort]);
+  const inSearch = !!query.trim();
   const folders = items.filter(i => i.folder), files = items.filter(i => !i.folder);
   const cols = Math.max(2, Math.floor(((wide ? Math.min(width - 300, 1500) : width) - 40) / (wide ? 200 : 160)));
+  const ordered = view === 'grid' ? [...folders, ...files] : items, viewList = files.filter(i => viewable(driveKind(i)));
+  // teclado no site, como no Google Drive: setas escolhem o item, Enter abre, Delete manda para a lixeira, F2 renomeia,
+  // Esc tira a selecao. Nao age enquanto a pessoa digita, com janela/visualizador aberto ou fora do Drive.
+  const keyState = useRef({ordered, selected, cols, view, busy: false}); keyState.current = {ordered, selected, cols, view, busy: !!(preview || naming || moving)};
+  useEffect(() => {
+    if (!WEB || !active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const st = keyState.current, t = e.target as HTMLElement | null;
+      if (st.busy || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || !t || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable || !dropRef.current?.isConnected) return;
+      if (document.querySelector('[role=dialog],[role=alertdialog],[role=menu],[aria-modal=true]')) return;
+      const list = st.ordered; if (!list.length) return; const i = list.findIndex(x => x.id === st.selected), cur = i >= 0 ? list[i] : null;
+      const step = {ArrowRight: 1, ArrowLeft: -1, ArrowDown: st.view === 'grid' ? st.cols : 1, ArrowUp: st.view === 'grid' ? -st.cols : -1}[e.key];
+      if (step) { e.preventDefault(); const n = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + step)); setSelected(list[n].id);
+        requestAnimationFrame(() => document.querySelector('[data-testid="drive-item-' + list[n].id + '"]')?.scrollIntoView({block: 'nearest'})); return; }
+      if (!cur) return;
+      if (e.key === 'Enter') { e.preventDefault(); openItem(cur); } else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); trash(cur); }
+      else if (e.key === 'F2') { e.preventDefault(); setNaming({mode: 'rename', item: cur, value: cur.name}); } else if (e.key === 'Escape') setSelected('');
+    };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  });
 
   const Card = ({it}: {it: SdItem}) => { const k = KIND[driveKind(it)], sel = selected === it.id, target = dragTarget === it.id;
-    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB && !it.folder && selected !== it.id) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))}
-      {...({onDoubleClick: () => openItem(it), ...contextMenu(() => menu(it)), ...dragProps(it)} as any)}
+    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))}
+      {...({onDoubleClick: () => openItem(it), ...contextMenu(() => { setSelected(it.id); return menu(it); }), ...dragProps(it)} as any)}
       style={({hovered}: any) => ({width: `${100 / cols}%`, padding: 6})}>
       {({hovered}: any) => <View style={{borderRadius: 12, borderWidth: 1, borderColor: target ? c.accent : sel ? c.accent : c.line, backgroundColor: target ? c.accentSoft : sel ? c.accentSoft : hovered ? c.input : c.surface, overflow: 'hidden'}}>
         {it.folder ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12}}><Icon name="folder" size={22} color={k.color} active /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 14, fontWeight: '500'}}>{it.name}</Text><Pressable accessibilityLabel={'Mais ações para ' + it.name} hitSlop={8} onPress={(e: any) => openMore(e, it.name, menu(it))}><Icon name="more" size={18} color={c.muted} /></Pressable></View>
@@ -134,9 +173,9 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
             <View style={{marginHorizontal: 8, marginBottom: 8, borderRadius: 8, overflow: 'hidden', height: 120}}>{driveKind(it) === 'image' ? <Thumb api={api} item={it} h={120} /> : <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Icon name={k.icon} size={44} color={k.color} /></View>}</View></>}
       </View>}
     </Pressable>; };
-  const Row = ({it}: {it: SdItem}) => { const k = KIND[driveKind(it)], target = dragTarget === it.id;
-    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => openItem(it)} onLongPress={(e: any) => openMore(e, it.name, menu(it))} {...({...contextMenu(() => menu(it)), ...dragProps(it)} as any)}
-      style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: c.line, backgroundColor: target ? c.accentSoft : hovered ? c.input : 'transparent'})}>
+  const Row = ({it}: {it: SdItem}) => { const k = KIND[driveKind(it)], target = dragTarget === it.id, sel = selected === it.id;
+    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))} {...({onDoubleClick: () => openItem(it), ...contextMenu(() => { setSelected(it.id); return menu(it); }), ...dragProps(it)} as any)}
+      style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: c.line, backgroundColor: target || sel ? c.accentSoft : hovered ? c.input : 'transparent'})}>
       <Icon name={k.icon} size={20} color={k.color} active /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 14}}>{it.name}</Text>
       {wide ? <><Text style={{width: 120, color: c.muted, fontSize: 13}}>{when(it.modified)}</Text><Text style={{width: 90, color: c.muted, fontSize: 13, textAlign: 'right'}}>{it.folder ? '—' : size(it.size)}</Text></> : null}
       <Pressable accessibilityLabel={'Mais ações para ' + it.name} hitSlop={8} onPress={(e: any) => openMore(e, it.name, menu(it))}><Icon name="more" size={18} color={c.muted} /></Pressable>
@@ -147,6 +186,13 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
   async function grant() { // a propria conta Google do usuario: uma vez, na tela do Google
     setGranting(true); try { const r = await api.calendarConnect(); const u = new URL(r.url); if (u.protocol !== 'https:') throw Error('Endereço de autorização inválido.'); await WebBrowser.openAuthSessionAsync(u.toString(), 'sofiaapp://google'); await load('root'); } catch (e) { appAlert('Não deu certo', errorText(e)); } finally { setGranting(false); }
   }
+  const searchBox = <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.input, borderRadius: 10, paddingHorizontal: 12, width: wide ? 340 : undefined}}><Icon name="search" size={16} color={c.muted} />
+    <TextInput testID="drive-search" value={query} onChangeText={setQuery} placeholder="Pesquisar no Drive" placeholderTextColor={c.muted} returnKeyType="search" {...({onKeyPress: (e: any) => { if (e.nativeEvent?.key === 'Escape') setQuery(''); }} as any)} style={{flex: 1, color: c.text, paddingVertical: 9, fontSize: 14, outlineStyle: 'none'} as any} />
+    {searching ? <ActivityIndicator size="small" color={c.muted} /> : query ? <Pressable accessibilityRole="button" accessibilityLabel="Limpar pesquisa" onPress={() => setQuery('')} hitSlop={8}><Icon name="close" size={16} color={c.muted} /></Pressable> : null}</View>;
+  const sortMenu = (e: any) => openMore(e, 'Ordenar por', ([['name', 'Nome'], ['modified', 'Data de modificação'], ['size', 'Tamanho']] as const).map(([k, l]) => ({label: l + (sort.key === k ? (sort.dir === 1 ? '  ↑' : '  ↓') : ''), icon: (sort.key === k ? 'check' : 'sort') as IconName, run: () => sortBy(k)})));
+  const head = (label: string, key: 'name' | 'modified' | 'size', style: any) => <Pressable accessibilityRole="button" accessibilityLabel={'Ordenar por ' + label} onPress={() => sortBy(key)} style={[{flexDirection: 'row', alignItems: 'center', gap: 4}, style]}>
+    <Text style={{color: sort.key === key ? c.text : c.muted, fontSize: 12, fontWeight: '600'}}>{label}</Text>{sort.key === key ? <Text style={{color: c.text, fontSize: 12}}>{sort.dir === 1 ? '↑' : '↓'}</Text> : null}</Pressable>;
+  const emptyMenu = (): MenuItem[] => [{label: 'Nova pasta', icon: 'folderPlus', run: () => setNaming({mode: 'folder', value: ''})}, {label: 'Enviar arquivos', icon: 'upload', run: pickFiles}];
   return <View ref={dropRef} testID="sofia-drive" style={{flex: 1, backgroundColor: c.bg}}>
     {/* cabecalho */}
     <View style={{paddingHorizontal: wide ? 28 : 16, paddingTop: wide ? 22 : 12, gap: 14}}>
@@ -154,7 +200,7 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
         {onBack && !wide ? <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onBack} hitSlop={10}><Icon name="back" size={22} color={c.text} /></Pressable> : null}
         <Text accessibilityRole="header" style={{fontSize: wide ? 28 : 24, fontWeight: '600', letterSpacing: -1, color: c.text}}>Drive</Text>
         <View style={{flex: 1}} />
-        {wide ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.input, borderRadius: 10, paddingHorizontal: 12, width: 320}}><Icon name="search" size={16} color={c.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Pesquisar nesta pasta" placeholderTextColor={c.muted} style={{flex: 1, color: c.text, paddingVertical: 9, fontSize: 14, outlineStyle: 'none'} as any} /></View> : null}
+        {wide ? searchBox : null}
         <GhostButton icon={view === 'grid' ? 'listView' : 'gridView'} label={wide ? (view === 'grid' ? 'Lista' : 'Grade') : undefined} onPress={() => setViewSaved(view === 'grid' ? 'list' : 'grid')} testID="drive-view" />
         <Pressable testID="drive-new" accessibilityRole="button" accessibilityLabel="Novo" onPress={(e: any) => openMore(e, 'Novo', [{label: 'Nova pasta', icon: 'folderPlus', run: () => setNaming({mode: 'folder', value: ''})}, {label: 'Enviar arquivos', icon: 'upload', run: pickFiles}])}
           style={({hovered, pressed}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, backgroundColor: c.accent, opacity: hovered ? 0.92 : 1, transform: [{scale: pressed ? 0.97 : 1}], boxShadow: '0 4px 14px rgba(0,0,0,0.18)'} as any)}>
@@ -169,17 +215,22 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
           </Pressable></View>)}
       </ScrollView>
     </View>
+    {!wide ? <View style={{paddingHorizontal: 16, paddingBottom: 6}}>{searchBox}</View> : null}
     {!WEB ? <View style={{flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 6}}><GhostButton icon="folderPlus" label="Nova pasta" onPress={() => setNaming({mode: 'folder', value: ''})} /><GhostButton icon="upload" label="Enviar arquivos" onPress={pickFiles} /></View> : null}
     {/* conteudo */}
-    <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingHorizontal: wide ? 22 : 10, paddingBottom: 60, paddingTop: 8}}>
+    <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingHorizontal: wide ? 22 : 10, paddingBottom: 60, paddingTop: 8, flexGrow: 1}} {...(contextMenu(() => inSearch || notConnected ? [] : emptyMenu()) as any)}>
+      {data && !notConnected ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 6, marginBottom: 4, minHeight: 30}}>
+        <Text style={{flex: 1, color: c.muted, fontSize: 13}}>{inSearch ? (searching && !found ? 'Pesquisando no seu Drive…' : items.length + (items.length === 1 ? ' resultado' : ' resultados') + ' no seu Drive para “' + query.trim() + '”') : ''}</Text>
+        {view === 'grid' ? <Pressable testID="drive-sort" accessibilityRole="button" accessibilityLabel="Ordenar" onPress={sortMenu} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: hovered ? c.input : 'transparent'})}><Text style={{color: c.muted, fontSize: 13}}>{({name: 'Nome', modified: 'Modificado', size: 'Tamanho'})[sort.key]} {sort.dir === 1 ? '↑' : '↓'}</Text></Pressable> : null}
+      </View> : null}
       {notConnected ? <View testID="drive-connect" style={{margin: 16, padding: 24, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, gap: 10, alignItems: 'flex-start', maxWidth: 560}}><Icon name="drive" size={30} color={c.accent} /><Text style={{color: c.text, fontSize: 18, fontWeight: '600'}}>Seu Google Drive dentro da Sofia</Text><Text style={{color: c.muted, fontSize: 14, lineHeight: 20}}>{code === 'DRIVE_NEEDS_PERMISSION' ? 'Para mostrar aqui os seus arquivos e pastas, o Google precisa da sua permissão. É uma vez só.' : 'Entre com a sua conta Google para ver e organizar os seus arquivos aqui.'}</Text><PrimaryButton icon="drive" label={granting ? 'Abrindo o Google…' : 'Permitir acesso ao meu Google Drive'} disabled={granting} testID="drive-grant" onPress={() => void grant()} /></View>
         : error ? <View style={{margin: 16, gap: 10}}><Text style={{color: c.danger, fontSize: 14}}>{error}</Text><GhostButton icon="refresh" label="Tentar de novo" onPress={() => void load(folder)} /></View>
         : !data ? <View style={{padding: 40, alignItems: 'center'}}><ActivityIndicator color={c.accent} /></View>
-        : !items.length ? <Pressable onPress={pickFiles} style={{margin: 16, padding: 40, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: c.line, alignItems: 'center', gap: 10}}><Icon name="upload" size={34} color={c.muted} /><Text style={{color: c.text, fontSize: 16, fontWeight: '500'}}>{query ? 'Nada com esse nome nesta pasta' : 'Esta pasta está vazia'}</Text><Text style={{color: c.muted, fontSize: 13}}>{WEB ? 'Arraste arquivos para cá ou clique para enviar' : 'Toque para enviar arquivos'}</Text></Pressable>
+        : !items.length ? <Pressable onPress={query ? undefined : pickFiles} style={{margin: 16, padding: 40, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: c.line, alignItems: 'center', gap: 10}}><Icon name="upload" size={34} color={c.muted} /><Text style={{color: c.text, fontSize: 16, fontWeight: '500'}}>{query ? (searching ? 'Pesquisando…' : 'Nada com esse nome no seu Drive') : 'Esta pasta está vazia'}</Text><Text style={{color: c.muted, fontSize: 13}}>{WEB ? 'Arraste arquivos para cá ou clique para enviar' : 'Toque para enviar arquivos'}</Text></Pressable>
         : view === 'grid' ? <>
           {folders.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 6, marginBottom: 2}}>Pastas</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{folders.map(it => <Card key={it.id} it={it} />)}</View></> : null}
           {files.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 14, marginBottom: 2}}>Arquivos</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{files.map(it => <Card key={it.id} it={it} />)}</View></> : null}
-        </> : <View style={{borderTopWidth: 1, borderTopColor: c.line}}>{wide ? <View style={{flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 12}}><Text style={{flex: 1, marginLeft: 32, color: c.muted, fontSize: 12, fontWeight: '600'}}>Nome</Text><Text style={{width: 120, color: c.muted, fontSize: 12, fontWeight: '600'}}>Modificado</Text><Text style={{width: 90, color: c.muted, fontSize: 12, fontWeight: '600', textAlign: 'right'}}>Tamanho</Text><View style={{width: 18}} /></View> : null}{items.map(it => <Row key={it.id} it={it} />)}</View>}
+        </> : <View style={{borderTopWidth: 1, borderTopColor: c.line}}>{wide ? <View style={{flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 12}}>{head('Nome', 'name', {flex: 1, marginLeft: 32})}{head('Modificado', 'modified', {width: 120})}{head('Tamanho', 'size', {width: 90, justifyContent: 'flex-end'})}<View style={{width: 18}} /></View> : null}{items.map(it => <Row key={it.id} it={it} />)}</View>}
       {loading && data ? <View style={{position: 'absolute', top: 8, right: 16}}><ActivityIndicator size="small" color={c.accent} /></View> : null}
     </ScrollView>
     {/* arrastar arquivos do computador */}
@@ -194,7 +245,7 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
       <TextInput testID="drive-name-input" autoFocus value={naming?.value || ''} onChangeText={v => setNaming(n => n ? {...n, value: v} : n)} onSubmitEditing={() => { const n = naming; if (!n || !n.value.trim()) return; setNaming(null); void act(() => n.mode === 'folder' ? api.sdCreateFolder(folder, n.value.trim()) : api.sdUpdate(n.item!.id, {name: n.value.trim()})); }} placeholder={naming?.mode === 'folder' ? 'Pasta sem título' : 'Nome'} placeholderTextColor={c.muted} selectTextOnFocus style={{color: c.text, backgroundColor: c.input, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, outlineStyle: 'none'} as any} />
     </Dialog>
     {moving ? <MoveDialog api={api} item={moving} onClose={() => setMoving(null)} onPick={dest => { const it = moving; setMoving(null); void act(() => api.sdUpdate(it.id, {parent: dest})); }} /> : null}
-    {preview ? <Preview api={api} item={preview} onClose={() => setPreview(null)} onDownload={() => void download(preview)} /> : null}
+    {preview ? <Preview api={api} item={preview} list={viewList} onGo={it => { setPreview(it); setSelected(it.id); }} onClose={() => setPreview(null)} onDownload={() => void download(preview)} /> : null}
   </View>;
 }
 
@@ -212,9 +263,12 @@ function MoveDialog({api, item, onClose, onPick}: {api: SofiaApi; item: SdItem; 
   </Dialog>;
 }
 
-/** Visualizador (site): imagem, PDF, Word/Excel/PowerPoint (convertidos em PDF), audio, video e texto. */
-function Preview({api, item, onClose, onDownload}: {api: SofiaApi; item: SdItem; onClose: () => void; onDownload: () => void}) {
+/** Visualizador (site): imagem, PDF, Word/Excel/PowerPoint (convertidos em PDF), audio, video e texto.
+ * Como no Google Drive: setas (ou os botoes dos lados) passam para o arquivo anterior/seguinte da pasta, clicar fora do
+ * arquivo fecha, Esc fecha. No video, as setas avancam/voltam o video so depois de clicar nele (foco no player). */
+function Preview({api, item, list, onGo, onClose, onDownload}: {api: SofiaApi; item: SdItem; list: SdItem[]; onGo: (it: SdItem) => void; onClose: () => void; onDownload: () => void}) {
   const c = useTheme(), k = driveKind(item), [url, setUrl] = useState(''), [text, setText] = useState(''), [err, setErr] = useState('');
+  const idx = list.findIndex(x => x.id === item.id), prev = idx > 0 ? list[idx - 1] : null, next = idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
   useEffect(() => {
     let alive = true, made = ''; setUrl(''); setText(''); setErr('');
     const office = k === 'doc' || k === 'sheet' || k === 'slides';
@@ -222,25 +276,67 @@ function Preview({api, item, onClose, onDownload}: {api: SofiaApi; item: SdItem;
     void api.sdBlob(item.id, office ? 'preview' : 'content').then(async b => { if (!alive) return; if (k === 'text') setText((await b.text()).slice(0, 200000)); else { made = URL.createObjectURL(b); setUrl(made); } }).catch(e => { if (alive) setErr(errorText(e)); });
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
   }, [api, item.id, k]);
-  useEffect(() => { const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc); }, [onClose]);
-  const K = KIND[k];
-  return <View testID="drive-preview" style={{position: 'fixed' as any, left: 0, right: 0, top: 0, bottom: 0, zIndex: 50, backgroundColor: 'rgba(10,8,14,0.92)'}}>
+  const [zoom, setZoom] = useState(1), zoomRef = useRef(1); zoomRef.current = zoom; useEffect(() => setZoom(1), [item.id]);
+  const nav = useRef({prev, next, onGo, onClose, k}); nav.current = {prev, next, onGo, onClose, k};
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const n = nav.current; if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return; // o player ja tratou (video com foco)
+      if (e.key === 'Escape') { if (!document.fullscreenElement) n.onClose(); return; }
+      const t = e.target as HTMLElement | null; if (t && (/^(INPUT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable)) return;
+      if (document.activeElement?.closest?.('[data-testid=drive-video-player]')) return; // video em foco: as setas avancam o video
+      if (n.k === 'image' && (e.key === '+' || e.key === '=')) { e.preventDefault(); setZoom(z => Math.min(8, z * 1.25)); return; }
+      if (n.k === 'image' && (e.key === '-' || e.key === '_')) { e.preventDefault(); setZoom(z => Math.max(1, z / 1.25)); return; }
+      if (n.k === 'image' && e.key === '0') { setZoom(1); return; }
+      if (n.k === 'image' && zoomRef.current > 1 && e.key.startsWith('Arrow')) return; // com zoom, as setas andam pela imagem
+      if (e.key === 'ArrowRight' && n.next) { e.preventDefault(); n.onGo(n.next); } else if (e.key === 'ArrowLeft' && n.prev) { e.preventDefault(); n.onGo(n.prev); }
+    };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  }, []);
+  // fecha so quando o clique comeca e termina no fundo (arrastar a barra do video ate fora nao fecha)
+  const downOnBack = useRef(false);
+  const back = (e: any) => e.target === e.currentTarget;
+  const K = KIND[k], h = React.createElement;
+  const side = (dir: 'prev' | 'next', it: SdItem | null) => it ? <Pressable testID={'drive-preview-' + dir} accessibilityRole="button" accessibilityLabel={(dir === 'prev' ? 'Anterior: ' : 'Próximo: ') + it.name} onPress={() => onGo(it)}
+    style={({hovered}: any) => ({position: 'absolute', top: '50%', [dir === 'prev' ? 'left' : 'right']: 14, marginTop: -26, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.1)', zIndex: 2} as any)}>
+    <View style={{transform: [{rotate: dir === 'prev' ? '180deg' : '0deg'}]}}><Icon name="chevron" size={26} color="#fff" /></View></Pressable> : null;
+  const content = err ? <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>{err}</Text>
+    : k === 'text' ? (text ? <ScrollView keyboardShouldPersistTaps="handled" style={{width: '100%', maxWidth: 1000, maxHeight: '100%', backgroundColor: c.surface, borderRadius: 10, flexGrow: 0}} contentContainerStyle={{padding: 20}}><Text selectable style={{color: c.text, fontFamily: 'monospace', fontSize: 13}}>{text}</Text></ScrollView> : <ActivityIndicator color="#fff" />)
+    : !url ? <View style={{alignItems: 'center', gap: 12}}><ActivityIndicator color="#fff" /><Text style={{color: 'rgba(255,255,255,0.7)'}}>{k === 'doc' || k === 'sheet' || k === 'slides' ? 'Preparando a visualização…' : 'Abrindo…'}</Text></View>
+    : k === 'image' ? <ZoomImage key={item.id} src={url} alt={item.name} zoom={zoom} setZoom={setZoom} />
+    : k === 'audio' ? <DriveVideoPlayer key={item.id} src={url} title={item.name} audio />
+    : k === 'video' ? h('div', {style: {width: 'min(1400px, 100%)', aspectRatio: '16 / 9', maxHeight: '100%', display: 'flex'}}, <DriveVideoPlayer key={item.id} src={url} title={item.name} />)
+    : h('iframe', {src: url, title: item.name, style: {width: 'min(1100px, 100%)', height: '100%', border: 0, borderRadius: 6, background: '#fff', display: 'block'}});
+  return <View testID="drive-preview" accessibilityViewIsModal style={{position: 'fixed' as any, left: 0, right: 0, top: 0, bottom: 0, zIndex: 50, backgroundColor: 'rgba(10,8,14,0.92)'}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} hitSlop={10}><Icon name="back" size={22} color="#fff" /></Pressable>
       <Icon name={K.icon} size={20} color={K.color} active /><Text numberOfLines={1} style={{flex: 1, color: '#fff', fontSize: 16, fontWeight: '500'}}>{item.name}</Text>
+      {k === 'image' && url ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 4}}>
+        <Pressable testID="drive-zoom-out" accessibilityRole="button" accessibilityLabel="Diminuir zoom" disabled={zoom <= 1} onPress={() => setZoom(z => Math.max(1, z / 1.25))} style={{padding: 6, opacity: zoom <= 1 ? 0.4 : 1}}><Icon name="zoomOut" size={18} color="#fff" /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ajustar à tela" onPress={() => setZoom(1)} style={{paddingHorizontal: 4, minWidth: 48, alignItems: 'center'}}><Text style={{color: '#fff', fontSize: 13, fontVariant: ['tabular-nums']}}>{Math.round(zoom * 100)}%</Text></Pressable>
+        <Pressable testID="drive-zoom-in" accessibilityRole="button" accessibilityLabel="Aumentar zoom" disabled={zoom >= 8} onPress={() => setZoom(z => Math.min(8, z * 1.25))} style={{padding: 6, opacity: zoom >= 8 ? 0.4 : 1}}><Icon name="zoomIn" size={18} color="#fff" /></Pressable></View> : null}
+      {list.length > 1 && idx >= 0 ? <Text testID="drive-preview-count" style={{color: 'rgba(255,255,255,0.7)', fontSize: 13, fontVariant: ['tabular-nums']}}>{idx + 1} de {list.length}</Text> : null}
       <Pressable accessibilityRole="button" accessibilityLabel="Baixar" onPress={onDownload} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: hovered ? 'rgba(255,255,255,0.12)' : 'transparent'})}><Icon name="download" size={18} color="#fff" /><Text style={{color: '#fff'}}>Baixar</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Fechar visualização" onPress={onClose} hitSlop={10}><Icon name="close" size={22} color="#fff" /></Pressable>
     </View>
-    <Pressable style={{flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20}} onPress={onClose}>
-      <Pressable style={{width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', cursor: 'default'} as any} onPress={() => {}}>
-        {err ? <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>{err}</Text>
-          : k === 'text' ? (text ? <ScrollView keyboardShouldPersistTaps="handled" style={{width: '100%', maxWidth: 1000, backgroundColor: c.surface, borderRadius: 10}} contentContainerStyle={{padding: 20}}><Text selectable style={{color: c.text, fontFamily: 'monospace', fontSize: 13}}>{text}</Text></ScrollView> : <ActivityIndicator color="#fff" />)
-          : !url ? <View style={{alignItems: 'center', gap: 12}}><ActivityIndicator color="#fff" /><Text style={{color: 'rgba(255,255,255,0.7)'}}>{k === 'doc' || k === 'sheet' || k === 'slides' ? 'Preparando a visualização…' : 'Abrindo…'}</Text></View>
-          : k === 'image' ? React.createElement('img', {src: url, alt: item.name, style: {maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 6}})
-          : k === 'audio' ? <DriveVideoPlayer src={url} title={item.name} audio />
-          : k === 'video' ? <DriveVideoPlayer src={url} title={item.name} />
-          : React.createElement('iframe', {src: url, title: item.name, style: {width: 'min(1100px, 100%)', height: '100%', border: 0, borderRadius: 6, background: '#fff'}})}
-      </Pressable>
-    </Pressable>
+    {h('div', {'data-testid': 'drive-preview-backdrop', onMouseDown: (e: any) => { downOnBack.current = back(e); }, onClick: (e: any) => { if (downOnBack.current && back(e)) onClose(); downOnBack.current = false; },
+      style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 84px 24px', boxSizing: 'border-box'}},
+      side('prev', prev), content, side('next', next))}
   </View>;
+}
+
+/** Imagem do visualizador com zoom (botoes, + e -, Ctrl + rodinha, duplo clique). Com zoom, arrasta-se a imagem para andar nela. */
+function ZoomImage({src, alt, zoom, setZoom}: {src: string; alt: string; zoom: number; setZoom: (f: (z: number) => number) => void}) {
+  const box = useRef<HTMLDivElement | null>(null), [nat, setNat] = useState<{w: number; h: number} | null>(null), [area, setArea] = useState({w: 0, h: 0}), drag = useRef<{x: number; y: number; l: number; t: number} | null>(null);
+  useEffect(() => { const el = box.current; if (!el) return; const ro = new ResizeObserver(() => setArea({w: el.clientWidth, h: el.clientHeight})); ro.observe(el); setArea({w: el.clientWidth, h: el.clientHeight});
+    const wheel = (e: WheelEvent) => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); setZoom(z => Math.max(1, Math.min(8, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))); };
+    const host = el.parentElement || el; host.addEventListener('wheel', wheel, {passive: false}); return () => { ro.disconnect(); host.removeEventListener('wheel', wheel); }; }, [setZoom]);
+  const fit = nat && area.w ? Math.min(1, area.w / nat.w, area.h / nat.h) : 1, w = nat ? nat.w * fit * zoom : undefined;
+  const h = React.createElement;
+  return h('div', {ref: box, 'data-testid': 'drive-image', style: {width: '100%', height: '100%', overflow: zoom > 1 ? 'auto' : 'hidden', display: 'flex', pointerEvents: zoom > 1 ? 'auto' : 'none'}},
+    h('img', {src, alt, draggable: false, onLoad: (e: any) => setNat({w: e.currentTarget.naturalWidth || 1, h: e.currentTarget.naturalHeight || 1}),
+      onDoubleClick: () => setZoom(z => z > 1 ? 1 : 2),
+      onMouseDown: (e: any) => { const el = box.current; if (zoom <= 1 || !el) return; e.preventDefault(); drag.current = {x: e.clientX, y: e.clientY, l: el.scrollLeft, t: el.scrollTop};
+        const mv = (ev: MouseEvent) => { const d = drag.current; if (d) { el.scrollLeft = d.l - (ev.clientX - d.x); el.scrollTop = d.t - (ev.clientY - d.y); } }, up = () => { drag.current = null; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); },
+      style: {margin: 'auto', display: 'block', borderRadius: 6, pointerEvents: 'auto', cursor: zoom > 1 ? 'grab' : 'zoom-in', userSelect: 'none', flexShrink: 0, ...(w ? {width: w, height: 'auto', maxWidth: 'none'} : {maxWidth: '100%', maxHeight: '100%', objectFit: 'contain'})}}));
 }

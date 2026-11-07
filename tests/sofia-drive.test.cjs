@@ -18,6 +18,7 @@ function fakeDrive(){
     if(u.pathname==='/drive/v3/files/root')return json({id:'meudrive0001'});
     if(u.pathname==='/drive/v3/files'&&m==='POST'){const f={id:id(),name:body.name,mimeType:body.mimeType,parents:body.parents||['meudrive0001'],trashed:false};files.set(f.id,f);return json(f);}
     if(u.pathname==='/upload/drive/v3/files'){const meta=JSON.parse(String(opt.body).split('\r\n\r\n')[1].split('\r\n')[0]);const f={id:id(),name:meta.name,mimeType:meta.mimeType,parents:meta.parents,trashed:false,size:'8'};files.set(f.id,f);return json(f);}
+    if(u.pathname==='/drive/v3/files'&&m==='GET'&&/name contains/.test(u.searchParams.get('q'))&&!/in parents/.test(u.searchParams.get('q'))){const w=u.searchParams.get('q').match(/name contains '([^']+)'/)[1];return json({files:[...files.values()].filter(f=>f.name.includes(w)&&!f.trashed&&f.id!=='meudrive0001')});}
     if(u.pathname==='/drive/v3/files'&&m==='GET'){const par=u.searchParams.get('q').match(/'([^']+)' in parents/)[1];return json({files:[...files.values()].filter(f=>f.parents.includes(par)&&!f.trashed).sort((a,b)=>(b.mimeType.includes('folder')-a.mimeType.includes('folder'))||a.name.localeCompare(b.name))});}
     const fm=u.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
     if(fm){const f=files.get(fm[1]);if(!f)return json({error:{message:'nao achei'}},404);
@@ -61,4 +62,16 @@ test('Player: link de video assinado vale so para aquele arquivo e expira',t=>{
   const {g}=svc(t);const tk=g.sdStreamToken('arquivo123');
   assert.equal(g.sdStreamValid('arquivo123',tk.exp,tk.sig),true);assert.equal(g.sdStreamValid('outro123456',tk.exp,tk.sig),false);
   const old=g.sdStreamToken('arquivo123',-1000);assert.equal(g.sdStreamValid('arquivo123',old.exp,old.sig),false);assert.equal(g.sdStreamValid('arquivo123',tk.exp,'falsa'),false);
+});
+
+test('Drive: pesquisa no Drive inteiro nunca devolve nada da area da Sofia (nem o que esta dentro das pastas dela)',async t=>{
+  const {g,d}=svc(t);
+  d.files.set('relsofia00001',{id:'relsofia00001',name:'relatorio interno',mimeType:'text/plain',parents:['pastaantigasofia'],trashed:false});
+  d.files.set('subsofia00001',{id:'subsofia00001',name:'sub',mimeType:'application/vnd.google-apps.folder',parents:['pastaantigasofia'],trashed:false});
+  d.files.set('relsofia00002',{id:'relsofia00002',name:'relatorio fundo',mimeType:'text/plain',parents:['subsofia00001'],trashed:false});
+  d.files.set('relbackup0001',{id:'relbackup0001',name:'relatorio backup',mimeType:'text/plain',parents:['meudrive0001'],appProperties:{sofia_cat:'Backups'},trashed:false});
+  d.files.set('relusuario001',{id:'relusuario001',name:'relatorio da viagem',mimeType:'text/plain',parents:['fotosdousuario'],trashed:false});
+  const r=await g.sdSearch('relatorio');
+  assert.deepEqual(r.items.map(i=>i.name),['relatorio da viagem']);
+  assert.deepEqual((await g.sdSearch("  ")).items,[]);
 });

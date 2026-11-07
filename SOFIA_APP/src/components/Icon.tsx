@@ -123,6 +123,9 @@ import * as PHardDrives_ from 'phosphor-react-native/src/icons/HardDrives';
 import * as PPencilSimple_ from 'phosphor-react-native/src/icons/PencilSimple';
 import * as PArrowsOutCardinal_ from 'phosphor-react-native/src/icons/ArrowsOutCardinal';
 import * as PListBullets_ from 'phosphor-react-native/src/icons/ListBullets';
+import * as PArrowsDownUp_ from 'phosphor-react-native/src/icons/ArrowsDownUp';
+import * as PZoomIn_ from 'phosphor-react-native/src/icons/MagnifyingGlassPlus';
+import * as PZoomOut_ from 'phosphor-react-native/src/icons/MagnifyingGlassMinus';
 import * as PSquaresFour_ from 'phosphor-react-native/src/icons/SquaresFour';
 
 /** 0.3.259 (rodada premium, fase 1): icones de um conjunto profissional (Phosphor, licenca MIT), no mesmo grid e no
@@ -164,6 +167,9 @@ const ICONS = {
  rename: PPencilSimple_.PencilSimpleIcon,
  moveTo: PArrowsOutCardinal_.ArrowsOutCardinalIcon,
  listView: PListBullets_.ListBulletsIcon,
+ sort: PArrowsDownUp_.ArrowsDownUpIcon,
+ zoomIn: PZoomIn_.MagnifyingGlassPlusIcon,
+ zoomOut: PZoomOut_.MagnifyingGlassMinusIcon,
  gridView: PSquaresFour_.SquaresFourIcon,
  image: PImage.ImageIcon,
  copy: PCopy.CopyIcon,

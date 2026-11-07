@@ -39,7 +39,10 @@ export function DriveVideoPlayer({src, title, audio = false}: {src: string; titl
     return () => { offs.forEach(f => f()); document.removeEventListener('fullscreenchange', fs); clearTimeout(hideT.current); };
   }, [src, poke]);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { const el = v.current; if (!el || (e.target as HTMLElement)?.tagName === 'INPUT') return; const key = e.key.toLowerCase();
+    const k = (e: KeyboardEvent) => { const el = v.current; if (!el || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement)?.tagName || '')) return; const key = e.key.toLowerCase();
+      // setas so com o player em foco (depois de clicar no video); sem foco, elas passam para o arquivo anterior/seguinte
+      const focused = !!box.current && box.current.contains(document.activeElement);
+      if (key.startsWith('arrow') && !focused) return;
       if (key === ' ' || key === 'k') { e.preventDefault(); toggle(); } else if (key === 'arrowright') { e.preventDefault(); skip(5); } else if (key === 'arrowleft') { e.preventDefault(); skip(-5); } else if (key === 'l') skip(10); else if (key === 'j') skip(-10);
       else if (key === 'arrowup') { e.preventDefault(); el.volume = Math.min(1, el.volume + 0.1); el.muted = false; poke(); } else if (key === 'arrowdown') { e.preventDefault(); el.volume = Math.max(0, el.volume - 0.1); poke(); }
       else if (key === 'm') { el.muted = !el.muted; poke(); } else if (key === 'f' && !audio) fullscreen(); else if (/^[0-9]$/.test(key) && el.duration) { el.currentTime = el.duration * Number(key) / 10; poke(); }
@@ -49,7 +52,7 @@ export function DriveVideoPlayer({src, title, audio = false}: {src: string; titl
 
   const pct = dur ? t / dur * 100 : 0, bpct = dur ? Math.min(100, buf / dur * 100) : 0;
   const h = React.createElement;
-  return h('div', {ref: box, 'data-testid': 'drive-video-player', onMouseMove: poke, onMouseLeave: () => playing && setShow(false), style: {position: 'relative', width: audio ? 'min(720px, 92vw)' : '100%', height: audio ? 180 : '100%', maxHeight: '100%', background: audio ? 'linear-gradient(135deg,#2a2140,#14111c)' : '#000', borderRadius: full ? 0 : 10, overflow: 'hidden', cursor: show || !playing ? 'default' : 'none', userSelect: 'none'}},
+  return h('div', {ref: box, 'data-testid': 'drive-video-player', tabIndex: -1, onMouseDown: () => box.current?.focus({preventScroll: true}), onMouseMove: poke, onMouseLeave: () => playing && setShow(false), style: {position: 'relative', width: audio ? 'min(720px, 92vw)' : '100%', height: audio ? 180 : '100%', maxHeight: '100%', background: audio ? 'linear-gradient(135deg,#2a2140,#14111c)' : '#000', borderRadius: full ? 0 : 10, overflow: 'hidden', cursor: show || !playing ? 'default' : 'none', userSelect: 'none', outline: 'none'}},
     h('video', {ref: v, src, playsInline: true, preload: 'metadata', onClick: toggle, onDoubleClick: audio ? undefined : fullscreen, style: {width: '100%', height: '100%', objectFit: 'contain', display: audio ? 'none' : 'block', background: '#000'}}),
     audio ? h('div', {onClick: toggle, style: {position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, color: '#fff', fontSize: 16, fontWeight: 500, paddingBottom: 60}}, h(Svg, {d: ICON.vol, size: 28}), title) : null,
     waiting && !err ? h('div', {style: {position: 'absolute', left: '50%', top: '50%', width: 44, height: 44, margin: '-22px 0 0 -22px', border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', animation: 'sofiaspin .8s linear infinite'}}) : null,

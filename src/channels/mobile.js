@@ -308,6 +308,7 @@ function makeMobileApi(runtime, deps) {
     // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
     if (p.startsWith('/api/mobile/md/sofiadrive/')) {
       const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm0;
+      if (sd === 'search' && m === 'GET') { rate(session, 'sofiadrive', 120); try { return send({connected: true, ...(await g.sdSearch(String(url.searchParams.get('q') || '')))}); } catch (e) { if (e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION') return send({connected: false, code: e.code, reason: e.message, items: []}); throw e; } }
       if (sd === 'list' && m === 'GET') { rate(session, 'sofiadrive', 120); try { return send({connected: true, ...(await g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || '')))}); } catch (e) { if (e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION') return send({connected: false, code: e.code, reason: e.message}); throw e; } }
       mm0 = sd.match(/^items\/([A-Za-z0-9_-]+)\/stream-link$/);
       if (mm0 && m === 'GET') { rate(session, 'sofiadrive', 120); await g.sdPath(mm0[1]); const t = g.sdStreamToken(mm0[1]); return send({url: '/api/mobile/md/sofiadrive/stream/' + mm0[1] + '?exp=' + t.exp + '&sig=' + encodeURIComponent(t.sig)}); }

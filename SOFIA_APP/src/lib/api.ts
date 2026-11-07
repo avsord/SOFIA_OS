@@ -316,6 +316,7 @@ export class SofiaApi {
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
   /** 06/11/2026: relatorio do gravador de fluidez do Inicio (fluency-probe.ts). Envio direto: nao invalida caches nem dispara releituras. */
   // ===== Sofia Drive (07/11/2026): arquivos do usuario no Drive dele, com a cara do Google Drive =====
+  sdSearch(q: string) { return this.request<{connected?: boolean; items: SdItem[]}>('/md/sofiadrive/search?q=' + encodeURIComponent(q)); }
   sdList(folder = 'root', q = '') { return this.request<SdListing>('/md/sofiadrive/list?folder=' + encodeURIComponent(folder) + (q ? '&q=' + encodeURIComponent(q) : '')); }
   sdCreateFolder(parent: string, name: string) { return this.request<{item: SdItem}>('/md/sofiadrive/folder', {parent, name}, 'POST'); }
   sdUpdate(id: string, patch: {name?: string; parent?: string}) { return this.request<{item: SdItem}>('/md/sofiadrive/items/' + encodeURIComponent(id), patch, 'PATCH'); }

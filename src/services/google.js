@@ -1262,6 +1262,23 @@ class GoogleService {
     }
     return {folder: {id: id === at.root ? 'root' : id, name: at.meta.name}, path: at.path, items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
   }
+  /** Pesquisa no Drive inteiro (como no Google Drive). So entra o que esta dentro do Meu Drive e fora da area da Sofia:
+   * cada resultado tem os pais conferidos ate a raiz (com memoria por pesquisa), e qualquer item da Sofia no caminho tira-o. */
+  async sdSearch(q) {
+    const root = await this.sdRoot(), text = String(q || '').replace(/['\\]/g, ' ').trim().slice(0, 80);
+    if (!text) return {items: []};
+    const r = await this.call('GET', DRIVE + '/files?q=' + encodeURIComponent("name contains '" + text + "' and trashed=false and 'me' in owners") + '&orderBy=folder,modifiedTime desc&pageSize=60&fields=files(id,name,mimeType,size,modifiedTime,appProperties,spaces,parents)');
+    const memo = new Map([[root, Promise.resolve(true)]]);
+    const okFolder = (id, depth = 0) => {
+      if (!id || depth > 40) return Promise.resolve(false);
+      if (!memo.has(id)) memo.set(id, this.call('GET', DRIVE + '/files/' + GoogleService.sdId(id) + '?fields=id,parents,trashed,appProperties,spaces')
+        .then(f => !f.trashed && !this.sdProtected(f) && okFolder((f.parents || [])[0], depth + 1)).catch(() => false));
+      return memo.get(id);
+    };
+    const files = [];
+    for (const f of r.files || []) if (!this.sdProtected(f) && await okFolder((f.parents || [])[0])) files.push(f);
+    return {items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
+  }
   async sdParent(parent) { const at = await this.sdPath(parent); if (at.meta.mimeType !== 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Destino não é uma pasta.', 400); return at.meta.id; }
   static sdName(name) { const n = String(name || '').replace(/[\u0000-\u001f\\/]/g, ' ').trim().slice(0, 200); if (!n) throw new AppError('BAD_FIELD', 'Dê um nome.', 400); return n; }
   async sdCreateFolder(parent, name) { const p = await this.sdParent(parent); const f = await this.call('POST', DRIVE + '/files?fields=id,name,mimeType,modifiedTime', {name: GoogleService.sdName(name), mimeType: 'application/vnd.google-apps.folder', parents: [p]}); return {id: f.id, name: f.name, mime: f.mimeType, folder: true, size: null, modified: f.modifiedTime || ''}; }
