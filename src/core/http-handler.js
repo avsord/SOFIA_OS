@@ -195,6 +195,10 @@ function createHandler(runtime) {
         revokeWebSessions();mobileSessions.revokeAll();return redirect(res,303,'/login?reset=1');
       }
       if(m==='GET'&&p==='/logout'){if(railwayEnv())clearSession(req,res);return redirect(res,303,railwayEnv()?'/login?logout=1':'/');}
+      // 07/11/2026 (Pedro: "esse email precisa chegar pelo email da Sofia e eu nao vou pagar nada"): configuracao da empresa,
+      // feita UMA vez por quem esta logado na conta da Sofia (sofiaos.core). Nao aparece em tela nenhuma do site/app. Exige o
+      // login do dono (rota nao publica). Depois de ligado, so informa que esta pronto.
+      if(m==='GET'&&p==='/setup/email-sofia'&&runtime.google){if(runtime.google.canSendMail())return plain(res,200,'O e-mail da Sofia ja esta ligado para envio: '+runtime.google.senderEmail());res.statusCode=302;res.setHeader('Location',runtime.google.senderConnectUrl({}).url);res.end();return;}
       if(m==='GET'&&p==='/google/oauth/callback'&&runtime.google){publicHeaders(res,p);const r=await runtime.google.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/stores/mercadolivre/oauth/callback'&&runtime.stores){publicHeaders(res,p);const r=await runtime.stores.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local',task_description_format:true,selected_task_context:true,agenda_priority:true,persistent_sessions:true,unrestricted_chat_text:true,unrestricted_audio_duration:true});
