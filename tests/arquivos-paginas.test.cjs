@@ -58,7 +58,7 @@ test('Excel e PowerPoint tambem nos editores da Sofia; tema claro/escuro; so a j
  assert.ok(!pf.includes("tool('external', 'Abrir em janela', open)"),'sem a opcao da janela dentro da pagina na barra');
  for(const s of ["import('jszip')","function writeBox(","setChild(rPr, 'highlight', nh)","async function addSlide(","function deleteSlide(","async function addTextBox(","dragBox(b, 'move')"])assert.ok(sl.includes(s),s);
  assert.ok(sl.includes('el.innerHTML = bodyHtml(')&&!sl.includes('dangerouslySetInnerHTML: {__html: bodyHtml(b.el, b.title, sc)}}),'),'texto do slide nao e redesenhado ao clicar');
- assert.ok(ch.includes("const KEY = 'sofia.editor.theme'")&&read('SOFIA_APP/src/components/DocEditor.tsx').includes('h(ThemeToggle'));
+ assert.ok(ch.includes("['original', 'Original',")&&ch.includes("const KEY = 'sofia.editor.theme'")&&read('SOFIA_APP/src/components/DocEditor.tsx').includes('h(ThemeToggle'));
  assert.ok(read('SOFIA_APP/src/components/DocEditor.tsx').includes("wrap.style.cursor = 'default'"),'cursor nao some no cinza');
  assert.ok(read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'xlsx'")&&read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'pptx'"));
 });
