@@ -385,7 +385,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     </View>
   </View>;
   const ticked = (inGroup ? view : L.model === 'shopping' ? mine : view).filter(i => i.done);
-  const footer = L.model === 'shopping' && !inGroup && !mine.some(i => i.done) ? null : <View testID="list-footer" style={desktop ? {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface} : {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
+  const footer = (L.model === 'shopping' && !inGroup && !mine.some(i => i.done)) || !view.length /* 07/11/2026 (revisao): sem totais de R$ 0,00 com a lista vazia */ ? null : <View testID="list-footer" style={desktop ? {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface} : {flexDirection: 'row', alignItems: 'center', gap: 24, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
     {L.model === 'simple'
       ? <View style={{flex: 1}}><Text style={{color: c.muted, fontSize: 12}}>Feitos</Text><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>{done.length} de {view.length}</Text></View>
       : <View style={{flex: 1, flexDirection: 'row', gap: 24}}>

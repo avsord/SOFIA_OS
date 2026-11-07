@@ -100,7 +100,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 40, paddingHorizontal: 10}}>
               <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="tag" size={38} color={c.accent} /></View>
               <Text style={{fontSize: 20, fontWeight: '600', color: c.text, textAlign: 'center'}}>Acompanhe o preço do que você quer comprar</Text>
-              <Text style={{fontSize: 14, lineHeight: 21, color: c.muted, textAlign: 'center'}}>Cole o link de um produto. A Sofia lê o preço, encontra o mesmo item em outras lojas, desenha o histórico e te avisa quando valer a pena.</Text>
+              <Text style={{fontSize: 14, lineHeight: 21, color: c.muted, textAlign: 'center', maxWidth: 520}}>Cole o link de um produto. A Sofia lê o preço, encontra o mesmo item em outras lojas, desenha o histórico e te avisa quando valer a pena.</Text>
               <View style={{alignSelf: 'center', marginTop: 8}} /* 07/11/2026 (revisao): o botao ficava colado a esquerda, embaixo do texto centralizado */><Button title="Adicionar meu primeiro produto" onPress={() => setAdding(true)} /></View>
             </View>
           ) : (

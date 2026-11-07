@@ -4,6 +4,7 @@
 import React, {useMemo, useState} from 'react';
 import {Pressable, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../../lib/theme';
+import {tap} from '../../lib/desktop';
 import type {SofiaApi} from '../../lib/api';
 import {looseExpenses, monthLabel, spendCapFor, type Account} from '../../lib/finance';
 import type {Data} from './core';
@@ -53,7 +54,7 @@ export function SpendCapCard({api, d, month, accountId, account, show, reload, s
         {cap > 0 ? <Text style={{color, fontWeight: '700'}}>{pct}%</Text> : null}
       </View>
       <View style={{height: 7, borderRadius: 4, backgroundColor: c.line}}>{cap > 0 ? <View style={{width: (Math.min(100, Math.max(1, pct)) + '%') as any, height: 7, borderRadius: 4, backgroundColor: color}} /> : null}</View>
-      <Text style={{color: c.muted, fontSize: 12}}>{month > new Date().toISOString().slice(0, 7) ? monthLabel(month).split(' ')[0] + ' ainda não começou. Os números passam a contar quando o mês chegar.' : cap > 0 ? (spent <= cap ? 'Ainda pode gastar ' + show(Math.round((cap - spent) * 100) / 100) + ' neste mês, fora as contas.' : 'Passou ' + show(Math.round((spent - cap) * 100) / 100) + ' do teto do mês.') : 'Toque na engrenagem para definir quanto quer gastar no mês, fora as contas.'}</Text>
+      <Text style={{color: c.muted, fontSize: 12}}>{month > new Date().toISOString().slice(0, 7) ? monthLabel(month).split(' ')[0] + ' ainda não começou. Os números passam a contar quando o mês chegar.' : cap > 0 ? (spent <= cap ? 'Ainda pode gastar ' + show(Math.round((cap - spent) * 100) / 100) + ' neste mês, fora as contas.' : 'Passou ' + show(Math.round((spent - cap) * 100) / 100) + ' do teto do mês.') : tap('Toque na engrenagem para definir quanto quer gastar no mês, fora as contas.')}</Text>
     </Pressable>}
   </View>;
 }
