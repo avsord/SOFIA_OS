@@ -1472,7 +1472,7 @@ class GoogleService {
     this.attPdfMemo = this.attPdfMemo || new Map(); const hit = this.attPdfMemo.get(a.id); if (hit) return hit;
     const job = (async () => {
       const bytes = await this.attachmentBytes(a);
-      const {body, type} = GoogleService.multipart({name: 'Sofia - visualizacao temporaria (some sozinho)', mimeType: 'application/vnd.google-apps.' + kind, appProperties: {sofia_cat: 'preview_tmp'}}, mime || 'application/octet-stream', bytes);
+      const {body, type} = GoogleService.multipart({name: name.replace(/\.[^.]+$/, '') || 'Arquivo' /* 07/11/2026: o titulo do PDF e o nome do arquivo (era 'Sofia - visualizacao temp...') */, mimeType: 'application/vnd.google-apps.' + kind, appProperties: {sofia_cat: 'preview_tmp'}}, mime || 'application/octet-stream', bytes);
       const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': type});
       try {
         const res = await this.fetch(DRIVE + '/files/' + up.id + '/export?mimeType=application/pdf', {headers: {Authorization: 'Bearer ' + await this.token()}});

@@ -65,22 +65,38 @@ export async function downloadPageFile(api: SofiaApi, id: string) {
 }
 
 // ---------------- Janelas flutuantes ----------------
-type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean};
+type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean};
 let wins: Win[] = [], topZ = 1;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
 const setWins = (next: Win[]) => {wins = next; emit();};
-export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string}) {
-  const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, z: ++topZ} : w)); return;}
-  const W = window.innerWidth, H = window.innerHeight, w = Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = Math.min(H - 110, 720), n = wins.length;
-  setWins([...wins, {key: f.id + ':' + Date.now(), api, id: f.id, name: f.name, mime: f.mime, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false}]);
+export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
+  const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, ...(at || {}), z: ++topZ} : w)); return found.key;}
+  const W = window.innerWidth, H = window.innerHeight, w = Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = Math.min(H - 110, 720), n = wins.length, key = f.id + ':' + Date.now();
+  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
+  return key;
+}
+const useWins = () => useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
+/** 07/11/2026 (Pedro: "quero que esse bloco seja flutuante igual no iPad, que eu possa mover pelo navegador"): segurar a
+ * alca do bloco e arrastar TIRA o arquivo da pagina: vira janela flutuante que segue o mouse e fica onde soltar. */
+function popOut(api: SofiaApi, f: {id: string; name: string; mime: string}, e: any, el: HTMLElement | null) {
+  if (e.button != null && e.button !== 0) return; e.preventDefault(); e.stopPropagation();
+  const sx = e.clientX, sy = e.clientY, r = el?.getBoundingClientRect?.(), bodyStyle = document.body.style, oldSel = bodyStyle.userSelect; let key = '';
+  bodyStyle.userSelect = 'none';
+  const mv = (ev: PointerEvent) => {const dx = ev.clientX - sx, dy = ev.clientY - sy, W = window.innerWidth, H = window.innerHeight;
+    if (!key) {if (Math.hypot(dx, dy) < 6) return; const w = Math.round(Math.max(360, Math.min(720, r?.width || 520))), hgt = Math.round(Math.max(280, Math.min(H - 40, (r?.height || 480) + 44)));
+      key = openFileWindow(api, f, {x: (r?.left || sx - 40), y: (r?.top || sy - 20), w, hgt, drag: true});}
+    const cur = wins.find(x => x.key === key); if (!cur) return;
+    patchWin(key, {x: Math.min(W - 80, Math.max(-cur.w + 120, (r?.left || sx - 40) + dx)), y: Math.min(Math.max(0, H - cur.hgt - 4), Math.max(0, (r?.top || sy - 20) + dy))});};
+  const up = () => {bodyStyle.userSelect = oldSel; if (key) patchWin(key, {drag: false}); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
 const closeWin = (key: string) => setWins(wins.filter(w => w.key !== key));
 const patchWin = (key: string, p: Partial<Win>) => setWins(wins.map(w => w.key === key ? {...w, ...p} : w));
 
 /** Fica montado na tela de Paginas: as janelas abertas aparecem por cima de tudo (e continuam ao trocar de pagina). */
 export function FileWindowHost() {
-  const list = useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
+  const list = useWins();
   useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) closeWin(top.key);}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
   if (!WEB || !list.length) return null;
   return <OverAll>{list.map(w => <FileWindow key={w.key} win={w} />)}</OverAll>;
@@ -101,17 +117,18 @@ function FileWindow({win}: {win: Win}) {
   const btn = (icon: any, label: string, run: () => void) => <Pressable key={label} {...({dataSet: {winBtn: '1'}} as any)} accessibilityLabel={label} onPress={run} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Icon name={icon} size={15} color={c.muted} /></Pressable>;
   return h('div', {'data-testid': 'file-window', role: 'dialog', 'aria-label': win.name, onPointerDown: () => {if (wins.find(w => w.key === win.key)?.z !== topZ) patchWin(win.key, {z: ++topZ});},
     style: {position: 'absolute', ...box, zIndex: win.z, pointerEvents: 'auto', background: c.surface, borderRadius: 12, border: '1px solid ' + c.line, overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column'}},
-    h('div', {onPointerDown: drag('move'), onDoubleClick: () => patchWin(win.key, {max: !win.max}), style: {height: 40, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingRight: 6, borderBottom: '1px solid ' + c.line, cursor: moving ? 'grabbing' : 'grab', userSelect: 'none'}},
-      <><Icon name={meta.icon} size={16} color={meta.color} />
+    h('div', {onPointerDown: drag('move'), onDoubleClick: () => patchWin(win.key, {max: !win.max}), style: {height: 44, paddingTop: 4, position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingRight: 6, borderBottom: '1px solid ' + c.line, cursor: moving ? 'grabbing' : 'grab', userSelect: 'none'}},
+      <>{h('div', {style: {position: 'absolute', left: '50%', top: 4, width: 38, height: 4, marginLeft: -19, borderRadius: 2, background: c.line}})}<Icon name={meta.icon} size={16} color={meta.color} />
       <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
       {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
       {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
       {btn('external', win.max ? 'Restaurar tamanho' : 'Ocupar a tela', () => patchWin(win.key, {max: !win.max}))}
+      {btn('back', 'Voltar para a página', () => closeWin(win.key))}
       {btn('close', 'Fechar', () => closeWin(win.key))}</>
     ),
     <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
       <FileBody api={win.api} id={win.id} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} />
-      {moving ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
+      {moving || win.drag ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
     </View>,
     win.max ? null : h('div', {onPointerDown: drag('size'), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize'}},
       h('div', {style: {position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}})));
@@ -145,8 +162,9 @@ function DownloadButton({api, id}: {api: SofiaApi; id: string}) {
 export function PageFileBlock({api, data, selected, onSelect, onChange, onRemove}: {api: SofiaApi; data: PageFileData; selected: boolean; onSelect: () => void; onChange: (d: PageFileData) => void; onRemove: () => void}) {
   const c = useTheme(), [hover, setHover] = useState(false), k = fileKind(data.mime, data.name), meta = KIND[k], id = data.attachment_id || '';
   const view = data.view || defaultView(k), preview = view === 'preview' && inlineCapable(k) && !!id, scale = Math.max(15, Math.min(100, data.scale || (k === 'image' ? 70 : 100)));
-  const wrap = useRef<any>(null);
-  const open = () => {if (id) openFileWindow(api, {id, name: data.name || 'arquivo', mime: data.mime || ''});};
+  const wrap = useRef<any>(null), floating = useWins().some(w => w.id === id && !!id);
+  const file = {id, name: data.name || 'arquivo', mime: data.mime || ''};
+  const open = () => {if (id) openFileWindow(api, file);};
   if (data.uploading) return <View testID="page-file-uploading" style={{marginVertical: 6, height: 52, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12}}>
     <Spinner size={16} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name || 'Arquivo'}</Text><Text style={{color: c.muted, fontSize: 11}}>Enviando… {sizeLabel(data.size)}</Text></View>;
   const resize = (e: any) => {e.preventDefault(); e.stopPropagation(); const el = wrap.current as HTMLElement | null, col = el?.parentElement?.getBoundingClientRect?.(); if (!el || !col) return; const sx = e.clientX, w0 = el.getBoundingClientRect().width;
@@ -167,9 +185,14 @@ export function PageFileBlock({api, data, selected, onSelect, onChange, onRemove
       <Text numberOfLines={1} style={{color: c.muted, fontSize: 11}}>{[ext(data.name) || meta.label, sizeLabel(data.size)].filter(Boolean).join(' · ')}</Text></View>
     {bar}
   </Pressable>);
+  if (floating) return hoverDiv(<Pressable testID="page-file-floating" accessibilityRole="button" accessibilityLabel={'Trazer de volta ' + (data.name || 'arquivo')} onPress={() => setWins(wins.filter(w => w.id !== id))}
+    style={({hovered}: any) => ({marginVertical: 6, height: 44, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: hovered ? c.accentSoft : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12})}>
+    <Icon name={meta.icon} size={16} color={meta.color} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name}</Text><Text style={{color: c.muted, fontSize: 12}}>Em janela flutuante · </Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '600'}}>Trazer de volta</Text></Pressable>);
   return hoverDiv(<View style={{marginVertical: 6, position: 'relative'}}>
     <View ref={wrap} testID="page-file-preview" style={{width: (scale + '%') as any, maxWidth: '100%', position: 'relative', borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: selected ? c.accent : 'transparent'}}>
       {h('div', {onClick: onSelect, onDoubleClick: open}, <InlineMedia api={api} id={id} kind={k} name={data.name || ''} />)}
+      {h('div', {onPointerDown: (e: any) => popOut(api, file, e, wrap.current), title: 'Arraste para soltar na tela (janela flutuante)', 'aria-label': 'Arraste para soltar na tela', style: {position: 'absolute', left: '50%', top: 0, marginLeft: -40, width: 80, height: 18, cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover || selected ? 1 : 0, zIndex: 6}},
+        h('div', {style: {width: 42, height: 5, borderRadius: 3, background: 'rgba(255,255,255,.95)', boxShadow: '0 0 0 1px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.3)'}}))}
       {k !== 'audio' ? h('div', {onPointerDown: resize, 'aria-label': 'Arraste para mudar o tamanho', style: {position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover || selected ? 1 : 0}}, h('div', {style: {width: 4, height: 38, borderRadius: 2, background: 'rgba(255,255,255,.9)', boxShadow: '0 0 0 1px rgba(0,0,0,.25)'}})) : null}
       {bar}
     </View>
