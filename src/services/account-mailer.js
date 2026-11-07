@@ -11,13 +11,14 @@ class AccountMailer {
   constructor(config,options={}){this.config=config;this.google=options.google||null;}
   smtpConfigured(){return Boolean(this.config.smtpHost&&this.config.smtpPort&&this.config.smtpUser&&this.config.smtpPass&&this.config.smtpFrom);}
   googleReady(){try{return Boolean(this.google&&this.google.canSendMail&&this.google.canSendMail());}catch{return false;}}
-  configured(){return this.googleReady()||this.smtpConfigured();}
+  configured(){return this.googleReady()||(this.smtpConfigured()&&String(this.config.smtpUser||'').trim().toLowerCase()===String(this.config.sofiaEmail||'sofiaos.core@gmail.com').toLowerCase());}
   /** Entrega a mensagem: Google primeiro; se falhar (ou nao houver), SMTP seguro. */
   async _deliver({to,subject,body}){
     const head=from=>['From: '+smtpLine(from),'To: '+smtpLine(to),'Subject: '+encodeSubject(subject),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: 8bit','',body].join('\r\n');
     let googleError=null;
     if(this.googleReady()){try{const from=(this.google.senderEmail&&this.google.senderEmail())||this.config.smtpFrom||'';await this.google.sendRawMail(head(from?'Sofia OS <'+from+'>':'Sofia OS'));return {via:'google'};}catch(e){googleError=e;console.warn('[e-mail] Google nao enviou:',String(e.message||e).slice(0,160));}}
-    if(this.smtpConfigured()&&this.config.smtpSecure){await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message:head(this.config.smtpFrom)});return {via:'smtp'};}
+    // SMTP so como plano B se o remetente configurado for o proprio e-mail da Sofia (nunca o e-mail de um usuario)
+    if(this.smtpConfigured()&&this.config.smtpSecure&&String(this.config.smtpUser||'').trim().toLowerCase()===String(this.config.sofiaEmail||'sofiaos.core@gmail.com').toLowerCase()){await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message:head(this.config.smtpFrom)});return {via:'smtp'};}
     throw googleError||new Error('Envio de e-mail ainda não configurado.');
   }
   async sendPasswordReset({to,url}){

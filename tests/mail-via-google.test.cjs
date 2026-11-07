@@ -24,7 +24,7 @@ function svcWith(t,tokenEmail,scope){
     if(String(url).includes('oauth2.googleapis.com/token'))return {ok:true,status:200,json:async()=>({access_token:'at',refresh_token:'rt',expires_in:3600,scope,id_token:jwt(tokenEmail)})};
     if(String(url).includes('/messages/send'))return {ok:true,status:200,json:async()=>({id:'1'})};
     return {ok:true,status:200,json:async()=>({})};};
-  const svc=new GoogleService(f.store,f.core.workspace,{...f.config,smtpUser:'Sofia@Gmail.com',publicBaseUrl:'https://sofia.test'},{fetchImpl,env:ENV});
+  const svc=new GoogleService(f.store,f.core.workspace,{...f.config,sofiaEmail:'Sofia@Gmail.com',smtpUser:'pessoal@gmail.com',publicBaseUrl:'https://sofia.test'},{fetchImpl,env:ENV});
   return {svc,calls};
 }
 test('ligar o remetente: so aceita o e-mail da Sofia; outra conta e recusada e revogada',async t=>{
@@ -45,7 +45,7 @@ test('ligar o remetente com o e-mail da Sofia: envia pelo Gmail e nao mexe na co
 test('conta do usuario nunca fica com o e-mail da Sofia (ajuste na inicializacao)',t=>{
   const {createRuntime}=require('../src/core/runtime');const path=require('node:path');
   const f=fixture(t);f.store.updateSettings({profileEmail:'sofiaos.core@gmail.com'});
-  createRuntime({...f.config,userEmail:'usuario@exemplo.com',smtpUser:'sofiaos.core@gmail.com'},{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure2')});
+  createRuntime({...f.config,userEmail:'usuario@exemplo.com',sofiaEmail:'sofiaos.core@gmail.com'},{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure2')});
   assert.equal(f.store.settings().profileEmail,'usuario@exemplo.com');
   const g=fixture(t);g.store.updateSettings({profileEmail:'outro@exemplo.com'});
   createRuntime({...g.config,userEmail:'usuario@exemplo.com'},{store:g.store,provider:g.provider,secureDir:path.join(g.dir,'secure2')});

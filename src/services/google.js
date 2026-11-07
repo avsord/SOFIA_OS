@@ -270,7 +270,9 @@ class GoogleService {
   }
   // ---------- remetente da Sofia (so envio) ----------
   /** Endereco que a Sofia usa para mandar e-mails (o mesmo do SMTP configurado no servidor). */
-  senderAddress() { return String(this.config?.smtpUser || this.config?.smtpFrom || '').replace(/^.*<([^>]+)>.*$/, '$1').trim().toLowerCase(); }
+  // 07/11/2026: o remetente e SEMPRE o e-mail corporativo da Sofia. Nao usa SOFIA_SMTP_USER: no servidor ele estava com o
+  // e-mail pessoal do usuario (a mistura que o Pedro apontou) e a trava recusava a conta certa da Sofia.
+  senderAddress() { return String(this.config?.sofiaEmail || 'sofiaos.core@gmail.com').trim().toLowerCase(); }
   senderLink() { return this.kvGet('google.sender.v1'); }
   senderConnectUrl(options = {}) {
     if (!this.configured()) throw new AppError('GOOGLE_NOT_CONFIGURED', 'A conexão Google ainda não foi configurada no servidor.', 503);
