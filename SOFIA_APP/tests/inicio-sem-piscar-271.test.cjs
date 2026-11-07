@@ -86,7 +86,7 @@ test('Aba aberta pega a versao nova sozinha (sem recarregar na mao), nunca no me
 });
 test('Drive desligado pelo Pedro (07/11): fora do menu, da lista de apps e do endereco; codigo guardado para reativar',()=>{
   const f=read('src/lib/features.ts'),w=read('src/screens/Workspace.tsx'),dk=read('src/lib/desktop.ts'),core=read('src/screens/workspace/core.tsx');
-  assert.ok(f.includes('export const DRIVE_APP = false'));
+  assert.ok(f.includes('export const DRIVE_APP = true')); // 07/11/2026: reativado
   assert.ok(w.includes("DRIVE_APP&&module==='drive'?<Drive api={api}")&&w.includes("if(!DRIVE_APP&&module==='drive')setModule('')"));
   assert.ok(dk.includes("...(DRIVE_APP?[{id:'drive'")&&core.includes("...(DRIVE_APP?[{id:'drive'"));
 });

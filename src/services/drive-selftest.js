@@ -85,7 +85,7 @@ async function runDriveSelfTest(g, {base, log = console.log} = {}) {
 
 /** Uma vez por versao publicada (commit do Railway), 90 s depois de ligar, se o Drive do usuario estiver ligado. */
 // 07/11/2026: o app Drive foi desligado pelo Pedro; o teste no Google dele so roda com o app ligado (ao reativar: true)
-const DRIVE_APP_ON = false;
+const DRIVE_APP_ON = true; // 07/11/2026 (noite): Drive reativado pelo Pedro
 function scheduleDriveSelfTest(runtime, {dataDir, port, publicBaseUrl = '', version = process.env.RAILWAY_GIT_COMMIT_SHA || ''} = {}) {
   if (!DRIVE_APP_ON || !version || process.env.SOFIA_DRIVE_SELFTEST === '0') return;
   const mark = path.join(dataDir, 'drive-selftest.json');
