@@ -41,7 +41,7 @@ import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,
 import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
-import {finishLaunchHandoff, revealWebVeil} from './src/lib/launch-handoff';
+import {finishLaunchHandoff, revealWebVeil,holdVeil} from './src/lib/launch-handoff';
 import {wipeEncryptedStorage} from './src/lib/encrypted-storage';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
 import {isWeb,pathToRoute,routeTitle,routeToPath,pageIdFromPath} from './src/lib/web-route';
@@ -148,7 +148,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  // 04/11/2026 (Pedro: "fica muito tempo so no fundo, adiantar tudo"): o veu da abertura do site sai no 1o quadro do app,
  // sem esperar dados; a lista de Paginas (o 1o pedido do site) chega durante o fade e entra suave por baixo dele
- useEffect(()=>{revealWebVeil(c.bg);},[]);
+ useEffect(()=>{try{const p=window.location.pathname;if(p==='/'||p==='/inicio')holdVeil();}catch{/* sem endereco */}revealWebVeil(c.bg);},[]); // no Inicio o veu espera os dados (bolinha), nos outros sai ja
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;

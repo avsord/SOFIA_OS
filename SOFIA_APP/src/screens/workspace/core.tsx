@@ -1,3 +1,4 @@
+import {DRIVE_APP} from '../../lib/features';
 import {noteFluencyMovement} from '../../lib/fluency';
 import {PALETTE} from '../../lib/palette';
 import {contextMenu} from '../../components/ContextMenu';
@@ -75,7 +76,7 @@ export const modules:{id:string;title:string;caption:string;icon:IconName;kinds?
  {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'tag'},
  {id:'finance',title:'Finanças',caption:'Contas, cartões e orçamentos',icon:'wallet'},
  {id:'mail',title:'E-mails',caption:'A Sofia de olho no que importa',icon:'mail'},
- {id:'drive',title:'Drive',caption:'Seus arquivos e pastas',icon:'drive'},
+ ...(DRIVE_APP?[{id:'drive',title:'Drive',caption:'Seus arquivos e pastas',icon:'drive' as const}]:[]), // Drive desligado pelo Pedro (lib/features.ts)
  {id:'knowledge',title:'Notas',caption:'Conhecimento da sua Sofia',icon:'edit',group:'knowledge'},
  {id:'all',title:'Todos os registros',caption:'Tudo o que você já registrou',icon:'grid'}
 ];

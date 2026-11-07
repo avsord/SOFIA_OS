@@ -31,7 +31,7 @@ const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.r
 const SEND_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send'];
 // 07/11/2026 (Pedro): app Drive da Sofia = o Google Drive INTEIRO do usuario (permissao drive); a area da Sofia (appDataFolder,
 // oculta) nunca aparece nem pode ser mexida.
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/drive'];
+const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly' /* 07/11/2026: sem 'drive' (Drive inteiro): o app Drive foi desligado pelo Pedro; ao reativar, volta aqui */];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';

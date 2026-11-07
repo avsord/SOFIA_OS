@@ -14,9 +14,15 @@ export function finishLaunchHandoff(){
 let veilOut=false;const veilSubs=new Set<()=>void>();
 export function isVeilOut(){return Platform.OS!=='web'||veilOut||typeof document==='undefined'||!document.getElementById('sofia-veil');}
 export function subscribeVeil(f:()=>void){veilSubs.add(f);return()=>{veilSubs.delete(f);};}
+/** 07/11/2026 (Pedro: "so o fade, rapido, com uma bola de loading no meio"): abrindo no Inicio, o veu (com a bolinha) espera o
+ * Inicio ter os dados (releaseVeil) em vez de sair na montagem; nunca passa de 6 s. */
+let held=false,heldBg:string|undefined;
+export function holdVeil(maxMs=6000){if(Platform.OS!=='web'||veilOut)return;held=true;setTimeout(releaseVeil,maxMs);}
+export function releaseVeil(){if(!held)return;held=false;revealWebVeil(heldBg);}
 export function revealWebVeil(bg?: string){
  if(Platform.OS!=='web'||typeof document==='undefined'||veilOut)return;
+ if(held){heldBg=bg;return;}
  const veil=document.getElementById('sofia-veil');veilOut=true;veilSubs.forEach(f=>f());if(!veil)return;
  if(bg){veil.style.background=bg;try{localStorage.setItem('sofia.veil.bg',bg);}catch{/* modo privado */}} /* a proxima abertura ja cobre com a cor do tema do app (assets/early.js) */
- requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),900);});
+ requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),400);});
 }

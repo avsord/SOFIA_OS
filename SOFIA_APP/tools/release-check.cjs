@@ -77,7 +77,8 @@ async function main() {
       const out = (r.stdout || '') + (r.stderr || ''); const n = (out.match(/Total: (\d+) achado/) || [])[1];
       n === '0' ? pass('varredura sem achados') : fail('varredura: ' + (n || '?') + ' achado(s)\n' + out.split('\n').filter(l => l.startsWith('- ')).slice(0, 10).join('\n'));
     }
-    if (!process.argv.includes('--sem-drive')) {
+    const driveOn = /DRIVE_APP = true/.test(fs.readFileSync(path.join(APP, 'src/lib/features.ts'), 'utf8')); // app Drive desligado: nao roda o laboratorio
+    if (driveOn && !process.argv.includes('--sem-drive')) {
       console.log('\n4) Drive no laboratorio (Google Drive fiel: sondas do servidor + robo na tela)');
       const r = spawnSync(process.execPath, [path.join(APP, 'tools/drive-lab/run-all.cjs'), path.join(data, 'drive')], {encoding: 'utf8', timeout: 20 * 60000});
       const out = (r.stdout || '') + (r.stderr || '');

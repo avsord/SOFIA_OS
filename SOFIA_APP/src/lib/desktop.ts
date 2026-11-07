@@ -1,3 +1,4 @@
+import {DRIVE_APP} from './features';
 // 0.3.250: layout de computador (estilo Notion). No navegador com tela larga o app troca a barra de abas de baixo
 // por uma barra lateral fixa + barra de cima, e o conteudo ocupa a largura da tela. No celular nada muda:
 // tudo aqui so liga com Platform.OS==='web' e largura >= DESKTOP_MIN.
@@ -50,7 +51,7 @@ export const APP_SHORTCUTS:{id:string;title:string;icon:IconName}[]=[
  {id:'finance',title:'Finanças',icon:'wallet'},
  {id:'monitor',title:'Price Tracker',icon:'tag'},
  {id:'mail',title:'E-mails',icon:'mail'},
- {id:'drive',title:'Drive',icon:'drive'}, /* 07/11/2026: Sofia Drive */
+ ...(DRIVE_APP?[{id:'drive',title:'Drive',icon:'drive' as const}]:[]), /* 07/11/2026: Drive desligado pelo Pedro (lib/features.ts) */
  {id:'capsules',title:'Rotina',icon:'cycle'},
  {id:'reminders',title:'Lembretes',icon:'bell'},
  {id:'packages',title:'Encomendas',icon:'box'},

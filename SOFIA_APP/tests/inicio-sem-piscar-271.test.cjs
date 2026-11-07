@@ -84,10 +84,11 @@ test('Aba aberta pega a versao nova sozinha (sem recarregar na mao), nunca no me
   assert.ok(e.includes("fetch('/inicio',{cache:'no-store'")&&e.includes("a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable")&&e.includes('120000'));
   assert.ok(i.includes('early.js?v=6'));
 });
-test('Sofia Drive: app no menu (site e celular), endereco /apps/drive e tela com envio, pastas, mover e visualizador',()=>{
-  const d=read('src/screens/Drive.tsx'),w=read('src/screens/Workspace.tsx'),r=read('src/lib/web-route.ts'),dk=read('src/lib/desktop.ts'),core=read('src/screens/workspace/core.tsx');
-  assert.ok(w.includes("<Drive api={api} active={active&&module==='drive'}")&&r.includes("drive: 'drive'")&&dk.includes("{id:'drive',title:'Drive',icon:'drive'}")&&core.includes("{id:'drive',title:'Drive'"));
-  for(const k of ['api.sdUploadAny(','api.sdCreateFolder(','api.sdUpdate(','api.sdTrash(','api.sdRestore(','MoveDialog','<DrivePreview','DocumentPicker.getDocumentAsync'])assert.ok(d.includes(k),k);
+test('Drive desligado pelo Pedro (07/11): fora do menu, da lista de apps e do endereco; codigo guardado para reativar',()=>{
+  const f=read('src/lib/features.ts'),w=read('src/screens/Workspace.tsx'),dk=read('src/lib/desktop.ts'),core=read('src/screens/workspace/core.tsx');
+  assert.ok(f.includes('export const DRIVE_APP = false'));
+  assert.ok(w.includes("DRIVE_APP&&module==='drive'?<Drive api={api}")&&w.includes("if(!DRIVE_APP&&module==='drive')setModule('')"));
+  assert.ok(dk.includes("...(DRIVE_APP?[{id:'drive'")&&core.includes("...(DRIVE_APP?[{id:'drive'"));
 });
 test('Drive: player de video proprio (streaming, barra, velocidade, tela cheia, atalhos) e permissao do Drive do usuario',()=>{
   const p=read('src/components/DriveVideoPlayer.tsx'),d=read('src/screens/Drive.tsx'),v=read('src/components/DrivePreview.tsx');
