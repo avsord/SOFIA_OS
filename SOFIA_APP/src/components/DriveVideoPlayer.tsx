@@ -15,8 +15,8 @@ const ICON: Record<string, string> = {
 const Svg = ({d, size = 22}: {d: string; size?: number}) => React.createElement('svg', {width: size, height: size, viewBox: '0 0 24 24', fill: '#fff', 'aria-hidden': true}, React.createElement('path', {d}));
 const btn: React.CSSProperties = {background: 'transparent', border: 0, padding: 8, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'};
 
-export function DriveVideoPlayer({src, title, audio = false, onFail}: {src: string; title: string; audio?: boolean; onFail?: (msg: string) => void}) {
-  const failRef = useRef(onFail); failRef.current = onFail;
+export function DriveVideoPlayer({src, title, audio = false, onFail, onExpired}: {src: string; title: string; audio?: boolean; onFail?: (msg: string) => void; onExpired?: () => void}) {
+  const failRef = useRef(onFail); failRef.current = onFail; const expRef = useRef(onExpired); expRef.current = onExpired; const resumeAt = useRef(0);
   const box = useRef<HTMLDivElement | null>(null), v = useRef<HTMLVideoElement | null>(null), bar = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(false), [t, setT] = useState(0), [dur, setDur] = useState(0), [buf, setBuf] = useState(0), [vol, setVol] = useState(1), [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(1), [rateOpen, setRateOpen] = useState(false), [full, setFull] = useState(false), [waiting, setWaiting] = useState(true), [err, setErr] = useState(''), [show, setShow] = useState(true), [hover, setHover] = useState<{x: number; t: number} | null>(null), [flash, setFlash] = useState('');
@@ -34,8 +34,12 @@ export function DriveVideoPlayer({src, title, audio = false, onFail}: {src: stri
     const offs = [on('play', () => { setPlaying(true); poke(); }), on('pause', () => { setPlaying(false); setShow(true); }), on('timeupdate', () => setT(el.currentTime)),
       on('durationchange', () => setDur(el.duration || 0)), on('loadedmetadata', () => setDur(el.duration || 0)), on('waiting', () => setWaiting(true)), on('canplay', () => setWaiting(false)), on('playing', () => setWaiting(false)),
       on('progress', () => { try { const b = el.buffered; setBuf(b.length ? b.end(b.length - 1) : 0); } catch { /* ignore */ } }), on('volumechange', () => { setVol(el.volume); setMuted(el.muted); }),
-      on('error', () => { const me = el.error; failRef.current?.('media ' + (me?.code ?? '?') + ' ' + String(me?.message || '').slice(0, 80)); }), on('error', () => setErr('Não consegui tocar este arquivo. Ele pode estar num formato que o navegador não abre; use Baixar.')), on('ended', () => setShow(true))];
+      on('error', () => { const me = el.error; failRef.current?.('media ' + (me?.code ?? '?') + ' ' + String(me?.message || '').slice(0, 80)); }), on('error', () => { // link vencido (video pausado por horas) ou servidor fora: pede link novo; formato que o navegador nao toca: avisa
+        void fetch(src, {method: 'HEAD'}).then(r => { if (r.status === 403 && expRef.current) { resumeAt.current = el.currentTime; expRef.current(); }
+          else setErr(r.ok ? 'Este vídeo está num formato que o navegador não toca (ex.: .mov/.mkv/.avi). Use Baixar para ver no seu aparelho.' : 'Não consegui carregar o arquivo agora (' + r.status + '). Tente de novo.'); })
+          .catch(() => setErr('Sem conexão com a Sofia. Confira a internet e tente de novo.')); }), on('ended', () => setShow(true))];
     const fs = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', fs);
+    if (resumeAt.current) { const at = resumeAt.current; el.addEventListener('loadedmetadata', () => { el.currentTime = at; resumeAt.current = 0; }, {once: true}); }
     void el.play().catch(() => { /* o navegador pode exigir um clique */ });
     return () => { offs.forEach(f => f()); document.removeEventListener('fullscreenchange', fs); clearTimeout(hideT.current); };
   }, [src, poke]);

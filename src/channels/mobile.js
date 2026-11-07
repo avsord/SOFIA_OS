@@ -155,7 +155,7 @@ function makeMobileApi(runtime, deps) {
     }
     // 07/11/2026: player de video/audio do Drive - a tag <video> nao manda login; o link e assinado e vale 2 h
     { const sm = p.match(/^\/api\/mobile\/md\/sofiadrive\/stream\/([A-Za-z0-9_-]{6,200})$/);
-      if (sm && m === 'GET') { if (!runtime.google.sdStreamValid(sm[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do vídeo expirou. Abra de novo.', 403); await runtime.google.sdStream(req, res, sm[1]); return true; } }
+      if (sm && (m === 'GET' || m === 'HEAD')) { if (!runtime.google.sdStreamValid(sm[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await runtime.google.sdStream(req, res, sm[1], {as: ['preview', 'download'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''}); return true; } }
     const session = mobileSessions.require(req);
     if (p.startsWith('/api/mobile/chat-sync')) {
       if (m !== 'GET') rate(session, 'chat-sync-write', 30);
@@ -313,26 +313,43 @@ function makeMobileApi(runtime, deps) {
     }
     // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
     if (p.startsWith('/api/mobile/md/sofiadrive/')) {
-      const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm0;
-      if (sd === 'search' && m === 'GET') { rate(session, 'sofiadrive', 120); try { return send({connected: true, ...(await g.sdSearch(String(url.searchParams.get('q') || '')))}); } catch (e) { if (e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION') return send({connected: false, code: e.code, reason: e.message, items: []}); throw e; } }
-      if (sd === 'list' && m === 'GET') { rate(session, 'sofiadrive', 120); try { return send({connected: true, ...(await g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || '')))}); } catch (e) { if (e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION') return send({connected: false, code: e.code, reason: e.message}); throw e; } }
-      mm0 = sd.match(/^items\/([A-Za-z0-9_-]+)\/stream-link$/);
-      if (mm0 && m === 'GET') { rate(session, 'sofiadrive', 120); await g.sdPath(mm0[1]); const t = g.sdStreamToken(mm0[1]); return send({url: '/api/mobile/md/sofiadrive/stream/' + mm0[1] + '?exp=' + t.exp + '&sig=' + encodeURIComponent(t.sig)}); }
-      if (sd === 'folder' && m === 'POST') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdCreateFolder(String(b.parent || 'root'), b.name)}); }
+      const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm;
+      const notLinked = e => e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION' || e.code === 'GOOGLE_NOT_CONNECTED';
+      const read = async run => { rate(session, 'sofiadrive', 240); try { return send({connected: true, ...(await run())}); } catch (e) { if (notLinked(e)) return send({connected: false, code: e.code, reason: e.message, items: []}); throw e; } };
+      if (sd === 'list' && m === 'GET') return read(() => g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || '')));
+      if (sd === 'search' && m === 'GET') return read(() => g.sdSearch(String(url.searchParams.get('q') || '')));
+      if (['shared', 'recent', 'starred', 'trash'].includes(sd) && m === 'GET') return read(() => g.sdView(sd));
+      if (sd === 'about' && m === 'GET') return read(() => g.sdAbout());
+      if (sd === 'folder' && m === 'POST') { rate(session, 'sofiadrive-write', 120); const b = await bodyJson(req, 2048); return send({item: await g.sdCreateFolder(String(b.parent || 'root'), b.name)}); }
+      // envio pequeno de uma vez (site: o arquivo no corpo, nome na query; celular: JSON com base64)
       if (sd === 'upload' && m === 'POST') {
-        rate(session, 'sofiadrive-write', 60); const MAX = 70 * 1024 * 1024, chunks = []; let size = 0;
-        await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
+        rate(session, 'sofiadrive-write', 240); const MAX = 8 * 1024 * 1024, chunks = []; let size = 0;
+        await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Use o envio por partes para arquivos grandes.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
         const ctype = String(req.headers['content-type'] || '').split(';')[0].trim();
-        // celular: JSON {name, mime, base64}; site: o proprio arquivo no corpo, nome na query
+        // site: o arquivo cru no corpo, nome e tipo na query (um .json enviado pelo site nao e confundido com o envio do celular)
+        if (url.searchParams.has('name')) return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), String(url.searchParams.get('name') || 'arquivo'), String(url.searchParams.get('mime') || ctype), Buffer.concat(chunks))});
         if (ctype === 'application/json') { let b; try { b = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { fail('BAD_JSON', 'Envio inválido.'); } return send({item: await g.sdUpload(String(b.parent || 'root'), String(b.name || 'arquivo'), String(b.mime || ''), Buffer.from(String(b.base64 || ''), 'base64'))}); }
-        const name = decodeURIComponent(String(url.searchParams.get('name') || 'arquivo'));
-        return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), name, ctype, Buffer.concat(chunks))});
+        return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), String(url.searchParams.get('name') || 'arquivo'), ctype, Buffer.concat(chunks))});
       }
-      let mm = sd.match(/^items\/([A-Za-z0-9_-]+)$/);
-      if (mm && m === 'PATCH') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdUpdate(mm[1], {name: b.name === undefined ? undefined : b.name, parent: b.parent === undefined ? undefined : String(b.parent)})}); }
-      if (mm && m === 'DELETE') { rate(session, 'sofiadrive-write', 60); return send(await g.sdTrash(mm[1])); }
+      // envio grande por partes: abre a sessao, depois cada parte (ate 16 MB) com o ponto onde comeca
+      if (sd === 'upload/start' && m === 'POST') { rate(session, 'sofiadrive-write', 240); const b = await bodyJson(req, 4096); return send(await g.sdUploadStart(String(b.parent || 'root'), String(b.name || 'arquivo'), String(b.mime || ''), b.size)); }
+      mm = sd.match(/^upload\/([A-Za-z0-9_-]{10,60})$/);
+      if (mm && m === 'PUT') {
+        rate(session, 'sofiadrive-chunk', 4000); const MAX = 16 * 1024 * 1024, chunks = []; let size = 0;
+        await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Parte grande demais.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
+        return send(await g.sdUploadChunk(mm[1], Number(url.searchParams.get('start') || 0), Buffer.concat(chunks)));
+      }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)$/);
+      if (mm && m === 'PATCH') { rate(session, 'sofiadrive-write', 240); const b = await bodyJson(req, 2048); return send({item: await g.sdUpdate(mm[1], {name: b.name === undefined ? undefined : b.name, parent: b.parent === undefined ? undefined : String(b.parent), starred: b.starred === undefined ? undefined : !!b.starred})}); }
+      if (mm && m === 'DELETE') { rate(session, 'sofiadrive-write', 240); return send(await g.sdTrash(mm[1])); }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/restore$/);
+      if (mm && m === 'POST') { rate(session, 'sofiadrive-write', 240); return send(await g.sdRestore(mm[1])); }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/stream-link$/);
+      if (mm && m === 'GET') { rate(session, 'sofiadrive', 240); await g.sdResolve(mm[1]); const t = g.sdStreamToken(mm[1]); return send({url: '/api/mobile/md/sofiadrive/stream/' + mm[1] + '?exp=' + t.exp + '&sig=' + encodeURIComponent(t.sig)}); }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/thumb$/);
+      if (mm && m === 'GET') { rate(session, 'sofiadrive-thumb', 2000); const out = await g.sdThumb(mm[1], url.searchParams.get('s')); res.setHeader('Cache-Control', 'private, max-age=3600'); await GoogleService.sendFile(res, out, {inline: true}); return true; }
       mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/(content|preview|download)$/);
-      if (mm && m === 'GET') { rate(session, 'sofiadrive', 120); const out = mm[2] === 'preview' ? await g.sdPreview(mm[1]) : await g.sdContent(mm[1]); await GoogleService.sendFile(res, out, {inline: mm[2] !== 'download'}); return true; }
+      if (mm && m === 'GET') { rate(session, 'sofiadrive', 240); const out = mm[2] === 'preview' ? await g.sdPreview(mm[1]) : mm[2] === 'download' ? await g.sdDownload(mm[1]) : await g.sdContent(mm[1]); res.setHeader('X-Content-Type-Options', 'nosniff'); await GoogleService.sendFile(res, out, {inline: mm[2] !== 'download'}); return true; }
       fail('NOT_FOUND', 'Rota do Drive não existe.', 404);
     }
     // 0.3.244: Arquivos da Sofia (área oculta do Drive): resumo, lista por categoria, conteúdo e cópia visível.

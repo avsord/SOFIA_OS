@@ -82,8 +82,8 @@ export function currentApi() { return activeApi; }
 export type ProfilePhoto = {mime: string; base64: string; updated_at: string};
 export type CatalogHit = {type: string; title: string; year: number | null; creator: string; cover: string; genre: string; source: string};
 export type LinkPreview = {url: string; title: string; site: string; image: string; price: number | null; description: string; type?: string; read: boolean};
-export type SdItem = {id: string; name: string; mime: string; folder: boolean; size: number | null; modified: string};
-export type SdListing = {connected?: boolean; code?: string; reason?: string; folder: {id: string; name: string}; path: {id: string; name: string}[]; items: SdItem[]};
+export type SdItem = {id: string; name: string; mime: string; folder: boolean; size: number | null; modified: string; shortcut?: boolean; thumb?: boolean; starred?: boolean; shared?: boolean; web?: string; where?: string};
+export type SdListing = {connected?: boolean; code?: string; reason?: string; folder: {id: string; name: string}; path: {id: string; name: string}[]; items: SdItem[]; shared?: boolean};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
@@ -315,29 +315,48 @@ export class SofiaApi {
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
   /** 06/11/2026: relatorio do gravador de fluidez do Inicio (fluency-probe.ts). Envio direto: nao invalida caches nem dispara releituras. */
-  // ===== Sofia Drive (07/11/2026): arquivos do usuario no Drive dele, com a cara do Google Drive =====
-  sdSearch(q: string) { return this.request<{connected?: boolean; items: SdItem[]}>('/md/sofiadrive/search?q=' + encodeURIComponent(q)); }
-  sdList(folder = 'root', q = '') { return this.request<SdListing>('/md/sofiadrive/list?folder=' + encodeURIComponent(folder) + (q ? '&q=' + encodeURIComponent(q) : '')); }
+  // ===== Drive (07/11/2026): o Google Drive do usuario dentro da Sofia =====
+  sdSearch(q: string) { return this.request<{connected?: boolean; items: SdItem[]}>('/md/sofiadrive/search?q=' + encodeURIComponent(q), undefined, 'GET', 40000); }
+  sdList(folder = 'root', q = '') { return this.request<SdListing>('/md/sofiadrive/list?folder=' + encodeURIComponent(folder) + (q ? '&q=' + encodeURIComponent(q) : ''), undefined, 'GET', 40000); }
+  /** Listas como as do Google Drive: compartilhados comigo, recentes, com estrela e lixeira. */
+  sdView(view: 'shared' | 'recent' | 'starred' | 'trash') { return this.request<{connected?: boolean; code?: string; items: SdItem[]}>('/md/sofiadrive/' + view, undefined, 'GET', 40000); }
+  sdAbout() { return this.request<{connected?: boolean; used: number; limit: number | null}>('/md/sofiadrive/about'); }
   sdCreateFolder(parent: string, name: string) { return this.request<{item: SdItem}>('/md/sofiadrive/folder', {parent, name}, 'POST'); }
-  sdUpdate(id: string, patch: {name?: string; parent?: string}) { return this.request<{item: SdItem}>('/md/sofiadrive/items/' + encodeURIComponent(id), patch, 'PATCH'); }
+  sdUpdate(id: string, patch: {name?: string; parent?: string; starred?: boolean}) { return this.request<{item: SdItem}>('/md/sofiadrive/items/' + encodeURIComponent(id), patch, 'PATCH'); }
   sdTrash(id: string) { return this.request<{ok: boolean}>('/md/sofiadrive/items/' + encodeURIComponent(id), undefined, 'DELETE'); }
-  /** Envia um arquivo. No site: o proprio arquivo (Blob); no celular: base64. */
-  async sdUpload(parent: string, file: {name: string; mime: string; blob?: Blob; base64?: string}) {
-    const headers: Record<string, string> = {Accept: 'application/json', ...(this.token ? {Authorization: 'Bearer ' + this.token} : {})};
-    const url = SITE + '/api/mobile/md/sofiadrive/upload?parent=' + encodeURIComponent(parent) + '&name=' + encodeURIComponent(file.name);
-    const res = file.blob ? await fetch(url, {method: 'POST', headers: {...headers, 'Content-Type': file.mime || 'application/octet-stream'}, body: file.blob})
-      : await fetch(url, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify({parent, name: file.name, mime: file.mime, base64: file.base64 || ''})});
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new ApiError(data.error || 'Não consegui enviar o arquivo (' + res.status + ').', data.code || 'HTTP_ERROR', res.status, data);
-    systemChanged(this); return data as {item: SdItem};
+  sdRestore(id: string) { return this.request<{ok: boolean}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/restore', {}, 'POST'); }
+  private sdHeaders(extra: Record<string, string> = {}) { return {Accept: 'application/json', ...(this.token ? {Authorization: 'Bearer ' + this.token} : {}), ...extra}; }
+  private async sdJson(res: Response, what: string) { const data = await res.json().catch(() => ({})); if (!res.ok) throw new ApiError(data.error || 'Não consegui ' + what + ' (' + res.status + ').', data.code || 'HTTP_ERROR', res.status, data); return data; }
+  /** Envia um arquivo de qualquer tamanho, como o Google Drive: pequeno de uma vez, grande em partes de 8 MB (com
+   * porcentagem e cancelar). `read(start, end)` devolve o pedaco (Blob no site, bytes no celular). */
+  async sdUploadAny(parent: string, file: {name: string; mime: string; size: number; read: (start: number, end: number) => Promise<Blob | Uint8Array>}, onProgress?: (sent: number, total: number) => void, signal?: AbortSignal): Promise<{item: SdItem}> {
+    const SMALL = 4 * 1024 * 1024, CHUNK = 8 * 1024 * 1024;
+    if (file.size <= SMALL) {
+      const url = SITE + '/api/mobile/md/sofiadrive/upload?parent=' + encodeURIComponent(parent) + '&name=' + encodeURIComponent(file.name) + '&mime=' + encodeURIComponent(file.mime || 'application/octet-stream');
+      const body = await file.read(0, file.size);
+      const res = await fetch(url, {method: 'POST', headers: this.sdHeaders({'Content-Type': 'application/octet-stream'}), body: body as any, signal});
+      const d = await this.sdJson(res, 'enviar o arquivo'); onProgress?.(file.size, file.size); systemChanged(this); return d;
+    }
+    const st = await this.sdJson(await fetch(SITE + '/api/mobile/md/sofiadrive/upload/start', {method: 'POST', headers: this.sdHeaders({'Content-Type': 'application/json'}), body: JSON.stringify({parent, name: file.name, mime: file.mime, size: file.size}), signal}), 'começar o envio');
+    let pos = 0;
+    for (let tries = 0; pos < file.size;) {
+      const end = Math.min(file.size, pos + CHUNK), part = await file.read(pos, end);
+      let r: any;
+      try { r = await this.sdJson(await fetch(SITE + '/api/mobile/md/sofiadrive/upload/' + st.upload + '?start=' + pos, {method: 'PUT', headers: this.sdHeaders({'Content-Type': 'application/octet-stream'}), body: part as any, signal}), 'enviar uma parte'); tries = 0; }
+      catch (e: any) { if (signal?.aborted || e?.name === 'AbortError' || ++tries > 3 || (e?.status && e.status < 500 && e.status !== 429)) throw e; await new Promise(ok => setTimeout(ok, 1500 * tries)); continue; }
+      if (r.item) { onProgress?.(file.size, file.size); systemChanged(this); return {item: r.item}; }
+      pos = Number(r.next) || 0; onProgress?.(pos, file.size);
+    }
+    throw new ApiError('O envio não terminou.', 'UPLOAD_INCOMPLETE', 0, {});
   }
   /** Endereco do arquivo (conteudo, visualizacao em PDF ou download) e o cabecalho de acesso. */
-  sdFileUrl(id: string, kind: 'content' | 'preview' | 'download' = 'content') { return SITE + '/api/mobile/md/sofiadrive/items/' + encodeURIComponent(id) + '/' + kind; }
-  /** Link do player (video/audio): assinado no servidor, vale 2 h, sem precisar do login no cabecalho. */
-  async sdStreamUrl(id: string) { const r = await this.request<{url: string}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/stream-link'); return SITE + r.url; }
+  sdFileUrl(id: string, kind: 'content' | 'preview' | 'download' | 'thumb' = 'content') { return SITE + '/api/mobile/md/sofiadrive/items/' + encodeURIComponent(id) + '/' + kind; }
+  /** Link assinado (2 h): player, visualizador em quadro e download direto, sem o login no cabecalho. */
+  async sdSignedUrl(id: string, as: '' | 'preview' | 'download' = '') { const r = await this.request<{url: string}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/stream-link'); return SITE + r.url + (as ? '&as=' + as : ''); }
+  sdStreamUrl(id: string) { return this.sdSignedUrl(id); }
   sdAuthHeaders(): Record<string, string> { return this.token ? {Authorization: 'Bearer ' + this.token} : {}; }
-  async sdBlob(id: string, kind: 'content' | 'preview' | 'download' = 'content') {
-    const res = await fetch(this.sdFileUrl(id, kind), {headers: this.sdAuthHeaders()});
+  async sdBlob(id: string, kind: 'content' | 'preview' | 'download' | 'thumb' = 'content', signal?: AbortSignal, size?: number) {
+    const res = await fetch(this.sdFileUrl(id, kind) + (size ? '?s=' + size : ''), {headers: this.sdAuthHeaders(), signal});
     if (!res.ok) { const d = await res.json().catch(() => ({})); throw new ApiError(d.error || 'Não consegui abrir o arquivo (' + res.status + ').', d.code || 'HTTP_ERROR', res.status, d); }
     return res.blob();
   }

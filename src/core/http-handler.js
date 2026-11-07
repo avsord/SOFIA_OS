@@ -156,7 +156,8 @@ function createHandler(runtime) {
     if(publicRoute(p,m))publicHeaders(res,p);else headers(res);
     try {
       if(req.url.length>4096)throw new AppError('URL_TOO_LONG','Endereço grande demais.',414);
-      if(!['GET','POST','PATCH','DELETE'].includes(m))throw new AppError('METHOD','Método não suportado.',405);
+      // 07/11/2026: HEAD so no link do Drive (Safari/iPhone pergunta o tamanho do video antes); PUT so nas partes do envio grande
+      if(!(['GET','POST','PATCH','DELETE'].includes(m)||(m==='HEAD'&&/^\/api\/mobile\/md\/sofiadrive\/stream\//.test(p))||(m==='PUT'&&/^\/api\/mobile\/md\/sofiadrive\/upload\/[A-Za-z0-9_-]+$/.test(p))))throw new AppError('METHOD','Método não suportado.',405);
       if(await mobileApi(req,res,p,m,url))return;
       if(m==='GET'&&p==='/login'){
         if(railwayEnv()&&validSession(req))return redirect(res,303,'/');

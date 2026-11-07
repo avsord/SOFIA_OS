@@ -124,6 +124,11 @@ import * as PPencilSimple_ from 'phosphor-react-native/src/icons/PencilSimple';
 import * as PArrowsOutCardinal_ from 'phosphor-react-native/src/icons/ArrowsOutCardinal';
 import * as PListBullets_ from 'phosphor-react-native/src/icons/ListBullets';
 import * as PArrowsDownUp_ from 'phosphor-react-native/src/icons/ArrowsDownUp';
+import * as PArrowSquareOut_ from 'phosphor-react-native/src/icons/ArrowSquareOut';
+import * as PClock_ from 'phosphor-react-native/src/icons/Clock';
+import * as PArrowCCW_ from 'phosphor-react-native/src/icons/ArrowCounterClockwise';
+import * as PCloud_ from 'phosphor-react-native/src/icons/Cloud';
+import * as PCheckSquare_ from 'phosphor-react-native/src/icons/CheckSquare';
 import * as PZoomIn_ from 'phosphor-react-native/src/icons/MagnifyingGlassPlus';
 import * as PZoomOut_ from 'phosphor-react-native/src/icons/MagnifyingGlassMinus';
 import * as PSquaresFour_ from 'phosphor-react-native/src/icons/SquaresFour';
@@ -168,6 +173,11 @@ const ICONS = {
  moveTo: PArrowsOutCardinal_.ArrowsOutCardinalIcon,
  listView: PListBullets_.ListBulletsIcon,
  sort: PArrowsDownUp_.ArrowsDownUpIcon,
+ external: PArrowSquareOut_.ArrowSquareOutIcon,
+ clock: PClock_.ClockIcon,
+ restore: PArrowCCW_.ArrowCounterClockwiseIcon,
+ cloud: PCloud_.CloudIcon,
+ checkSquare: PCheckSquare_.CheckSquareIcon,
  zoomIn: PZoomIn_.MagnifyingGlassPlusIcon,
  zoomOut: PZoomOut_.MagnifyingGlassMinusIcon,
  gridView: PSquaresFour_.SquaresFourIcon,

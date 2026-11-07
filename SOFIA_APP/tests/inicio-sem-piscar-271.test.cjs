@@ -87,19 +87,21 @@ test('Aba aberta pega a versao nova sozinha (sem recarregar na mao), nunca no me
 test('Sofia Drive: app no menu (site e celular), endereco /apps/drive e tela com envio, pastas, mover e visualizador',()=>{
   const d=read('src/screens/Drive.tsx'),w=read('src/screens/Workspace.tsx'),r=read('src/lib/web-route.ts'),dk=read('src/lib/desktop.ts'),core=read('src/screens/workspace/core.tsx');
   assert.ok(w.includes("<Drive api={api} active={active&&module==='drive'}")&&r.includes("drive: 'drive'")&&dk.includes("{id:'drive',title:'Drive',icon:'drive'}")&&core.includes("{id:'drive',title:'Drive'"));
-  for(const k of ['api.sdUpload(','api.sdCreateFolder(','api.sdUpdate(','api.sdTrash(','MoveDialog','function Preview','DocumentPicker.getDocumentAsync'])assert.ok(d.includes(k),k);
+  for(const k of ['api.sdUploadAny(','api.sdCreateFolder(','api.sdUpdate(','api.sdTrash(','api.sdRestore(','MoveDialog','<DrivePreview','DocumentPicker.getDocumentAsync'])assert.ok(d.includes(k),k);
 });
 test('Drive: player de video proprio (streaming, barra, velocidade, tela cheia, atalhos) e permissao do Drive do usuario',()=>{
-  const p=read('src/components/DriveVideoPlayer.tsx'),d=read('src/screens/Drive.tsx');
-  for(const k of ['requestFullscreen','requestPictureInPicture','playbackRate','drive-video-seek',"key === 'arrowright'","key === 'm'"])assert.ok(p.includes(k),k);
-  assert.ok(d.includes('api.sdStreamUrl(item.id)')&&d.includes('<DriveVideoPlayer key={item.id} src={url}')&&d.includes('testID="drive-grant"'));
+  const p=read('src/components/DriveVideoPlayer.tsx'),d=read('src/screens/Drive.tsx'),v=read('src/components/DrivePreview.tsx');
+  for(const k of ['requestFullscreen','requestPictureInPicture','playbackRate','drive-video-seek',"key === 'arrowright'","key === 'm'","key.startsWith('arrow') && !focused",'onExpired'])assert.ok(p.includes(k),k);
+  assert.ok(v.includes('<DriveVideoPlayer key={item.id} src={url}')&&d.includes('testID="drive-grant"'));
 });
-
-test('Drive: setas passam de arquivo, clicar fora fecha, teclado na lista, ordenar e pesquisa no Drive todo',()=>{
-  const d=read('src/screens/Drive.tsx'),pl=read('src/components/DriveVideoPlayer.tsx');
-  assert.ok(d.includes("testID={'drive-preview-' + dir}")&&d.includes("e.key === 'ArrowRight' && n.next")&&d.includes('drive-preview-count'),'setas e botoes no visualizador');
-  assert.ok(d.includes("'data-testid': 'drive-preview-backdrop'")&&d.includes('downOnBack.current && back(e)'),'clicar fora fecha');
-  assert.ok(d.includes("e.key === 'Delete'")&&d.includes("e.key === 'F2'")&&d.includes('drive-item-'),'teclado na lista');
-  assert.ok(d.includes('api.sdSearch(q)')&&d.includes("VIEW_KEY + '.sort'")&&d.includes('function ZoomImage'),'pesquisa, ordenar e zoom');
-  assert.ok(pl.includes("key.startsWith('arrow') && !focused"),'no video, setas so com o player em foco');
+test('Drive: visualizador por link assinado (quadro liberado), setas, clicar fora, Esc',()=>{
+  const v=read('src/components/DrivePreview.tsx');
+  assert.ok(v.includes("api.sdSignedUrl(item.id, office")&&!/createObjectURL\(b\)\); setUrl/.test(v),'PDF/Office pelo link assinado, nao blob:');
+  assert.ok(v.includes("testID={'drive-preview-' + dir}")&&v.includes("e.key === 'ArrowRight' && n.next")&&v.includes('drive-preview-count')&&v.includes('downOnBack.current && back(e)'));
+});
+test('Drive: Google Drive inteiro - listas, varios selecionados, envio grande por partes, pastas, desfazer, endereco da pasta',()=>{
+  const d=read('src/screens/Drive.tsx'),a=read('src/lib/api.ts'),u=read('src/lib/drive-upload.ts');
+  for(const k of ["'shared'","'recent'","'starred'","'trash'",'drive-selbar','drive-undo','sdUploadAny','pickFolder',"searchParams.set('pasta'",'popstate','neighbour(','keyFns.current','NameInput'])assert.ok(d.includes(k),k);
+  assert.ok(a.includes("'/api/mobile/md/sofiadrive/upload/start'")&&a.includes("'&mime='"),'envio por partes e tipo na query');
+  assert.ok(u.includes('webkitGetAsEntry')&&u.includes('readBytes'),'pastas soltas e leitura em pedacos no celular');
 });

@@ -41,10 +41,10 @@ export async function track<T>(op: string, run: () => Promise<T>, extra: {kind?:
 /** Mesma api, com cada chamada do Drive medida (sem guardar argumentos, exceto tipo/tamanho do arquivo enviado). */
 export function trackedDriveApi<A extends Record<string, any>>(a: A): A {
   const ops: Record<string, (args: any[]) => string> = {sdList: () => 'listar', sdSearch: () => 'pesquisar', sdCreateFolder: () => 'criar-pasta', sdTrash: () => 'lixeira',
-    sdUpdate: args => args[1]?.parent ? 'mover' : 'renomear', sdUpload: () => 'enviar', sdBlob: args => 'abrir-' + (args[1] || 'content'), sdStreamUrl: () => 'link-video'};
+    sdUpdate: args => args[1]?.parent ? 'mover' : args[1]?.starred !== undefined ? 'estrela' : 'renomear', sdUploadAny: () => 'enviar', sdBlob: args => 'abrir-' + (args[1] || 'content'), sdSignedUrl: args => 'link-' + (args[1] || 'arquivo'), sdView: args => 'lista-' + args[0], sdRestore: () => 'restaurar', sdAbout: () => 'espaco'};
   return new Proxy(a, {get(target, prop, recv) {
     const v: any = Reflect.get(target, prop, recv); const op = typeof prop === 'string' ? ops[prop] : undefined;
     if (!op || typeof v !== 'function') return typeof v === 'function' ? v.bind(target) : v;
-    return (...args: any[]) => { const f = prop === 'sdUpload' ? {name: args[1]?.name, size: args[1]?.blob?.size ?? null} : undefined; return track(op(args), () => v.apply(target, args), {file: f}); };
+    return (...args: any[]) => { const f = prop === 'sdUploadAny' ? {name: args[1]?.name, size: args[1]?.size ?? null} : undefined; return track(op(args), () => v.apply(target, args), {file: f}); };
   }});
 }

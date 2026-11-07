@@ -43,6 +43,8 @@ async function runDriveSelfTest(g, {base, log = console.log} = {}) {
   const must = (c, m) => { if (!c) throw new Error(m); };
   try {
     if (!await step('listar Meu Drive', async () => { const l = await g.sdList('root'); return l.items.length + ' itens'; })) return finish();
+    await step('limpar sobra de teste anterior', async () => { const old = await g.call('GET', 'https://www.googleapis.com/drive/v3/files?pageSize=20&fields=files(id)&q=' + encodeURIComponent("name='Teste automatico da Sofia (some sozinho)' and trashed=false and 'me' in owners"));
+      for (const f of old.files || []) await g.call('DELETE', 'https://www.googleapis.com/drive/v3/files/' + f.id); return (old.files || []).length + ' sobra(s)'; });
     const root = await g.sdRoot();
     folder = await g.call('POST', 'https://www.googleapis.com/drive/v3/files?fields=id', {name: 'Teste automatico da Sofia (some sozinho)', mimeType: 'application/vnd.google-apps.folder', parents: [root], appProperties: {sofia_selftest: '1'}});
     await step('pasta de teste fora da lista', async () => { const l = await g.sdList('root'); must(!l.items.some(i => i.id === folder.id), 'a pasta de teste apareceu na lista'); });
@@ -65,8 +67,14 @@ async function runDriveSelfTest(g, {base, log = console.log} = {}) {
     if (up['notas.txt'] && sub) await step('mover para a subpasta', async () => { await g.sdUpdate(up['notas.txt'].id, {parent: sub.id}); const l = await g.sdList(sub.id); must(l.items.some(i => i.id === up['notas.txt'].id), 'nao chegou'); must(l.path.some(p => p.id === folder.id), 'caminho sem a pasta de cima'); });
     if (sub) await step('pasta nao entra nela mesma', async () => { try { await g.sdUpdate(folder.id, {parent: sub.id}); } catch { return; } throw new Error('deixou mover a pasta para dentro da subpasta'); });
     if (up['planilha.xlsx']) await step('pesquisar no Drive todo', async () => { for (let i = 0; i < 4; i++) { const r = await g.sdSearch('planilha'); if (r.items.some(x => x.id === up['planilha.xlsx'].id)) return 'achou na tentativa ' + (i + 1); await new Promise(r => setTimeout(r, 2500)); } return 'AVISO: o Google ainda nao indexou (normal nos primeiros segundos)'; });
-    await step('area da Sofia protegida', async () => { const ids = Object.values(g.link()?.drive?.folders || {}).filter(Boolean); const l = await g.sdList('root'); must(!l.items.some(i => ids.includes(i.id)), 'pasta da Sofia apareceu');
-      for (const id of ids.slice(0, 3)) { try { await g.sdTrash(id); } catch { continue; } throw new Error('deixou mandar a pasta da Sofia para a lixeira'); } return ids.length + ' pasta(s) da Sofia conferida(s)'; });
+    // so leitura: nunca tenta apagar nada da Sofia (se a protecao falhasse, o proprio teste estragaria)
+    await step('area da Sofia protegida', async () => {
+      const named = await g.call('GET', 'https://www.googleapis.com/drive/v3/files?pageSize=20&fields=files(id)&q=' + encodeURIComponent("name='Sofia OS' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'me' in owners"));
+      const ids = [...new Set([...Object.values(g.link()?.drive?.folders || {}).filter(Boolean), ...(named.files || []).map(f => f.id)])];
+      const l = await g.sdList('root'); must(!l.items.some(i => ids.includes(i.id)), 'pasta da Sofia apareceu na lista');
+      for (const id of ids.slice(0, 5)) { let reached = false; try { await g.sdPath(id); reached = true; } catch { /* recusado: certo */ } must(!reached, 'o Drive alcanca uma pasta da Sofia'); }
+      const s = await g.sdSearch('Sofia OS'); must(!s.items.some(i => ids.includes(i.id)), 'pasta da Sofia apareceu na pesquisa');
+      return ids.length + ' pasta(s) da Sofia conferida(s)'; });
     if (up['foto.png']) await step('lixeira', async () => { await g.sdTrash(up['foto.png'].id); const l = await g.sdList(folder.id); must(!l.items.some(i => i.id === up['foto.png'].id), 'continua na lista'); });
   } finally {
     if (folder) await step('apagar a pasta de teste', async () => { await g.call('DELETE', 'https://www.googleapis.com/drive/v3/files/' + folder.id); });
@@ -85,9 +93,12 @@ function scheduleDriveSelfTest(runtime, {dataDir, port, publicBaseUrl = '', vers
       if (last === version) return;
       const g = runtime.google; const l = g && g.link && g.link();
       if (!l || !g.fullDriveOn || !g.fullDriveOn(l)) { console.log('[drive-teste] pulado: Drive do usuario sem a permissao completa'); return; }
-      fs.writeFileSync(mark, JSON.stringify({version, at: new Date().toISOString()}));
+      let tries = 0; try { const m = JSON.parse(fs.readFileSync(mark, 'utf8')); if (m.pending === version) tries = Number(m.tries || 0); } catch { /* primeira vez */ }
+      if (tries >= 2) return; // caiu no meio duas vezes: nao insiste nesta versao
+      fs.writeFileSync(mark, JSON.stringify({version: last, pending: version, tries: tries + 1, at: new Date().toISOString()}));
       // pelo endereco publico, como o navegador (o servidor recusa outro endereco por seguranca)
-      await runDriveSelfTest(g, {base: String(publicBaseUrl || '').replace(/\/$/, '') || 'http://127.0.0.1:' + port});
+      const r = await runDriveSelfTest(g, {base: String(publicBaseUrl || '').replace(/\/$/, '') || 'http://127.0.0.1:' + port});
+      fs.writeFileSync(mark, JSON.stringify({version, ok: r.ok, at: new Date().toISOString()}));
     } catch (e) { console.log('[drive-teste] erro: ' + String(e && e.message || e).slice(0, 200)); }
   }, 90000).unref();
 }

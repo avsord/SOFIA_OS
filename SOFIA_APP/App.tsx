@@ -221,7 +221,8 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
   // abrindo o site num endereco: os passos ate chegar nele substituem (nao empilham) o historico
   const opening=!!initialPath.current;if(opening&&path===initialPath.current)initialPath.current='';
   const quick=lastPush.current.path==='/apps'&&path.startsWith('/apps/')&&Date.now()-lastPush.current.at<1500;
-  if(routeFromPop.current||quick||opening||window.location.pathname==='/'){window.history.replaceState(route,'',path);routeFromPop.current=false;}else window.history.pushState(route,'',path);
+  // 07/11/2026: abrindo o site num endereco com ?pasta=... (Drive), a parte depois do ? fica (recarregar nao perde a pasta)
+  if(routeFromPop.current||quick||opening||window.location.pathname==='/'){window.history.replaceState(route,'',path+(opening?window.location.search:''));routeFromPop.current=false;}else window.history.pushState(route,'',path);
   lastPush.current={path,at:Date.now()};
  },[tab,appsModule]);
  const [mailTarget,setMailTarget]=useState(0);const openMail=useCallback(()=>{navigate('apps');setMailTarget(v=>v+1);},[navigate]);
