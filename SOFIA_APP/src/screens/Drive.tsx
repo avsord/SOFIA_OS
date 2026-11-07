@@ -220,6 +220,31 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
     const down = (e: MouseEvent) => { if (e.button !== 0) return; const t = e.target as HTMLElement; if (!t?.closest?.('[data-testid^="drive-item-"],[data-testid=drive-selbar],[role=menu]')) setSel(s => s.length ? [] : s); };
     el.addEventListener('mousedown', down); return () => el.removeEventListener('mousedown', down);
   }, [active]);
+  // selecao arrastando o mouse num lugar vazio (retangulo), como no Google Drive; Ctrl/Shift soma a selecao que ja havia;
+  // perto da borda de cima/baixo a lista rola sozinha
+  const scrollRef = useRef<any>(null);
+  useEffect(() => {
+    if (!WEB || touchWeb || !active) return; const host: HTMLElement | null = scrollRef.current?.getScrollableNode?.() || null; if (!host) return;
+    let st: {x: number; y: number; base: string[]} | null = null, box: HTMLDivElement | null = null, raf = 0, last = {x: 0, y: 0}, timer: any = null;
+    const toContent = (cx: number, cy: number) => { const r = host.getBoundingClientRect(); return {x: cx - r.left + host.scrollLeft, y: cy - r.top + host.scrollTop}; };
+    const paint = () => { raf = 0; if (!st) return; const r = host.getBoundingClientRect(), cur = toContent(last.x, last.y);
+      const x1 = Math.min(st.x, cur.x), x2 = Math.max(st.x, cur.x), y1 = Math.min(st.y, cur.y), y2 = Math.max(st.y, cur.y);
+      if (!box) { box = document.createElement('div'); box.setAttribute('data-testid', 'drive-marquee'); Object.assign(box.style, {position: 'fixed', zIndex: '40', pointerEvents: 'none', border: '1px solid ' + c.accent, background: c.accent + '26', borderRadius: '2px'}); document.body.appendChild(box); }
+      const vx = Math.max(r.left, x1 - host.scrollLeft + r.left), vy = Math.max(r.top, y1 - host.scrollTop + r.top), vx2 = Math.min(r.right, x2 - host.scrollLeft + r.left), vy2 = Math.min(r.bottom, y2 - host.scrollTop + r.top);
+      Object.assign(box.style, {left: vx + 'px', top: vy + 'px', width: Math.max(0, vx2 - vx) + 'px', height: Math.max(0, vy2 - vy) + 'px'});
+      const hit: string[] = []; for (const el of Array.from(host.querySelectorAll('[data-testid^="drive-item-"]')) as HTMLElement[]) { const b = el.getBoundingClientRect(), bx = b.left - r.left + host.scrollLeft, by = b.top - r.top + host.scrollTop;
+        if (bx < x2 && bx + b.width > x1 && by < y2 && by + b.height > y1) hit.push(String(el.getAttribute('data-testid')).slice('drive-item-'.length)); }
+      const next = [...new Set([...st.base, ...hit])]; setSel(s => s.length === next.length && s.every((x, i) => x === next[i]) ? s : next); if (hit.length) anchor.current = hit[hit.length - 1]; };
+    const scrollTick = () => { if (!st) return; const r = host.getBoundingClientRect(), d = last.y > r.bottom - 36 ? 18 : last.y < r.top + 36 ? -18 : 0; if (d) { host.scrollTop += d; if (!raf) raf = requestAnimationFrame(paint); } };
+    const move = (e: MouseEvent) => { if (!st) return; last = {x: e.clientX, y: e.clientY}; const p = toContent(e.clientX, e.clientY); if (!box && Math.hypot(p.x - st.x, p.y - st.y) < 5) return; e.preventDefault(); if (!raf) raf = requestAnimationFrame(paint); };
+    const up = () => { st = null; clearInterval(timer); if (box) { box.remove(); box = null; } window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    const down = (e: MouseEvent) => { if (e.button !== 0) return; const t = e.target as HTMLElement;
+      if (t.closest('[data-testid^="drive-item-"],button,[role=button],[role=checkbox],[role=link],input,textarea,a,[data-testid=drive-selbar]')) return;
+      const p = toContent(e.clientX, e.clientY); if (p.x > host.clientWidth + host.scrollLeft) return; // barra de rolagem
+      st = {...p, base: e.ctrlKey || e.metaKey || e.shiftKey ? [...keyState.current.sel] : []}; last = {x: e.clientX, y: e.clientY}; e.preventDefault();
+      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); timer = setInterval(scrollTick, 30); };
+    host.addEventListener('mousedown', down); return () => { host.removeEventListener('mousedown', down); up(); };
+  }, [active, touchWeb, c.accent]); // eslint-disable-line react-hooks/exhaustive-deps
   // teclado (site): setas pela posicao na tela, Enter abre, Delete lixeira, F2 renomeia, Ctrl+A seleciona tudo, Esc limpa.
   // Age so com o foco na pagina ou num item do Drive (nunca rouba Enter de um botao, do menu lateral ou de um campo).
   const keyState = useRef({ordered, sel, busy: false, trashView}); keyState.current = {ordered, sel, busy: !!(preview || naming || moving), trashView};
@@ -362,7 +387,7 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
         </ScrollView>}
       </View>
       {/* conteudo */}
-      <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingHorizontal: wide ? 18 : 10, paddingBottom: 90, paddingTop: 4, flexGrow: 1}}
+      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingHorizontal: wide ? 18 : 10, paddingBottom: 90, paddingTop: 4, flexGrow: 1}}
         scrollEventThrottle={200} onScroll={(e: any) => { const n = e.nativeEvent; if (n.contentOffset.y + n.layoutMeasurement.height > n.contentSize.height - 800 && limit < items.length) setLimit(l => l + 300); }}
         {...(contextMenu(() => canWrite && !notConnected ? newMenu : []) as any)}>
         {!notConnected && (data || viewItems) ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 6, marginBottom: 4, minHeight: 30}}>
