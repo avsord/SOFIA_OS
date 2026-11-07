@@ -62,3 +62,10 @@ test('Excel e PowerPoint tambem nos editores da Sofia; tema claro/escuro; so a j
  assert.ok(read('SOFIA_APP/src/components/DocEditor.tsx').includes("wrap.style.cursor = 'default'"),'cursor nao some no cinza');
  assert.ok(read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'xlsx'")&&read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'pptx'"));
 });
+
+test('fonte do documento e modo escuro do navegador (Pedro 07/11)',()=>{
+ const f=read('SOFIA_APP/src/lib/doc-fonts.ts'),m=read('src/channels/mobile.js'),pf=read('SOFIA_APP/src/components/PageFiles.tsx');
+ assert.ok(f.includes("'/api/mobile/fonts.css?f='")&&f.includes('FALLBACK'),'fonte que falta vem do Google Fonts pelo site; reserva sem serifa');
+ assert.ok(m.includes("if (p === '/api/mobile/fonts.css' && m === 'GET')")&&m.includes("https://fonts.gstatic.com' + path"),'rota de fontes so busca no Google Fonts');
+ assert.ok(pf.includes("meta.name = 'color-scheme'"),'janela separada nao recebe o escuro forcado do navegador');
+});

@@ -9,6 +9,7 @@ import type {OfficeSaved} from './SheetEditor';
 import {useEditorColors, ThemeToggle} from './EditorChrome';
 import {uploadOfficeBytes} from '../lib/office-save';
 import {errorText} from '../lib/chat-model';
+import {ensureDocFonts} from '../lib/doc-fonts';
 
 const h = React.createElement as any;
 export const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
@@ -58,8 +59,8 @@ function bodyHtml(sp: Element, title: boolean, scale: number) {
       if (e.localName !== 'r' && e.localName !== 'fld') continue;
       const rPr = kid(e, NS.a, 'rPr'), t = kid(e, NS.a, 't')?.textContent || '';
       const sz = Number(rPr?.getAttribute('sz') || 0) / 100 || (title ? 40 : 18), b = rPr?.getAttribute('b') === '1', i = rPr?.getAttribute('i') === '1', u = !!rPr?.getAttribute('u') && rPr?.getAttribute('u') !== 'none', st = !!rPr?.getAttribute('strike') && rPr?.getAttribute('strike') !== 'noStrike';
-      const col = srgb(rPr && kid(rPr, NS.a, 'solidFill')), hl = srgb(rPr && kid(rPr, NS.a, 'highlight'));
-      const css = 'font-size:' + (sz * 12700 * scale).toFixed(2) + 'px;' + (b ? 'font-weight:700;' : '') + (i ? 'font-style:italic;' : '') + (u || st ? 'text-decoration:' + [u ? 'underline' : '', st ? 'line-through' : ''].join(' ') + ';' : '') + (col ? 'color:' + col + ';' : '') + (hl ? 'background-color:' + hl + ';' : '');
+      const col = srgb(rPr && kid(rPr, NS.a, 'solidFill')), hl = srgb(rPr && kid(rPr, NS.a, 'highlight')), face = (rPr && kid(rPr, NS.a, 'latin')?.getAttribute('typeface')) || '';
+      const css = 'font-size:' + (sz * 12700 * scale).toFixed(2) + 'px;' + (b ? 'font-weight:700;' : '') + (i ? 'font-style:italic;' : '') + (u || st ? 'text-decoration:' + [u ? 'underline' : '', st ? 'line-through' : ''].join(' ') + ';' : '') + (col ? 'color:' + col + ';' : '') + (hl ? 'background-color:' + hl + ';' : '') + (face && !face.startsWith('+') ? 'font-family:\'' + face.replace(/'/g, '') + '\', Calibri, Arial, sans-serif;' : '');
       inner += '<span data-r="' + pi + ':' + ri + '" data-sz="' + sz + '" data-b="' + (b ? 1 : 0) + '" data-i="' + (i ? 1 : 0) + '" data-u="' + (u ? 1 : 0) + '" data-s="' + (st ? 1 : 0) + '" data-c="' + col + '" data-h="' + hl + '" style="' + css + '">' + esc(t) + '</span>';
       ri++;}
     if (!inner) {const end = kid(p, NS.a, 'endParaRPr'); const sz = Number(end?.getAttribute('sz') || 0) / 100 || (title ? 40 : 18); inner = '<span style="font-size:' + (sz * 12700 * scale).toFixed(2) + 'px"><br></span>';}
@@ -120,7 +121,7 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
       const sz = deep(pdoc, NS.p, 'sldSz')[0]; pres.current = {doc: pdoc, rels: prels, ct, cx: Number(sz?.getAttribute('cx') || 12192000), cy: Number(sz?.getAttribute('cy') || 6858000)};
       const relMap = new Map(deep(prels, NS.rel, 'Relationship').map(r => [r.getAttribute('Id') || '', r.getAttribute('Target') || '']));
       const list: Slide[] = []; for (const sid of deep(pdoc, NS.p, 'sldId')) {const t = relMap.get(sid.getAttributeNS(NS.r, 'id') || ''); if (t) list.push(await loadSlide(resolve('ppt/presentation.xml', t)));}
-      if (!live) return; slides.current = list; setCur(0); setVer(v => v + 1); setState('ready');
+      if (!live) return; slides.current = list; setCur(0); setVer(v => v + 1); setState('ready'); setTimeout(() => ensureDocFonts(stage.current), 300);
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
   }, [url]);

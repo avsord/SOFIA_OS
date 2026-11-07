@@ -59,6 +59,31 @@ function makeMobileApi(runtime, deps) {
     return {ok: false, need: {challenge: id, sent_to: masked}};
   }
   const extra = makeApi45(runtime, { bodyJson, json });
+  const FONT_W = {thin: 100, hairline: 100, extralight: 200, ultralight: 200, light: 300, regular: 400, normal: 400, book: 400, medium: 500, semibold: 600, demibold: 600, bold: 700, extrabold: 800, ultrabold: 800, black: 900, heavy: 900};
+  const fontCssMemo = new Map(), fontFileMemo = new Map();
+  async function fontCss(name) {
+    name = String(name || '').replace(/["';{}<>\\]/g, '').trim().slice(0, 80); if (!name) return '';
+    if (fontCssMemo.has(name)) return fontCssMemo.get(name);
+    const words = name.split(/\s+/); let weight = 0; const last = (words[words.length - 1] || '').toLowerCase().replace(/[-\s]/g, '');
+    if (words.length > 1 && FONT_W[last]) { weight = FONT_W[last]; words.pop(); }
+    const base = words.join(' '); if (!/^[A-Za-z0-9 ]{2,60}$/.test(base)) return '';
+    const spec = weight ? 'ital,wght@0,' + weight + ';1,' + weight : 'ital,wght@0,400;0,700;1,400;1,700';
+    let css = '';
+    try {
+      const r = await fetch('https://fonts.googleapis.com/css2?family=' + encodeURIComponent(base).replace(/%20/g, '+') + ':' + spec + '&display=swap', {headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'}});
+      if (r.ok) css = (await r.text()).replace(/font-family:\s*'[^']*'/g, "font-family: '" + name + "'")
+        .replace(/url\(https:\/\/fonts\.gstatic\.com(\/[^)]+)\)/g, (_, pth) => 'url(/api/mobile/fontfile/' + Buffer.from(pth).toString('base64url') + ')');
+    } catch { css = ''; }
+    fontCssMemo.set(name, css); if (fontCssMemo.size > 200) fontCssMemo.delete(fontCssMemo.keys().next().value);
+    return css;
+  }
+  async function fontFile(path) {
+    const hit = fontFileMemo.get(path); if (hit) return hit;
+    const r = await fetch('https://fonts.gstatic.com' + path); if (!r.ok) fail('NOT_FOUND', 'Fonte não encontrada.', 404);
+    const buf = Buffer.from(await r.arrayBuffer()); fontFileMemo.set(path, buf);
+    let total = 0; for (const [k, v] of [...fontFileMemo].reverse()) { total += v.length; if (total > 40 * 1024 * 1024) fontFileMemo.delete(k); }
+    return buf;
+  }
   const fileKey = crypto.randomBytes(32);
   const fileSig = (id, exp) => crypto.createHmac('sha256', fileKey).update('file:' + id + ':' + exp).digest('base64url');
   const fileLink = id => { const exp = Date.now() + 2 * 3600000; return '/api/mobile/file-stream/' + id + '?exp=' + exp + '&sig=' + fileSig(id, exp); };
@@ -171,6 +196,12 @@ function makeMobileApi(runtime, deps) {
       if (!step.ok) return send({ ok: false, need_code: true, ...step.need });
       clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile(), ...(step.trust ? {trust: step.trust} : {}) });
     }
+    // 07/11/2026 (Pedro: "ele ta alterando a fonte"): fontes dos documentos (Montserrat ExtraBold etc.) que o computador nao
+    // tem vem do Google Fonts pelo proprio site (a protecao da pagina so aceita fontes daqui). Publico: so fontes abertas.
+    if (p === '/api/mobile/fonts.css' && m === 'GET') { res.setHeader('Content-Type', 'text/css; charset=utf-8'); res.setHeader('Cache-Control', 'public, max-age=86400'); res.end(await fontCss(String(url.searchParams.get('f') || ''))); return true; }
+    { const fm = p.match(/^\/api\/mobile\/fontfile\/([A-Za-z0-9_-]{8,400})$/);
+      if (fm && m === 'GET') { const path = Buffer.from(fm[1], 'base64url').toString('utf8'); if (!/^\/s\/[a-z0-9]+\/v\d+\/[A-Za-z0-9_\-\/.]+\.(woff2|woff|ttf)$/.test(path)) fail('NOT_FOUND', 'Fonte não encontrada.', 404);
+        const buf = await fontFile(path); res.setHeader('Content-Type', path.endsWith('.woff2') ? 'font/woff2' : path.endsWith('.woff') ? 'font/woff' : 'font/ttf'); res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); res.setHeader('Content-Length', String(buf.length)); res.end(buf); return true; } }
     // 07/11/2026 (Pedro: arquivos nas Paginas): PDF/video/audio da pagina abre na janela flutuante. O quadro e o player nao
     // mandam login: link assinado (chave sorteada a cada partida do servidor), vale 2 h. Video pula para frente (Range).
     { const am = p.match(/^\/api\/mobile\/file-stream\/([A-Za-z0-9_-]{6,80})$/);

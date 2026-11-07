@@ -81,6 +81,9 @@ export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: st
   const win = window.open('', 'sofia-arquivo-' + f.id, 'popup=yes,width=' + w + ',height=' + hh + ',left=' + Math.max(0, sw - w - 40) + ',top=40');
   if (!win) return false;
   const doc = win.document; doc.title = f.name;
+  // 07/11/2026 (Pedro): o modo escuro forcado do navegador (Brave) pintava por cima e invertia os temas: a janela declara que
+  // ja cuida das proprias cores, entao o navegador nao mexe (Original = o arquivo como ele e).
+  try {const meta = doc.createElement('meta'); meta.name = 'color-scheme'; meta.content = 'light dark'; doc.head.appendChild(meta); doc.documentElement.style.colorScheme = 'light dark';} catch {}
   doc.body.style.cssText = 'margin:0;height:100vh;background:#1c1c1f;display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;color:#ddd';
   doc.body.textContent = 'Abrindo ' + f.name + '…';
   const ek = editKind(f.mime, f.name), editable = !!ek && !!f.pageId;

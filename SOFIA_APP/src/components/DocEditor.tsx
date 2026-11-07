@@ -9,6 +9,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import {useEditorColors, ThemeToggle} from './EditorChrome';
 import {errorText} from '../lib/chat-model';
+import {addSansFallback, ensureDocFonts} from '../lib/doc-fonts';
 
 const h = React.createElement as any;
 type Saved = {id: string; name: string; mime: string; bytes: number};
@@ -53,7 +54,7 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
       // 07/11/2026 (Pedro: "o mouse ta sumindo na parte cinza"): no Windows o cursor de texto inverte a cor do fundo e some no
       // cinza medio. Fora das paginas: fundo do editor e seta normal; cursor de texto so em cima da folha.
       wrap.style.background = 'transparent'; wrap.style.cursor = 'default'; wrap.querySelectorAll('section.docx').forEach(sec => {(sec as HTMLElement).style.cursor = 'text';});
-      setState('ready');
+      addSansFallback(styles.current, host.current); setState('ready'); setTimeout(() => ensureDocFonts(host.current), 50);
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
   }, [url]);
