@@ -1,3 +1,4 @@
+import {FinanceDeskSkeleton, FinancePhoneSkeleton} from './finance/Skeleton';
 import {DeskPageSkeleton} from '../components/Loading';
 import {useDraft} from '../lib/draft-bus';
 import {Presence} from '../components/Presence';
@@ -177,7 +178,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
 
   // 0.3.285: no computador, enquanto carrega, o esqueleto no desenho da tela pronta (antes aparecia o cabecalho do
   // celular, em outra fonte e altura, e a tela pulava quando os dados chegavam)
-  if (desktop && !d) return <DeskPageSkeleton title="Finanças" testID="finance-loading" />;
+  if (desktop && !d && !error) return <FinanceDeskSkeleton />;
   return (
     <FinanceLocal.Provider value={local}>
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
@@ -185,7 +186,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         {/* 0.3.253: no computador o cabecalho, a linha conta/mes e as abas se alinham a coluna de leitura */}
         {/* 0.3.269: no SITE (computador) Finanças tem a estrutura nova (lateral, extrato no centro, mês valendo para tudo); o celular segue igual */}
         {/* 07/11/2026 (Pedro: "shimmer e esqueleto em todas as paginas"): no computador a tela ficava so com o titulo enquanto carregava */}
-        {desktop && !d && !error ? <AppSkeleton label="Carregando suas finanças" /> : desktop && d && d.accounts.length ? <FinanceDesk api={api} d={scoped || d} full={d} month={month} setMonth={setMonth} accountId={accountId} isPrimary={isPrimary} account={account} onPickAccount={() => setAccountPicker(true)} reload={reload} onTx={setEditing} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow(t !== 'new' && t.kind === 'income' ? 'income' : 'expense'); setBillCard(''); setBillEditor(t); }} onNewBill={flow => { setBillScope('series'); setBillFlow(flow); setBillCard(''); setBillEditor('new'); }} onManage={() => setManage(true)} view={deskView} setView={setDeskView} pendingSide={pendingSide} setPendingSide={setPendingSide} warning={notificationWarning} /> : <>
+        {desktop && !d && !error ? <FinanceDeskSkeleton /> : desktop && d && d.accounts.length ? <FinanceDesk api={api} d={scoped || d} full={d} month={month} setMonth={setMonth} accountId={accountId} isPrimary={isPrimary} account={account} onPickAccount={() => setAccountPicker(true)} reload={reload} onTx={setEditing} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow(t !== 'new' && t.kind === 'income' ? 'income' : 'expense'); setBillCard(''); setBillEditor(t); }} onNewBill={flow => { setBillScope('series'); setBillFlow(flow); setBillCard(''); setBillEditor('new'); }} onManage={() => setManage(true)} view={deskView} setView={setDeskView} pendingSide={pendingSide} setPendingSide={setPendingSide} warning={notificationWarning} /> : <>
         <View style={pad(0)}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
@@ -213,7 +214,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         </View>
         </View>
 
-        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><LoadingCaption label="Carregando suas finanças" /><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
+        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <FinancePhoneSkeleton />}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
           <ScrollView ref={mainScroll} onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={64} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>

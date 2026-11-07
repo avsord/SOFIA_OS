@@ -26,7 +26,8 @@ import {DateTimeField} from '../components/DateTimeField';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
-import {AppFrame, NavTabs, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
+import {AppFrame, NavTabs, Chip, Dialog, FieldRow, GhostButton, IconPicker, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast} from '../components/AppKit';
+import {RowsSkeleton, TextShimmer} from '../components/ListSkeleton';
 
 /* ---------- tipos (modelos com blocos liga/desliga) ---------- */
 export type TypeDef = {id: string; name: string; one: string; icon: IconName; statuses: string[]; rating: boolean; fields: string[]; kind: string; e: Entity | null; area?: LibraryArea; builtin?: string; position: number; pinned: boolean; inMore: boolean};
@@ -292,7 +293,6 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
       {t.statuses.length > 1 ? <Pressable testID={'lib-status-' + it.id} accessibilityRole="button" accessibilityLabel={isDone ? 'Marcado como ' + t.statuses[last] : 'Marcar ' + t.statuses[Math.min(last, it.status + 1)]} onPress={next} style={({hovered}: any) => ({paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: isDone ? PALETTE.green + '88' : c.line, backgroundColor: isDone ? PALETTE.green + '18' : hovered ? c.input : 'transparent'})}><Text style={{color: isDone ? c.success : c.muted, fontSize: 12, fontWeight: '500'}}>{t.statuses[it.status] || t.statuses[0]}</Text></Pressable> : null}
     </Pressable>;
   }
-  if (!ents) return <AppSkeleton label="Carregando a Biblioteca…" />;
   const kbd = (k: string) => <Text style={{color: c.muted, fontSize: 11, borderWidth: 1, borderColor: c.line, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1}}>{k}</Text>;
   return <InternalBackGesture enabled={active && !openId && !adding && !typeDialog} onBack={onBack}>
     <View testID="library-screen" style={{flex: 1}}>
@@ -302,7 +302,7 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1}}>
               <Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Biblioteca</Text>
-              {desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : null}
+              {desktop && !ents ? <TextShimmer width={340} style={{marginTop: 9}} /> : desktop ? <Text style={{color: c.muted, fontSize: 14, marginTop: 4}}>{(() => { const pend = shown.filter(i => { const t = typeOf(i.type); return t.statuses.length > 1 && i.status < t.statuses.length - 1; }); return !shown.length ? 'Nada aqui ainda. Aperte N para adicionar pelo nome, por um link ou por um arquivo.' : pend.length ? (pend.length === 1 ? '“' + pend[0].title + '” está esperando por você.' : pend.length + ' itens esperando por você; o mais recente é “' + pend[0].title + '”.') : 'Você já viu, leu ou fez tudo o que está aqui.'; })()}</Text> : null}
             </View>
             {desktop && curType && !curType.area ? <GhostButton icon="edit" label="Editar tipo" onPress={() => setTypeDialog({edit: curType})} /> : null}
             {!desktop ? <IconButton name="search" label="Buscar na Biblioteca" onPress={() => setSearchOpen(v => {if (v) setQuery(''); return !v;})} /> : null}
@@ -324,10 +324,11 @@ export function Library({api, active, onBack}: {api: SofiaApi; active: boolean; 
             <StarRow value={filter.rating} onChange={r => setFilter(f => ({...f, rating: r}))} />
             <View style={{height: 12}} />
           </DropPanel> : null}
-          <ResultLine text={[tagList.join(', '), filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (curType ? curType.name.toLowerCase() : shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} />
+          {!ents ? <TextShimmer width={56} height={10} style={{marginLeft: 4}} /> : null}{ents ? <ResultLine text={[tagList.join(', '), filter.rating ? filter.rating + '★' : ''].filter(Boolean).concat([(filterOn ? shown.length + ' de ' + items.filter(i => view === 'all' || i.type === view).length : String(shown.length)) + ' ' + (curType ? curType.name.toLowerCase() : shown.length === 1 ? 'item' : 'itens')]).join(' · ')} onClear={filterOn ? () => setFilter({status: '', rating: 0, tag: ''}) : undefined} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
+          {!ents ? <RowsSkeleton desktop={desktop} rows={6} lead="icon" trailing testID="library-skeleton" /> : null}
           {shown.length ? <View style={desktop ? {borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'} : {gap: 8}}>{shown.map((it, k) => <Card key={it.id} it={it} first={!k} />)}</View> : null}
-          {!shown.length ? <View style={{alignItems: 'center', gap: 10, paddingVertical: 40}}><Icon name={curType?.icon || 'book'} size={32} color={c.muted} /><Text style={{color: c.muted, textAlign: 'center', maxWidth: 360}}>{query || filterOn ? 'Nada encontrado com esse filtro.' : 'Nada aqui ainda. Adicione pelo nome, cole um link de qualquer site ou arraste um arquivo.'}</Text></View> : null}
+          {ents && !shown.length ? <View style={{alignItems: 'center', gap: 10, paddingVertical: 40}}><Icon name={curType?.icon || 'book'} size={32} color={c.muted} /><Text style={{color: c.muted, textAlign: 'center', maxWidth: 360}}>{query || filterOn ? 'Nada encontrado com esse filtro.' : 'Nada aqui ainda. Adicione pelo nome, cole um link de qualquer site ou arraste um arquivo.'}</Text></View> : null}
         </ScrollView>
       </AppFrame>
       {dropping ? <View pointerEvents="none" style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: c.accent + '1f', borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent, borderRadius: 16, margin: 8}}><Text style={{color: c.accent, fontSize: 18, fontWeight: '700'}}>Solte para adicionar à Biblioteca</Text></View> : null}

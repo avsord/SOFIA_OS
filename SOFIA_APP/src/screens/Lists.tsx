@@ -1,3 +1,5 @@
+import {RowsSkeleton} from '../components/ListSkeleton';
+import {ShimmerBlock, ShimmerGroup} from '../components/Loading';
 import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Listas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/listas.html). Mesma tela no
@@ -395,7 +397,7 @@ export function Lists({api, active, onBack}: {api: SofiaApi; active: boolean; on
     {L.model === 'shopping' && !inGroup ? null : <PrimaryButton testID="list-finish" icon={L.model === 'simple' ? 'check' : 'wallet'} label={L.model === 'simple' ? 'Concluir lista' : inGroup ? 'Finalizar compra de ' + gname(gfilter) : 'Finalizar compra'} disabled={!ticked.length} onPress={() => setDialog({type: 'finish', gid: inGroup ? gfilter : undefined})} />}
   </View>;
 
-  if (!data) return <AppSkeleton label="Carregando listas…" />;
+  if (!data) return <ListsSkeleton desktop={desktop} />;
   return <InternalBackGesture enabled={active && !openId && !histOpen && !dialog} onBack={() => inGroup ? setGfilter('all') : onBack()}>
     <View testID="lists-screen" style={{flex: 1}}>
       <AppFrame tabsOnTop sidebar={sidebar} footer={desktop ? undefined : footer}>
@@ -511,4 +513,27 @@ function RemindDialog({current, agenda, onClose, onSave}: {current: string; agen
     </Pressable>
     <Text style={{color: c.muted, fontSize: 12}}>O lembrete entra em Lembretes e chega como notificação na hora.</Text>
   </Dialog>;
+}
+
+/** 07/11/2026 (Pedro: esqueleto na estrutura real): o mesmo titulo, abas das listas, campo de adicionar e itens. */
+function ListsSkeleton({desktop}: {desktop: boolean}) {
+  const c = useTheme();
+  return <View testID="app-skeleton" accessibilityLabel="Carregando listas" style={{flex: 1, backgroundColor: c.bg}}><ShimmerGroup>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{...(desktop ? {paddingLeft: dpx(40), paddingRight: dpx(40), paddingTop: dpx(32), maxWidth: 1160, width: '100%', alignSelf: 'flex-start'} : {paddingHorizontal: 16, paddingTop: 6}) as any, paddingBottom: 40, maxWidth: desktop ? 800 : undefined, width: '100%'}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+        {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={() => {}} /> : null}
+        <View style={{flex: 1, minWidth: 0, gap: desktop ? 8 : 6}}>
+          <Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Listas</Text>
+          {desktop ? <ShimmerBlock width={120} height={14} /> : null}
+          <ShimmerBlock width={desktop ? 260 : 150} height={desktop ? 12 : 10} />
+        </View>
+      </View>
+      {desktop ? <View style={{flexDirection: 'row', gap: 24, marginTop: 14, borderBottomWidth: 1, borderColor: c.line, paddingBottom: 12}}>{[70, 64, 120, 110].map((w, i) => <ShimmerBlock key={i} width={w} height={11} />)}</View>
+        : <View style={{flexDirection: 'row', gap: 8, marginHorizontal: -16, marginTop: 6, paddingHorizontal: 16, paddingVertical: 10, overflow: 'hidden'}}>{[86, 84, 150].map((w, i) => <ShimmerBlock key={i} width={w} height={30} radius={15} />)}</View>}
+      <View style={{marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
+        <Icon name="plus" size={16} color={c.muted} /><Text style={{flex: 1, color: c.muted, fontSize: 14, paddingVertical: 13}}>Adicionar…</Text>
+      </View>
+      <View style={{marginTop: 20}}><RowsSkeleton desktop={desktop} rows={6} lead="check" lines={1} testID="lists-skeleton" /></View>
+    </ScrollView>
+  </ShimmerGroup></View>;
 }

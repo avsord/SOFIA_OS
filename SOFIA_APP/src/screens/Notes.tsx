@@ -1,3 +1,4 @@
+import {RowsSkeleton, TextShimmer} from '../components/ListSkeleton';
 import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
 // 0.3.269 — Notas redesenhadas (protótipo aprovado em 31/10, docs/prototipos-2026-10-31/notas.html), web e celular.
@@ -21,7 +22,7 @@ import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Presence} from '../components/Presence';
 import {contextMenu} from '../components/ContextMenu';
 import {BarPill, DropPanel, PanelRow, ResultLine} from '../components/FilterBar';
-import {AppFrame, NavTabs, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast, AppSkeleton} from '../components/AppKit';
+import {AppFrame, NavTabs, Chip, Dialog, GhostButton, Input, Panel, PrimaryButton, SideItem, SideLabel, fold, openMore, useToast} from '../components/AppKit';
 
 const COLORS = ['#b49ae6', '#7f9ad8', '#7fcf9f', '#e8b04a', '#e08ad0', '#7fc0c9', '#f0997b', '#a3a0ad'];
 const LOCKED_TITLE = 'Nota protegida';
@@ -203,7 +204,6 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
     </Pressable>;
   }
   const pinned = visible.filter(n => n.pinned && view !== 'pinned'), rest = visible.filter(n => !(n.pinned && view !== 'pinned'));
-  if (!notesE) return <AppSkeleton label="Carregando notas…" />;
   return <InternalBackGesture enabled={active && !openId && !tagDialog} onBack={onBack}>
     <View testID="notes-screen" style={{flex: 1}} onTouchStart={touch} {...({onMouseMove: touch, onKeyDown: touch} as any)}>
       <AppFrame tabsOnTop sidebar={sidebar} mobileNav={undefined} /* 07/11/2026 (revisao + desenho aprovado): no computador tambem a barra [Área ⌄] e a ordem, sem abas */>
@@ -212,7 +212,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             {!desktop ? <IconButton name="back" label="Voltar aos apps" onPress={onBack} /> : null}
             <View style={{flex: 1}}>
               <Text accessibilityRole="header" style={{color: c.text, fontSize: 28, fontWeight: '600', letterSpacing: -1}}>Notas</Text>
-              {desktop ? <Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 0}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text> : null}
+              {desktop && !notesE ? <TextShimmer width={340} style={{marginTop: 9}} /> : desktop ? <Text style={{color: c.muted, fontSize: desktop ? 14 : 13, marginTop: desktop ? 4 : 0}}>{curTag?.lock && !lockedView ? 'Criptografada · tranca ao sair ou após 5 min parado' : lockedView ? 'Protegida por senha' : (desktop ? (visible.length ? (visible.length === 1 ? 'Uma nota' : visible.length + ' notas') + '; a última mexida foi “' + ([...visible].sort((a, b) => String(b.e.updated_at || '').localeCompare(String(a.e.updated_at || '')))[0]?.title || 'sem título') + '”.' : 'Nenhuma nota aqui. Escreva o título abaixo e aperte Enter.') : visible.length + (visible.length === 1 ? ' nota' : ' notas'))}</Text> : null}
             </View>
             {curTag && !lockedView ? <GhostButton icon="edit" label={desktop ? 'Editar etiqueta' : undefined} onPress={() => setTagDialog({tag: curTag})} /> : null}
             {curTag?.lock && !lockedView ? <GhostButton testID="notes-lock-now" icon="lock" label={desktop ? 'Trancar' : undefined} onPress={() => lockTag(curTag.key)} /> : null}
@@ -233,7 +233,7 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             <PanelRow kind="plain" icon="pin" label={'Fixadas · ' + notes.filter(n => n.pinned && !n.archived && !n.lockTag).length} on={view === 'pinned'} onPress={() => { go(view === 'pinned' ? 'all' : 'pinned'); setOrderOpen(false); }} />
             <PanelRow kind="plain" icon="box" label={'Arquivadas · ' + notes.filter(n => n.archived && !n.lockTag).length} on={view === 'archived'} onPress={() => { go(view === 'archived' ? 'all' : 'archived'); setOrderOpen(false); }} />
           </DropPanel> : null}
-          {!desktop ? <ResultLine text={visible.length + (visible.length === 1 ? ' nota' : ' notas') + (view === 'pinned' ? ' fixadas' : view === 'archived' ? ' arquivadas' : '')} onClear={view === 'pinned' || view === 'archived' ? () => go('all') : undefined} /> : null}
+          {!desktop && !notesE ? <TextShimmer width={60} height={10} style={{marginLeft: 4}} /> : !desktop ? <ResultLine text={visible.length + (visible.length === 1 ? ' nota' : ' notas') + (view === 'pinned' ? ' fixadas' : view === 'archived' ? ' arquivadas' : '')} onClear={view === 'pinned' || view === 'archived' ? () => go('all') : undefined} /> : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {lockedView ? <LockScreen tag={curTag!} count={notes.filter(n => tagKey(n.lockTag) === curTag!.key).length} onUnlock={async pw => { const k = await unlock(pw, curTag!.lock!); if (!k) return false; keys.current.set(curTag!.key, k); await decryptAll(curTag!.key, k); bump(x => x + 1); touch(); return true; }} /> : <>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
@@ -245,9 +245,10 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
             {desktop || searchOpen ? <View style={{flexDirection: 'row', gap: 10}}>
               <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Icon name="search" size={15} color={c.muted} /><TextInput accessibilityLabel="Buscar em Notas" value={query} onChangeText={setQuery} placeholder={'Buscar em ' + title} placeholderTextColor={c.muted} style={{flex: 1, color: c.text, fontSize: 14, paddingVertical: 9}} /></View>
             </View> : null}
+            {!notesE ? <RowsSkeleton desktop={desktop} rows={6} testID="notes-skeleton" /> : null}
             {pinned.length ? <View style={{gap: 8}}><Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Fixadas <Text style={{fontWeight: '400', color: c.muted}}>{pinned.length}</Text></Text>{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{pinned.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : pinned.map(n => <Card key={n.id} n={n} />)}</View> : null}
             {rest.length ? <View style={{gap: 8}}>{pinned.length ? <Text style={{color: desktop ? c.text : c.muted, fontSize: desktop ? 16 : 12, fontWeight: desktop ? '600' : '700', paddingHorizontal: desktop ? 0 : 4}}>Notas <Text style={{fontWeight: '400', color: c.muted}}>{rest.length}</Text></Text> : null}{desktop ? <View style={{borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden'}}>{rest.map((n, k) => <Card key={n.id} n={n} first={!k} />)}</View> : rest.map(n => <Card key={n.id} n={n} />)}</View> : null}
-            {!visible.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 24}}>{query ? 'Nada encontrado.' : view === 'archived' ? 'Nenhuma nota arquivada.' : 'Nenhuma nota aqui ainda. Escreva o título no campo acima e aperte Enter.'}</Text> : null}
+            {notesE && !visible.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 24}}>{query ? 'Nada encontrado.' : view === 'archived' ? 'Nenhuma nota arquivada.' : 'Nenhuma nota aqui ainda. Escreva o título no campo acima e aperte Enter.'}</Text> : null}
           </>}
         </ScrollView>
       </AppFrame>
