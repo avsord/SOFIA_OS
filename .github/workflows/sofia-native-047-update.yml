@@ -196,6 +196,34 @@ jobs:
         git diff --exit-code -- App.tsx
         python3 tools/verify-abi-equivalence.py
         sha256sum -c dist/Sofia-OS.apk.sha256
+    - name: Build QA-only synthetic seed below the published version (manual candidate)
+      # 07/11/2026: substitui a semente 0.3.60 guardada como artefato (expirou em 30 dias). Mesmo App de producao com
+      # transporte sintetico; versionCode abaixo da versao publicada para o teste subir semente -> publicada -> candidato.
+      working-directory: SOFIA_APP
+      run: |
+        set -euo pipefail
+        SDK_TOOLS="$(python3 -c 'import os,pathlib; p=pathlib.Path(os.environ["ANDROID_HOME"])/"build-tools"; print(max((x for x in p.iterdir() if x.is_dir()), key=lambda x:tuple(int(n) for n in x.name.split(".") if n.isdigit())))')"
+        BASE_CODE="$("$SDK_TOOLS/aapt" dump badging dist/baseline-Sofia-OS.apk | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
+        test -n "$BASE_CODE"
+        cp App.tsx /tmp/sofia-seed-App.tsx
+        cp android/app/build.gradle /tmp/sofia-seed-build.gradle
+        trap 'cp /tmp/sofia-seed-App.tsx App.tsx; cp /tmp/sofia-seed-build.gradle android/app/build.gradle; rm -f ProductionApp.tsx' EXIT
+        cp App.tsx ProductionApp.tsx
+        cp tests/fixtures/calendar-performance.tsx.fixture App.tsx
+        npm run check
+        sed -i -E "s/versionCode [0-9]+/versionCode $((BASE_CODE-1))/" android/app/build.gradle
+        grep -q "versionCode $((BASE_CODE-1))" android/app/build.gradle
+        cd android
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
+        cp app/build/outputs/apk/release/app-release.apk ../dist/QA-ONLY-seed.apk
+        cd ..
+        "$SDK_TOOLS/aapt" dump badging dist/QA-ONLY-seed.apk | grep -q "versionCode='$((BASE_CODE-1))'"
+        cp /tmp/sofia-seed-App.tsx App.tsx
+        cp /tmp/sofia-seed-build.gradle android/app/build.gradle
+        rm ProductionApp.tsx
+        git diff --exit-code -- App.tsx
+        sha256sum -c dist/Sofia-OS.apk.sha256
+      if: steps.plan.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]') && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - name: Build full production shell with isolated transport for acceptance
       working-directory: SOFIA_APP
       run: |
@@ -366,48 +394,6 @@ jobs:
       with:
         name: ${{ needs.build.outputs.artifact_name }}
         path: SOFIA_APP/dist
-    - name: Restore retained synthetic seed without rebuilding the app
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-37809157208-1
-        run-id: 37809157208
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/seed-060
-    - name: Restore exact previously delivered production APK for comparison
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-37838702548-1
-        run-id: 37838702548
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-063
-    - name: Restore the APK currently installed by the owner for timing comparison
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-37977881730-1
-        run-id: 37977881730
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-094
-    - name: Restore exact 0.3.105 QA APK for same-emulator before/after timing
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-38066335139-1
-        run-id: 38066335139
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-105
-    - name: Restore 0.3.106 QA APK to compare first-open timing in the SAME emulator
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-38070454563-1
-        run-id: 38070454563
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-106
-    - name: Restore exact 0.3.107 QA baseline before instrumented Old/New comparisons
-      uses: actions/download-artifact@v4
-      with:
-        name: Sofia-build-38080609693-1
-        run-id: 38080609693
-        github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-107
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:
@@ -419,8 +405,8 @@ jobs:
         test ! -e dist/QA-ONLY-full-fixture.apk
         test -s dist/QA-ONLY-manual-universal.apk
         python3 tools/verify-abi-equivalence.py
-        test -s dist/previous-105/QA-ONLY-manual-universal.apk
-        test -s dist/previous-106/QA-ONLY-manual-universal.apk
+        test -s dist/QA-ONLY-seed.apk
+        test -s dist/baseline-Sofia-OS.apk
     - name: Enable KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

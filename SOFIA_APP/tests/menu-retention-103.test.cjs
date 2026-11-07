@@ -77,16 +77,16 @@ test('R5 first taps prewarm independently of the full archived Page/chat history
  assert.ok(f.frames.some(x=>x.cancelled),'foreground touch cancels pending background work');
 });
 
-test('R5 manual smoke explicitly exercises first taps and 0.3.106 same-emulator baseline',()=>{
+test('R5 manual smoke explicitly exercises first taps and a same-emulator baseline (07/11/2026: the published version, durable)',()=>{
  const fs=require('node:fs'),path=require('node:path');
  const root=path.join(__dirname,'..','..');
  const smoke=fs.readFileSync(path.join(root,'SOFIA_APP/tools/manual-apk-smoke.py'),'utf8');
  const workflow=fs.readFileSync(path.join(root,'.github/workflows/sofia-native-047-update.yml'),'utf8');
- assert.ok(workflow.includes('Sofia-build-38070454563-1'));
- assert.ok(workflow.includes('dist/previous-106/QA-ONLY-manual-universal.apk'));
- assert.ok(smoke.includes("result['previous_106_runs']=[cold('previous106-'"));
- assert.ok(smoke.includes("result['startup_vs_106_ms']"));
- assert.ok(smoke.includes("result['startup_vs_106_ms']['DATA']<=100"));
+ // os artefatos de 30 dias (0.3.60 semente, 0.3.94, 0.3.105-107) expiraram; a base agora e a versao publicada
+ assert.ok(!/run-id: 3\d{10}/.test(workflow),'nenhum artefato antigo fixo por numero de compilacao');
+ assert.ok(workflow.includes('dist/QA-ONLY-seed.apk')&&workflow.includes('versionCode $((BASE_CODE-1))'),'semente compilada a cada rodada, abaixo da publicada');
+ assert.ok(smoke.includes("previous=dist/'baseline-Sofia-OS.apk'")&&smoke.includes("adb('install',str(dist/'QA-ONLY-seed.apk'))"));
+ assert.ok(smoke.includes("result['candidate_median_ms']<=result['owner_baseline_median_ms']+100"),'mesmo limite de 100 ms, contra a publicada');
  assert.ok(smoke.includes("result['early_menu_first_touch_after_native_DATA']=True"));
  assert.ok(smoke.includes("result['early_menu_native_touch_count']>=3"));
  assert.ok(smoke.includes("for label in ['Páginas','Conversa','Agenda','Início']"));

@@ -352,13 +352,15 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Conversa/Agenda/Páginas/Apps/Perfil: esqueleto enquanto o arquivo da tela baixa (era só o fundo) e esqueleto sem a pausa de 300 ms; conferido com o arquivo atrasado 2,5 s num navegador limpo | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Esqueleto de cada aba na estrutura real (Pedro: "esqueleto igual dos dois"): Agenda = a propria grade do mes carregando; Conversa = topo, baloes e caixa; Paginas = Recentes + lista (tambem enquanto a lista chega); Apps com 4 colunas no computador; Perfil com cartao, secoes e Conta | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Página trancada (Pedro: ficou aberta com 'Não salvo'): cópia velha do editor (outra aba ou rascunho guardado) não vence mais a versão trancada; rascunho de página trancada não fica no navegador (a senha escrita ficava em texto aberto) | reproduzido com 2 abas e corrigido; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Esqueleto na estrutura real também em Finanças, E-mails, Listas, Biblioteca, Notas e Todos os registros (sem o texto @records) | lado a lado computador/celular; portão verde |
 | 2026-11-07 | (delivery) | Arquivos nas Páginas (Pedro): arrastar qualquer arquivo (até 25 MB) ou '/arquivo' → linha com tipo e nome, ou visualização com escala (imagem, vídeo, áudio, PDF, Office); clique abre janela flutuante que move/redimensiona; Office vira PDF pelo Google | servidor e site testados; portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Teste do APK no emulador não depende mais de compilações antigas (semente 0.3.60 e bases 0.3.94/105-107 expiraram no GitHub após 30 dias): semente compilada a cada rodada abaixo da versão publicada; comparação de abertura contra a versão publicada (mesmo limite de 100 ms) | testes locais verdes; CI em andamento |
 
 ## 11. Lições de erro (para calibrar quem chegar)
+
+- Artefato do GitHub Actions dura 30 dias: nunca fixar `run-id` antigo como base de teste (07/11/2026: semente 0.3.60 sumiu e todo [manual-apk] falhou). Base durável = release publicada; semente = compilada na rodada.
 
 - Depois de publicar, abrir o site compilado e conferir que nenhuma tela mostra "Algo deu errado" (teste local olhava só a parte mudada; 1eb44b2 derrubou todas as telas e passou despercebido) (06/11/2026).
 - Campo novo gravado pelo servidor precisa estar no catálogo do tipo (workspace recusa com BAD_FIELD); teste unitário de função pura não pega: testar a gravação real (06/11/2026).
