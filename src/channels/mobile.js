@@ -424,6 +424,16 @@ function makeMobileApi(runtime, deps) {
       fail('NOT_FOUND','Operação de Cápsulas não disponível.',404);
     }
     // Reuse web workspace operations only AFTER bearer auth. Never bridge admin/credentials/restore endpoints.
+    // 07/11/2026 (Pedro: editor de Word proprio da Sofia; "a Sofia consegue criar um arquivo doc na pagina e comecar a editar"):
+    // o editor do site manda o HTML do documento; aqui vira .docx de verdade e entra como anexo novo da pagina.
+    { const dm = p.match(/^\/api\/mobile\/workspace\/entities\/([A-Za-z0-9_-]{6,80})\/docx$/);
+      if (dm && m === 'POST') { rate(session, 'docx-save', 240); const b = await bodyJson(req, 30 * 1024 * 1024);
+        let name = String(b.name || 'Documento.docx').replace(/[\\/]/g, '_').trim().slice(0, 150) || 'Documento.docx'; if (!/\.docx$/i.test(name)) name += '.docx';
+        const H = require('@turbodocx/html-to-docx'), html = String(b.html || '').trim() || '<p></p>';
+        const out = await (H.default || H)(html, null, {title: name.replace(/\.docx$/i, ''), font: 'Calibri', fontSize: 22, margins: {top: 1440, right: 1440, bottom: 1440, left: 1440}});
+        const buf = Buffer.isBuffer(out) ? out : Buffer.from(out instanceof ArrayBuffer ? new Uint8Array(out) : await out.arrayBuffer());
+        const a = workspace.attach(validId(dm[1]), {name, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base64: buf.toString('base64')});
+        return send({id: a.id, name: a.name, mime: a.mime, bytes: a.bytes}); } }
     { const lm = p.match(/^\/api\/mobile\/workspace\/attachments\/([A-Za-z0-9_-]{6,80})\/link$/);
       if (lm && m === 'GET') { rate(session, 'file-link', 600); const a = workspace.attachment(validId(lm[1])); return send({url: fileLink(a.id), name: a.name, mime: a.mime, bytes: a.bytes}); } }
     if (p.startsWith('/api/mobile/workspace/')) {

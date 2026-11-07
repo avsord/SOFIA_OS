@@ -427,6 +427,8 @@ export class SofiaApi {
   /** 0.3.199: miniatura minuscula da foto (o chat mostra desfocada sem baixar o original do Drive). */
   attachmentThumb(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?thumb=1',headers:{Authorization:'Bearer '+this.token}}; }
   /** 07/11/2026: link assinado (2 h) para abrir o arquivo da pagina num quadro/player (que nao mandam login). */
+  /** 07/11/2026: documento do editor de Word da Sofia (HTML) -> .docx anexado a pagina. */
+  saveDocx(pageId:string,input:{html:string;name:string}) { return this.request<{id:string;name:string;mime:string;bytes:number}>('/workspace/entities/'+encodeURIComponent(pageId)+'/docx',input,'POST',90000); }
   async attachmentLink(id:string) { const r=await this.request<{url:string;name:string;mime:string;bytes:number}>('/workspace/attachments/'+encodeURIComponent(id)+'/link');return {...r,url:SITE+r.url}; }
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }

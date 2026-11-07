@@ -16,6 +16,8 @@ import {Spinner} from './Loading';
 import {driveKind, KIND, type Kind} from './DrivePreview';
 import {OverAll} from '../lib/over-all';
 import {errorText} from '../lib/chat-model';
+import {DocEditor} from './DocEditor';
+import {mountInWindow} from '../lib/popup-root';
 
 const WEB = Platform.OS === 'web';
 const h = React.createElement as any;
@@ -24,6 +26,10 @@ export type PageFileData = {attachment_id?: string; name?: string; mime?: string
 
 export const fileKind = (mime?: string, name?: string): Kind => driveKind({mime: String(mime || ''), name: String(name || ''), folder: false} as any);
 const OFFICE = (k: Kind) => k === 'doc' || k === 'sheet' || k === 'slides';
+export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+/** .docx abre no editor da Sofia (o resto do Office continua em PDF). */
+export const isDocx = (mime?: string, name?: string) => String(mime || '') === DOCX_MIME || /\.docx$/i.test(String(name || ''));
+type SavedFile = {id: string; name: string; mime: string; bytes: number};
 /** Pode aparecer dentro da pagina (modo visualizacao). */
 export const inlineCapable = (k: Kind) => k === 'image' || k === 'video' || k === 'audio' || k === 'pdf' || OFFICE(k);
 /** Abre na janela (o resto: so baixar). */
@@ -63,7 +69,7 @@ function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '') {
 /** 07/11/2026 (Pedro: "quero que ela possa sair da Sofia, como uma segunda pagina avulsa, e navegar entre as telas"): abre o
  * arquivo numa JANELA SEPARADA do navegador (pode ir para outro monitor). A janela e aberta na hora do clique (senao o
  * navegador bloqueia) e preenchida quando o link assinado chega. So imagem, video, audio, PDF, Office (em PDF) e texto. */
-export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: string}) {
+export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}) {
   const k = fileKind(f.mime, f.name), sw = window.screen?.availWidth || 1440, sh = window.screen?.availHeight || 900;
   const w = Math.round(Math.min(960, sw * 0.5)), hh = Math.round(Math.min(1040, sh * 0.88));
   const win = window.open('', 'sofia-arquivo-' + f.id, 'popup=yes,width=' + w + ',height=' + hh + ',left=' + Math.max(0, sw - w - 40) + ',top=40');
@@ -71,6 +77,10 @@ export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: st
   const doc = win.document; doc.title = f.name;
   doc.body.style.cssText = 'margin:0;height:100vh;background:#1c1c1f;display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;color:#ddd';
   doc.body.textContent = 'Abrindo ' + f.name + '…';
+  const editable = isDocx(f.mime, f.name) && !!f.pageId;
+  // 07/11/2026 (Pedro: "nesse tipo de aba tambem tem que dar pra editar e salvar no proprio docx"): .docx abre no editor
+  if (editable) {void signedUrl(api, f.id, '').then(url => {doc.body.textContent = ''; doc.body.style.cssText = 'margin:0;height:100vh;background:#e9e9ee;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif';
+    mountInWindow(win, <DocEditor api={api} id={f.id} name={f.name} url={url} pageId={f.pageId!} onSaved={a => {doc.title = a.name; f.onSaved?.(a);}} />);}).catch(e => {doc.body.textContent = errorText(e);}); return true;}
   void signedUrl(api, f.id, OFFICE(k) ? 'pdf' : '').then(async url => {
     doc.body.textContent = ''; doc.title = f.name;
     const el = (tag: string, css: string) => {const x = doc.createElement(tag); x.style.cssText = css; doc.body.appendChild(x); return x as any;};
@@ -87,15 +97,15 @@ export async function downloadPageFile(api: SofiaApi, id: string) {
 }
 
 // ---------------- Janelas flutuantes ----------------
-type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean};
+type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean; pageId?: string; onSaved?: (a: SavedFile) => void};
 let wins: Win[] = [], topZ = 1;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
 const setWins = (next: Win[]) => {wins = next; emit();};
-export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
+export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
   const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, ...(at || {}), z: ++topZ} : w)); return found.key;}
-  const W = window.innerWidth, H = window.innerHeight, w = Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = Math.min(H - 110, 720), n = wins.length, key = f.id + ':' + Date.now();
-  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
+  const ed = isDocx(f.mime, f.name) && !!f.pageId, W = window.innerWidth, H = window.innerHeight, w = ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = ed ? H - 90 : Math.min(H - 110, 720), n = wins.length, key = f.id + ':' + Date.now();
+  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
   return key;
 }
 const useWins = () => useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
@@ -124,46 +134,61 @@ export function FileWindowHost() {
   return <OverAll>{list.map(w => <FileWindow key={w.key} win={w} />)}</OverAll>;
 }
 
+// alcas um pouco para fora da borda (o canto arredondado cortava a ponta onde se pega)
+const HANDLES: [string, any, string][] = [
+  ['nw', {left: -6, top: -6, width: 20, height: 20}, 'nwse-resize'], ['ne', {right: -6, top: -6, width: 20, height: 20}, 'nesw-resize'],
+  ['sw', {left: -6, bottom: -6, width: 20, height: 20}, 'nesw-resize'], ['se', {right: -6, bottom: -6, width: 22, height: 22}, 'nwse-resize'],
+  ['n', {left: 14, right: 14, top: -5, height: 9}, 'ns-resize'], ['s', {left: 14, right: 16, bottom: -5, height: 9}, 'ns-resize'],
+  ['w', {left: -5, top: 14, bottom: 14, width: 9}, 'ew-resize'], ['e', {right: -5, top: 14, bottom: 16, width: 9}, 'ew-resize']];
 function FileWindow({win}: {win: Win}) {
-  const c = useTheme(), k = fileKind(win.mime, win.name), meta = KIND[k], [zoom, setZoom] = useState(0), [moving, setMoving] = useState(false);
-  const drag = (mode: 'move' | 'size') => (e: any) => {
+  const firstId = useRef(win.id), c = useTheme(), k = fileKind(win.mime, win.name), meta = KIND[k], [zoom, setZoom] = useState(0), [moving, setMoving] = useState(false);
+  const drag = (mode: string) => (e: any) => {
     if (e.button != null && e.button !== 0) return; if (mode === 'move' && (e.target as HTMLElement)?.closest?.('[data-win-btn]')) return;
     e.preventDefault(); try {window.getSelection()?.removeAllRanges();} catch {} const sx = e.clientX, sy = e.clientY, o = {...win}, bodyStyle = document.body.style, oldSel = bodyStyle.userSelect; bodyStyle.userSelect = 'none'; setMoving(true); patchWin(win.key, {z: ++topZ});
     const mv = (ev: PointerEvent) => {const dx = ev.clientX - sx, dy = ev.clientY - sy, W = window.innerWidth, H = window.innerHeight;
       if (mode === 'move') patchWin(win.key, {max: false, x: Math.min(W - 80, Math.max(-o.w + 120, o.x + dx)), y: Math.min(Math.max(0, H - o.hgt - 4), Math.max(0, o.y + dy))});
-      else patchWin(win.key, {w: Math.max(300, Math.min(W - o.x - 4, o.w + dx)), hgt: Math.max(220, Math.min(H - o.y - 4, o.hgt + dy))});};
+      else {// 07/11/2026 (Pedro: "da pra escalar a tela nos quatro cantos"): os 4 cantos e os 4 lados mudam o tamanho
+        let x = o.x, y = o.y, w = o.w, hh = o.hgt;
+        if (mode.includes('e')) w = Math.min(W - o.x - 4, o.w + dx);
+        if (mode.includes('s')) hh = Math.min(H - o.y - 4, o.hgt + dy);
+        if (mode.includes('w')) {const nx = Math.max(0, Math.min(o.x + o.w - 300, o.x + dx)); w = o.w + (o.x - nx); x = nx;}
+        if (mode.includes('n')) {const ny = Math.max(0, Math.min(o.y + o.hgt - 220, o.y + dy)); hh = o.hgt + (o.y - ny); y = ny;}
+        patchWin(win.key, {x, y, w: Math.max(300, w), hgt: Math.max(220, hh)});}};
     const up = () => {bodyStyle.userSelect = oldSel; setMoving(false); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
   const box = win.max ? {left: 12, top: 12, width: 'calc(100vw - 24px)', height: 'calc(100vh - 24px)'} : {left: win.x, top: win.y, width: win.w, height: win.hgt};
   const btn = (icon: any, label: string, run: () => void) => <Pressable key={label} {...({dataSet: {winBtn: '1'}} as any)} accessibilityLabel={label} onPress={run} style={({hovered}: any) => ({width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: hovered ? c.line : 'transparent'})}><Icon name={icon} size={15} color={c.muted} /></Pressable>;
   return h('div', {'data-testid': 'file-window', role: 'dialog', 'aria-label': win.name, onPointerDown: () => {if (wins.find(w => w.key === win.key)?.z !== topZ) patchWin(win.key, {z: ++topZ});},
-    style: {position: 'absolute', ...box, zIndex: win.z, pointerEvents: 'auto', background: c.surface, borderRadius: 12, border: '1px solid ' + c.line, overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column'}},
+    style: {position: 'absolute', ...box, zIndex: win.z, pointerEvents: 'auto', borderRadius: 12, boxShadow: '0 18px 50px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.12)'}},
+    h('div', {style: {position: 'absolute', inset: 0, background: c.surface, borderRadius: 12, border: '1px solid ' + c.line, overflow: 'hidden', display: 'flex', flexDirection: 'column'}},
     h('div', {onPointerDown: drag('move'), onDoubleClick: () => patchWin(win.key, {max: !win.max}), style: {height: 44, paddingTop: 4, position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingRight: 6, borderBottom: '1px solid ' + c.line, cursor: moving ? 'grabbing' : 'grab', userSelect: 'none'}},
       <>{h('div', {style: {position: 'absolute', left: '50%', top: 4, width: 38, height: 4, marginLeft: -19, borderRadius: 2, background: c.line}})}<Icon name={meta.icon} size={16} color={meta.color} />
       <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
       {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
       {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
-      {windowCapable(k, win.name) ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime})) closeWin(win.key);}) : null}
+      {windowCapable(k, win.name) ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime, pageId: win.pageId, onSaved: win.onSaved})) closeWin(win.key);}) : null}
       {btn('back', 'Voltar para a página', () => closeWin(win.key))}
       {btn('close', 'Fechar', () => closeWin(win.key))}</>
     ),
     <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
-      <FileBody api={win.api} id={win.id} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} />
+      <FileBody api={win.api} id={win.id} firstId={firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} />
       {moving || win.drag ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
-    </View>,
-    win.max ? null : h('div', {onPointerDown: drag('size'), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize'}},
-      h('div', {style: {position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}})));
+    </View>),
+    win.max ? null : HANDLES.map(([mode, css, cursor]) => h('div', {key: mode, onPointerDown: drag(mode), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', zIndex: 3, cursor, ...css}},
+      mode === 'se' ? h('div', {style: {position: 'absolute', right: 10, bottom: 10, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}}) : null)));
 }
 
-function FileBody({api, id, name, mime, zoom, onZoom}: {api: SofiaApi; id: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void}) {
-  const c = useTheme(), k = fileKind(mime, name), {url, error} = useSigned(api, id, OFFICE(k) ? 'pdf' : ''), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
+function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; onSaved: (a: SavedFile) => void}) {
+  const editable = isDocx(mime, name) && !!pageId; /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
+  const c = useTheme(), k = fileKind(mime, name), {url, error} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : ''), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
   const textual = !inlineCapable(k) && windowCapable(k, name);
   useEffect(() => {if (!textual || !url) return; let live = true; fetch(url).then(r => r.text()).then(t => {if (live) setText(t.slice(0, 400000));}).catch(() => {if (live) setText('');}); return () => {live = false;};}, [url, textual]);
   if (error) return <Center><Icon name="warning" size={22} color={c.muted} /><Text style={{color: c.text, fontSize: 13, textAlign: 'center', maxWidth: 320}}>{error}</Text><DownloadButton api={api} id={id} /></Center>;
   if (!windowCapable(k, name)) return <Center><Icon name={KIND[k].icon} size={30} color={KIND[k].color} /><Text style={{color: c.text, fontSize: 13}}>Este tipo de arquivo não tem visualização.</Text><DownloadButton api={api} id={id} /></Center>;
   if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
+  if (editable && pageId) return <DocEditor api={api} id={firstId} name={name} url={url} pageId={pageId} onSaved={onSaved} />;
   if (k === 'image') return h('div', {style: {width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: zoom ? 'flex-start' : 'center', justifyContent: zoom ? 'flex-start' : 'center'},
     onWheel: (e: any) => {if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); onZoom(Math.max(25, Math.min(400, (zoom || 100) + (e.deltaY < 0 ? 15 : -15))));}},
     h('img', {src: url, alt: name, draggable: false, style: zoom ? {width: zoom + '%', maxWidth: 'none'} : {maxWidth: '100%', maxHeight: '100%', objectFit: 'contain'}}));
@@ -181,11 +206,12 @@ function DownloadButton({api, id}: {api: SofiaApi; id: string}) {
 
 // ---------------- Bloco da pagina ----------------
 /** Arquivo dentro da pagina: linha (anexo) ou visualizacao com escala. Barra ao passar o mouse. */
-export function PageFileBlock({api, data, selected, onSelect, onChange, onRemove}: {api: SofiaApi; data: PageFileData; selected: boolean; onSelect: () => void; onChange: (d: PageFileData) => void; onRemove: () => void}) {
+export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, onRemove}: {api: SofiaApi; data: PageFileData; pageId?: string; selected: boolean; onSelect: () => void; onChange: (d: PageFileData) => void; onRemove: () => void}) {
+  const latest = useRef({data, onChange}); latest.current = {data, onChange};
   const c = useTheme(), [hover, setHover] = useState(false), k = fileKind(data.mime, data.name), meta = KIND[k], id = data.attachment_id || '';
   const view = data.view || defaultView(k), preview = view === 'preview' && inlineCapable(k) && !!id, scale = Math.max(15, Math.min(100, data.scale || (k === 'image' ? 70 : 100)));
   const wrap = useRef<any>(null), floating = useWins().some(w => w.id === id && !!id);
-  const file = {id, name: data.name || 'arquivo', mime: data.mime || ''};
+  const file = {id, name: data.name || 'arquivo', mime: data.mime || '', pageId, onSaved: (a: SavedFile) => latest.current.onChange({...latest.current.data, attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes})};
   const open = () => {if (id) openFileWindow(api, file);};
   if (data.uploading) return <View testID="page-file-uploading" style={{marginVertical: 6, height: 52, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12}}>
     <Spinner size={16} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name || 'Arquivo'}</Text><Text style={{color: c.muted, fontSize: 11}}>Enviando… {sizeLabel(data.size)}</Text></View>;

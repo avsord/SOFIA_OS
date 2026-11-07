@@ -30,11 +30,24 @@ test('link assinado para quadro/player: so com assinatura valida, com Range e pr
 });
 test('site: bloco de arquivo, soltar arquivos, "/arquivo" e janela flutuante',()=>{
  const pf=read('SOFIA_APP/src/components/PageFiles.tsx'),pg=read('SOFIA_APP/src/screens/Pages.tsx');
- for(const s of ['export function PageFileBlock','export function FileWindowHost','export function openFileWindow',"seg('Anexo', 'attach')","seg('Visualização', 'preview')","drag('move')","drag('size')"])assert.ok(pf.includes(s),s);
+ for(const s of ['export function PageFileBlock','export function FileWindowHost','export function openFileWindow',"seg('Anexo', 'attach')","seg('Visualização', 'preview')","drag('move')","onPointerDown: drag(mode)"])assert.ok(pf.includes(s),s);
  assert.ok(pg.includes("if(b.type==='file'&&Platform.OS==='web')return")&&pg.includes('async function dropFiles(')&&pg.includes('<FileWindowHost/>'));
  assert.ok(pg.includes("Arquivos ainda não entram em páginas trancadas"),'pagina trancada nao recebe arquivo sem criptografia');
  assert.ok(read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'file',label:'Arquivo'"));
  assert.ok(pf.includes('function popOut(')&&pf.includes("testID=\"page-file-floating\"")&&pf.includes("'Voltar para a página'"),'arrastar a alca solta o bloco como janela flutuante (iPad)');
  assert.ok(pf.includes('export function detachFile(')&&pf.includes("'Abrir em janela separada (fora da Sofia)'")&&pf.includes("window.open('', 'sofia-arquivo-'"),'janela separada do navegador (outro monitor)');
+ assert.ok(pf.includes('mountInWindow(win, <DocEditor')&&read('SOFIA_APP/src/lib/popup-root.web.ts').includes('createRoot'),'Word tambem editavel na janela separada, salvando na Sofia');
  assert.ok(read('SOFIA_APP/src/components/PageRichInput.web.tsx').includes('props.onDropFiles(all)'));
+});
+test('editor de Word da Sofia: abre .docx com paginas, grifa e salva de volta em .docx; "/documento" cria um novo',async t=>{
+ const ed=read('SOFIA_APP/src/components/DocEditor.tsx'),pf=read('SOFIA_APP/src/components/PageFiles.tsx'),pg=read('SOFIA_APP/src/screens/Pages.tsx');
+ for(const s of ["import('docx-preview')","exec('hiliteColor', col)","exec('bold')","api.saveDocx(pageId"])assert.ok(ed.includes(s),s);
+ assert.ok(pf.includes('if (editable && pageId) return <DocEditor')&&pf.includes("['nw', {left: -6, top: -6"),'docx no editor; janela muda de tamanho pelos 4 cantos');
+ assert.ok(pg.includes("if(type==='docx')")&&read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'docx',label:'Documento do Word'"));
+ // o servidor transforma o HTML do editor em .docx de verdade (com o grifo)
+ const H=require('@turbodocx/html-to-docx'),JSZip=require('jszip');
+ const buf=await (H.default||H)('<p>Texto <span style="background-color:rgb(255, 241, 118)">grifado</span> <b>forte</b></p>',null,{});
+ const xml=await (await JSZip.loadAsync(buf)).file('word/document.xml').async('string');
+ assert.ok(/w:fill="fff176"/i.test(xml)&&xml.includes('<w:b/>')&&xml.includes('grifado'));
+ assert.ok(read('src/channels/mobile.js').includes("/^\\/api\\/mobile\\/workspace\\/entities\\/([A-Za-z0-9_-]{6,80})\\/docx$/"));
 });
