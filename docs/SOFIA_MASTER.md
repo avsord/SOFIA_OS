@@ -350,11 +350,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Revisão do site, lotes 2–5: Biblioteca/Notas sem abas recusadas, Notificações, Páginas alinhada, Agenda Ano no celular, tarefa atrasada vermelha, Apps alinhado, Finanças/Rotina/Encomendas/filtros | portão verde em cada lote; [manual-apk] |
 | 2026-11-07 | (delivery) | Esqueleto em Finanças (computador), Lembretes, Tarefas (celular) e Conversa; Perfil no celular sem rótulo em pé; foto do perfil aparece no 1º quadro (cópia de 96 px guardada; sem iniciais trocando); Início com fade rápido do véu de novo | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Agenda com pílulas em shimmer nos dias enquanto carrega (estava com o mês vazio); Conversa com os balões numa coluna de 760 px | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Conversa/Agenda/Páginas/Apps/Perfil: esqueleto enquanto o arquivo da tela baixa (era só o fundo) e esqueleto sem a pausa de 300 ms; conferido com o arquivo atrasado 2,5 s num navegador limpo | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Esqueleto de cada aba na estrutura real (Pedro: "esqueleto igual dos dois"): Agenda = a propria grade do mes carregando; Conversa = topo, baloes e caixa; Paginas = Recentes + lista (tambem enquanto a lista chega); Apps com 4 colunas no computador; Perfil com cartao, secoes e Conta | portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Página trancada (Pedro: ficou aberta com 'Não salvo'): cópia velha do editor (outra aba ou rascunho guardado) não vence mais a versão trancada; rascunho de página trancada não fica no navegador (a senha escrita ficava em texto aberto) | reproduzido com 2 abas e corrigido; portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

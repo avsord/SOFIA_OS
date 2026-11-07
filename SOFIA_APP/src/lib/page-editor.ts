@@ -64,8 +64,8 @@ export class PageEditorStore {
   * digitacao pendente (se o rascunho igual a base nova, fica salvo). */
  rebase(base:Entity){if(this.deps.view)base=this.deps.view(base);const e=this.entries.get(base.id);if(!e){this.open(base);this.changed();return;}
   if((base.tags||[]).includes('sofia-lock-v1'))e.secretAsk=false;
-  const d=pageDraft(base);if(e.state==='saved'){e.base=base;e.baseDraft=d;e.draft=clone(d);e.past=[];e.future=[];this.changed();return;}
-  e.base=base;e.baseDraft=d;if(same(d,e.draft)){e.acked=e.version;e.state='saved';e.error='';}else{e.state='pending';this.schedule(base.id);}this.changed();}
+  const d=pageDraft(base);if(e.state==='saved'){e.base=base;e.baseDraft=d;e.draft=clone(d);e.past=[];e.future=[];this.changed();void this.persist();return;}
+  e.base=base;e.baseDraft=d;if(same(d,e.draft)){e.acked=e.version;e.state='saved';e.error='';}else{e.state='pending';this.schedule(base.id);}this.changed();void this.persist(); /* 07/11/2026: trancou - o rascunho aberto sai do disco na hora */}
  /** "Nao, salvar sem senha": marca a pagina e salva de novo. */
  // a resposta vale para a pagina em qualquer copia do editor (a tela pode ter mais de uma; a que salva pode nao ser a que perguntou)
  allowSecret(id:string){ALLOW_SECRET.add(id);for(const st of STORES)st.wakeSecret(id);}

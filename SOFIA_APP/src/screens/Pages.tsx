@@ -93,7 +93,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     if(patch.data){const plain=String((patch.data as any).blocks_json??plainOf(id,h)??'[]');patch={...patch,data:{...patch.data,blocks_json:'[]',lock_json:await seal(id,h.kid,plain)}};}
     const tags=[...((patch.tags as string[]|undefined)||cur?.tags||[])];if(!tags.includes(LOCK_TAG))patch={...patch,tags:[...tags.filter(t=>t!==SECRET_OK_TAG),LOCK_TAG]};}
    return apiRef.current.saveEntity(patch);},read:id=>apiRef.current.entity(id),
-  persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
+  // 07/11/2026 (Pedro: trancou e a pagina ficou aberta com 'Nao salvo'): rascunho de pagina trancada nao vai para o disco
+  // (era o texto aberto, com a senha que ele escreveu, guardado sem criptografia no navegador).
+  persist:all=>{const items=all.filter(it=>!isLocked(it.base)&&!isLocked(pagesRef.current.find(x=>x.id===it.base.id)));return items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts');},
   onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
  }),[key]); // 06/11/2026: um editor por tela (antes, cada redesenho com outro `api` criava outro: 387 copias, e a resposta "nao, salvar sem senha" ia para a copia errada)
  const storeSession=useMemo(()=>pageStoreSession(store),[store]);
@@ -123,7 +125,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    for(let offset=0;offset<10000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;if(offset===9900)throw Error('Há mais páginas do que esta sincronização consegue carregar. Nenhuma página foi removida.');}
    if(mounted.current&&!moveBusy.current&&epoch===mutationEpoch.current){
     items.forEach(page=>store.open(page));
-    setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);return !!e&&e.state!=='saved';}));setLoaded(true);setError('');
+    setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);if(!e||e.state==='saved')return false;const r=items.find(x=>x.id===id);return !(r&&isLocked(r)&&!isLocked(e.base)); /* 07/11/2026: trancada em outra aba/aparelho vence a copia aberta daqui */}));setLoaded(true);setError('');
    }
   }catch(e){if(mounted.current)setError(errorText(e));}
   finally{refreshFlight.current=false;if(manual&&mounted.current)setRefreshing(false);}
@@ -161,6 +163,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  useEffect(()=>onLockChange(()=>setLockTick(t=>t+1)),[]);
  const selRaw=selectedId?pages.find(x=>x.id===selectedId):undefined,selKid=selRaw&&isLocked(selRaw)?(lockHeader(selRaw)?.kid||''):'';
  useEffect(()=>{if(!selKid)return;entered(selKid);return()=>left(selKid);},[selKid]);
+ // 07/11/2026 (Pedro: "tranquei a pagina mas ficou assim" - texto aberto, 'Nao salvo', 'abra com a senha para salvar'): a copia
+ // do editor era a de ANTES de trancar (rascunho guardado no navegador ou outra aba). Se o servidor diz que a pagina esta
+ // trancada e a copia nao: com a chave aberta, junta na versao trancada; fechada, descarta a copia velha (a tela pede a senha).
+ useEffect(()=>{for(const p of pages){if(!isLocked(p))continue;const e=store.get(p.id);if(!e||isLocked(e.base))continue;const h=lockHeader(p);if(h&&isOpen(h.kid))store.rebase(p);else{store.forget(p.id);store.open(p);}}},[pages,store]);
  useEffect(()=>{if(selRaw&&needsOpen(selRaw)){const h=lockHeader(selRaw)!;void openBlocks(selRaw.id,h).then(()=>store.rebase(selRaw)).catch(e=>setError(errorText(e)));}},[selRaw?.id,selRaw?.revision,lockTick]); // eslint-disable-line react-hooks/exhaustive-deps
  // 0.3.250 (computador): a barra lateral mostra a arvore destas paginas e abre uma pagina daqui; o caminho
  // da pagina aberta vai para a barra de cima. No celular nada disso roda.
