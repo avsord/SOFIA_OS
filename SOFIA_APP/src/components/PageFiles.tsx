@@ -34,7 +34,7 @@ export const isDocx = (mime?: string, name?: string) => String(mime || '') === D
 /** 07/11/2026: Word, Excel e PowerPoint abrem nos editores da Sofia. */
 export const editKind = (mime?: string, name?: string): 'docx' | 'xlsx' | 'pptx' | null => isDocx(mime, name) ? 'docx' : String(mime || '') === XLSX_MIME || /\.xlsx$/i.test(String(name || '')) ? 'xlsx' : String(mime || '') === PPTX_MIME || /\.pptx$/i.test(String(name || '')) ? 'pptx' : null;
 export {XLSX_MIME, PPTX_MIME};
-function officeEditor(kind: 'docx' | 'xlsx' | 'pptx', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void}) {return kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
+function officeEditor(kind: 'docx' | 'xlsx' | 'pptx', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {return kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
 type SavedFile = {id: string; name: string; mime: string; bytes: number};
 /** Pode aparecer dentro da pagina (modo visualizacao). */
 export const inlineCapable = (k: Kind) => k === 'image' || k === 'video' || k === 'audio' || k === 'pdf' || OFFICE(k);
@@ -195,14 +195,14 @@ function FileWindow({win}: {win: Win}) {
     ),
     <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
       {vers ? <Versions win={win} onClose={() => setVers(false)} /> : null}
-      <FileBody key={win.rev || 0} api={win.api} id={win.id} firstId={win.editId || firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} />
+      <FileBody key={win.rev || 0} api={win.api} id={win.id} firstId={win.editId || firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} onShowVersions={() => setVers(true)} />
       {moving || win.drag ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
     </View>),
     win.max ? null : HANDLES.map(([mode, css, cursor]) => h('div', {key: mode, onPointerDown: drag(mode), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', zIndex: 3, cursor, ...css}},
       mode === 'se' ? h('div', {style: {position: 'absolute', right: 10, bottom: 10, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}}) : null)));
 }
 
-function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; onSaved: (a: SavedFile) => void}) {
+function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
   const ek = editKind(mime, name), editable = !!ek && !!pageId; /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
   const c = useTheme(), k = fileKind(mime, name), {url, error} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : ''), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
@@ -211,7 +211,7 @@ function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved}:
   if (error) return <Center><Icon name="warning" size={22} color={c.muted} /><Text style={{color: c.text, fontSize: 13, textAlign: 'center', maxWidth: 320}}>{error}</Text><DownloadButton api={api} id={id} /></Center>;
   if (!windowCapable(k, name)) return <Center><Icon name={KIND[k].icon} size={30} color={KIND[k].color} /><Text style={{color: c.text, fontSize: 13}}>Este tipo de arquivo não tem visualização.</Text><DownloadButton api={api} id={id} /></Center>;
   if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
-  if (editable && pageId && ek) return officeEditor(ek, {api, id: firstId, name, url, pageId, onSaved});
+  if (editable && pageId && ek) return officeEditor(ek, {api, id: firstId, name, url, pageId, onSaved, onShowVersions});
   if (k === 'image') return h('div', {style: {width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: zoom ? 'flex-start' : 'center', justifyContent: zoom ? 'flex-start' : 'center'},
     onWheel: (e: any) => {if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); onZoom(Math.max(25, Math.min(400, (zoom || 100) + (e.deltaY < 0 ? 15 : -15))));}},
     h('img', {src: url, alt: name, draggable: false, style: zoom ? {width: zoom + '%', maxWidth: 'none'} : {maxWidth: '100%', maxHeight: '100%', objectFit: 'contain'}}));
@@ -231,7 +231,7 @@ function Versions({win, onClose}: {win: Win; onClose: () => void}) {
   return <View testID="file-versions" style={{position: 'absolute', top: 6, right: 8, zIndex: 20, width: 340, maxHeight: 380, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, boxShadow: '0 12px 30px rgba(0,0,0,.25)', overflow: 'hidden'} as any}>
     <View style={{flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderColor: c.line}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 13}}>Versões anteriores</Text><Pressable accessibilityLabel="Fechar versões" onPress={onClose}><Icon name="close" size={14} color={c.muted} /></Pressable></View>
     {err ? <Text style={{color: c.danger, fontSize: 12, padding: 10}}>{err}</Text> : !list ? <View style={{padding: 16}}><Spinner size={16} /></View> :
-      h('div', {style: {overflowY: 'auto', maxHeight: 320}}, list.map(x => <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={'Usar a versão de ' + new Date(x.created_at).toLocaleString('pt-BR')} onPress={() => {if (x.id !== win.id) use(x);}} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: x.id === win.id ? c.accentSoft : hovered ? c.input : 'transparent'})}>
+      h('div', {style: {overflowY: 'auto', maxHeight: 320, display: 'flex', flexDirection: 'column'}}, list.map(x => <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={'Usar a versão de ' + new Date(x.created_at).toLocaleString('pt-BR')} onPress={() => {if (x.id !== win.id) use(x);}} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: x.id === win.id ? c.accentSoft : hovered ? c.input : 'transparent'})}>
         <View style={{flex: 1}}><Text style={{color: c.text, fontSize: 13}}>{new Date(x.created_at).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</Text><Text style={{color: c.muted, fontSize: 11}}>{sizeLabel(x.bytes)}{x.name !== win.name ? ' · ' + x.name : ''}</Text></View>
         <Text style={{color: x.id === win.id ? c.accent : c.muted, fontSize: 12, fontWeight: '600'}}>{x.id === win.id ? 'Aberta agora' : 'Usar esta'}</Text></Pressable>))}
   </View>;

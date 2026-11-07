@@ -356,11 +356,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Editores (Pedro): janela separada não recebe mais o escuro forçado do Brave (invertia Claro/Escuro); fonte do documento que falta no computador (ex.: Montserrat ExtraBold) vem do Google Fonts pelo site; sem a fonte, cai em sem serifa | fonte testada no navegador; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Janela do arquivo lembra tamanho e lugar da última vez (Pedro): flutuante e separada (inclusive o monitor), editor e visualização com memória própria | testado (fechar, recarregar, reabrir igual); portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Arquivos das Páginas e Word salvo pelo editor vão direto para o Drive (área oculta) na hora; sem Drive, recusa com aviso (antes ficavam até 15 min no servidor, ou para sempre sem Drive). Site volta após o plano Hobby | testes verdes; [manual-apk] |
 | 2026-11-07 | (delivery) | Tudo do usuário direto no Drive (fotos da Conversa sem as 24 h; áudio em 2 min); Word: botão Versões e trava que não troca o arquivo se o salvo perder conteúdo; página compartilhada mostra vídeo/áudio/imagem/PDF/Office; capa com a mesma proporção em qualquer monitor; zoom próprio nos 3 editores | testes e navegador; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Ícone 🔗 da página copia o link do COMPARTILHADO (/p/…; de subpágina aponta para ela); sem compartilhar, avisa e abre o Compartilhar. Word nunca salva antes de terminar de abrir nem documento vazio (o Reel_GWM do Pedro ficou em branco: voltar pela Versões) | testado no navegador; portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Word vazio com versões anteriores: aviso no meio da página com o botão 'Ver versões anteriores' (o Reel_GWM do Pedro está numa versão vazia de 20 KB = .docx em branco salvo antes da trava) | testado; portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

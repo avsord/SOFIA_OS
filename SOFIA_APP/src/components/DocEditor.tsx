@@ -38,7 +38,8 @@ function inlineForDocx(src: HTMLElement): string {
   return clone.innerHTML;
 }
 
-export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void}) {
+export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void; onShowVersions?: () => void}) {
+  const [empty, setEmpty] = useState(false);
   const [zoom, setZoom] = useEditorZoom('docx'), scroller = useRef<HTMLDivElement | null>(null);
   const [c, toggleTheme] = useEditorColors(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [status, setStatus] = useState(''), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false);
@@ -55,7 +56,8 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
       // 07/11/2026 (Pedro: "o mouse ta sumindo na parte cinza"): no Windows o cursor de texto inverte a cor do fundo e some no
       // cinza medio. Fora das paginas: fundo do editor e seta normal; cursor de texto so em cima da folha.
       wrap.style.background = 'transparent'; wrap.style.cursor = 'default'; wrap.querySelectorAll('section.docx').forEach(sec => {(sec as HTMLElement).style.cursor = 'text';});
-      addSansFallback(styles.current, host.current); initial.current = pageHtml(); setState('ready'); setTimeout(() => ensureDocFonts(host.current), 50);
+      addSansFallback(styles.current, host.current); initial.current = pageHtml(); setState('ready');
+      if (!((host.current?.innerText || '').replace(/\s+/g, '').length)) void api.entityAttachments(pageId).then(items => {if (live && items.filter(x => /\.docx$/i.test(x.name)).length > 1) setEmpty(true);}).catch(() => {}); // so avisa se ha versao anterior setTimeout(() => ensureDocFonts(host.current), 50);
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
   }, [url]);
@@ -122,6 +124,10 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
     bar,
     h('div', {ref: scroller, style: {flex: 1, minHeight: 0, overflow: 'auto', background: c.bg, position: 'relative'}, onKeyUp: keep, onMouseUp: keep, onInput: changed},
       h('div', {ref: styles}),
+      // 07/11/2026 (Pedro: "ainda ta vazio"): documento vazio ao abrir -> mostra o caminho para a versao anterior
+      empty && onShowVersions ? h('div', {style: {position: 'sticky', top: 12, zIndex: 5, margin: '12px auto 0', width: 'min(460px, 90%)', padding: '14px 16px', borderRadius: 12, background: c.bar, border: '1px solid ' + c.line, boxShadow: '0 8px 24px rgba(0,0,0,.25)', color: c.text, fontSize: 13, display: 'flex', alignItems: 'center', gap: 12}},
+        h('span', {style: {flex: 1}}, 'Este documento está vazio. Se ele tinha conteúdo, volte para uma versão anterior.'),
+        h('button', {type: 'button', onClick: onShowVersions, style: {height: 30, padding: '0 12px', border: 0, borderRadius: 8, background: c.accent, color: c.onAccent, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'}}, 'Ver versões anteriores')) : null,
       state === 'loading' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#666', fontSize: 13}}, 'Abrindo o documento…') : null,
       state === 'error' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#a33', fontSize: 13}}, err) : null,
       h('div', {ref: host, style: {color: '#000', filter: c.pageFilter, zoom, fontFamily: 'Calibri, Carlito, Arial, sans-serif' /* letra padrao do Word (sem herdar a do site) */}})));
