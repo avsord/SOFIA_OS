@@ -171,6 +171,12 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'diag-fluidez', 6); const b = await bodyJson(req, 60000);
       console.log('[fluidez] ' + JSON.stringify(b).slice(0, 60000)); return send({ ok: true });
     }
+    // 07/11/2026 (Pedro: "como faz pra voce resolver sem eu falar item por item"): o Drive do site/app manda o que falhou ou
+    // demorou (acao, tipo de arquivo, codigo do erro, tempo). Sem nome nem conteudo de arquivo. So vai para o registro.
+    if (p === '/api/mobile/diag/drive' && m === 'POST') {
+      rate(session, 'diag-drive', 30); const b = await bodyJson(req, 30000);
+      console.log('[drive] ' + JSON.stringify(b).slice(0, 30000)); return send({ ok: true });
+    }
     if (p === '/api/mobile/auth/change-password' && m === 'POST') {
       rate(session, 'password', 5); const b = await bodyJson(req, 4096);
       const current = String(b.currentPassword || ''), next = String(b.newPassword || ''), confirmation = String(b.confirmPassword || '');

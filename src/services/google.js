@@ -1258,7 +1258,7 @@ class GoogleService {
     const files = []; let page = '';
     for (let i = 0; i < 10; i++) {
       const r = await this.call('GET', DRIVE + '/files?q=' + encodeURIComponent("'" + id + "' in parents and trashed=false" + (q ? " and name contains '" + String(q).replace(/['\\]/g, ' ').slice(0, 80) + "'" : '')) + '&orderBy=folder,name_natural&pageSize=200&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,appProperties,spaces)' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
-      files.push(...(r.files || []).filter(f => !this.sdProtected(f))); page = r.nextPageToken || ''; if (!page) break;
+      files.push(...(r.files || []).filter(f => !this.sdProtected(f) && !(f.appProperties && f.appProperties.sofia_selftest))); page = r.nextPageToken || ''; if (!page) break;
     }
     return {folder: {id: id === at.root ? 'root' : id, name: at.meta.name}, path: at.path, items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
   }
@@ -1276,7 +1276,7 @@ class GoogleService {
       return memo.get(id);
     };
     const files = [];
-    for (const f of r.files || []) if (!this.sdProtected(f) && await okFolder((f.parents || [])[0])) files.push(f);
+    for (const f of r.files || []) if (!this.sdProtected(f) && !(f.appProperties && f.appProperties.sofia_selftest) && await okFolder((f.parents || [])[0])) files.push(f);
     return {items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
   }
   async sdParent(parent) { const at = await this.sdPath(parent); if (at.meta.mimeType !== 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Destino não é uma pasta.', 400); return at.meta.id; }

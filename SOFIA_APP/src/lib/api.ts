@@ -343,6 +343,7 @@ export class SofiaApi {
   }
   /** 07/11/2026: a aparencia escolhida (escuro/claro/horario) vale tambem para as paginas compartilhadas. Envio direto, sem invalidar caches. */
   saveAppearance(p: {appearance: string; lightAt?: string; darkAt?: string}) { return this.fetchRequest<{ok: boolean}>('/appearance', {appearance: p.appearance, lightAt: p.lightAt, darkAt: p.darkAt}, 'PATCH', 10000); }
+  diagDrive(body: unknown) { return this.fetchRequest<{ok: boolean}>('/diag/drive', body, 'POST', 10000); }
   diagFluidez(body: unknown) { return this.fetchRequest<{ok: boolean}>('/diag/fluidez', body, 'POST', 10000); }
   tasks() { return this.request<{items: Task[]}>('/tasks'); }
   /** 0.3.255: qualquer estado valido (ex.: "scheduled" = tarefa que esta na agenda) */

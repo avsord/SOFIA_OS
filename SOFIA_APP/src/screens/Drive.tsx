@@ -15,6 +15,7 @@ import {Icon, type IconName} from '../components/Icon';
 import {Dialog, GhostButton, PrimaryButton, openMore} from '../components/AppKit';
 import {contextMenu, type MenuItem} from '../components/ContextMenu';
 import {DriveVideoPlayer} from '../components/DriveVideoPlayer';
+import {driveDiagInit, note, trackedDriveApi} from '../lib/drive-diag';
 import * as WebBrowser from 'expo-web-browser';
 
 const WEB = Platform.OS === 'web';
@@ -45,15 +46,28 @@ const size = (b: number | null) => b == null ? '—' : b < 1024 ? b + ' B' : b <
 const when = (iso: string) => { const d = new Date(iso); if (!iso || Number.isNaN(d.getTime())) return ''; const today = new Date().toDateString() === d.toDateString(); return today ? d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : d.toLocaleDateString('pt-BR', {day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'}); };
 const viewable = (k: Kind) => k !== 'folder' && k !== 'zip' && k !== 'other';
 
+/** Copias das imagens ja baixadas (por item e data de modificacao), para a miniatura e o visualizador nao baixarem de
+ * novo a cada clique ou volta a pasta. Guarda ate 120; a mais antiga e liberada. */
+const blobCache = new Map<string, Promise<string>>();
+export function cachedImageUrl(api: SofiaApi, item: SdItem): Promise<string> {
+  const key = item.id + '|' + (item.modified || '');
+  const hit = blobCache.get(key); if (hit) { blobCache.delete(key); blobCache.set(key, hit); return hit; }
+  const p = api.sdBlob(item.id).then(b => URL.createObjectURL(b)); blobCache.set(key, p);
+  p.catch(() => blobCache.delete(key));
+  while (blobCache.size > 120) { const [k, old] = blobCache.entries().next().value as [string, Promise<string>]; blobCache.delete(k); void old.then(u => setTimeout(() => URL.revokeObjectURL(u), 30000)).catch(() => {}); }
+  return p;
+}
+
 /** Miniatura de imagem com o login da Sofia (no site, o navegador nao manda o cabecalho de acesso numa <img>). */
 function Thumb({api, item, h}: {api: SofiaApi; item: SdItem; h: number}) {
   const c = useTheme(), [url, setUrl] = useState('');
-  useEffect(() => { if (!WEB) return; let alive = true, made = ''; void api.sdBlob(item.id).then(b => { if (!alive) return; made = URL.createObjectURL(b); setUrl(made); }).catch(() => {}); return () => { alive = false; if (made) URL.revokeObjectURL(made); }; }, [api, item.id]);
+  useEffect(() => { if (!WEB) return; let alive = true; void cachedImageUrl(api, item).then(u => { if (alive) setUrl(u); }).catch(() => {}); return () => { alive = false; }; }, [api, item.id, item.modified]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!WEB) return <Image source={{uri: api.sdFileUrl(item.id), headers: api.sdAuthHeaders()}} style={{width: '100%', height: h, backgroundColor: c.input}} resizeMode="cover" />;
   return url ? <Image source={{uri: url}} style={{width: '100%', height: h, backgroundColor: c.input}} resizeMode="cover" /> : <View style={{height: h, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Icon name="fileImage" size={34} color={KIND.image.color} /></View>;
 }
 
-export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+  const api = useMemo(() => { driveDiagInit(rawApi); return trackedDriveApi(rawApi); }, [rawApi]);
   const c = useTheme(), {width} = useWindowDimensions(), wide = width >= 900;
   const [folder, setFolder] = useState('root'), [data, setData] = useState<SdListing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState(''), [code, setCode] = useState('');
   const [view, setView] = useState<'grid' | 'list'>(() => { try { return (WEB && globalThis.localStorage?.getItem(VIEW_KEY) === 'list') ? 'list' : 'grid'; } catch { return 'grid'; } });
@@ -150,21 +164,23 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
     if (!WEB || !active) return;
     const onKey = (e: KeyboardEvent) => {
       const st = keyState.current, t = e.target as HTMLElement | null;
-      if (st.busy || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || !t || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable || !dropRef.current?.isConnected) return;
+      if (st.busy || e.altKey || e.ctrlKey || e.metaKey || !t || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable || !dropRef.current?.isConnected) return;
       if (document.querySelector('[role=dialog],[role=alertdialog],[role=menu],[aria-modal=true]')) return;
       const list = st.ordered; if (!list.length) return; const i = list.findIndex(x => x.id === st.selected), cur = i >= 0 ? list[i] : null;
       const step = {ArrowRight: 1, ArrowLeft: -1, ArrowDown: st.view === 'grid' ? st.cols : 1, ArrowUp: st.view === 'grid' ? -st.cols : -1}[e.key];
-      if (step) { e.preventDefault(); const n = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + step)); setSelected(list[n].id);
+      // fase de captura: o botao do item em foco (react-native-web) trataria Enter/espaco antes e cancelaria o evento
+      const handled = () => { e.preventDefault(); e.stopPropagation(); };
+      if (step) { handled(); const n = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + step)); setSelected(list[n].id);
         requestAnimationFrame(() => document.querySelector('[data-testid="drive-item-' + list[n].id + '"]')?.scrollIntoView({block: 'nearest'})); return; }
       if (!cur) return;
-      if (e.key === 'Enter') { e.preventDefault(); openItem(cur); } else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); trash(cur); }
-      else if (e.key === 'F2') { e.preventDefault(); setNaming({mode: 'rename', item: cur, value: cur.name}); } else if (e.key === 'Escape') setSelected('');
+      if (e.key === 'Enter') { handled(); openItem(cur); } else if (e.key === 'Delete' || e.key === 'Backspace') { handled(); trash(cur); }
+      else if (e.key === 'F2') { handled(); setNaming({mode: 'rename', item: cur, value: cur.name}); } else if (e.key === 'Escape') setSelected('');
     };
-    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true); return () => window.removeEventListener('keydown', onKey, true);
   });
 
-  const Card = ({it}: {it: SdItem}) => { const k = KIND[driveKind(it)], sel = selected === it.id, target = dragTarget === it.id;
-    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))}
+  const card = (it: SdItem) => { const k = KIND[driveKind(it)], sel = selected === it.id, target = dragTarget === it.id;
+    return <Pressable key={it.id} testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))}
       {...({onDoubleClick: () => openItem(it), ...contextMenu(() => { setSelected(it.id); return menu(it); }), ...dragProps(it)} as any)}
       style={({hovered}: any) => ({width: `${100 / cols}%`, padding: 6})}>
       {({hovered}: any) => <View style={{borderRadius: 12, borderWidth: 1, borderColor: target ? c.accent : sel ? c.accent : c.line, backgroundColor: target ? c.accentSoft : sel ? c.accentSoft : hovered ? c.input : c.surface, overflow: 'hidden'}}>
@@ -173,8 +189,8 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
             <View style={{marginHorizontal: 8, marginBottom: 8, borderRadius: 8, overflow: 'hidden', height: 120}}>{driveKind(it) === 'image' ? <Thumb api={api} item={it} h={120} /> : <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Icon name={k.icon} size={44} color={k.color} /></View>}</View></>}
       </View>}
     </Pressable>; };
-  const Row = ({it}: {it: SdItem}) => { const k = KIND[driveKind(it)], target = dragTarget === it.id, sel = selected === it.id;
-    return <Pressable testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))} {...({onDoubleClick: () => openItem(it), ...contextMenu(() => { setSelected(it.id); return menu(it); }), ...dragProps(it)} as any)}
+  const row = (it: SdItem) => { const k = KIND[driveKind(it)], target = dragTarget === it.id, sel = selected === it.id;
+    return <Pressable key={it.id} testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} onPress={() => { if (WEB) setSelected(it.id); else openItem(it); }} onLongPress={(e: any) => openMore(e, it.name, menu(it))} {...({onDoubleClick: () => openItem(it), ...contextMenu(() => { setSelected(it.id); return menu(it); }), ...dragProps(it)} as any)}
       style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: c.line, backgroundColor: target || sel ? c.accentSoft : hovered ? c.input : 'transparent'})}>
       <Icon name={k.icon} size={20} color={k.color} active /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 14}}>{it.name}</Text>
       {wide ? <><Text style={{width: 120, color: c.muted, fontSize: 13}}>{when(it.modified)}</Text><Text style={{width: 90, color: c.muted, fontSize: 13, textAlign: 'right'}}>{it.folder ? '—' : size(it.size)}</Text></> : null}
@@ -228,9 +244,9 @@ export function Drive({api, active, onBack}: {api: SofiaApi; active: boolean; on
         : !data ? <View style={{padding: 40, alignItems: 'center'}}><ActivityIndicator color={c.accent} /></View>
         : !items.length ? <Pressable onPress={query ? undefined : pickFiles} style={{margin: 16, padding: 40, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: c.line, alignItems: 'center', gap: 10}}><Icon name="upload" size={34} color={c.muted} /><Text style={{color: c.text, fontSize: 16, fontWeight: '500'}}>{query ? (searching ? 'Pesquisando…' : 'Nada com esse nome no seu Drive') : 'Esta pasta está vazia'}</Text><Text style={{color: c.muted, fontSize: 13}}>{WEB ? 'Arraste arquivos para cá ou clique para enviar' : 'Toque para enviar arquivos'}</Text></Pressable>
         : view === 'grid' ? <>
-          {folders.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 6, marginBottom: 2}}>Pastas</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{folders.map(it => <Card key={it.id} it={it} />)}</View></> : null}
-          {files.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 14, marginBottom: 2}}>Arquivos</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{files.map(it => <Card key={it.id} it={it} />)}</View></> : null}
-        </> : <View style={{borderTopWidth: 1, borderTopColor: c.line}}>{wide ? <View style={{flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 12}}>{head('Nome', 'name', {flex: 1, marginLeft: 32})}{head('Modificado', 'modified', {width: 120})}{head('Tamanho', 'size', {width: 90, justifyContent: 'flex-end'})}<View style={{width: 18}} /></View> : null}{items.map(it => <Row key={it.id} it={it} />)}</View>}
+          {folders.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 6, marginBottom: 2}}>Pastas</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{folders.map(card)}</View></> : null}
+          {files.length ? <><Text style={{color: c.muted, fontSize: 13, fontWeight: '600', marginHorizontal: 6, marginTop: 14, marginBottom: 2}}>Arquivos</Text><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>{files.map(card)}</View></> : null}
+        </> : <View style={{borderTopWidth: 1, borderTopColor: c.line}}>{wide ? <View style={{flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 12}}>{head('Nome', 'name', {flex: 1, marginLeft: 32})}{head('Modificado', 'modified', {width: 120})}{head('Tamanho', 'size', {width: 90, justifyContent: 'flex-end'})}<View style={{width: 18}} /></View> : null}{items.map(row)}</View>}
       {loading && data ? <View style={{position: 'absolute', top: 8, right: 16}}><ActivityIndicator size="small" color={c.accent} /></View> : null}
     </ScrollView>
     {/* arrastar arquivos do computador */}
@@ -273,6 +289,7 @@ function Preview({api, item, list, onGo, onClose, onDownload}: {api: SofiaApi; i
     let alive = true, made = ''; setUrl(''); setText(''); setErr('');
     const office = k === 'doc' || k === 'sheet' || k === 'slides';
     if (k === 'video' || k === 'audio') { void api.sdStreamUrl(item.id).then(u => { if (alive) setUrl(u); }).catch(e => { if (alive) setErr(errorText(e)); }); return () => { alive = false; }; }
+    if (k === 'image') { void cachedImageUrl(api, item).then(u => { if (alive) setUrl(u); }).catch(e => { if (alive) setErr(errorText(e)); }); return () => { alive = false; }; }
     void api.sdBlob(item.id, office ? 'preview' : 'content').then(async b => { if (!alive) return; if (k === 'text') setText((await b.text()).slice(0, 200000)); else { made = URL.createObjectURL(b); setUrl(made); } }).catch(e => { if (alive) setErr(errorText(e)); });
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
   }, [api, item.id, k]);
@@ -303,8 +320,8 @@ function Preview({api, item, list, onGo, onClose, onDownload}: {api: SofiaApi; i
     : k === 'text' ? (text ? <ScrollView keyboardShouldPersistTaps="handled" style={{width: '100%', maxWidth: 1000, maxHeight: '100%', backgroundColor: c.surface, borderRadius: 10, flexGrow: 0}} contentContainerStyle={{padding: 20}}><Text selectable style={{color: c.text, fontFamily: 'monospace', fontSize: 13}}>{text}</Text></ScrollView> : <ActivityIndicator color="#fff" />)
     : !url ? <View style={{alignItems: 'center', gap: 12}}><ActivityIndicator color="#fff" /><Text style={{color: 'rgba(255,255,255,0.7)'}}>{k === 'doc' || k === 'sheet' || k === 'slides' ? 'Preparando a visualização…' : 'Abrindo…'}</Text></View>
     : k === 'image' ? <ZoomImage key={item.id} src={url} alt={item.name} zoom={zoom} setZoom={setZoom} />
-    : k === 'audio' ? <DriveVideoPlayer key={item.id} src={url} title={item.name} audio />
-    : k === 'video' ? h('div', {style: {width: 'min(1400px, 100%)', aspectRatio: '16 / 9', maxHeight: '100%', display: 'flex'}}, <DriveVideoPlayer key={item.id} src={url} title={item.name} />)
+    : k === 'audio' ? <DriveVideoPlayer key={item.id} src={url} title={item.name} audio onFail={m => note('tocar', false, {kind: k, file: item, msg: m})} />
+    : k === 'video' ? h('div', {style: {width: 'min(1400px, 100%)', aspectRatio: '16 / 9', maxHeight: '100%', display: 'flex'}}, <DriveVideoPlayer key={item.id} src={url} title={item.name} onFail={m => note('tocar', false, {kind: k, file: item, msg: m})} />)
     : h('iframe', {src: url, title: item.name, style: {width: 'min(1100px, 100%)', height: '100%', border: 0, borderRadius: 6, background: '#fff', display: 'block'}});
   return <View testID="drive-preview" accessibilityViewIsModal style={{position: 'fixed' as any, left: 0, right: 0, top: 0, bottom: 0, zIndex: 50, backgroundColor: 'rgba(10,8,14,0.92)'}}>
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12}}>

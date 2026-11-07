@@ -40,6 +40,8 @@ async function startServer(options={}) {
     {const sweep=async()=>{try{const ws=runtime.core.workspace;ws.cleanupOrphanCovers();await ws.shrinkExistingCovers({isBusy:()=>!!(runtime.google&&runtime.google.offloading)});}catch{/* best-effort */}};setTimeout(sweep,120000).unref();setInterval(sweep,12*3600*1000).unref();}
     timer=setInterval(()=>{if(!runtime.core.busy){runtime.backups.daily();runtime.backups.prune();}},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
+    // 07/11/2026: teste do Drive no Google de verdade, uma vez por versao publicada (resultado no registro: [drive-teste])
+    try{require('./services/drive-selftest').scheduleDriveSelfTest(runtime,{dataDir:config.dataDir,port});}catch(e){console.log('[drive-teste] nao agendado: '+String(e.message||e).slice(0,120));}
     console.log('Sofia OS online em http://'+HOST+':'+port);
     console.log('Core v138 | Memória em data/sofia.sqlite | painel online protegido por login + endpoints públicos controlados.');
     console.log('Início normal: chave preservada, sem nova colagem. Ctrl+C encerra com segurança.');
