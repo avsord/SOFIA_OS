@@ -13,7 +13,7 @@ test('telas cheias viram painel lateral; janelas mantem botoes na largura; fora 
   assert.ok(read('src/screens/Workspace.tsx').includes('editing?<MotionModal visible animationType="none"'));
 });
 test('Paginas: capa e barra largas, texto em coluna de leitura; pastas em cartoes fixos',()=>{
-  const p=read('src/screens/Pages.tsx');assert.ok(p.includes("maxWidth:960,alignSelf:'center'")&&p.includes('height:hasCover?190:28'));
+  const p=read('src/screens/Pages.tsx');assert.ok(p.includes("maxWidth:960,alignSelf:'center'")&&p.includes('height:hasCover?(desktop?coverH:190):28'));
   assert.ok(read('src/components/NotebookBlock.tsx').includes("width:desktop?224:'48%'"));
   assert.ok(!read('src/lib/desktop.ts').includes("if(tab==='pages')return 980;"));
 });

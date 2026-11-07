@@ -396,6 +396,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}
  function pickFiles(after:PageBlock|null){if(Platform.OS!=='web')return;const input=document.createElement('input');input.type='file';input.multiple=true;input.onchange=()=>{const list=[...(input.files||[])] as File[];if(list.length)void dropFiles(after,list);};input.click();}
  const editorDrop=useRef<any>(null),[fileOver,setFileOver]=useState(false);
+ // 07/11/2026 (Pedro: "a foto num monitor maior fica fora da posicao"): capa com a MESMA proporcao em qualquer tela (largura/6),
+ // entao o recorte escolhido e igual no monitor pequeno e no grande
+ const [coverW,setCoverW]=useState(0);
  const dropRef=useRef(dropFiles);dropRef.current=dropFiles;const currentBlocksRef=useRef(currentBlocks);currentBlocksRef.current=currentBlocks;const focusRef=useRef<string|null>(null);focusRef.current=focus;
  useEffect(()=>{const el=editorDrop.current as HTMLElement|null;if(Platform.OS!=='web'||!el?.addEventListener)return;
   const hasFiles=(e:DragEvent)=>[...(e.dataTransfer?.types||[])].includes('Files');let leave:any=null;
@@ -590,7 +593,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
   const titleInput=<TextInput ref={preview?undefined:(n:any)=>{titleRef.current=n;}} scrollEnabled={false} editable={!preview} autoFocus={desktop&&!preview&&draft.title==='Sem título'&&emptyBody} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
   return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
-   <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?(imageCover?c.input:c.accentSoft):'transparent'}}>
+   <View onLayout={e=>{const w=Math.round(e.nativeEvent.layout.width);if(Math.abs(w-coverW)>2)setCoverW(w);}} style={{height:hasCover?(desktop?coverH:190):28,overflow:'hidden',backgroundColor:hasCover?(imageCover?c.input:c.accentSoft):'transparent'}}>
     {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
      // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
      :desktop?(hasCover?<Pressable accessible={false} onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} style={StyleSheet.absoluteFill}>{()=><>
@@ -632,7 +635,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     </View>:null}
    </View>
   {/* 05/11/2026: botões da capa no canto de baixo (como no Notion), desenhados por último para ficar por cima do cabeçalho */}
-    {desktop&&hasCover?<View pointerEvents="box-none" style={{position:'absolute',top:0,left:0,right:0}}>{!preview&&!coverMove?<View testID="page-cover-tools" style={{position:'absolute',right:16,top:250-12-30,zIndex:30,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:coverHover?1:0}}>
+    {desktop&&hasCover?<View pointerEvents="box-none" style={{position:'absolute',top:0,left:0,right:0}}>{!preview&&!coverMove?<View testID="page-cover-tools" style={{position:'absolute',right:16,top:coverH-12-30,zIndex:30,flexDirection:'row',borderRadius:6,overflow:'hidden',backgroundColor:c.surface+'ee',opacity:coverHover?1:0}}>
        <Pressable testID="page-cover-change" accessibilityRole="button" accessibilityLabel="Alterar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={e=>openAppearance('cover',e)} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Alterar capa</Text></Pressable>
        {imageCover?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onHoverIn={coverHoverOn} onHoverOut={coverHoverOff} onPress={startCoverMove} style={({hovered:h}:any)=>({paddingHorizontal:10,paddingVertical:6,borderLeftWidth:1,borderColor:c.line,backgroundColor:h?c.input:'transparent'})}><Text style={{color:c.text,fontSize:12}}>Reposicionar</Text></Pressable>:null}
       </View>:null}</View>:null}
@@ -702,7 +705,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
- const hasCover=!!draft.appearance.cover_type;
+ const hasCover=!!draft.appearance.cover_type,coverH=coverW?Math.max(200,Math.min(460,Math.round(coverW/6))):250;
  const editor=<View ref={editorDrop} style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   {fileOver?<View pointerEvents="none" testID="page-file-drop" style={{position:'absolute',top:10,left:10,right:10,bottom:10,zIndex:80,borderRadius:16,borderWidth:2,borderStyle:'dashed',borderColor:c.accent,backgroundColor:c.bg+'cc',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="upload" size={30} color={c.accent}/><Text style={{color:c.text,fontSize:16,fontWeight:'600'}}>Solte para anexar à página</Text><Text style={{color:c.muted,fontSize:12}}>Qualquer arquivo até 25 MB · PDF, Word, Excel, imagem, vídeo, áudio…</Text></View>:null}
   {/* 0.3.263 (fase 3 — Paginas no computador): o caminho e o titulo ja estao na barra de cima; aqui fica uma faixa fina so com o

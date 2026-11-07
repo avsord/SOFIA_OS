@@ -116,7 +116,7 @@ export async function downloadPageFile(api: SofiaApi, id: string) {
 }
 
 // ---------------- Janelas flutuantes ----------------
-type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean; pageId?: string; onSaved?: (a: SavedFile) => void};
+type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean; pageId?: string; onSaved?: (a: SavedFile) => void; editId?: string; rev?: number};
 let wins: Win[] = [], topZ = 1;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
@@ -126,7 +126,7 @@ export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime
   const ed = !!editKind(f.mime, f.name) && !!f.pageId, W = window.innerWidth, H = window.innerHeight, g = readGeo('win', ed), n = wins.length, key = f.id + ':' + Date.now();
   const w = g ? Math.min(g.w, W - 8) : ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = g ? Math.min(g.h, H - 8) : ed ? H - 90 : Math.min(H - 110, 720);
   const x0 = g ? Math.max(0, Math.min(W - 120, g.x)) : Math.max(12, W - w - 24), y0 = g ? Math.max(0, Math.min(H - 60, g.y)) : 70;
-  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: x0 + n * 28, y: y0 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
+  setWins([...wins, {key, api, id: f.id, editId: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: x0 + n * 28, y: y0 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
   return key;
 }
 const useWins = () => useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
@@ -162,7 +162,7 @@ const HANDLES: [string, any, string][] = [
   ['n', {left: 14, right: 14, top: -5, height: 9}, 'ns-resize'], ['s', {left: 14, right: 16, bottom: -5, height: 9}, 'ns-resize'],
   ['w', {left: -5, top: 14, bottom: 14, width: 9}, 'ew-resize'], ['e', {right: -5, top: 14, bottom: 16, width: 9}, 'ew-resize']];
 function FileWindow({win}: {win: Win}) {
-  const firstId = useRef(win.id), c = useTheme(), k = fileKind(win.mime, win.name), meta = KIND[k], [zoom, setZoom] = useState(0), [moving, setMoving] = useState(false);
+  const [vers, setVers] = useState(false), firstId = useRef(win.id), c = useTheme(), k = fileKind(win.mime, win.name), meta = KIND[k], [zoom, setZoom] = useState(0), [moving, setMoving] = useState(false);
   const drag = (mode: string) => (e: any) => {
     if (e.button != null && e.button !== 0) return; if (mode === 'move' && (e.target as HTMLElement)?.closest?.('[data-win-btn]')) return;
     e.preventDefault(); try {window.getSelection()?.removeAllRanges();} catch {} const sx = e.clientX, sy = e.clientY, o = {...win}, bodyStyle = document.body.style, oldSel = bodyStyle.userSelect; bodyStyle.userSelect = 'none'; setMoving(true); patchWin(win.key, {z: ++topZ});
@@ -187,13 +187,15 @@ function FileWindow({win}: {win: Win}) {
       <>{h('div', {style: {position: 'absolute', left: '50%', top: 4, width: 38, height: 4, marginLeft: -19, borderRadius: 2, background: c.line}})}<Icon name={meta.icon} size={16} color={meta.color} />
       <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
       {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
+      {win.pageId ? btn('history', 'Versões anteriores', () => setVers(v => !v)) : null}
       {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
       {windowCapable(k, win.name) ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime, pageId: win.pageId, onSaved: win.onSaved})) closeWin(win.key);}) : null}
       {btn('back', 'Voltar para a página', () => closeWin(win.key))}
       {btn('close', 'Fechar', () => closeWin(win.key))}</>
     ),
     <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
-      <FileBody api={win.api} id={win.id} firstId={firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} />
+      {vers ? <Versions win={win} onClose={() => setVers(false)} /> : null}
+      <FileBody key={win.rev || 0} api={win.api} id={win.id} firstId={win.editId || firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} />
       {moving || win.drag ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
     </View>),
     win.max ? null : HANDLES.map(([mode, css, cursor]) => h('div', {key: mode, onPointerDown: drag(mode), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', zIndex: 3, cursor, ...css}},
@@ -218,6 +220,21 @@ function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved}:
   if (k === 'pdf' || OFFICE(k)) return <View style={{flex: 1}}>{h('iframe', {src: url, title: name, onLoad: () => setLoaded(true), style: {width: '100%', height: '100%', border: 0, background: '#fff'}})}{loaded ? null : <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg}}><Spinner size={18} /></View>}</View>;
   if (text == null) return <Center><Spinner size={18} /></Center>;
   return h('pre', {style: {margin: 0, padding: 14, width: '100%', height: '100%', overflow: 'auto', boxSizing: 'border-box', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.5, color: c.text, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'}}, text);
+}
+/** 07/11/2026 (Pedro: "sumiu conteudo"): cada salvamento vira um arquivo novo e o anterior fica guardado; aqui da para voltar. */
+function Versions({win, onClose}: {win: Win; onClose: () => void}) {
+  const c = useTheme(), [list, setList] = useState<{id: string; name: string; mime: string; bytes: number; created_at: string}[] | null>(null), [err, setErr] = useState('');
+  useEffect(() => {let live = true; const ext = (win.name.split('.').pop() || '').toLowerCase();
+    win.api.entityAttachments(win.pageId!).then(items => {if (live) setList(items.filter(x => (x.name.split('.').pop() || '').toLowerCase() === ext).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))));}).catch(e => {if (live) setErr(errorText(e));});
+    return () => {live = false;};}, [win.pageId, win.name]);
+  const use = (x: {id: string; name: string; mime: string; bytes: number}) => {win.onSaved?.(x); patchWin(win.key, {id: x.id, editId: x.id, name: x.name, rev: (win.rev || 0) + 1}); onClose();};
+  return <View testID="file-versions" style={{position: 'absolute', top: 6, right: 8, zIndex: 20, width: 340, maxHeight: 380, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, boxShadow: '0 12px 30px rgba(0,0,0,.25)', overflow: 'hidden'} as any}>
+    <View style={{flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderColor: c.line}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 13}}>Versões anteriores</Text><Pressable accessibilityLabel="Fechar versões" onPress={onClose}><Icon name="close" size={14} color={c.muted} /></Pressable></View>
+    {err ? <Text style={{color: c.danger, fontSize: 12, padding: 10}}>{err}</Text> : !list ? <View style={{padding: 16}}><Spinner size={16} /></View> :
+      h('div', {style: {overflowY: 'auto', maxHeight: 320}}, list.map(x => <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={'Usar a versão de ' + new Date(x.created_at).toLocaleString('pt-BR')} onPress={() => {if (x.id !== win.id) use(x);}} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: x.id === win.id ? c.accentSoft : hovered ? c.input : 'transparent'})}>
+        <View style={{flex: 1}}><Text style={{color: c.text, fontSize: 13}}>{new Date(x.created_at).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</Text><Text style={{color: c.muted, fontSize: 11}}>{sizeLabel(x.bytes)}{x.name !== win.name ? ' · ' + x.name : ''}</Text></View>
+        <Text style={{color: x.id === win.id ? c.accent : c.muted, fontSize: 12, fontWeight: '600'}}>{x.id === win.id ? 'Aberta agora' : 'Usar esta'}</Text></Pressable>))}
+  </View>;
 }
 const Center = ({children}: {children: React.ReactNode}) => <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20}}>{children}</View>;
 function DownloadButton({api, id}: {api: SofiaApi; id: string}) {

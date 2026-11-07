@@ -78,6 +78,22 @@ test('janela lembra o tamanho e o lugar da ultima vez (flutuante e separada)',()
 test('arquivo de Pagina vai direto para o Drive (area oculta); sem Drive nao fica no servidor (Pedro 07/11)',()=>{
  const g=read('src/services/google.js'),a=read('src/core/api45.js'),m=read('src/channels/mobile.js');
  assert.ok(g.includes('async attachmentToDrive(id)')&&g.includes("new AppError('NO_DRIVE'")&&g.includes("UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);"));
- assert.ok(a.includes("if(w.get(key).kind==='user_page'&&runtime.google&&runtime.google.attachmentToDrive)")&&a.includes("DELETE FROM attachments WHERE id=?"),'falhou no Drive: apaga do servidor e avisa');
+ assert.ok(a.includes("if(runtime.google&&runtime.google.attachmentToDrive){")&&a.includes("DELETE FROM attachments WHERE id=?"),'falhou no Drive: apaga do servidor e avisa');
  assert.ok(m.includes('await runtime.google.attachmentToDrive(a.id)'),'Word salvo pelo editor tambem vai direto');
+});
+
+test('pagina compartilhada mostra os arquivos (video, audio, imagem, PDF, Office) so os da propria pagina',()=>{
+ const ps=read('src/core/page-share.js');
+ assert.ok(ps.includes("else if(type==='file'&&b.data&&b.data.attachment_id)out.push(fileHtml(b.data,ctx));")&&ps.includes('async function serveSharedFile('));
+ assert.ok(ps.includes("if(!shares.attachmentAllowed(token,attId)){res.statusCode=404;")&&ps.includes("res.statusCode=206;"),'so arquivo da pagina; video avanca');
+ assert.ok(ps.includes("media-src 'self'; frame-src 'self'; font-src 'self'"));
+ const pg=read('SOFIA_APP/src/screens/Pages.tsx');assert.ok(pg.includes('coverH=coverW?Math.max(200,Math.min(460,Math.round(coverW/6))):250'),'capa com a mesma proporcao em qualquer monitor');
+ const ed=read('SOFIA_APP/src/components/DocEditor.tsx');assert.ok(ed.includes("Não salvei para não perder conteúdo")&&ed.includes('if (html === initial.current)'),'Word: nao troca se perder conteudo; nao salva sem mudanca');
+ assert.ok(read('SOFIA_APP/src/components/PageFiles.tsx').includes("'Versões anteriores'"),'voltar versao');
+});
+
+test('zoom proprio dos editores (sem mudar o do navegador)',()=>{
+ const ch=read('SOFIA_APP/src/components/EditorChrome.tsx');
+ assert.ok(ch.includes('export function useEditorZoom(')&&ch.includes("node.addEventListener('wheel', on, {passive: false})"));
+ for(const f of ['DocEditor','SheetEditor','SlideEditor'])assert.ok(read('SOFIA_APP/src/components/'+f+'.tsx').includes('h(ZoomControl'),f);
 });

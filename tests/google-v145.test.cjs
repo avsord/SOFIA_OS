@@ -273,8 +273,7 @@ test('0.3.202: foto PNG da conversa vai para Comprovantes e volta inteira do Dri
  const e=w.save({kind:'file',title:'1000281170.png',area:'Pessoal',state:'saved',tags:['chat-attachment'],data:{provider:'local',logical_path:'conversations/x',description:'Arquivo enviado na conversa com a Sofia'}});
  const png=Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),Buffer.alloc(5000,7)]);
  const att=w.attach(e.id,{name:'1000281170.png',mime:'image/png',base64:png.toString('base64')});
- await svc.offloadAttachments();assert.ok(!w.attachment(att.id).drive_id,'0.3.206: recente fica no servidor (24 h)');
- w.db.prepare('UPDATE attachments SET created_at=? WHERE id=?').run(new Date(Date.now()-25*3600*1000).toISOString(),att.id);
+ // 07/11/2026 (Pedro: tudo no Drive): nao fica mais 24 h no servidor
  await svc.offloadAttachments();const row=w.attachment(att.id);assert.ok(row.drive_id,'foi para o Drive');assert.equal(row.blob.length,0,'saiu do servidor');
  const dir=await svc.folderId('Comprovantes');assert.ok(g.driveFiles.find(f=>f.id===row.drive_id).parents.includes(dir),'na pasta Comprovantes');
  svc.blobCache.clear();svc.blobCacheBytes=0;

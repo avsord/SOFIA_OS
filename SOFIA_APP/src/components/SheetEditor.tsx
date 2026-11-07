@@ -13,7 +13,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import {errorText} from '../lib/chat-model';
 import {uploadOfficeBytes} from '../lib/office-save';
-import {useEditorColors, ThemeToggle} from './EditorChrome';
+import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
 
 export type OfficeSaved = {id: string; name: string; mime: string; bytes: number};
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -124,7 +124,7 @@ const COLORS: [string, string][] = [['Preto', '#000000'], ['Vermelho', '#d32f2f'
 type Sel = {r: number; c: number; r2: number; c2: number};
 
 export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void}) {
-  const [c, toggleTheme] = useEditorColors();
+  const [c, toggleTheme] = useEditorColors(), [zoom, setZoom] = useEditorZoom('xlsx');
   const wb = useRef<any>(null), [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [, setTick] = useState(0);
   const [sheet, setSheet] = useState(0), [sel, setSel] = useState<Sel>({r: 1, c: 1, r2: 1, c2: 1}), [editing, setEditing] = useState<{text: string; bar: boolean} | null>(null);
   const [scroll, setScroll] = useState({top: 0, left: 0, height: 600}), [renaming, setRenaming] = useState<number | null>(null), [status, setStatus] = useState('');
@@ -163,8 +163,8 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
     if (move) go(at.r + move[0], at.c + move[1]); grid.current?.focus?.();};
   const go = (r: number, cc: number, extend = false) => {r = Math.max(1, Math.min(rows, r)); cc = Math.max(1, Math.min(cols, cc));
     const next = extend ? {...selRef.current, r2: r, c2: cc} : {r, c: cc, r2: r, c2: cc}; selRef.current = next; setSel(next); ensureVisible(r, cc);};
-  const ensureVisible = (r: number, cc: number) => {const g = grid.current as HTMLElement | null; if (!g) return; const top = HEAD_H + (r - 1) * ROW_H;
-    if (top < g.scrollTop + HEAD_H) g.scrollTop = top - HEAD_H; else if (top + ROW_H > g.scrollTop + g.clientHeight) g.scrollTop = top + ROW_H - g.clientHeight;
+  const ensureVisible = (r: number, cc: number) => {const g = grid.current as HTMLElement | null; if (!g) return; const top = (HEAD_H + (r - 1) * ROW_H) * zoom, rh = ROW_H * zoom, hh = HEAD_H * zoom;
+    if (top < g.scrollTop + hh) g.scrollTop = top - hh; else if (top + rh > g.scrollTop + g.clientHeight) g.scrollTop = top + rh - g.clientHeight;
     const L = lefts[cc], R = lefts[cc + 1]; if (L < g.scrollLeft + HEAD_W) g.scrollLeft = L - HEAD_W; else if (R > g.scrollLeft + g.clientWidth) g.scrollLeft = R - g.clientWidth;};
   const onKey = (e: any) => {
     if (editRef.current) {if (e.target !== grid.current) return; const ed = editRef.current; // a caixa de edicao ainda nao apareceu
@@ -195,7 +195,7 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
   const rowOp = (del: boolean) => {if (!s) return; if (del) s.spliceRows(range.r1, range.r2 - range.r1 + 1); else s.spliceRows(sel.r, 0, []); changed();};
   const colOp = (del: boolean) => {if (!s) return; if (del) s.spliceColumns(range.c1, range.c2 - range.c1 + 1); else s.spliceColumns(sel.c, 0, []); changed();};
   const colResize = (cc: number) => (e: any) => {e.preventDefault(); e.stopPropagation(); if (!s) return; const sx = e.clientX, w0 = widths[cc];
-    const mv = (ev: PointerEvent) => {s.getColumn(cc).width = Math.max(2, (Math.max(20, w0 + ev.clientX - sx) - 5) / 7); redraw();};
+    const mv = (ev: PointerEvent) => {s.getColumn(cc).width = Math.max(2, (Math.max(20, w0 + (ev.clientX - sx) / zoom) - 5) / 7); redraw();};
     const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); changed();}; window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);};
   const addSheet = () => {if (!wb.current) return; let n = wb.current.worksheets.length + 1; while (wb.current.getWorksheet('Planilha' + n)) n++; wb.current.addWorksheet('Planilha' + n); setSheet(wb.current.worksheets.length - 1); setSel({r: 1, c: 1, r2: 1, c2: 1}); changed();};
 
@@ -218,7 +218,7 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
     B('+ Linha', 'Inserir linha acima', () => rowOp(false), {fontSize: 12}), B('− Linha', 'Apagar linha', () => rowOp(true), {fontSize: 12}),
     B('+ Coluna', 'Inserir coluna à esquerda', () => colOp(false), {fontSize: 12}), B('− Coluna', 'Apagar coluna', () => colOp(true), {fontSize: 12}),
     h('span', {key: 'sp', style: {flex: 1}}),
-    h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'gap', style: {width: 6}}),
+    h(ZoomControl, {key: 'zoom', colors: c, zoom, setZoom}), h('span', {key: 'gz', style: {width: 6}}), h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'gap', style: {width: 6}}),
     h('span', {key: 'st', style: {fontSize: 11, color: /Não salvo/.test(status) ? c.danger : c.muted, marginRight: 6}}, status),
     B('Salvar', 'Salvar agora', () => {dirty.current = true; void save();}, {background: c.accent, color: c.onAccent, fontWeight: 600, padding: '0 10px'}));
   const fbar = h('div', {style: {display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', borderBottom: '1px solid ' + c.line, background: c.bar, flexShrink: 0}},
@@ -230,13 +230,14 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
       style: {flex: 1, height: 26, border: '1px solid ' + c.line, borderRadius: 6, padding: '0 8px', background: c.field, color: c.text, fontSize: 13, outline: 'none'}}));
 
   // ---------- grade (so as linhas que aparecem) ----------
-  const first = Math.max(1, Math.floor((scroll.top) / ROW_H) - 5), last = Math.min(rows, first + Math.ceil(scroll.height / ROW_H) + 12);
+  useWheelZoom(grid, zoom, setZoom, state === 'ready');
+  const sTop = scroll.top / zoom, sLeft = scroll.left / zoom, first = Math.max(1, Math.floor(sTop / ROW_H) - 5), last = Math.min(rows, first + Math.ceil(scroll.height / zoom / ROW_H) + 12); // zoom do documento: posicoes em px sem zoom
   const gridW = lefts[cols + 1], gridH = HEAD_H + rows * ROW_H, cellBase = {position: 'absolute', height: ROW_H, boxSizing: 'border-box', borderRight: '1px solid #e1e1e6', borderBottom: '1px solid #e1e1e6', padding: '0 5px', fontSize: 13, lineHeight: ROW_H - 1 + 'px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', color: '#111', fontFamily: 'Calibri, Carlito, Arial, sans-serif'};
   const cells: any[] = [];
   if (s && state === 'ready') {
     for (let r = first; r <= last; r++) {
       const top = HEAD_H + (r - 1) * ROW_H;
-      cells.push(h('div', {key: 'rh' + r, style: {...cellBase, left: scroll.left, top, width: HEAD_W, background: r >= range.r1 && r <= range.r2 ? '#dfe3ea' : '#f3f3f6', color: '#555', textAlign: 'center', fontSize: 11, zIndex: 2}, onMouseDown: (e: any) => {e.preventDefault(); setSel({r, c: 1, r2: r, c2: cols}); grid.current?.focus?.();}}, r));
+      cells.push(h('div', {key: 'rh' + r, style: {...cellBase, left: sLeft, top, width: HEAD_W, background: r >= range.r1 && r <= range.r2 ? '#dfe3ea' : '#f3f3f6', color: '#555', textAlign: 'center', fontSize: 11, zIndex: 2}, onMouseDown: (e: any) => {e.preventDefault(); setSel({r, c: 1, r2: r, c2: cols}); grid.current?.focus?.();}}, r));
       for (let cc = 1; cc <= cols; cc++) {
         const cell = s.getCell(r, cc), f = cell.font || {}, fill = cell.fill, al = cell.alignment?.horizontal, text = shown(s, r, cc), v = cell.value;
         const isNum = typeof v === 'number' || (v && typeof v === 'object' && 'formula' in v && typeof (v.result ?? evaluate(String(v.formula || ''), s)) === 'number');
@@ -251,10 +252,10 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
       }
     }
     // cabecalho das colunas (fica no alto ao rolar)
-    for (let cc = 1; cc <= cols; cc++) cells.push(h('div', {key: 'ch' + cc, style: {...cellBase, top: scroll.top, left: lefts[cc], width: widths[cc], height: HEAD_H, lineHeight: HEAD_H - 1 + 'px', background: cc >= range.c1 && cc <= range.c2 ? '#dfe3ea' : '#f3f3f6', color: '#555', textAlign: 'center', fontSize: 11, zIndex: 3},
+    for (let cc = 1; cc <= cols; cc++) cells.push(h('div', {key: 'ch' + cc, style: {...cellBase, top: sTop, left: lefts[cc], width: widths[cc], height: HEAD_H, lineHeight: HEAD_H - 1 + 'px', background: cc >= range.c1 && cc <= range.c2 ? '#dfe3ea' : '#f3f3f6', color: '#555', textAlign: 'center', fontSize: 11, zIndex: 3},
       onMouseDown: (e: any) => {e.preventDefault(); setSel({r: 1, c: cc, r2: rows, c2: cc}); grid.current?.focus?.();}}, colName(cc),
       h('div', {onPointerDown: colResize(cc), title: 'Arraste para mudar a largura', style: {position: 'absolute', right: -3, top: 0, width: 6, height: '100%', cursor: 'col-resize', zIndex: 4}})));
-    cells.push(h('div', {key: 'corner', style: {...cellBase, top: scroll.top, left: scroll.left, width: HEAD_W, height: HEAD_H, background: '#ebebf0', zIndex: 4}}));
+    cells.push(h('div', {key: 'corner', style: {...cellBase, top: sTop, left: sLeft, width: HEAD_W, height: HEAD_H, background: '#ebebf0', zIndex: 4}}));
     // cursor da celula ativa
     const top = HEAD_H + (sel.r - 1) * ROW_H;
     cells.push(h('div', {key: 'cursor', style: {position: 'absolute', left: lefts[sel.c] - 1, top: top - 1, width: widths[sel.c] + 1, height: ROW_H + 1, border: '2px solid #217346', boxSizing: 'border-box', pointerEvents: 'none', zIndex: 1}}));
@@ -280,6 +281,6 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
       style: {flex: 1, minHeight: 0, overflow: 'auto', position: 'relative', outline: 'none', background: '#fff', filter: c.pageFilter, userSelect: 'none'}},
       state === 'loading' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#666', fontSize: 13}}, 'Abrindo a planilha…') : null,
       state === 'error' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#a33', fontSize: 13}}, err) : null,
-      state === 'ready' ? h('div', {style: {position: 'relative', width: gridW, height: gridH}}, ...cells) : null),
+      state === 'ready' ? h('div', {style: {position: 'relative', width: gridW, height: gridH, zoom}}, ...cells) : null),
     tabs);
 }

@@ -46,8 +46,8 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
   if(m==='POST'&&action==='observations')return send(w.observe(key,await body()),201);
   if(m==='GET'&&action==='attachments')return send({items:w.attachmentList(key)});
   if(m==='POST'&&action==='attachments'){const a=w.attach(key,await bodyJson(req,36*1024*1024)); /* 07/11/2026: ate 25 MB por arquivo */
-   // arquivo de Pagina vai direto para o Drive (area oculta); sem Drive, nao fica no servidor
-   if(w.get(key).kind==='user_page'&&runtime.google&&runtime.google.attachmentToDrive){try{await runtime.google.attachmentToDrive(a.id);}catch(e){try{w.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id);}catch{}throw e;}}
+   // arquivo do usuario vai direto para o Drive (area oculta); sem Drive, nao fica no servidor
+   if(runtime.google&&runtime.google.attachmentToDrive){ /* 07/11/2026 (Pedro: "tudo no Drive"): todo arquivo, de qualquer app */try{await runtime.google.attachmentToDrive(a.id);}catch(e){try{w.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id);}catch{}throw e;}}
    return send(w.attachmentList(key).find(x=>x.id===a.id)||a,201);}
   if(m==='GET'&&action==='calendar'){res.setHeader('Content-Type','text/calendar; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="Sofia_compromisso.ics"');res.end(calendar(w.get(key)));return true;}
   if(m==='POST'&&action==='action'){const b=await body(),e=w.get(key);if(b.revision!==undefined&&b.revision!==e.revision)throw new AppError('REVISION_CONFLICT','Reabra o registro.',409);

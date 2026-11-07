@@ -1036,7 +1036,7 @@ class GoogleService {
     this.offloadingVoice = true; let moved = 0;
     try {
       if (!(await this.target('Áudios'))) return {moved: 0};
-      const cutoff = new Date(Date.now() - 864e5).toISOString();
+      const cutoff = new Date(Date.now() - 2 * 60000).toISOString(); // 07/11/2026: audio vai para o Drive 2 min depois (tempo da transcricao), nao 24 h
       const rows = this.db.prepare('SELECT message_id, mime, blob, created_at FROM voice_messages WHERE drive_id IS NULL AND length(blob) > 0 AND created_at < ? ORDER BY created_at LIMIT ?').all(cutoff, limit);
       for (const v of rows) {
         const buf = Buffer.from(v.blob), sha = crypto.createHash('sha256').update(buf).digest('hex');
@@ -1117,10 +1117,14 @@ class GoogleService {
   /** 07/11/2026 (Pedro: "nada de imagem, video ou documento salvo no servidor: vai para o Drive conectado, na pasta oculta"):
    * arquivo da Pagina vai para o Drive NA HORA (antes esperava a rodada de 15 min). Sem Drive conectado: recusa. */
   async attachmentToDrive(id) {
+    if (process.env.SOFIA_TEST_LOCAL_FILES === '1') return; // so no servidor de teste local (sem Google); nunca definido no Railway
     const noDrive = () => new AppError('NO_DRIVE', 'Para guardar arquivos, conecte o Google Drive em Perfil › Conexões. Eles ficam na área oculta do seu Drive, nunca no servidor.', 409);
     if (!this.driveOn(this.link()) || !(await this.target('Anexos'))) throw noDrive();
-    const a = this.db.prepare('SELECT id, entity_id, name, mime, blob, drive_id FROM attachments WHERE id=?').get(id); if (!a || a.drive_id) return;
-    const up = await this.upload({name: a.name, mime: a.mime || 'application/octet-stream', bytes: Buffer.from(a.blob || []), cat: 'Anexos', description: 'Anexo da Sofia OS (' + a.entity_id + ')', props: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
+    const a = this.db.prepare('SELECT a.id, a.entity_id, a.name, a.mime, a.blob, a.drive_id, e.tags AS tags FROM attachments a LEFT JOIN entities e ON e.id=a.entity_id WHERE a.id=?').get(id); if (!a || a.drive_id) return;
+    // foto da Conversa (ex.: cupom): miniatura fica aqui para a lista abrir rapido; o original vai para Comprovantes
+    const fromChat = String(a.tags || '').includes('chat-attachment') && /^image\//.test(String(a.mime || ''));
+    if (fromChat) { ensureThumbColumn(this.db); const t = makeThumb(Buffer.from(a.blob || []), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
+    const up = await this.upload({name: a.name, mime: a.mime || 'application/octet-stream', bytes: Buffer.from(a.blob || []), cat: fromChat ? 'Comprovantes' : 'Anexos', description: 'Anexo da Sofia OS (' + a.entity_id + ')', props: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
     if (!up?.id) throw new AppError('DRIVE_UPLOAD', 'Não consegui guardar o arquivo no Google Drive. Tente de novo.', 502);
     this.db.prepare('UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);
   }
@@ -1131,7 +1135,7 @@ class GoogleService {
       if (!(await this.target('Anexos'))) return {moved: 0};
       ensureThumbColumn(this.db);
       // 0.3.206: foto da conversa fica 24 h aqui (a Sofia le e voce abre na hora, sem depender do Drive); depois vai
-      const chatCutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const chatCutoff = new Date(Date.now() + 60000).toISOString(); // 07/11/2026 (Pedro: tudo no Drive): sem as 24 h no servidor
       const rows = this.db.prepare("SELECT a.id, a.entity_id, a.name, a.mime, a.bytes, a.blob, e.tags AS tags FROM attachments a LEFT JOIN entities e ON e.id=a.entity_id WHERE a.drive_id IS NULL AND length(a.blob) > 0 AND (COALESCE(e.tags,'') NOT LIKE '%chat-attachment%' OR a.created_at < ?) ORDER BY a.created_at LIMIT ?").all(chatCutoff, limit);
       for (const a of rows) {
         // 0.3.199: foto enviada na conversa (ex.: cupom) vai para "Sofia OS/Comprovantes"; a miniatura fica aqui
@@ -1500,9 +1504,11 @@ class GoogleService {
     if (this.timer) return;
     const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
+    // 07/11/2026: o que ainda estiver no servidor (audio recem-transcrito, sobra de envio) vai para o Drive a cada minuto
+    this.offTimer = setInterval(() => { const l = this.link(); if (!l?.refresh || !this.driveOn(l)) return; this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); }, 60000); this.offTimer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; if (this.offTimer) clearInterval(this.offTimer); this.offTimer = null; }
 }
 
 module.exports = {ensureThumbColumn, GoogleService, SCOPES, CALLBACK};

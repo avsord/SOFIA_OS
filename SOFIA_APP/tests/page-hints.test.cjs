@@ -36,7 +36,7 @@ test('undo and redo share the right-hand tools group, after the flexible breadcr
 test('page canvas stays compact and subpages render as inline page rows',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(source.includes("height:hasCover?190:28"));
+ assert.ok(source.includes("height:hasCover?(desktop?coverH:190):28")); // 07/11/2026: no computador a capa segue a proporcao da tela
  assert.ok(source.includes("marginTop:hasCover?-44:0"));
  assert.ok(source.includes("style={{minHeight:18}}"));
  assert.ok(source.includes('fontSize:56'));

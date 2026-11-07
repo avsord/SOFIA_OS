@@ -6,7 +6,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import type {OfficeSaved} from './SheetEditor';
-import {useEditorColors, ThemeToggle} from './EditorChrome';
+import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
 import {uploadOfficeBytes} from '../lib/office-save';
 import {errorText} from '../lib/chat-model';
 import {ensureDocFonts} from '../lib/doc-fonts';
@@ -69,7 +69,7 @@ function bodyHtml(sp: Element, title: boolean, scale: number) {
 }
 
 export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void}) {
-  const [c, toggleTheme] = useEditorColors();
+  const [c, toggleTheme] = useEditorColors(), [userZoom, setUserZoom] = useEditorZoom('pptx');
   const zip = useRef<any>(null), pres = useRef<{doc: Document; rels: Document; ct: Document; cx: number; cy: number} | null>(null), slides = useRef<Slide[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [cur, setCur] = useState(0), [ver, setVer] = useState(0), [status, setStatus] = useState(''), [selBox, setSelBox] = useState<string | null>(null);
   const stage = useRef<HTMLDivElement | null>(null), [stageW, setStageW] = useState(900), stageWRef = useRef(900), flushTextRef = useRef<() => void>(() => {}), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false), boxDirty = useRef(new Set<string>()), sel = useRef<Range | null>(null);
@@ -192,6 +192,7 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
   const flushText = () => {for (const s of slides.current) for (const b of s.boxes) {if (!boxDirty.current.has(b.key)) continue; const node = stage.current?.querySelector('[data-box="' + CSS.escape(b.key) + '"]') as HTMLElement | null; if (node) writeBox(b, node);} boxDirty.current.clear();};
 
   flushTextRef.current = flushText;
+  useWheelZoom(stage, userZoom, setUserZoom, state === 'ready');
   // ---------- slides ----------
   const nextName = (prefix: string, ext: string) => {let n = 1; while (zip.current.file(prefix + n + ext)) n++; return prefix + n + ext;};
   const newRelId = (rels: Document) => {const ids = new Set(deep(rels, NS.rel, 'Relationship').map(r => r.getAttribute('Id'))); let n = 1; while (ids.has('rId' + n)) n++; return 'rId' + n;};
@@ -241,7 +242,7 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
     b.x = x; b.y = y; b.w = w; b.hgt = hh;
   }
   const dragBox = (b: Box, mode: 'move' | 'size') => (e: any) => {
-    e.preventDefault(); e.stopPropagation(); const s = scaleNow(), f = stageW / BASE, sx = e.clientX, sy = e.clientY, o = {x: b.x, y: b.y, w: b.w, hgt: b.hgt}, el = stage.current?.querySelector('[data-wrap="' + CSS.escape(b.key) + '"]') as HTMLElement | null, w = winOf();
+    e.preventDefault(); e.stopPropagation(); const s = scaleNow(), f = stageW / BASE * userZoom, sx = e.clientX, sy = e.clientY, o = {x: b.x, y: b.y, w: b.w, hgt: b.hgt}, el = stage.current?.querySelector('[data-wrap="' + CSS.escape(b.key) + '"]') as HTMLElement | null, w = winOf();
     const mv = (ev: PointerEvent) => {const dx = (ev.clientX - sx) / (s * f), dy = (ev.clientY - sy) / (s * f);
       if (mode === 'move') {b.x = o.x + dx; b.y = o.y + dy;} else {b.w = Math.max(200000, o.w + dx); b.hgt = Math.max(150000, o.hgt + dy);}
       if (el) {el.style.left = b.x * s + 'px'; el.style.top = b.y * s + 'px'; el.style.width = b.w * s + 'px'; el.style.height = b.hgt * s + 'px';}};
@@ -273,11 +274,11 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
     h('span', {key: 'hl', style: {display: 'flex', alignItems: 'center', gap: 3, padding: '0 4px'}}, h('span', {style: {fontSize: 11, color: c.muted, marginRight: 2}}, 'Grifar'), ...HIGHLIGHTS.map(([n, col]) => swatch('h' + n, col, 'Marca-texto ' + n.toLowerCase(), () => exec('hiliteColor', col))), B('⌫', 'Tirar o grifo', () => exec('hiliteColor', 'transparent'))), sep('e'),
     h('span', {key: 'fc', style: {display: 'flex', alignItems: 'center', gap: 3, padding: '0 4px'}}, h('span', {style: {fontSize: 11, color: c.muted, marginRight: 2}}, 'Cor'), ...COLORS.map(([n, col]) => swatch('c' + n, col, 'Cor ' + n.toLowerCase(), () => exec('foreColor', col)))), sep('f'),
     B('⯇≡', 'Alinhar à esquerda', () => exec('justifyLeft'), {fontSize: 11}), B('≡', 'Centralizar', () => exec('justifyCenter')), B('≡⯈', 'Alinhar à direita', () => exec('justifyRight'), {fontSize: 11}),
-    h('span', {key: 'sp', style: {flex: 1}}), h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'g', style: {width: 6}}),
+    h('span', {key: 'sp', style: {flex: 1}}), h(ZoomControl, {key: 'zoom', colors: c, zoom: userZoom, setZoom: setUserZoom}), h('span', {key: 'gz', style: {width: 6}}), h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'g', style: {width: 6}}),
     h('span', {key: 'st', style: {fontSize: 11, color: /Não salvo/.test(status) ? c.danger : c.muted, marginRight: 6}}, status),
     B('Salvar', 'Salvar agora', () => {flushText(); dirty.current = true; void save();}, {background: c.accent, color: c.onAccent, fontWeight: 600, padding: '0 10px'}));
 
-  const P = pres.current, s = slides.current[cur], scale = P ? BASE / P.cx : 1, zoom = stageW / BASE, H = P ? P.cy * scale : 0;
+  const P = pres.current, s = slides.current[cur], scale = P ? BASE / P.cx : 1, zoom = stageW / BASE * userZoom, H = P ? P.cy * scale : 0;
   const slideView = (sl: Slide, sc: number, editable: boolean, k: string) => h('div', {key: k, style: {position: 'relative', width: P!.cx * sc, height: P!.cy * sc, background: sl.bg, boxShadow: '0 2px 10px rgba(0,0,0,.25)', overflow: 'hidden', fontFamily: 'Calibri, Carlito, Arial, sans-serif', color: '#000', flexShrink: 0, filter: c.pageFilter}},
     sl.boxes.map(b => {const st: any = {position: 'absolute', left: b.x * sc, top: b.y * sc, width: b.w * sc, height: b.hgt * sc, boxSizing: 'border-box', background: b.fill || 'transparent'};
       if (b.kind === 'pic') return h('img', {key: b.key, src: b.src, alt: '', draggable: false, style: {...st, objectFit: 'fill'}});
@@ -300,6 +301,6 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
         slides.current.map((sl, i) => h('div', {key: sl.path + ':' + ver, onMouseDown: (e: any) => {e.preventDefault(); flushText(); setCur(i); setSelBox(null);}, style: {display: 'flex', gap: 6, cursor: 'pointer', alignItems: 'flex-start'}},
           h('span', {style: {fontSize: 11, color: c.muted, width: 14, textAlign: 'right'}}, String(i + 1)),
           h('div', {style: {outline: i === cur ? '2px solid ' + c.accent : '1px solid ' + c.line, outlineOffset: 1}}, slideView(sl, 112 / P!.cx, false, 't' + i))))),
-      h('div', {ref: stage, onMouseDown: (e: any) => {if (e.target === e.currentTarget) setSelBox(null);}, style: {flex: 1, minWidth: 0, overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24}},
+      h('div', {ref: stage, onMouseDown: (e: any) => {if (e.target === e.currentTarget) setSelBox(null);}, style: {flex: 1, minWidth: 0, overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: userZoom > 1 ? 'flex-start' : 'center', padding: 24}},
         s ? h('div', {style: {width: BASE * zoom, height: H * zoom, flexShrink: 0}}, h('div', {style: {width: BASE, height: H, transform: 'scale(' + zoom + ')', transformOrigin: '0 0'}}, slideView(s, scale, true, 'main:' + cur + ':' + ver))) : null)));
 }

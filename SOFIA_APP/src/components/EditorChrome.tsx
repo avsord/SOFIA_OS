@@ -29,3 +29,26 @@ export function ThemeToggle({k, colors, toggle}: {k?: string; colors: EditorColo
       onMouseDown: (e: any) => e.preventDefault(), onClick: (e: any) => {e.preventDefault(); e.stopPropagation(); toggle(id);},
       style: {height: 24, padding: '0 8px', border: 0, borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: cur === id ? 700 : 500, background: cur === id ? colors.accent : 'transparent', color: cur === id ? colors.onAccent : colors.text}}, label)));
 }
+
+// 07/11/2026 (Pedro: "zoom do proprio projeto igual no Word, sem mudar o zoom do navegador"): zoom so do documento.
+// Botoes - 100% + na barra e Ctrl + rodinha dentro do documento. Fica guardado por tipo de editor.
+const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+export function useEditorZoom(kind: string): [number, (z: number) => void] {
+  const [z, setZ] = useState<number>(() => {try {const v = Number(localStorage.getItem('sofia.editor.zoom.' + kind)); return v >= 0.25 && v <= 4 ? v : 1;} catch {return 1;}});
+  const set = (v: number) => {const n = Math.round(Math.max(0.25, Math.min(4, v)) * 100) / 100; setZ(n); try {localStorage.setItem('sofia.editor.zoom.' + kind, String(n));} catch {}};
+  return [z, set];
+}
+/** Ctrl/Cmd + rodinha dentro do documento muda o zoom do documento (e nao o da pagina inteira do navegador). */
+export function useWheelZoom(el: {current: HTMLElement | null}, zoom: number, setZoom: (z: number) => void, ready = true) {
+  const ref = React.useRef({zoom, setZoom}); ref.current = {zoom, setZoom};
+  useEffect(() => {const node = el.current; if (!node) return;
+    const on = (e: WheelEvent) => {if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); ref.current.setZoom(ref.current.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1));};
+    node.addEventListener('wheel', on, {passive: false}); return () => node.removeEventListener('wheel', on);}, [el.current, ready]);
+}
+export function ZoomControl({colors, zoom, setZoom}: {colors: EditorColors; zoom: number; setZoom: (z: number) => void}) {
+  const step = (dir: 1 | -1) => {const i = dir > 0 ? ZOOM_STEPS.findIndex(s => s > zoom + 0.001) : ZOOM_STEPS.map(s => s < zoom - 0.001).lastIndexOf(true); if (i >= 0) setZoom(ZOOM_STEPS[i]);};
+  const b = (label: string, title: string, run: () => void, extra: any = {}) => h('button', {type: 'button', title, 'aria-label': title, onMouseDown: (e: any) => e.preventDefault(), onClick: (e: any) => {e.preventDefault(); run();},
+    style: {height: 24, minWidth: 24, padding: '0 6px', border: 0, borderRadius: 5, background: 'transparent', color: colors.text, cursor: 'pointer', fontSize: 13, ...extra}}, label);
+  return h('span', {role: 'group', 'aria-label': 'Zoom do documento', style: {display: 'inline-flex', alignItems: 'center', padding: 2, gap: 1, borderRadius: 7, border: '1px solid ' + colors.line, background: colors.field}},
+    b('−', 'Diminuir o zoom do documento', () => step(-1), {fontSize: 16}), b(Math.round(zoom * 100) + '%', 'Voltar o zoom para 100%', () => setZoom(1), {minWidth: 44, fontSize: 12, fontWeight: 600}), b('+', 'Aumentar o zoom do documento', () => step(1), {fontSize: 16}));
+}

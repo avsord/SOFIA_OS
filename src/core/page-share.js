@@ -75,7 +75,29 @@ function collectionHtml(data){
  const cell=v=>Array.isArray(v)?esc(v.join(', ')):typeof v==='boolean'?(v?'☑':'☐'):plainWithLinks(v==null?'':String(v));
  return '<div class="table-wrap">'+(data.title&&data.show_title!==false?'<h3>'+esc(data.title)+'</h3>':'')+'<table><thead><tr>'+cols.map(c=>'<th>'+esc(c.label||c.key)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+cell((r.values||{})[c.key])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
 }
-function blocksHtml(blocks,{token,linkable,imgUrl}){
+/** 07/11/2026: tipo do arquivo pelo tipo/nome (mesma divisao do site). */
+function fileKind(mime,name){const m=String(mime||''),n=String(name||'').toLowerCase();
+ if(/^image\/(png|jpe?g|gif|webp|avif|bmp)$/.test(m))return 'image';if(m.startsWith('video/'))return 'video';if(m.startsWith('audio/'))return 'audio';
+ if(m==='application/pdf'||n.endsWith('.pdf'))return 'pdf';
+ if(/wordprocessingml|msword|opendocument\.text|rtf/.test(m)||/\.(docx?|odt|rtf)$/.test(n))return 'doc';
+ if(/spreadsheetml|ms-excel|opendocument\.spreadsheet/.test(m)||/\.(xlsx?|ods)$/.test(n))return 'sheet';
+ if(/presentationml|ms-powerpoint|opendocument\.presentation/.test(m)||/\.(pptx?|odp)$/.test(n))return 'slides';return 'other';}
+const FILE_LABEL={pdf:'PDF',doc:'Documento',sheet:'Planilha',slides:'Apresentação',image:'Imagem',video:'Vídeo',audio:'Áudio',other:'Arquivo'};
+const FILE_COLOR={pdf:'#E5484D',doc:'#3B82F6',sheet:'#16A34A',slides:'#EA8A23',image:'#D9534F',video:'#E5484D',audio:'#A855F7',other:'#8A8F98'};
+function sizeText(n){n=Number(n)||0;if(!n)return '';if(n<1048576)return Math.max(1,Math.round(n/1024))+' KB';return (n/1048576).toFixed(1).replace('.',',')+' MB';}
+function fileHtml(d,{fileUrl}){
+ const id=String(d.attachment_id),k=fileKind(d.mime,d.name),name=String(d.name||'Arquivo'),office=k==='doc'||k==='sheet'||k==='slides';
+ const view=(d.view||((k==='image'||k==='video'||k==='audio')?'preview':'attach'))==='preview',scale=Math.max(15,Math.min(100,Number(d.scale)||(k==='image'?70:100)));
+ const open=fileUrl(id)+(office?'?as=pdf':''),dl=fileUrl(id)+'?dl=1';
+ const row='<a class="file-row" href="'+esc(k==='other'?dl:open)+'" target="_blank" rel="noopener"><span class="file-ico" style="background:'+FILE_COLOR[k]+'22;color:'+FILE_COLOR[k]+'">'+esc((name.split('.').pop()||'').slice(0,4).toUpperCase()||'ARQ')+'</span><span class="file-txt"><b>'+esc(name)+'</b><small>'+esc([FILE_LABEL[k],sizeText(d.size)].filter(Boolean).join(' · '))+'</small></span><span class="file-dl" title="Baixar">⬇</span></a>';
+ if(!view)return row.replace('<span class="file-dl" title="Baixar">⬇</span>','')+'<div class="file-actions"><a href="'+esc(dl)+'">Baixar</a></div>';
+ if(k==='image')return '<figure style="width:'+scale+'%"><img src="'+esc(fileUrl(id))+'" alt="'+esc(name)+'" loading="lazy"></figure>';
+ if(k==='video')return '<figure style="width:'+scale+'%"><video controls preload="metadata" src="'+esc(fileUrl(id))+'"></video><figcaption>'+esc(name)+'</figcaption></figure>';
+ if(k==='audio')return '<figure><audio controls preload="metadata" src="'+esc(fileUrl(id))+'"></audio><figcaption>'+esc(name)+'</figcaption></figure>';
+ if(k==='pdf'||office)return '<figure style="width:'+scale+'%"><iframe class="file-frame" src="'+esc(open)+'" title="'+esc(name)+'"></iframe><figcaption><a href="'+esc(open)+'" target="_blank" rel="noopener">Abrir em tela cheia</a> · <a href="'+esc(dl)+'">Baixar</a></figcaption></figure>';
+ return row;
+}
+function blocksHtml(blocks,ctx){const {token,linkable,imgUrl}=ctx;
  const out=[];let list=null;
  const closeList=()=>{if(list){out.push('</'+list+'>');list=null;}};
  for(const b of blocks){
@@ -90,6 +112,7 @@ function blocksHtml(blocks,{token,linkable,imgUrl}){
   else if(type==='callout')out.push('<div class="callout"><span>'+esc((b.data&&b.data.icon)||'💡')+'</span><div>'+textOf(b)+'</div></div>');
   else if(type==='code')out.push('<pre><code>'+esc(b.text)+'</code></pre>');
   else if(type==='divider')out.push('<hr>');
+  else if(type==='file'&&b.data&&b.data.attachment_id)out.push(fileHtml(b.data,ctx)); /* 07/11/2026 (Pedro): arquivos da pagina aparecem para quem recebe o link */
   else if(type==='image'&&b.data&&b.data.attachment_id)out.push('<figure><img src="'+esc(imgUrl(String(b.data.attachment_id)))+'" alt="'+esc(b.data.caption||'')+'" loading="lazy">'+(b.data.caption?'<figcaption>'+esc(b.data.caption)+'</figcaption>':'')+'</figure>');
   else if(type==='page_link'&&b.data&&b.data.page_id){const l=linkable(String(b.data.page_id));if(l)out.push('<a class="page-link" href="'+esc(l.href)+'">'+esc(l.icon)+' <span>'+esc(l.title)+'</span></a>');}
   else if(type==='collection'&&b.data)out.push(collectionHtml(b.data));
@@ -110,7 +133,7 @@ function shareTheme(a,now=new Date()){
 function renderSharedPage({root,current,shares,token}){
  const base='/p/'+encodeURIComponent(token);
  const href=id=>id===root.id?base:base+'/'+encodeURIComponent(id);
- const imgUrl=att=>base+'/img/'+encodeURIComponent(att);
+ const imgUrl=att=>base+'/img/'+encodeURIComponent(att),fileUrl=att=>base+'/file/'+encodeURIComponent(att);
  const isEmoji=v=>v&&!/^[a-z0-9_-]+$/i.test(String(v));
  const pageIcon=e=>isEmoji(e.data&&e.data.icon)?String(e.data.icon):'📄';
  const linkable=id=>{const r=shares.resolve(token,id===root.id?undefined:id);if(!r||!r.current)return null;return {href:href(id),title:r.current.title||'Sem título',icon:pageIcon(r.current)};};
@@ -146,7 +169,7 @@ p{margin:3px 0;min-height:1.65em;overflow-wrap:anywhere}p.empty{min-height:1.2em
 ul,ol{margin:4px 0;padding-left:26px}li{margin:2px 0}blockquote{margin:8px 0;padding:2px 14px;border-left:3px solid var(--text)}
 .callout{display:flex;gap:10px;margin:8px 0;padding:14px 16px;border-radius:8px;background:var(--soft)}pre{background:var(--soft);padding:14px 16px;border-radius:8px;overflow:auto;font-size:14px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:88%;background:var(--soft);padding:1px 5px;border-radius:4px}pre code{padding:0;background:none}
-hr{border:0;border-top:1px solid var(--line);margin:18px 0}figure{margin:12px 0}figure img{max-width:100%;border-radius:6px;display:block}figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+hr{border:0;border-top:1px solid var(--line);margin:18px 0}figure{margin:12px 0}.file-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit;margin:8px 0 2px}.file-row:hover{background:var(--soft)}.file-ico{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0}.file-txt{flex:1;min-width:0;display:flex;flex-direction:column}.file-txt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file-txt small{color:var(--muted)}.file-actions{font-size:12px;margin:0 0 10px 4px}.file-actions a{color:var(--muted)}.file-frame{width:100%;height:560px;border:0;border-radius:8px;background:#fff}figure video{width:100%;border-radius:8px;background:#000}figure audio{width:100%}figcaption a{color:var(--muted)}figure img{max-width:100%;border-radius:6px;display:block}figcaption{font-size:13px;color:var(--muted);margin-top:6px}
 .todo{display:flex;gap:10px;align-items:flex-start}.box{flex:0 0 16px;height:16px;margin-top:5px;border:1.5px solid var(--muted);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}.box.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}.done{text-decoration:line-through;color:var(--muted)}
 .page-link{display:flex;align-items:center;gap:8px;margin:4px 0;padding:4px 6px;border-radius:6px;text-decoration:none;font-weight:600}.page-link span{text-decoration:underline;text-decoration-color:var(--line)}.page-link:hover{background:var(--soft)}
 .subs{margin-top:28px;padding-top:14px;border-top:1px solid var(--line)}.subs .label{font-size:12px;color:var(--muted);margin-bottom:4px}
@@ -158,7 +181,7 @@ footer{max-width:960px;margin:0 auto;padding:24px 48px;color:var(--muted);font-s
 <nav class="top">${trail.map((t,i)=>(i?'<span class="sep">/</span>':'')+(t.id===current.id?'<span>'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</span>':'<a href="'+esc(href(t.id))+'">'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</a>')).join(' ')}</nav>
 ${cover?'<div class="cover"><img src="'+esc(cover)+'" alt=""></div>':''}
 <main>${icon?'<div class="icon">'+esc(icon)+'</div>':''}<h1 class="title">${esc(title)}</h1>
-${blocksHtml(blocks,{token,linkable,imgUrl})}
+${blocksHtml(blocks,{token,linkable,imgUrl,fileUrl})}
 ${kids.length?'<div class="subs"><div class="label">Subpáginas</div>'+kids.map(k=>'<a class="page-link" href="'+esc(href(k.id))+'">'+esc(pageIcon(k))+' <span>'+esc(k.title||'Sem título')+'</span></a>').join('')+'</div>':''}
 </main><footer>Publicado com Sofia OS · somente leitura</footer></body></html>`;
 }
@@ -166,8 +189,9 @@ const NOT_FOUND_PAGE=`<!doctype html><html lang="pt-BR"><head><meta charset="utf
 
 /** Rotas publicas /p/<codigo>, /p/<codigo>/<subpagina> e /p/<codigo>/img/<anexo>. Devolve true se respondeu. */
 async function servePublicPage(req,res,p,m,{shares,workspace,google}){
- if(m!=='GET'&&m!=='HEAD')return false;const match=p.match(/^\/p\/([A-Za-z0-9_-]+)(?:\/(img)\/([\w-]+)|\/([\w-]+))?\/?$/);if(!match)return false;
- const [,token,isImg,attId,subId]=match;
+ if(m!=='GET'&&m!=='HEAD')return false;const match=p.match(/^\/p\/([A-Za-z0-9_-]+)(?:\/(img|file)\/([\w-]+)|\/([\w-]+))?\/?$/);if(!match)return false;
+ const [,token,kindPath,attId,subId]=match,isImg=kindPath==='img';
+ if(kindPath==='file')return serveSharedFile(req,res,m,token,attId,{shares,workspace,google});
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Robots-Tag','noindex, nofollow');res.setHeader('X-Frame-Options','DENY');
  if(isImg){
   if(!shares.attachmentAllowed(token,attId)){res.statusCode=404;res.setHeader('Cache-Control','no-store');res.end();return true;}
@@ -176,9 +200,25 @@ async function servePublicPage(req,res,p,m,{shares,workspace,google}){
   res.setHeader('Content-Type',mime);res.setHeader('Content-Disposition','inline');res.setHeader('Cache-Control','private, max-age=300');res.setHeader('Content-Length',String(bytes.length));res.end(m==='HEAD'?undefined:bytes);return true;
  }
  const r=shares.resolve(token,subId);
- res.setHeader('Cache-Control','no-store');res.setHeader('Content-Security-Policy',"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+ res.setHeader('Cache-Control','no-store');res.setHeader('Content-Security-Policy',"default-src 'none'; img-src 'self'; media-src 'self'; frame-src 'self'; font-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
  res.setHeader('Content-Type','text/html; charset=utf-8');
  if(!r||!r.current){res.statusCode=404;res.end(NOT_FOUND_PAGE);return true;}
  res.statusCode=200;res.end(m==='HEAD'?undefined:renderSharedPage({root:r.root,current:r.current,shares,token}));return true;
+}
+/** 07/11/2026: arquivo de pagina compartilhada (video/audio com avanço, PDF e Office em quadro, download). So os da pagina. */
+async function serveSharedFile(req,res,m,token,attId,{shares,workspace,google}){
+ res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Robots-Tag','noindex, nofollow');
+ if(!shares.attachmentAllowed(token,attId)){res.statusCode=404;res.setHeader('Cache-Control','no-store');res.end();return true;}
+ const url=new URL(req.url,'http://x'),dl=url.searchParams.get('dl')==='1',pdf=url.searchParams.get('as')==='pdf';
+ const a0=workspace.attachment(attId),a=pdf?{...a0,mime:'application/pdf',name:String(a0.name||'arquivo').replace(/\.[^.]+$/,'')+'.pdf'}:a0;
+ const bytes=pdf?await google.attachmentPdf(a0):google&&google.attachmentBytes?await google.attachmentBytes(a0):Buffer.from(a0.blob||[]);
+ const inline=!dl&&require('./workspace').inlineSafe(a.mime),total=bytes.length;
+ res.setHeader('X-Frame-Options','SAMEORIGIN');res.setHeader('Content-Security-Policy',"frame-ancestors 'self'; object-src 'self'");res.setHeader('Cache-Control','private, max-age=300');res.setHeader('Accept-Ranges','bytes');
+ res.setHeader('Content-Type',inline?a.mime:'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));
+ let start=0,end=total-1;const r=/^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range||''));
+ if(r&&total){if(r[1]==='')start=Math.max(0,total-Number(r[2]||0));else{start=Number(r[1]);if(r[2]!=='')end=Math.min(total-1,Number(r[2]));}
+  if(start>end||start>=total){res.statusCode=416;res.setHeader('Content-Range','bytes */'+total);res.end();return true;}
+  res.statusCode=206;res.setHeader('Content-Range','bytes '+start+'-'+end+'/'+total);}else res.statusCode=200;
+ res.setHeader('Content-Length',String(total?end-start+1:0));res.end(m==='HEAD'?undefined:bytes.subarray(start,end+1));return true;
 }
 module.exports={makePageShares,servePublicPage,renderSharedPage,richHtml,shareTheme};

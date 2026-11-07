@@ -8,6 +8,7 @@ const PASSWORD='development-fixture-only-203';
 test('foto do cupom chega a quem responde; "ta na imagem" logo depois tambem leva a foto',async t=>{
  const f=fixture(t);f.config.loginPassword=PASSWORD;f.config.loginEmail='owner@example.com';
  const runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure')});
+ if(runtime.google)runtime.google.attachmentToDrive=async()=>{}; // 07/11/2026: no teste nao ha Drive (em producao a foto vai direto para la)
  const server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
  t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
  const H=tok=>({'Content-Type':'application/json',Authorization:'Bearer '+tok});

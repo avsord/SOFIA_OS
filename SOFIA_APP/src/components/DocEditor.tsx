@@ -7,7 +7,7 @@
 //   o arquivo do bloco (o anterior fica guardado como versao antiga no servidor).
 import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
-import {useEditorColors, ThemeToggle} from './EditorChrome';
+import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
 import {errorText} from '../lib/chat-model';
 import {addSansFallback, ensureDocFonts} from '../lib/doc-fonts';
 
@@ -39,36 +39,51 @@ function inlineForDocx(src: HTMLElement): string {
 }
 
 export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void}) {
+  const [zoom, setZoom] = useEditorZoom('docx'), scroller = useRef<HTMLDivElement | null>(null);
   const [c, toggleTheme] = useEditorColors(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [status, setStatus] = useState(''), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false);
-  const onSavedRef = useRef(onSaved); onSavedRef.current = onSaved;
+  const onSavedRef = useRef(onSaved); onSavedRef.current = onSaved; const initial = useRef(''), blocked = useRef(''), lib = useRef<any>(null);
   useEffect(() => {let live = true; setState('loading');
     (async () => {
       const buf = await fetch(url).then(r => {if (!r.ok) throw new Error('Não consegui abrir o documento (' + r.status + ').'); return r.arrayBuffer();});
-      const lib: any = await import('docx-preview'); if (!live || !host.current) return;
+      const mod: any = await import('docx-preview'); lib.current = mod; if (!live || !host.current) return;
       host.current.innerHTML = ''; if (styles.current) styles.current.innerHTML = '';
-      await lib.renderAsync(buf, host.current, styles.current, {className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, useBase64URL: true, renderHeaders: true, renderFooters: true, experimental: true});
+      await mod.renderAsync(buf, host.current, styles.current, {className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, useBase64URL: true, renderHeaders: true, renderFooters: true, experimental: true});
       if (!live || !host.current) return;
       const wrap = host.current.querySelector('.docx-wrapper') as HTMLElement | null || host.current;
       wrap.setAttribute('contenteditable', 'true'); wrap.setAttribute('spellcheck', 'true'); wrap.style.outline = 'none';
       // 07/11/2026 (Pedro: "o mouse ta sumindo na parte cinza"): no Windows o cursor de texto inverte a cor do fundo e some no
       // cinza medio. Fora das paginas: fundo do editor e seta normal; cursor de texto so em cima da folha.
       wrap.style.background = 'transparent'; wrap.style.cursor = 'default'; wrap.querySelectorAll('section.docx').forEach(sec => {(sec as HTMLElement).style.cursor = 'text';});
-      addSansFallback(styles.current, host.current); setState('ready'); setTimeout(() => ensureDocFonts(host.current), 50);
+      addSansFallback(styles.current, host.current); initial.current = pageHtml(); setState('ready'); setTimeout(() => ensureDocFonts(host.current), 50);
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
   }, [url]);
   const pageHtml = () => {const wrap = host.current?.querySelector('.docx-wrapper') as HTMLElement | null; if (!wrap) return '';
     const pages = Array.from(wrap.querySelectorAll('section.docx')) as HTMLElement[];
     return (pages.length ? pages : [wrap]).map(p => {const art = (p.querySelector('article') as HTMLElement | null) || p; return inlineForDocx(art);}).join('<div class="page-break" style="page-break-after: always;"></div>');};
-  const save = async () => {if (saving.current || !dirty.current) return; saving.current = true; dirty.current = false; setStatus('Salvando…');
-    try {const a = await api.saveDocx(pageId, {html: pageHtml(), name}); onSavedRef.current(a); setStatus('Salvo');}
+  /** Quanto de conteudo ha num trecho: linhas de tabela e letras (sem espacos). */
+  const measure = (root: Element | null) => ({rows: root ? root.querySelectorAll('tr').length : 0, chars: (root ? (root as HTMLElement).innerText || root.textContent || '' : '').replace(/\s+/g, '').length});
+  const save = async () => {if (saving.current || !dirty.current) return;
+    const html = pageHtml(); if (html === initial.current) {dirty.current = false; setStatus(''); return;} // nada mudou de verdade: nao salva
+    if (html === blocked.current) {dirty.current = false; return;} // a mesma versao ja foi recusada: nao tenta em loop
+    saving.current = true; dirty.current = false; setStatus('Salvando…');
+    try {const a = await api.saveDocx(pageId, {html, name});
+      // 07/11/2026 (Pedro: "sumiu conteudo aqui"): antes de trocar o arquivo, abre o salvo escondido e compara com a tela.
+      // Se faltar linha de tabela ou texto, NAO troca: o documento continua o de antes.
+      const now = measure(host.current?.querySelector('.docx-wrapper') || null);
+      try {const bytes = await fetch((await api.attachmentLink(a.id)).url + '&as=download').then(r => r.arrayBuffer()); const d = host.current!.ownerDocument, box = d.createElement('div'), st = d.createElement('div'); box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;visibility:hidden'; d.body.appendChild(st); d.body.appendChild(box);
+        await lib.current.renderAsync(bytes, box, st, {className: 'docxcheck', inWrapper: true, breakPages: false, experimental: true}); const got = measure(box); box.remove(); st.remove();
+        if (got.rows < now.rows || got.chars < now.chars * 0.97) {dirty.current = false; blocked.current = html; setStatus('Não salvei para não perder conteúdo (' + (got.rows < now.rows ? 'tabela' : 'texto') + '). O documento continua como estava.'); return;}
+      } catch {/* sem como conferir: segue (o servidor ja confere o texto) */}
+      onSavedRef.current(a); initial.current = html; setStatus('Salvo');}
     catch (e) {dirty.current = true; setStatus('Não salvo: ' + errorText(e));}
     finally {saving.current = false; if (dirty.current) schedule();}};
   const schedule = () => {clearTimeout(timer.current); timer.current = setTimeout(() => void save(), 2000);};
   useEffect(() => () => {clearTimeout(timer.current); if (dirty.current) void save();}, []); // fechou a janela com algo por salvar
   const changed = () => {dirty.current = true; setStatus('Editando…'); schedule();};
   const doc = () => (host.current?.ownerDocument || document) as Document, win = () => (doc().defaultView || window) as Window;
+  useWheelZoom(scroller, zoom, setZoom, state === 'ready');
   const keep = () => {const s = win().getSelection(); if (s && s.rangeCount && host.current?.contains(s.anchorNode)) sel.current = s.getRangeAt(0).cloneRange();};
   const restore = () => {const s = win().getSelection(); if (sel.current && s) {s.removeAllRanges(); s.addRange(sel.current);}};
   const exec = (cmd: string, value?: string) => {restore(); try {doc().execCommand('styleWithCSS', false, 'true');} catch {} doc().execCommand(cmd, false, value); keep(); changed();};
@@ -98,14 +113,14 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
     B('⯇≡', 'Alinhar à esquerda', () => exec('justifyLeft'), {fontSize: 11}), B('≡', 'Centralizar', () => exec('justifyCenter')), B('≡⯈', 'Alinhar à direita', () => exec('justifyRight'), {fontSize: 11}), B('☰', 'Justificar', () => exec('justifyFull')), sep('s7'),
     B('Tx', 'Limpar formatação', () => exec('removeFormat'), {textDecoration: 'line-through', fontSize: 12}),
     h('span', {key: 'sp', style: {flex: 1}}),
-    h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'gap', style: {width: 6}}),
+    h(ZoomControl, {key: 'zoom', colors: c, zoom, setZoom}), h('span', {key: 'gz', style: {width: 6}}), h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'gap', style: {width: 6}}),
     h('span', {key: 'st', style: {fontSize: 11, color: /Não salvo/.test(status) ? c.danger : c.muted, marginRight: 6}}, status),
     B('Salvar', 'Salvar agora', () => {dirty.current = true; void save();}, {background: c.accent, color: c.onAccent, fontWeight: 600, padding: '0 10px'}));
   return h('div', {style: {display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0}},
     bar,
-    h('div', {style: {flex: 1, minHeight: 0, overflow: 'auto', background: c.bg, position: 'relative'}, onKeyUp: keep, onMouseUp: keep, onInput: changed},
+    h('div', {ref: scroller, style: {flex: 1, minHeight: 0, overflow: 'auto', background: c.bg, position: 'relative'}, onKeyUp: keep, onMouseUp: keep, onInput: changed},
       h('div', {ref: styles}),
       state === 'loading' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#666', fontSize: 13}}, 'Abrindo o documento…') : null,
       state === 'error' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#a33', fontSize: 13}}, err) : null,
-      h('div', {ref: host, style: {color: '#000', filter: c.pageFilter, fontFamily: 'Calibri, Carlito, Arial, sans-serif' /* letra padrao do Word (sem herdar a do site) */}})));
+      h('div', {ref: host, style: {color: '#000', filter: c.pageFilter, zoom, fontFamily: 'Calibri, Carlito, Arial, sans-serif' /* letra padrao do Word (sem herdar a do site) */}})));
 }

@@ -137,7 +137,7 @@ test('Voltar ao Início sem pulo, página criada pela lateral abre direto e o po
 
 test('Capa: botões no canto de baixo por cima do cabeçalho e reposicionar abre sozinho depois de enviar',()=>{
  const pg=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');
- assert.ok(pg.includes("testID=\"page-cover-tools\" style={{position:'absolute',right:16,top:250-12-30,zIndex:30,"));
+ assert.ok(pg.includes("testID=\"page-cover-tools\" style={{position:'absolute',right:16,top:coverH-12-30,zIndex:30,"));
  assert.ok(pg.includes("if(desktop&&patch.cover_type==='attachment'&&patch.cover_attachment_id)setTimeout(startCoverMove,0);"));
 });
 
