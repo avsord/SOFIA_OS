@@ -22,6 +22,8 @@ function makeConfig(overrides = {}) {
     loginPassword: process.env.SOFIA_LOGIN_PASSWORD || '',
     // E-mail inicial do proprietário. Fica em variável de ambiente para não publicar endereço pessoal no Git/ZIP.
     loginEmail: process.env.SOFIA_LOGIN_EMAIL?.trim() || '',
+    // 07/11/2026 (Pedro): e-mail DO USUARIO dono da conta (recebe a redefinicao de senha). O e-mail da Sofia so comunica.
+    userEmail: process.env.SOFIA_USER_EMAIL?.trim() || '',
     // SMTP seguro para recuperação de senha. Para Gmail use smtp.gmail.com:465 e uma senha de app em SOFIA_SMTP_PASS.
     smtpHost: process.env.SOFIA_SMTP_HOST?.trim() || 'smtp.gmail.com',
     smtpPort: Number(process.env.SOFIA_SMTP_PORT || 465),

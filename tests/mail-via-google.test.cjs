@@ -42,3 +42,12 @@ test('ligar o remetente com o e-mail da Sofia: envia pelo Gmail e nao mexe na co
   assert.equal(out.via,'google');const send=calls.find(c=>c.url.includes('/messages/send'));assert.ok(send);
   const raw=Buffer.from(JSON.parse(send.opt.body).raw,'base64url').toString('utf8');assert.match(raw,/^From: Sofia OS <sofia@gmail\.com>\r\nTo: usuario@exemplo\.com/);
 });
+test('conta do usuario nunca fica com o e-mail da Sofia (ajuste na inicializacao)',t=>{
+  const {createRuntime}=require('../src/core/runtime');const path=require('node:path');
+  const f=fixture(t);f.store.updateSettings({profileEmail:'sofiaos.core@gmail.com'});
+  createRuntime({...f.config,userEmail:'usuario@exemplo.com',smtpUser:'sofiaos.core@gmail.com'},{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure2')});
+  assert.equal(f.store.settings().profileEmail,'usuario@exemplo.com');
+  const g=fixture(t);g.store.updateSettings({profileEmail:'outro@exemplo.com'});
+  createRuntime({...g.config,userEmail:'usuario@exemplo.com'},{store:g.store,provider:g.provider,secureDir:path.join(g.dir,'secure2')});
+  assert.equal(g.store.settings().profileEmail,'outro@exemplo.com','e-mail pessoal ja definido nao e trocado');
+});
