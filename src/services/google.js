@@ -1114,6 +1114,16 @@ class GoogleService {
     try { const r = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN drive_id IS NOT NULL THEN 1 ELSE 0 END) AS in_drive, SUM(CASE WHEN drive_id IS NULL THEN bytes ELSE 0 END) AS local_bytes FROM attachments').get(); return {total: r.total || 0, in_drive: r.in_drive || 0, local_mb: Math.round((r.local_bytes || 0) / 1048576 * 10) / 10}; } catch { return {total: 0, in_drive: 0, local_mb: 0}; }
   }
   /** Leva para o Drive os anexos que ainda estão só no servidor (até `limit` por rodada), e aqui fica só a referência. */
+  /** 07/11/2026 (Pedro: "nada de imagem, video ou documento salvo no servidor: vai para o Drive conectado, na pasta oculta"):
+   * arquivo da Pagina vai para o Drive NA HORA (antes esperava a rodada de 15 min). Sem Drive conectado: recusa. */
+  async attachmentToDrive(id) {
+    const noDrive = () => new AppError('NO_DRIVE', 'Para guardar arquivos, conecte o Google Drive em Perfil › Conexões. Eles ficam na área oculta do seu Drive, nunca no servidor.', 409);
+    if (!this.driveOn(this.link()) || !(await this.target('Anexos'))) throw noDrive();
+    const a = this.db.prepare('SELECT id, entity_id, name, mime, blob, drive_id FROM attachments WHERE id=?').get(id); if (!a || a.drive_id) return;
+    const up = await this.upload({name: a.name, mime: a.mime || 'application/octet-stream', bytes: Buffer.from(a.blob || []), cat: 'Anexos', description: 'Anexo da Sofia OS (' + a.entity_id + ')', props: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
+    if (!up?.id) throw new AppError('DRIVE_UPLOAD', 'Não consegui guardar o arquivo no Google Drive. Tente de novo.', 502);
+    this.db.prepare('UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);
+  }
   async offloadAttachments(limit = 10) {
     const l = this.link(); if (!this.driveOn(l) || this.offloading) return {moved: 0};
     this.offloading = true; let moved = 0;

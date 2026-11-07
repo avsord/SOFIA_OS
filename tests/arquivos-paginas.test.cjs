@@ -74,3 +74,10 @@ test('janela lembra o tamanho e o lugar da ultima vez (flutuante e separada)',()
  const pf=read('SOFIA_APP/src/components/PageFiles.tsx');
  assert.ok(pf.includes("const geoKey = (where: 'win' | 'popup', ed: boolean)")&&pf.includes("readGeo('popup', ed)")&&pf.includes("saveGeo('popup', ed, cur)")&&pf.includes("readGeo('win', ed)"));
 });
+
+test('arquivo de Pagina vai direto para o Drive (area oculta); sem Drive nao fica no servidor (Pedro 07/11)',()=>{
+ const g=read('src/services/google.js'),a=read('src/core/api45.js'),m=read('src/channels/mobile.js');
+ assert.ok(g.includes('async attachmentToDrive(id)')&&g.includes("new AppError('NO_DRIVE'")&&g.includes("UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);"));
+ assert.ok(a.includes("if(w.get(key).kind==='user_page'&&runtime.google&&runtime.google.attachmentToDrive)")&&a.includes("DELETE FROM attachments WHERE id=?"),'falhou no Drive: apaga do servidor e avisa');
+ assert.ok(m.includes('await runtime.google.attachmentToDrive(a.id)'),'Word salvo pelo editor tambem vai direto');
+});

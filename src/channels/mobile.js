@@ -464,6 +464,7 @@ function makeMobileApi(runtime, deps) {
         const out = await (H.default || H)(html, null, {title: name.replace(/\.docx$/i, ''), font: 'Calibri', fontSize: 22, margins: {top: 1440, right: 1440, bottom: 1440, left: 1440}});
         const buf = Buffer.isBuffer(out) ? out : Buffer.from(out instanceof ArrayBuffer ? new Uint8Array(out) : await out.arrayBuffer());
         const a = workspace.attach(validId(dm[1]), {name, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base64: buf.toString('base64')});
+        try { await runtime.google.attachmentToDrive(a.id); } catch (e) { try { workspace.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id); } catch {} throw e; } // direto para o Drive (area oculta)
         return send({id: a.id, name: a.name, mime: a.mime, bytes: a.bytes}); } }
     { const lm = p.match(/^\/api\/mobile\/workspace\/attachments\/([A-Za-z0-9_-]{6,80})\/link$/);
       if (lm && m === 'GET') { rate(session, 'file-link', 600); const a = workspace.attachment(validId(lm[1])); return send({url: fileLink(a.id), name: a.name, mime: a.mime, bytes: a.bytes}); } }
