@@ -50,6 +50,9 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
       if (!live || !host.current) return;
       const wrap = host.current.querySelector('.docx-wrapper') as HTMLElement | null || host.current;
       wrap.setAttribute('contenteditable', 'true'); wrap.setAttribute('spellcheck', 'true'); wrap.style.outline = 'none';
+      // 07/11/2026 (Pedro: "o mouse ta sumindo na parte cinza"): no Windows o cursor de texto inverte a cor do fundo e some no
+      // cinza medio. Fora das paginas: fundo do editor e seta normal; cursor de texto so em cima da folha.
+      wrap.style.background = 'transparent'; wrap.style.cursor = 'default'; wrap.querySelectorAll('section.docx').forEach(sec => {(sec as HTMLElement).style.cursor = 'text';});
       setState('ready');
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
