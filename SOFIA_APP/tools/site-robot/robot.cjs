@@ -119,7 +119,11 @@ function audit(scopeSel) {
         return Array.from(document.querySelectorAll('[role=button],button,[role=tab],[role=link]')).map((el, i) => { const r = el.getBoundingClientRect(); const name = (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 50); return {i, name, x: r.left + r.width / 2, y: r.top + r.height / 2, ok: r.width > 4 && r.height > 4 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= W && !!name && !dz.test(name) && !sk.test(name) && !(W > 900 && r.left < 250)}; }).filter(c => c.ok);
       }, {DANGER: DANGER.source, SKIP: SKIP.source});
       const seen = new Set(); let n = 0;
-      for (const c of cands) { if (n >= Number(opt.max || 18)) break; const key = c.name.toLowerCase().replace(/\d+/g, '#'); if (seen.has(key)) continue; seen.add(key); n++;
+      // 07/11/2026: a posicao de cada botao e procurada DE NOVO antes de cada clique (com a tela mudando, a posicao antiga
+      // caia num item da lista e o print saia com o nome de outro botao)
+      const findNow = async (name) => (await page.evaluate(({DANGER, SKIP, name}) => { const W = innerWidth; for (const el of document.querySelectorAll('[role=button],button,[role=tab],[role=link]')) { const r = el.getBoundingClientRect(); const nm = (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 50); if (nm === name && r.width > 4 && r.height > 4 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= W) return {x: r.left + r.width / 2, y: r.top + r.height / 2}; } return null; }, {DANGER: DANGER.source, SKIP: SKIP.source, name}));
+      for (const c0 of cands) { if (n >= Number(opt.max || 18)) break; const key = c0.name.toLowerCase().replace(/\d+/g, '#'); if (seen.has(key)) continue; seen.add(key);
+        const pos = await findNow(c0.name); if (!pos) continue; const c = {...c0, ...pos}; n++;
         const before = page.url();
         await page.evaluate(() => { window.__before = new Set(Array.from(document.querySelectorAll('*'))); });
         try { await page.mouse.click(c.x, c.y); } catch { continue; } await page.waitForTimeout(700);
