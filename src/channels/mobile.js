@@ -302,6 +302,24 @@ function makeMobileApi(runtime, deps) {
       if (action === 'backup') return send(await g.backupToDrive(true));
       fail('NOT_FOUND', 'Operação desconhecida.', 404);
     }
+    // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
+    if (p.startsWith('/api/mobile/md/sofiadrive/')) {
+      const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length);
+      if (sd === 'list' && m === 'GET') { rate(session, 'sofiadrive', 120); return send(await g.sdList(String(url.searchParams.get('folder') || 'root'), String(url.searchParams.get('q') || ''))); }
+      if (sd === 'folder' && m === 'POST') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdCreateFolder(String(b.parent || 'root'), b.name)}); }
+      if (sd === 'upload' && m === 'POST') {
+        rate(session, 'sofiadrive-write', 60); const MAX = 50 * 1024 * 1024, chunks = []; let size = 0;
+        await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
+        const name = decodeURIComponent(String(url.searchParams.get('name') || 'arquivo'));
+        return send({item: await g.sdUpload(String(url.searchParams.get('parent') || 'root'), name, String(req.headers['content-type'] || '').split(';')[0], Buffer.concat(chunks))});
+      }
+      let mm = sd.match(/^items\/([A-Za-z0-9_-]+)$/);
+      if (mm && m === 'PATCH') { rate(session, 'sofiadrive-write', 60); const b = await bodyJson(req, 2048); return send({item: await g.sdUpdate(mm[1], {name: b.name === undefined ? undefined : b.name, parent: b.parent === undefined ? undefined : String(b.parent)})}); }
+      if (mm && m === 'DELETE') { rate(session, 'sofiadrive-write', 60); return send(await g.sdTrash(mm[1])); }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/(content|preview|download)$/);
+      if (mm && m === 'GET') { rate(session, 'sofiadrive', 120); const out = mm[2] === 'preview' ? await g.sdPreview(mm[1]) : await g.sdContent(mm[1]); await GoogleService.sendFile(res, out, {inline: mm[2] !== 'download'}); return true; }
+      fail('NOT_FOUND', 'Rota do Drive não existe.', 404);
+    }
     // 0.3.244: Arquivos da Sofia (área oculta do Drive): resumo, lista por categoria, conteúdo e cópia visível.
     if (p === '/api/mobile/md/drive/files' && m === 'GET') {
       rate(session, 'drive-files', 60); const cat = url.searchParams.get('cat');

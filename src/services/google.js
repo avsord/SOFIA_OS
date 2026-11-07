@@ -1219,6 +1219,86 @@ class GoogleService {
     }
   }
 
+  // ================= Sofia Drive (07/11/2026, Pedro) =================
+  // Um "Google Drive dentro da Sofia": os arquivos ficam no DRIVE DO PROPRIO USUARIO, numa pasta "Sofia Drive" que aparece
+  // tambem no Google Drive dele. Permissao drive.file (a Sofia so ve o que ela mesma criou). Toda operacao confere que o item
+  // esta dentro dessa pasta.
+  async sdRoot() {
+    const l = this.link(); if (!this.visibleOn(l)) throw new AppError('DRIVE_NOT_CONNECTED', 'Ligue sua conta Google em Perfil → Conexões para usar o Drive.', 409);
+    let id = l.sofia_drive_root || '';
+    if (id) { try { const f = await this.call('GET', DRIVE + '/files/' + encodeURIComponent(id) + '?fields=id,trashed'); if (f.trashed) id = ''; } catch { id = ''; } }
+    if (!id) { id = (await this.call('POST', DRIVE + '/files?fields=id', {name: 'Sofia Drive', mimeType: 'application/vnd.google-apps.folder'})).id; this.saveLink({...this.link(), sofia_drive_root: id}); }
+    return id;
+  }
+  static sdId(id) { if (!/^[A-Za-z0-9_-]{6,200}$/.test(String(id || ''))) throw new AppError('BAD_FILE', 'Item inválido.', 400); return String(id); }
+  /** Caminho do item ate a raiz do Sofia Drive (lanca erro se estiver fora). */
+  async sdPath(id) {
+    const root = await this.sdRoot(); if (!id || id === 'root' || id === root) return {root, path: [], meta: {id: root, name: 'Meu Drive', mimeType: 'application/vnd.google-apps.folder'}};
+    const path = []; let cur = GoogleService.sdId(id), meta = null;
+    for (let i = 0; i < 40; i++) {
+      let f; try { f = await this.call('GET', DRIVE + '/files/' + cur + '?fields=id,name,mimeType,parents,trashed,size,modifiedTime'); } catch { throw new AppError('NOT_FOUND', cur === id ? 'Item não encontrado.' : 'Esse item não está no Sofia Drive.', 404); }
+      if (!meta) meta = f;
+      if (f.trashed) throw new AppError('NOT_FOUND', 'Esse item foi para a lixeira.', 404);
+      if (cur !== id) path.unshift({id: f.id, name: f.name});
+      const up = (f.parents || [])[0]; if (!up) break; if (up === root) return {root, path, meta};
+      cur = up;
+    }
+    throw new AppError('NOT_FOUND', 'Esse item não está no Sofia Drive.', 404);
+  }
+  async sdList(folder = 'root', q = '') {
+    const at = await this.sdPath(folder), id = at.meta.id;
+    if (at.meta.mimeType !== 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Isso não é uma pasta.', 400);
+    const files = []; let page = '';
+    for (let i = 0; i < 10; i++) {
+      const r = await this.call('GET', DRIVE + '/files?q=' + encodeURIComponent("'" + id + "' in parents and trashed=false" + (q ? " and name contains '" + String(q).replace(/['\\]/g, ' ').slice(0, 80) + "'" : '')) + '&orderBy=folder,name_natural&pageSize=200&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,iconLink,hasThumbnail)' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+      files.push(...(r.files || [])); page = r.nextPageToken || ''; if (!page) break;
+    }
+    return {folder: {id: id === at.root ? 'root' : id, name: at.meta.name}, path: at.path, items: files.map(f => ({id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''}))};
+  }
+  async sdParent(parent) { const at = await this.sdPath(parent); if (at.meta.mimeType !== 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Destino não é uma pasta.', 400); return at.meta.id; }
+  static sdName(name) { const n = String(name || '').replace(/[\u0000-\u001f\\/]/g, ' ').trim().slice(0, 200); if (!n) throw new AppError('BAD_FIELD', 'Dê um nome.', 400); return n; }
+  async sdCreateFolder(parent, name) { const p = await this.sdParent(parent); const f = await this.call('POST', DRIVE + '/files?fields=id,name,mimeType,modifiedTime', {name: GoogleService.sdName(name), mimeType: 'application/vnd.google-apps.folder', parents: [p]}); return {id: f.id, name: f.name, mime: f.mimeType, folder: true, size: null, modified: f.modifiedTime || ''}; }
+  async sdUpload(parent, name, mime, bytes) {
+    const p = await this.sdParent(parent), type = /^[\w.+-]+\/[\w.+-]+$/.test(String(mime || '')) ? String(mime) : 'application/octet-stream';
+    const {body, type: ct} = GoogleService.multipart({name: GoogleService.sdName(name), parents: [p], mimeType: type}, type, bytes);
+    const f = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,name,mimeType,size,modifiedTime', body, {'Content-Type': ct});
+    return {id: f.id, name: f.name, mime: f.mimeType, folder: false, size: f.size != null ? Number(f.size) : bytes.length, modified: f.modifiedTime || ''};
+  }
+  async sdUpdate(id, {name, parent} = {}) {
+    const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não muda.', 400);
+    let url = DRIVE + '/files/' + at.meta.id + '?fields=id,name,mimeType,size,modifiedTime,parents';
+    if (parent !== undefined) {
+      const dest = await this.sdParent(parent);
+      if (dest === at.meta.id) throw new AppError('BAD_FILE', 'Uma pasta não entra nela mesma.', 400);
+      if (at.meta.mimeType === 'application/vnd.google-apps.folder') { const d = await this.sdPath(dest); if (d.path.some(x => x.id === at.meta.id)) throw new AppError('BAD_FILE', 'Uma pasta não entra numa pasta dela.', 400); }
+      url += '&addParents=' + dest + '&removeParents=' + (at.meta.parents || []).join(',');
+    }
+    const f = await this.call('PATCH', url, name !== undefined ? {name: GoogleService.sdName(name)} : {});
+    return {id: f.id, name: f.name, mime: f.mimeType, folder: f.mimeType === 'application/vnd.google-apps.folder', size: f.size != null ? Number(f.size) : null, modified: f.modifiedTime || ''};
+  }
+  async sdTrash(id) { const at = await this.sdPath(id); if (at.meta.id === at.root) throw new AppError('BAD_FILE', 'A pasta principal não vai para a lixeira.', 400); await this.call('PATCH', DRIVE + '/files/' + at.meta.id + '?fields=id', {trashed: true}); return {ok: true}; }
+  async sdContent(id) { const at = await this.sdPath(id); return this.driveContent(at.meta.id); }
+  /** Word/Excel/PowerPoint e afins: o Google converte uma copia temporaria e exporta em PDF para ver na Sofia. */
+  async sdPreview(id) {
+    const at = await this.sdPath(id), mime = String(at.meta.mimeType || ''), name = String(at.meta.name || '');
+    const kind = /wordprocessingml|msword|opendocument\.text|rtf|^text\/plain$/.test(mime) || /\.(docx?|odt|rtf)$/i.test(name) ? 'document'
+      : /spreadsheetml|ms-excel|opendocument\.spreadsheet|^text\/csv$/.test(mime) || /\.(xlsx?|ods|csv)$/i.test(name) ? 'spreadsheet'
+      : /presentationml|ms-powerpoint|opendocument\.presentation/.test(mime) || /\.(pptx?|odp)$/i.test(name) ? 'presentation' : '';
+    if (mime.startsWith('application/vnd.google-apps.')) {
+      const res = await this.fetch(DRIVE + '/files/' + at.meta.id + '/export?mimeType=application/pdf', {headers: {Authorization: 'Bearer ' + await this.token()}});
+      if (!res.ok) throw new AppError('GOOGLE_API', 'O Google não converteu o arquivo (' + res.status + ').', 502);
+      return {meta: {name: name + '.pdf', mimeType: 'application/pdf'}, res};
+    }
+    if (!kind) throw new AppError('BAD_FILE', 'Esse tipo de arquivo não tem visualização; baixe para abrir.', 415);
+    const copy = await this.call('POST', DRIVE + '/files/' + at.meta.id + '/copy?fields=id', {name: 'Sofia - visualizacao temporaria', mimeType: 'application/vnd.google-apps.' + kind, parents: [at.root]});
+    try {
+      const res = await this.fetch(DRIVE + '/files/' + copy.id + '/export?mimeType=application/pdf', {headers: {Authorization: 'Bearer ' + await this.token()}});
+      if (!res.ok) throw new AppError('GOOGLE_API', 'O Google não converteu o arquivo (' + res.status + ').', 502);
+      const buf = Buffer.from(await res.arrayBuffer());
+      return {meta: {name: name.replace(/\.[^.]+$/, '') + '.pdf', mimeType: 'application/pdf', size: buf.length}, res: new Response(buf)};
+    } finally { this.call('DELETE', DRIVE + '/files/' + copy.id).catch(() => {}); }
+  }
+
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
     const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };
