@@ -122,6 +122,8 @@ import * as PDownloadSimple_ from 'phosphor-react-native/src/icons/DownloadSimpl
 import * as PHardDrives_ from 'phosphor-react-native/src/icons/HardDrives';
 import * as PPencilSimple_ from 'phosphor-react-native/src/icons/PencilSimple';
 import * as PArrowsOutCardinal_ from 'phosphor-react-native/src/icons/ArrowsOutCardinal';
+import * as PCornersOut_ from 'phosphor-react-native/src/icons/CornersOut';
+import * as PCornersIn_ from 'phosphor-react-native/src/icons/CornersIn';
 import * as PListBullets_ from 'phosphor-react-native/src/icons/ListBullets';
 import * as PArrowsDownUp_ from 'phosphor-react-native/src/icons/ArrowsDownUp';
 import * as PArrowSquareOut_ from 'phosphor-react-native/src/icons/ArrowSquareOut';
@@ -169,6 +171,8 @@ const ICONS = {
  upload: PUploadSimple_.UploadSimpleIcon,
  download: PDownloadSimple_.DownloadSimpleIcon,
  drive: PHardDrives_.HardDrivesIcon,
+ expand: PCornersOut_.CornersOutIcon,
+ collapse: PCornersIn_.CornersInIcon,
  rename: PPencilSimple_.PencilSimpleIcon,
  moveTo: PArrowsOutCardinal_.ArrowsOutCardinalIcon,
  listView: PListBullets_.ListBulletsIcon,

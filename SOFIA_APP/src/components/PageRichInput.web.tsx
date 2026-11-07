@@ -10,7 +10,7 @@ import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
 
 type Props={value:string;html?:string;placeholder?:string;placeholderColor?:string;style?:any;editable?:boolean;accessibilityLabel?:string;testID?:string;
- onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
+ onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number,html?:string)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i;
@@ -27,6 +27,17 @@ export function sanitizeRich(html:string):string{
   if(node.nodeType!==Node.ELEMENT_NODE){node.childNodes.forEach(c=>frag.append(build(c,false)));return frag;}
   const el=node as HTMLElement,tag=el.tagName;
   if(tag==='DIV'||tag==='P'){if(!first)frag.append(document.createElement('br'));el.childNodes.forEach((c,i)=>frag.append(build(c,i===0)));return frag;}
+  // 07/11/2026 (Pedro: "copiar o texto em bold tambem vai o bold, italico"): o que vem de outro site (e da propria Sofia)
+  // marca negrito/italico/sublinhado no estilo (font-weight etc.). Vira <b>/<i>/<u>/<s>; o <b style="font-weight:normal">
+  // que o Google Docs poe em volta de tudo NAO vira negrito.
+  {const st=el.style,fw=String(st?.fontWeight||''),heavy=fw==='bold'||fw==='bolder'||(+fw>=600),light=fw==='normal'||fw==='lighter'||(fw!==''&&+fw<600),ital=st?.fontStyle==='italic',deco=String(st?.textDecorationLine||st?.textDecoration||'');
+   if((tag==='B'||tag==='STRONG')&&light){const f2=document.createDocumentFragment();el.childNodes.forEach((c,i)=>f2.append(build(c,first&&i===0)));return f2;}
+   if(tag!=='BR'&&tag!=='B'&&tag!=='STRONG'&&tag!=='I'&&tag!=='EM'&&(heavy||ital||/underline|line-through/.test(deco))){
+    const inner=ALLOWED.has(tag)&&tag!=='SPAN'?null:document.createDocumentFragment();
+    let wrap:HTMLElement|null=null,root:HTMLElement|null=null;const add=(t:string)=>{const n=document.createElement(t);if(wrap)wrap.append(n);else root=n;wrap=n;};
+    if(heavy)add('b');if(ital)add('i');if(/underline/.test(deco))add('u');if(/line-through/.test(deco))add('s');
+    if(inner&&root&&wrap){el.childNodes.forEach(c=>(wrap as HTMLElement).append(build(c,false)));const color=st.color,bg=st.backgroundColor;if((color&&SAFE_COLOR.test(color.trim()))||(bg&&SAFE_COLOR.test(bg.trim()))){const sp=document.createElement('span');if(color&&SAFE_COLOR.test(color.trim()))sp.style.color=color;if(bg&&SAFE_COLOR.test(bg.trim()))sp.style.backgroundColor=bg;sp.append(root);return sp;}return root;}
+   }}
   if(!ALLOWED.has(tag)){el.childNodes.forEach((c,i)=>frag.append(build(c,first&&i===0)));return frag;}
   const out=document.createElement(tag==='STRONG'?'b':tag==='EM'?'i':tag==='STRIKE'||tag==='DEL'?'s':tag.toLowerCase());
   if(tag==='A'){const href=String(el.getAttribute('href')||'');if(/^(https?:|mailto:)/i.test(href)){out.setAttribute('href',href);out.setAttribute('target','_blank');out.setAttribute('rel','noopener noreferrer');}}
@@ -38,6 +49,14 @@ export function sanitizeRich(html:string):string{
  target.querySelectorAll('b,i,u,s,code,span,mark,a').forEach(n=>{if(!n.textContent&&!n.querySelector('br'))n.remove();});
  return target.innerHTML;
 }
+/** HTML colado: so o trecho copiado (entre os marcadores do navegador), limpo pela mesma lista de marcas. */
+export function pasteHtml(html:string):string{
+ const m=/<!--StartFragment-->([\s\S]*?)<!--EndFragment-->/.exec(html);let body=m?m[1]:html.replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
+ body=body.replace(/<(style|script|meta|title|head)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<meta[^>]*>/gi,'');
+ return sanitizeRich(body).replace(/^(<br>)+|(<br>)+$/g,'');
+}
+/** Linhas do HTML limpo (separadas por <br>), para colar varias linhas mantendo a formatacao de cada uma. */
+export function htmlLines(html:string):string[]{return String(html||'').split(/<br\s*\/?>/i);}
 /** Texto de um trecho do editor: <br> conta como "\n" (igual ao texto guardado). */
 function textOf(node:Node):string{let out='';const walk=(n:Node)=>{if(n.nodeType===Node.TEXT_NODE){out+=n.textContent||'';return;}if(n.nodeName==='BR'){if((n as any).dataset?.fill)return;out+='\n';return;}n.childNodes.forEach(walk);};walk(node);return out;}
 // 06/11/2026 (Pedro: "Shift+Enter nao ta quebrando linha"): no fim do texto o navegador so mostra a linha nova se houver
@@ -123,7 +142,10 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
    // 07/11/2026 (Pedro: colar qualquer tipo de item): arquivo copiado no computador (PDF, Word...) vira bloco de arquivo
    if(props.onDropFiles){const fl=[...(e.clipboardData?.files||[])] as File[];if(fl.length&&!e.clipboardData?.getData('text/plain')){e.preventDefault();props.onDropFiles(fl);return;}}
    const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
-   if(props.onPasteText?.(text,start,end))return;
+   const rawHtml=e.clipboardData?.getData('text/html')||'',rich=rawHtml?pasteHtml(rawHtml):'';
+   if(props.onPasteText?.(text,start,end,rich||undefined))return;
+   // uma linha com formatacao (negrito, italico, cor, link): entra com a formatacao
+   if(rich&&!text.includes('\n')&&/<(b|i|u|s|code|mark|a|span)\b/i.test(rich)){document.execCommand('insertHTML',false,rich);return;}
    const sel=document.getSelection();if(sel&&!sel.isCollapsed&&/^https?:\/\/\S+$/i.test(text.trim())){document.execCommand('createLink',false,text.trim());return;}
    const links=findLinks(text);if(!links.length){document.execCommand('insertText',false,text);return;}
    let html='',at=0;for(const l of links){html+=escapeHtml(text.slice(at,l.start))+'<a href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.url)+'</a>';at=l.end;}

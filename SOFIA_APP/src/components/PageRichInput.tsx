@@ -5,3 +5,5 @@ export function escapeHtml(v:string){return String(v||'').replace(/&/g,'&amp;').
 export function textToHtml(v:string){return escapeHtml(v).replace(/\n/g,'<br>');}
 export function sanitizeRich(html:string){return escapeHtml(String(html||'').replace(/<[^>]*>/g,''));}
 export const PageRichInput=React.forwardRef<any,any>(function PageRichInput(){return null;});
+export function pasteHtml(html: string) { return sanitizeRich(html); }
+export function htmlLines(html: string): string[] { return String(html || '').split(/<br\s*\/?>/i); }

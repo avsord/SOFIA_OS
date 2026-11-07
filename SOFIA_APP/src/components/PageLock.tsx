@@ -53,11 +53,7 @@ export function PageLockDialog({title, change, onCancel, onLock}: {title: string
 export function PageLockScreen({title, level, onUnlock, onRecover}: {title: string; level: LockLevel; onUnlock: (password: string) => Promise<void>; onRecover: (account: string, newPassword: string) => Promise<void>}) {
   const c = useTheme(), [pw, setPw] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [rec, setRec] = useState(false), [acc, setAcc] = useState(''), [n1, setN1] = useState(''), [n2, setN2] = useState('');
   const run = async (fn: () => Promise<void>) => {setBusy(true); setErr(''); try {await fn();} catch (e: any) {setErr(String(e?.message || 'Não deu certo.')); setBusy(false);}};
-  return <View testID="page-locked" style={{flex: 1, alignItems: 'center', paddingTop: 80, paddingHorizontal: 24}}>
-    <View style={{width: 58, height: 58, borderRadius: 16, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16}}><Icon name="lock" size={26} color={c.accent} /></View>
-    <Text style={{color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center'}}>{title || 'Sem título'}</Text>
-    <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', maxWidth: 340, marginTop: 6}}>{level === 'max' ? 'Esta página está trancada (Máxima). Digite a senha para ver o conteúdo; ao sair da página, ela tranca de novo.' : 'Esta página está trancada (Média). Digite a senha para ver o conteúdo; ela continua aberta por 5 minutos depois que você sair.'}</Text>
-    <View style={{width: 300, maxWidth: '100%', gap: 10, marginTop: 18}}>
+  return <LockFrame testID="page-locked" title={title || 'Sem título'} text={level === 'max' ? 'Esta página está trancada (Máxima). Digite a senha para ver o conteúdo; ao sair da página, ela tranca de novo.' : 'Esta página está trancada (Média). Digite a senha para ver o conteúdo; ela continua aberta por 5 minutos depois que você sair.'}>
       {rec ? <>
         <Text style={{color: c.text, fontSize: 13, fontWeight: '600'}}>Criar senha nova</Text>
         <Field testID="lock-account" value={acc} onChange={setAcc} placeholder="Senha da sua conta Sofia" autoFocus />
@@ -71,7 +67,19 @@ export function PageLockScreen({title, level, onUnlock, onRecover}: {title: stri
         {level === 'medium' ? <Pressable accessibilityRole="button" onPress={() => {setRec(true); setErr('');}} style={{alignSelf: 'center', padding: 6}}><Text style={{color: c.accent, fontSize: 13}}>Esqueci a senha</Text></Pressable> : null}
       </>}
       {err ? <Text testID="unlock-error" style={{color: c.danger, fontSize: 12, textAlign: 'center'}}>{err}</Text> : null}
-    </View>
+  </LockFrame>;
+}
+
+/** 07/11/2026 (Pedro: "alinhar a diagramacao de todos que entram com bloqueio, padronizado"): a mesma moldura para toda
+ * tela de senha (pagina, Drive, etiqueta de notas): cadeado, titulo, explicacao e campos de 300 px, na mesma altura. */
+export function LockFrame({testID, title, text, children, foot}: {testID?: string; title: string; text: string; children: React.ReactNode; foot?: string}) {
+  const c = useTheme();
+  return <View testID={testID} style={{flex: 1, alignItems: 'center', paddingTop: 80, paddingBottom: 40, paddingHorizontal: 24}}>
+    <View style={{width: 58, height: 58, borderRadius: 16, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16}}><Icon name="lock" size={26} color={c.accent} /></View>
+    <Text style={{color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center'}}>{title}</Text>
+    <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', maxWidth: 340, marginTop: 6}}>{text}</Text>
+    <View style={{width: 300, maxWidth: '100%', gap: 10, marginTop: 18}}>{children}</View>
+    {foot ? <Text style={{color: c.muted, fontSize: 12, textAlign: 'center', maxWidth: 340, marginTop: 14}}>{foot}</Text> : null}
   </View>;
 }
 

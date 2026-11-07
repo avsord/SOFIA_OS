@@ -1,3 +1,4 @@
+import {Btn, Field, LockFrame} from '../components/PageLock';
 import {RowsSkeleton, TextShimmer} from '../components/ListSkeleton';
 import {useLiveReload} from '../lib/live-reload';
 import {dpx} from '../lib/content-width';
@@ -262,14 +263,11 @@ export function Notes({api, active, onBack}: {api: SofiaApi; active: boolean; on
 function LockScreen({tag, count, onUnlock}: {tag: Tag; count: number; onUnlock: (pw: string) => Promise<boolean>}) {
   const c = useTheme(), [pw, setPw] = useState(''), [msg, setMsg] = useState(''), [busy, setBusy] = useState(false);
   const go = async () => { if (!pw || busy) return; setBusy(true); setMsg('Abrindo…'); const ok = await onUnlock(pw); setBusy(false); if (!ok) { setMsg('Senha incorreta.'); setPw(''); } };
-  return <View testID="notes-lockscreen" style={{alignItems: 'center', gap: 12, paddingVertical: 40}}>
-    <View style={{width: 64, height: 64, borderRadius: 20, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="lock" size={28} color={c.accent} /></View>
-    <Text style={{color: c.text, fontSize: 18, fontWeight: '700'}}>{tag.name} está protegida</Text>
-    <Text style={{color: c.muted, textAlign: 'center', maxWidth: 380}}>{count} {count === 1 ? 'nota guardada' : 'notas guardadas'} com criptografia. Digite a senha para abrir.</Text>
-    <View style={{flexDirection: 'row', gap: 8, width: '100%', maxWidth: 380}}><Input testID="notes-password" secureTextEntry autoFocus value={pw} onChangeText={setPw} onSubmitEditing={() => void go()} placeholder="Senha" style={{flex: 1}} /><PrimaryButton label="Abrir" disabled={!pw || busy} onPress={() => void go()} /></View>
-    {msg ? <Text style={{color: msg === 'Senha incorreta.' ? c.danger : c.muted, fontSize: 13}}>{msg}</Text> : null}
-    <Text style={{color: c.muted, fontSize: 12, textAlign: 'center', maxWidth: 380}}>A senha não fica guardada em lugar nenhum. Se ela for esquecida, as notas desta etiqueta não podem ser recuperadas.</Text>
-  </View>;
+  return <LockFrame testID="notes-lockscreen" title={tag.name + ' está protegida'} text={count + ' ' + (count === 1 ? 'nota guardada' : 'notas guardadas') + ' com criptografia. Digite a senha para abrir.'} foot="A senha não fica guardada em lugar nenhum. Se ela for esquecida, as notas desta etiqueta não podem ser recuperadas.">
+    <Field testID="notes-password" value={pw} onChange={setPw} onSubmit={() => void go()} placeholder="Senha da etiqueta" autoFocus />
+    <Btn testID="notes-open" title="Abrir" primary busy={busy} disabled={!pw} onPress={() => void go()} />
+    {msg && msg !== 'Abrindo…' ? <Text style={{color: msg === 'Senha incorreta.' ? c.danger : c.muted, fontSize: 12, textAlign: 'center'}}>{msg}</Text> : null}
+  </LockFrame>;
 }
 function NotePanel({n, tags, onClose, onChange, onMenu, canUseTag}: {n: Note; tags: Tag[]; onClose: () => void; onChange: (p: {title?: string; body?: string; tags?: string[]}) => void; onMenu: (e: any) => void; canUseTag: (t: Tag) => boolean}) {
   const c = useTheme(), [title, setTitle] = useState(n.title), [body, setBody] = useState(n.body), [adding, setAdding] = useState(false), [newTag, setNewTag] = useState(''), timer = useRef<any>(null), latest = useRef({title, body});

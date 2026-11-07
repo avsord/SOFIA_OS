@@ -6,7 +6,7 @@ import {ActivityIndicator, Pressable, Text, View} from 'react-native';
 import type {DriveLockState, SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
-import {Btn, Field} from './PageLock';
+import {Btn, Field, LockFrame} from './PageLock';
 
 const listeners = new Set<() => void>();
 /** Qualquer tela que recebeu DRIVE_LOCKED chama isto: a porta do Drive fecha e pede a senha de novo. */
@@ -29,11 +29,7 @@ export function DriveLock({api, active, children}: {api: SofiaApi; active: boole
   if (st && st.hasPassword && !st.locked) return <>{children}</>;
   if (!st) return <View testID="drive-lock-check" style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}><ActivityIndicator color={c.muted} /></View>;
   const first = !st.hasPassword, forgot = mode === 'forgot';
-  return <View testID="drive-locked" style={{flex: 1, alignItems: 'center', paddingTop: 80, paddingHorizontal: 24}}>
-    <View style={{width: 58, height: 58, borderRadius: 16, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16}}><Icon name="lock" size={26} color={c.accent} /></View>
-    <Text style={{color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center'}}>Drive</Text>
-    <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', maxWidth: 340, marginTop: 6}}>{first ? 'Crie uma senha para o Drive. Depois de digitar a senha, o Drive fica aberto por 10 minutos.' : forgot ? 'Crie uma senha nova para o Drive usando a senha da sua conta Sofia.' : 'O Drive está trancado. Digite a senha do Drive; ele fica aberto por 10 minutos.'}</Text>
-    <View style={{width: 300, maxWidth: '100%', gap: 10, marginTop: 18}}>
+  return <LockFrame testID="drive-locked" title="Drive" text={first ? 'Crie uma senha para o Drive. Depois de digitar a senha, o Drive fica aberto por 10 minutos.' : forgot ? 'Crie uma senha nova para o Drive usando a senha da sua conta Sofia.' : 'O Drive está trancado. Digite a senha do Drive; ele fica aberto por 10 minutos.'}>
       {first || forgot ? <>
         {forgot ? <Field testID="drive-lock-account" value={acc} onChange={setAcc} placeholder="Senha da sua conta Sofia" autoFocus /> : null}
         <Field testID="drive-lock-new" value={n1} onChange={setN1} placeholder="Senha nova do Drive" autoFocus={first} />
@@ -47,6 +43,5 @@ export function DriveLock({api, active, children}: {api: SofiaApi; active: boole
         <Pressable accessibilityRole="button" onPress={() => { setMode('forgot'); setErr(''); }} style={{alignSelf: 'center', padding: 6}}><Text style={{color: c.accent, fontSize: 13}}>Esqueci a senha</Text></Pressable>
       </>}
       {err ? <Text testID="drive-lock-error" style={{color: c.danger, fontSize: 12, textAlign: 'center'}}>{err}</Text> : null}
-    </View>
-  </View>;
+  </LockFrame>;
 }

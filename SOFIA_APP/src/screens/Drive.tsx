@@ -64,13 +64,13 @@ function lockAware(api: SofiaApi): SofiaApi {
   return new Proxy(api, {get(t: any, k: any) { const v = t[k]; if (typeof v !== 'function' || !String(k).startsWith('sd')) return typeof v === 'function' ? v.bind(t) : v;
     return (...a: any[]) => { const r = v.apply(t, a); return r && typeof r.catch === 'function' ? r.catch((e: any) => { if (isDriveLocked(e)) driveLockedNow(); throw e; }) : r; }; }}) as SofiaApi;
 }
-export function Drive(props: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+export function Drive(props: {api: SofiaApi; active: boolean; onBack?: () => void; frame?: {width: number}}) {
   const api = useMemo(() => lockAware(props.api), [props.api]);
   return <DriveLock api={props.api} active={props.active}><DriveInner {...props} api={api} /></DriveLock>;
 }
-function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boolean; onBack?: () => void}) {
+function DriveInner({api: rawApi, active, onBack, frame}: {api: SofiaApi; active: boolean; onBack?: () => void; frame?: {width: number}}) {
   const api = useMemo(() => { driveDiagInit(rawApi); return trackedDriveApi(rawApi); }, [rawApi]);
-  const c = useTheme(), {width} = useWindowDimensions(), wide = width >= 900, touchWeb = WEB && !wide;
+  const c = useTheme(), {width: screenW} = useWindowDimensions(), width = frame ? frame.width : screenW, wide = width >= 900, touchWeb = WEB && screenW < 900 /* 07/11/2026: Drive flutuante usa a largura da janela; mouse continua mouse */;
   const [view, setView] = useState<View_>('drive'), [folder, setFolder] = useState('root');
   const [data, setData] = useState<SdListing | null>(null), [viewItems, setViewItems] = useState<SdItem[] | null>(null);
   const [loading, setLoading] = useState(false), [error, setError] = useState(''), [code, setCode] = useState('');
@@ -103,10 +103,12 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
   // endereco acompanha a pasta (site): ?pasta=<id> / ?lista=<recentes...>; voltar do navegador sobe de pasta
   const go = useCallback((v: View_, f = 'root', push = true) => {
     setQuery(''); setFound(null); setView(v); setFolder(f); setPreview(null); void load(v, f);
-    if (WEB && push) { try { const u = new URL(location.href); u.searchParams.delete('pasta'); u.searchParams.delete('lista'); if (v !== 'drive') u.searchParams.set('lista', v); else if (f !== 'root') u.searchParams.set('pasta', f); if (u.href !== location.href) history.pushState({sofiaDrive: true}, '', u.href); } catch { /* sem historico */ } }
+    if (WEB && push && !frame) { try { // flutuante: nao mexe no endereco da pagina por baixo
+ const u = new URL(location.href); u.searchParams.delete('pasta'); u.searchParams.delete('lista'); if (v !== 'drive') u.searchParams.set('lista', v); else if (f !== 'root') u.searchParams.set('pasta', f); if (u.href !== location.href) history.pushState({sofiaDrive: true}, '', u.href); } catch { /* sem historico */ } }
   }, [load]);
   useEffect(() => { if (!active) return;
     if (WEB) { const read = () => { try { const u = new URL(location.href); const l = u.searchParams.get('lista') as View_ | null; return {v: l && VIEWS.some(x => x.id === l) ? l : 'drive' as View_, f: u.searchParams.get('pasta') || 'root'}; } catch { return {v: 'drive' as View_, f: 'root'}; } };
+      if (frame) { void load(); return; }
       const s = read(); go(s.v, s.f, false); const pop = () => { if (!location.pathname.includes('/apps/drive')) return; const r = read(); go(r.v, r.f, false); }; window.addEventListener('popstate', pop); return () => window.removeEventListener('popstate', pop); }
     void load(); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (active && !code) void api.sdAbout().then(r => { if (r.connected !== false) setAbout({used: r.used, limit: r.limit}); }).catch(() => {}); }, [active, code, api]);
@@ -187,7 +189,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
     if (!WEB || !active) return;
     const onPaste = (e: ClipboardEvent) => {
       const ae = document.activeElement as HTMLElement | null;
-      if (!rootRef.current?.isConnected || keyState.current.busy || (ae && (ae.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(ae.tagName)))) return;
+      if (!rootRef.current?.isConnected || (frame ? !rootRef.current.contains(ae) : !!ae?.closest?.('[data-drive-float]')) || keyState.current.busy || (ae && (ae.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(ae.tagName)))) return;
       if (document.querySelector('[role=dialog],[role=alertdialog],[role=menu],[aria-modal=true]')) return;
       const files = Array.from(e.clipboardData?.files || []), clip = clipFromPaste(e);
       if (!clip && !files.length) return;
@@ -308,7 +310,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
     if (!WEB || !active) return;
     const onKey = (e: KeyboardEvent) => {
       const st = keyState.current, ae = document.activeElement as HTMLElement | null;
-      if (st.busy || e.altKey || !rootRef.current?.isConnected) return;
+      if (st.busy || e.altKey || !rootRef.current?.isConnected || (frame ? !rootRef.current.contains(ae) : !!ae?.closest?.('[data-drive-float]'))) return;
       const onItem = !!ae?.closest?.('[data-testid^="drive-item-"]');
       if (!(ae === document.body || ae === document.documentElement || onItem || ae === rootRef.current)) return;
       if (document.querySelector('[role=dialog],[role=alertdialog],[role=menu],[aria-modal=true]')) return;
@@ -419,7 +421,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
       <View style={{paddingHorizontal: wide ? 24 : 16, paddingTop: wide ? 22 : 12, gap: 12}}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
           {onBack && !wide ? <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onBack} hitSlop={10}><Icon name="back" size={22} color={c.text} /></Pressable> : null}
-          {!wide ? <Text accessibilityRole="header" style={{fontSize: 24, fontWeight: '600', letterSpacing: -1, color: c.text}}>Drive</Text> : searchBox}
+          {!wide && !frame ? <Text accessibilityRole="header" style={{fontSize: 24, fontWeight: '600', letterSpacing: -1, color: c.text}}>Drive</Text> : searchBox}
           <View style={{flex: 1}} />
           <GhostButton icon={layout === 'grid' ? 'listView' : 'gridView'} label={wide ? (layout === 'grid' ? 'Lista' : 'Grade') : undefined} onPress={() => setLayoutSaved(layout === 'grid' ? 'list' : 'grid')} testID="drive-layout" />
         </View>

@@ -1,3 +1,5 @@
+import {DRIVE_APP} from '../lib/features';
+import {DriveWindowHost,openDriveWindow,closeDriveWindow,useDriveWindowOpen} from '../components/DriveWindow';
 import {uiScale} from '../web/desktop-scale';
 import {LoadingLines} from '../components/Loading';
 // 0.3.250: moldura do app no computador (estilo Notion). So e usada no navegador com tela larga
@@ -252,6 +254,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     <Pressable testID="desktop-search" accessibilityRole="button" accessibilityLabel="Buscar" onPress={()=>setPalette(true)} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,width:260,paddingHorizontal:12,paddingVertical:7,borderRadius:9,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
      <Icon name="search" size={16} color={c.muted}/><Text style={{flex:1,color:c.muted,fontSize:13}}>Buscar</Text><Text style={{color:c.muted,fontSize:11}}>Ctrl+K</Text>
     </Pressable>
+    {DRIVE_APP?<DriveFloatButton api={api}/>:null}
     <NotificationBell onViewAll={()=>onNavigate('notifications')}/>
     <Pressable accessibilityRole="button" accessibilityLabel="Abrir perfil e configurações" onPress={()=>onNavigate('profile')}><ProfileAvatar scope={profile.email} name={profile.name} size={34}/></Pressable>
    </View>
@@ -261,3 +264,11 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  </View>;
 }
 
+
+/** 07/11/2026 (Pedro: Drive flutuante para usar junto com as Paginas): botao na barra de cima; a janela fica aberta ao trocar de tela. */
+function DriveFloatButton({api}:{api:SofiaApi}){
+ const c=useTheme(),on=useDriveWindowOpen();
+ return <><Pressable testID="drive-float-toggle" accessibilityRole="button" accessibilityState={{selected:on}} accessibilityLabel={on?'Fechar o Drive flutuante':'Abrir o Drive em janela flutuante'} onPress={()=>on?closeDriveWindow():openDriveWindow()}
+  style={({hovered}:any)=>({width:34,height:34,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:on?c.accentSoft:hovered?c.input:'transparent'})}><Icon name="drive" size={18} color={on?c.accent:c.muted}/></Pressable>
+  <DriveWindowHost api={api}/></>;
+}

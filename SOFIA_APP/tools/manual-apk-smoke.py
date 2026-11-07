@@ -44,7 +44,9 @@ def cold(label):
  assert 'FATAL EXCEPTION' not in logs,logs
  stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(SYSTEM_CALLBACK|UI|LOCAL_READY|FADE_START|FADE_DONE|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
  assert 'DATA' in stages,logs
- assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
+ # 07/11/2026: a versao publicada (base da comparacao) pode ser anterior a marca LOCAL_READY; sem ela, so a ordem UI<=DATA
+ assert stages['UI']<=stages.get('LOCAL_READY',stages['UI'])<=stages['DATA'],stages
+ assert 'LOCAL_READY' in stages or label.startswith('baseline'),('LOCAL_READY ausente',label,stages)
  icon=re.search(r'SOFIA_LAUNCH_ICON_KIND=([A-Za-z0-9_$]+)',logs)
  image=re.search(r'SOFIA_LAUNCH_ICON_IS_IMAGE_VIEW=(true|false)',logs)
  surface=re.search(r'SOFIA_LAUNCH_ICON_IS_SURFACE_VIEW=(true|false)',logs)

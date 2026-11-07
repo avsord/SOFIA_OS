@@ -128,7 +128,8 @@ async function probeOverlay(page, url, o) {
     const spot = await page.evaluate(boxes => { const rects = boxes.map(k => { const [x, y, wh] = k.split(','); const [w, h] = wh.split('x'); return {x: +x, y: +y, w: +w, h: +h}; }); const inside = (px, py) => rects.some(r => px >= r.x - 8 && px <= r.x + r.w + 8 && py >= r.y - 8 && py <= r.y + r.h + 8); for (let y = innerHeight - 30; y > 60; y -= 37) for (let x = innerWidth - 30; x > 300; x -= 53) { if (inside(x, y)) continue; const el = document.elementFromPoint(x, y); if (!el || el.closest('button,[role=button],a,input,textarea,[contenteditable=true],[role=link],[tabindex]')) continue; return {x, y}; } return null; }, opened2);
     if (spot) {
       await page.mouse.click(spot.x, spot.y); await page.waitForTimeout(450);
-      const stay = (await overlays(page)).filter(k => opened2.includes(k));
+      // 07/11/2026: janela de ferramenta (Drive flutuante) fica aberta de proposito ao clicar na pagina; so precisa fechar com Esc
+      const stay = (await page.evaluate(() => !!document.querySelector('[data-tool-window]'))) ? [] : (await overlays(page)).filter(k => opened2.includes(k));
       if (stay.length) problem = problem ? {kind: 'nao-fecha-esc-nem-fora', detail: problem.detail + '; e tambem nao fecha clicando fora'} : {kind: 'nao-fecha-clicando-fora', detail: 'abre ' + opened2[0] + ' e continua aberto apos clicar fora'};
     }
   }
