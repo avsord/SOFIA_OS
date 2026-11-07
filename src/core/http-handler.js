@@ -275,6 +275,9 @@ function createHandler(runtime) {
     }catch(error) {
       const e=publicError(error);
       if(e.status>=500)console.error('[Sofia] '+e.code); // No provider body, request headers, tokens or private message content.
+      // 07/11/2026 (checkup): gravacao recusada pelo app ficava sem rastro (5 PATCH 400 seguidos no registro). Registra o motivo
+      // (codigo e texto curto do erro, rota sem ids) - nunca o conteudo enviado.
+      if(e.status>=400&&e.status<500&&m!=='GET'&&!['AUTH_REQUIRED','RATE_LIMIT','LOGIN_INVALID','LOGIN_CODE_INVALID','LOGIN_CODE_EXPIRED','REVISION_CONFLICT','CONFLICT'].includes(e.code))console.warn('[recusado] '+m+' '+String(p).replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi,'ID').slice(0,80)+' '+e.code+' '+String(e.error||'').replace(/\s+/g,' ').slice(0,140));
       if(!res.headersSent)json(res,e.status,{ok:false,code:e.code,error:e.error,conversation_id:error.conversationId || null,message_id:error.messageId || null});
       else if(!res.writableEnded)res.end();
     }

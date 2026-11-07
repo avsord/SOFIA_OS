@@ -29,3 +29,16 @@
  // a foto pronta fica a mao do avatar, que ja nasce com ela (sem as iniciais primeiro)
  window.__sofiaEarly['/profile/photo'].then(function(d){if(d&&d.photo&&/^image\/[a-z+.-]+$/.test(d.photo.mime))window.__sofiaPhoto='data:'+d.photo.mime+';base64,'+d.photo.base64;});
 }catch(e){}})();
+/* 07/11/2026 (Pedro: "abri la e continua na mesma"): depois de uma publicacao, a aba aberta continuava com a versao antiga ate
+ * alguem recarregar na mao - as correcoes "nao chegavam". Ao voltar para a aba (e a cada 10 min com ela visivel), confere se
+ * o site tem versao nova; se tiver e a pessoa nao estiver digitando nem arrastando, recarrega (no maximo 1 vez a cada 2 min). */
+(function(){try{
+ var sig=function(html){var m=String(html).match(/\/_expo\/static\/js\/web\/index-[0-9a-f]+\.js/);return m?m[0]:'';};
+ var mine='';var own=function(){if(!mine){var el=document.querySelector('script[src*="/_expo/static/js/web/index-"]');mine=el?sig(el.getAttribute('src')):'';}return mine;}; /* lida na hora: este arquivo roda antes do resto da pagina */
+ var busy=function(){var a=document.activeElement;if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable))return true;return !!(document.body&&document.body.style.cursor==='grabbing');};
+ var KEY='sofia.version.reload.at',checking=false;
+ var check=function(){if(checking||document.visibilityState!=='visible')return;checking=true;
+  fetch('/inicio',{cache:'no-store',credentials:'same-origin'}).then(function(r){return r.ok?r.text():'';}).then(function(html){checking=false;var now=sig(html),cur=own();if(!now||!cur||now===cur||busy())return;
+   try{var last=+sessionStorage.getItem(KEY)||0;if(Date.now()-last<120000)return;sessionStorage.setItem(KEY,String(Date.now()));}catch(e){}location.reload();}).catch(function(){checking=false;});};
+ document.addEventListener('visibilitychange',check);window.addEventListener('focus',check);setInterval(check,600000);
+}catch(e){}})();

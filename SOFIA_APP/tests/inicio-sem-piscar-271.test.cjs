@@ -79,3 +79,8 @@ test('Aparencia escolhida vai para o servidor (pagina compartilhada com a mesma 
   const app=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8'),api=read('src/lib/api.ts');
   assert.ok(app.includes('api.saveAppearance({appearance:prefs.appearance'));assert.ok(api.includes("this.fetchRequest<{ok: boolean}>('/appearance'"));
 });
+test('Aba aberta pega a versao nova sozinha (sem recarregar na mao), nunca no meio da digitacao',()=>{
+  const e=read('public/assets/early.js'),i=read('public/index.html');
+  assert.ok(e.includes("fetch('/inicio',{cache:'no-store'")&&e.includes("a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable")&&e.includes('120000'));
+  assert.ok(i.includes('early.js?v=6'));
+});

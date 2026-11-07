@@ -123,7 +123,8 @@ function renderSharedPage({root,current,shares,token}){
  const rawPos=d.cover_position,pos=rawPos!==''&&rawPos!=null&&Number.isFinite(Number(rawPos))?Math.max(0,Math.min(100,Number(rawPos))):50;
  const icon=isEmoji(d.icon)?String(d.icon):'';
  const title=current.title||'Sem título';
- const theme=shareTheme(shares.getAppearance&&shares.getAppearance());
+ // sem a escolha ainda registrada (o app manda ao abrir), vale o padrao da Sofia: por horario, em Brasilia - nunca o tema de quem abre
+ const theme=shareTheme((shares.getAppearance&&shares.getAppearance())||{appearance:'schedule'});
  const css=(p)=>`--bg:${p.bg};--text:${p.text};--muted:${p.muted};--line:${p.line};--soft:${p.soft};--accent:${p.accent};`;
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title>
 <style>${theme==='dark'?`:root{${css(PALETTE)}color-scheme:dark}`:theme==='light'?`:root{${css(LIGHT)}color-scheme:light}`:`:root{${css(PALETTE)}color-scheme:dark}@media (prefers-color-scheme:light){:root{${css(LIGHT)}color-scheme:light}}`}
