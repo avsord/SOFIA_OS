@@ -92,5 +92,14 @@ test('Sofia Drive: app no menu (site e celular), endereco /apps/drive e tela com
 test('Drive: player de video proprio (streaming, barra, velocidade, tela cheia, atalhos) e permissao do Drive do usuario',()=>{
   const p=read('src/components/DriveVideoPlayer.tsx'),d=read('src/screens/Drive.tsx');
   for(const k of ['requestFullscreen','requestPictureInPicture','playbackRate','drive-video-seek',"key === 'arrowright'","key === 'm'"])assert.ok(p.includes(k),k);
-  assert.ok(d.includes('api.sdStreamUrl(item.id)')&&d.includes('<DriveVideoPlayer src={url}')&&d.includes('testID="drive-grant"'));
+  assert.ok(d.includes('api.sdStreamUrl(item.id)')&&d.includes('<DriveVideoPlayer key={item.id} src={url}')&&d.includes('testID="drive-grant"'));
+});
+
+test('Drive: setas passam de arquivo, clicar fora fecha, teclado na lista, ordenar e pesquisa no Drive todo',()=>{
+  const d=read('src/screens/Drive.tsx'),pl=read('src/components/DriveVideoPlayer.tsx');
+  assert.ok(d.includes("testID={'drive-preview-' + dir}")&&d.includes("e.key === 'ArrowRight' && n.next")&&d.includes('drive-preview-count'),'setas e botoes no visualizador');
+  assert.ok(d.includes("'data-testid': 'drive-preview-backdrop'")&&d.includes('downOnBack.current && back(e)'),'clicar fora fecha');
+  assert.ok(d.includes("e.key === 'Delete'")&&d.includes("e.key === 'F2'")&&d.includes('drive-item-'),'teclado na lista');
+  assert.ok(d.includes('api.sdSearch(q)')&&d.includes("VIEW_KEY + '.sort'")&&d.includes('function ZoomImage'),'pesquisa, ordenar e zoom');
+  assert.ok(pl.includes("key.startsWith('arrow') && !focused"),'no video, setas so com o player em foco');
 });
