@@ -141,6 +141,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   guarda rotas da Home; o restante hidrata por `api.hydrate()`.
 
 ## 7. Decisões fechadas
+- (07/11, Pedro) **"Drive da Sofia" = um APP Drive dentro da Sofia (site e app), igual ao Google Drive**: subir qualquer arquivo, criar pastas, arrastar/mover/renomear/apagar, visualizar PDF, Word, Excel, imagem, áudio, vídeo; os arquivos ficam no **Google Drive do próprio usuário** (conta Google que ele já liga na Sofia). NÃO é cópia do servidor no Drive da conta da Sofia (isso foi suposição errada e foi desfeito).
 - (06/11, Pedro) **Site e app são do usuário: nenhuma configuração do e-mail da Sofia na interface; isso é estrutura do servidor.** **E-mail da Sofia (sofiaos.core@gmail.com) é do app**: só manda os e-mails do sistema ao usuário. **O e-mail do usuário é da conta dele**: Drive, Gmail, Agenda e tudo dele. Nunca misturar.
 
 - 05/11/2026 (Pedro): **áreas só existem se a pessoa criar** ("isso nunca foi criado pelo usuário... essas áreas têm que ser criadas pelo próprio usuário"). A lista vem de `userAreas` (configurações; começa só com "Pessoal"), cria-se no próprio seletor ("Criar …") e o × tira da lista; a IA não cria área nova (nome fora da lista vira o padrão) e os apps não gravam mais áreas prontas (Lembretes, Encomendas, Notas, Biblioteca). Registros antigos mantêm a área que tinham.
@@ -207,7 +208,6 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Implementação desta rodada está em candidato 0.3.150, ainda não é aprovação de atualização OTA.
 
 ### 7.5 Arquivos da Sofia no Drive (dono, 26/10/2026)
-- (07/11) **Drive da Sofia (conta corporativa sofiaos.core):** guarda as cópias de segurança do SERVIDOR (estrutura do app), 1x/dia, 30 mais novas, pasta "Sofia OS - copias do servidor" (`backupToSofiaDrive` em google.js; estado em md_kv `sofia.drive.v1`). Coisas do usuário (anexos, áudios, páginas, backup pessoal) seguem no Drive DO USUÁRIO. Ligação única da conta da Sofia em `/setup/conta-sofia`.
 - Tudo o que a Sofia guarda no Drive fica na **área oculta do app** (`appDataFolder`, escopo `drive.appdata`): não aparece no Drive (web, celular, PC), ninguém apaga sem querer. `drive.file` continua só para a cópia visível pedida pela pessoa.
 - Porta de entrada: tela **Arquivos da Sofia** (Perfil → Conta Google, e o site em `/arquivos`): tipos com quantidade/espaço, abrir/compartilhar, **apagar** (de vez; menos as cópias .md das páginas, que acompanham a página) e **Exportar cópia** numa pasta visível.
 - Conta conectada antes da 0.3.244: segue na pasta visível até tocar em Reconectar; a migração copia, confere o tamanho, troca a referência e só então manda o original para a lixeira. Arquivo que falha 3 vezes fica onde está e a pasta antiga não é apagada.
@@ -339,11 +339,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-06 | (delivery) | E-mails da Sofia (redefinir senha, código do login) saem pela conta Google ligada (gmail.send), já que o Railway bloqueia SMTP; SMTP fica como 2ª opção. Perfil → Conexões mostra "Religar o Google" até a permissão ser dada. Ao liberar, o código do 2º passo passa a valer de verdade | testes ok; [manual-apk] |
 | 2026-11-06 | (delivery) | E-mail da Sofia (sofiaos.core) é o remetente do app (redefinir senha, código do login), ligado só para envio e só aceitando essa conta; a conta Google do usuário fica só com Agenda/Drive/Gmail. Perfil → Conexões → "E-mail da Sofia" | testes ok; [manual-apk] |
 | 2026-11-07 | (delivery) | Início só com a saudação (print do Pedro, monitor 4K): o prazo de 8 s recomeçava a cada dado. Agora fixo + alarme `inicio-incompleto` com a leitura que faltou (testado travando a agenda: blocos em 8,5 s, alarme certo). Portão `tools/release-check.cjs` obrigatório (MASTER §8) | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Página compartilhada (/p/…) branca no notebook do Pedro: seguia o tema do sistema de quem abre. Agora segue a aparência escolhida na Sofia (escuro/claro/horário de Brasília); o app manda a escolha em PATCH /api/mobile/appearance | portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | "Continua na mesma": a aba aberta do Pedro seguia com a versão antiga (nunca mandou a aparência). Agora a aba recarrega sozinha ao voltar para ela se houver versão nova (não no meio da digitação); página compartilhada sem escolha registrada usa o padrão por horário (Brasília); gravação recusada passa a ter motivo no log ([recusado]) | portão verde; [manual-apk] |
-| 2026-11-07 | (delivery) | Drive da Sofia: a conta corporativa (sofiaos.core) guarda a cópia de segurança diária do SERVIDOR na pasta "Sofia OS - copias do servidor" do Drive dela (30 mais novas); a cópia no Drive do usuário continua. Ligação única em /setup/conta-sofia (gmail.send + drive.file) | portão verde |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

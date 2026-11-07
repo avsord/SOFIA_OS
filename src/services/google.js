@@ -28,10 +28,7 @@ const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.r
 // 06/11/2026 (Pedro: "EMAIL DA SOFIA ENVIA PARA O USUARIO, NAO O MEU EMAIL"): os e-mails da propria Sofia (redefinir senha,
 // codigo do login) saem do E-MAIL DA SOFIA por uma ligacao so de envio, separada da conta Google pessoal (que nao muda).
 // O Railway bloqueia SMTP; pela API do Gmail (HTTPS) passa. SEND_SCOPES = so enviar, nao le nada.
-// 07/11/2026 (Pedro: "o drive da Sofia"): a conta da Sofia tambem guarda as COPIAS DE SEGURANCA DO SERVIDOR no Drive dela
-// (drive.file = so os arquivos que a propria Sofia cria). As coisas do usuario continuam no Drive do usuario.
-const SEND_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/drive.file'];
-const SOFIA_KEEP = 30, SOFIA_FOLDER = 'Sofia OS - copias do servidor';
+const SEND_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send'];
 const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -294,9 +291,9 @@ class GoogleService {
     const want = this.senderAddress();
     if (want && got !== want) { await revoke(); return {ok: false, message: 'Você entrou com ' + (got || 'outra conta') + '. Para a Sofia mandar e-mails, entre com o e-mail da Sofia: ' + want + '.'}; }
     if (!/gmail\.send/.test(String(tokens.scope || ''))) { await revoke(); return {ok: false, message: 'O Google não liberou o envio de e-mails. Tente de novo e clique em Permitir.'}; }
-    this.kvSet('google.sender.v1', {refresh: this.seal(tokens.refresh_token), email: got, scopes: String(tokens.scope || ''), connected_at: now()});
+    this.kvSet('google.sender.v1', {refresh: this.seal(tokens.refresh_token), email: got, connected_at: now()});
     this.senderAccess = {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000};
-    return {ok: true, message: 'Pronto: a Sofia agora manda e-mails de ' + got + (/drive\.file/.test(String(tokens.scope || '')) ? ' e guarda as cópias de segurança do servidor no Drive dela' : '') + '. Pode fechar esta aba.'};
+    return {ok: true, message: 'Pronto: a Sofia agora manda e-mails de ' + got + '. Pode voltar para a Sofia.'};
   }
   /** Pode enviar e-mail pelo remetente da Sofia. */
   canSendMail() { const l = this.senderLink(); return !!(l && l.refresh); }
@@ -310,44 +307,6 @@ class GoogleService {
     if (!res.ok) { if (t.error === 'invalid_grant') this.kvSet('google.sender.v1', null); throw new AppError('SENDER_TOKEN', 'O Google recusou o envio pelo e-mail da Sofia (' + (t.error || res.status) + ').', 502); }
     this.senderAccess = {token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 3000) * 1000 - 60000};
     return this.senderAccess.token;
-  }
-  sofiaDriveReady() { const l = this.senderLink(); return !!(l && l.refresh && /drive\.file/.test(l.scopes || '')); }
-  async sofiaCall(method, url, body, headers = {}) {
-    for (let attempt = 0; ; attempt++) {
-      const res = await this.fetch(url, {method, headers: {Authorization: 'Bearer ' + await this.senderToken(attempt > 0), ...(body && !(body instanceof Buffer) && typeof body !== 'string' ? {'Content-Type': 'application/json'} : {}), ...headers}, body: body ? (body instanceof Buffer || typeof body === 'string' ? body : JSON.stringify(body)) : undefined});
-      if (res.status === 401 && attempt === 0) continue;
-      if (res.status === 204) return {};
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new AppError('SOFIA_DRIVE', 'Drive da Sofia: ' + (d.error?.message || res.status), 502);
-      return d;
-    }
-  }
-  /** Copia de seguranca diaria do servidor no Drive da Sofia (pasta propria, guarda as 30 mais novas). */
-  async backupToSofiaDrive(force = false) {
-    if (!this.sofiaDriveReady() || !this.backups) return {skipped: true};
-    const st = this.kvGet('sofia.drive.v1') || {};
-    if (!force && st.last_backup && st.last_backup.slice(0, 10) === now().slice(0, 10)) return {skipped: true};
-    try {
-      let folder = st.folder_id || '';
-      if (folder) { try { const f = await this.sofiaCall('GET', DRIVE + '/files/' + encodeURIComponent(folder) + '?fields=id,trashed'); if (f.trashed) folder = ''; } catch { folder = ''; } }
-      if (!folder) folder = (await this.sofiaCall('POST', DRIVE + '/files?fields=id', {name: SOFIA_FOLDER, mimeType: 'application/vnd.google-apps.folder'})).id;
-      const made = this.backups.create('sofia-drive');
-      const bytes = fs.readFileSync(path.join(this.backups.directory, made.name));
-      const {body, type} = GoogleService.multipart({name: made.name, parents: [folder], mimeType: 'application/octet-stream', description: 'Cópia de segurança criptografada do servidor da Sofia OS'}, 'application/octet-stream', bytes);
-      const sent = await this.sofiaCall('POST', UPLOAD + '/files?uploadType=multipart&fields=id,size', body, {'Content-Type': type});
-      if (!sent?.id) throw new AppError('SOFIA_DRIVE', 'O Drive da Sofia não confirmou a cópia.', 502);
-      const list = await this.sofiaCall('GET', DRIVE + '/files?q=' + encodeURIComponent("'" + folder + "' in parents and trashed=false") + '&orderBy=createdTime desc&pageSize=100&fields=files(id,name)');
-      for (const old of (list.files || []).slice(SOFIA_KEEP)) await this.sofiaCall('DELETE', DRIVE + '/files/' + old.id).catch(() => {});
-      // no disco do servidor ficam so as 3 mais novas (o volume e pequeno); o Drive da Sofia guarda o historico
-      for (const b of this.backups.list().slice(3)) { try { fs.unlinkSync(path.join(this.backups.directory, b.name)); } catch { /* ignore */ } }
-      this.kvSet('sofia.drive.v1', {folder_id: folder, last_backup: now(), last_error: '', count: Math.min(SOFIA_KEEP, (list.files || []).length), bytes: bytes.length});
-      console.log('[drive da sofia] copia do servidor guardada (' + Math.round(bytes.length / 1024) + ' KB)');
-      return {ok: true, name: made.name, bytes: bytes.length};
-    } catch (e) {
-      this.kvSet('sofia.drive.v1', {...st, last_error: String(e.message).slice(0, 200)});
-      console.warn('[drive da sofia] copia nao guardada: ' + String(e.message).slice(0, 160));
-      throw e;
-    }
   }
   /** Envia uma mensagem pronta (cabecalhos + corpo) pelo e-mail da Sofia. */
   async sendRawMail(message) {
@@ -1264,12 +1223,9 @@ class GoogleService {
     if (this.timer) return;
     const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
-    // 07/11/2026: copia do servidor no Drive da Sofia (1x por dia), mesmo sem conta Google do usuario ligada
-    const sofiaTick = () => { this.backupToSofiaDrive().catch(() => {}); };
-    this.sofiaTimer = setInterval(sofiaTick, 60 * 60000); this.sofiaTimer.unref?.(); setTimeout(sofiaTick, 60000).unref?.();
     setTimeout(tick, 30000).unref?.();
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; if (this.sofiaTimer) clearInterval(this.sofiaTimer); this.sofiaTimer = null; }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 }
 
 module.exports = {ensureThumbColumn, GoogleService, SCOPES, CALLBACK};

@@ -23,7 +23,6 @@ function svcWith(t,tokenEmail,scope){
   const fetchImpl=async(url,opt={})=>{calls.push({url:String(url),opt});
     if(String(url).includes('oauth2.googleapis.com/token'))return {ok:true,status:200,json:async()=>({access_token:'at',refresh_token:'rt',expires_in:3600,scope,id_token:jwt(tokenEmail)})};
     if(String(url).includes('/messages/send'))return {ok:true,status:200,json:async()=>({id:'1'})};
-    if(String(url).includes('/drive/v3/'))return {ok:true,status:200,json:async()=>({id:'f1',files:[],trashed:false})};
     return {ok:true,status:200,json:async()=>({})};};
   const svc=new GoogleService(f.store,f.core.workspace,{...f.config,sofiaEmail:'Sofia@Gmail.com',smtpUser:'pessoal@gmail.com',publicBaseUrl:'https://sofia.test'},{fetchImpl,env:ENV});
   return {svc,calls};
@@ -58,15 +57,4 @@ test('pagina compartilhada segue a aparencia escolhida na Sofia (nao o tema de q
   const at=h=>new Date(Date.UTC(2026,10,7,h+3,0)); // Brasilia = UTC-3
   assert.equal(shareTheme({appearance:'schedule',lightAt:'05:00',darkAt:'19:00'},at(12)),'light');
   assert.equal(shareTheme({appearance:'schedule',lightAt:'05:00',darkAt:'19:00'},at(21)),'dark');
-});
-test('Drive da Sofia: copia do servidor vai para o Drive da conta da Sofia, nao para o do usuario',async t=>{
-  const {svc,calls}=svcWith(t,'sofia@gmail.com','openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file');
-  const u=new URL(svc.senderConnectUrl().url);assert.match(u.searchParams.get('scope'),/drive\.file/);assert.ok(!/drive\.appdata|calendar/.test(u.searchParams.get('scope')));
-  assert.equal((await svc.callback(new URLSearchParams({state:u.searchParams.get('state'),code:'c'}))).ok,true);
-  assert.equal(svc.sofiaDriveReady(),true);
-  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');const dir=fs.mkdtempSync(path.join(os.tmpdir(),'bk-'));
-  svc.backups={directory:dir,create:()=>{fs.writeFileSync(path.join(dir,'sofia-x.sofia-backup'),'cifrado');return {name:'sofia-x.sofia-backup'};},list:()=>[]};
-  const r=await svc.backupToSofiaDrive(true);assert.equal(r.ok,true);
-  assert.ok(calls.some(c=>c.url.includes('/upload/drive/v3/files')),'enviou para o Drive');assert.equal(svc.link(),null,'nao usou a conta do usuario');
-  assert.equal((await svc.backupToSofiaDrive()).skipped,true,'uma vez por dia');
 });
