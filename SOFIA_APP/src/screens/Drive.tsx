@@ -210,7 +210,8 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
     if (!WEB || touchWeb) { if (sel.length) { setSel(s => s.includes(it.id) ? s.filter(x => x !== it.id) : [...s, it.id]); return; } openItem(it); return; }
     if (ne.shiftKey && anchor.current) { const a = ordered.findIndex(x => x.id === anchor.current), b = ordered.findIndex(x => x.id === it.id); if (a >= 0 && b >= 0) { const [i, j] = a < b ? [a, b] : [b, a]; setSel(ordered.slice(i, j + 1).map(x => x.id)); return; } }
     if (ne.ctrlKey || ne.metaKey) { setSel(s => s.includes(it.id) ? s.filter(x => x !== it.id) : [...s, it.id]); anchor.current = it.id; return; }
-    setSel([it.id]); anchor.current = it.id;
+    if (sel.length > 1) { setSel(s => s.includes(it.id) ? s.filter(x => x !== it.id) : [...s, it.id]); anchor.current = it.id; return; } // marcando varios: clique soma/tira
+    openItem(it); // Pedro (07/11): um clique ja abre (arquivo ou pasta)
   };
   const longPress = (it: SdItem, e: any) => { if (!WEB || touchWeb) { setSel(s => s.includes(it.id) ? s : [...s, it.id]); return; } openMore(e, it.name, menu(it)); };
   // clicar fora de um item (area vazia, cabecalho) tira a selecao
@@ -262,15 +263,23 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
   // ---------- desenho ----------
   const cols = Math.max(2, Math.floor((width - (wide ? 560 : 24)) / (wide ? 210 : 160)));
   const itemPress = (it: SdItem) => ({onPress: (e: any) => clickItem(it, e), onLongPress: (e: any) => longPress(it, e), delayLongPress: 380,
-    ref: (el: any) => bindDom(el, {dblclick: () => { if (!touchWeb) openItem(it); }, selected: sel.includes(it.id), ...dragProps(it)}),
+    ref: (el: any) => bindDom(el, {selected: sel.includes(it.id), ...dragProps(it)}),
     ...(contextMenu(() => { if (!sel.includes(it.id)) setSel([it.id]); return menu(it); }) as any)});
   // funcoes de desenho (nao componentes): um componente criado dentro do desenho e recriado a cada mudanca e perde o clique
   const more = (it: SdItem) => <Pressable accessibilityLabel={'Mais ações para ' + it.name} hitSlop={8} onPress={(e: any) => { if (!sel.includes(it.id)) setSel([it.id]); openMore(e, it.name, menu(it)); }}><Icon name="more" size={18} color={c.muted} /></Pressable>;
+  // caixinha de marcar (computador): aparece ao passar o mouse ou quando ja ha selecao; no lugar do icone do tipo
+  // o mesmo botao fica sempre montado (se sumisse no meio do clique, o clique se perdia); so muda de cara
+  const check = (it: SdItem, icon: React.ReactNode, hovered: boolean) => { const on = sel.includes(it.id), box = hovered || sel.length > 0;
+    if (!WEB || touchWeb) return icon;
+    return <Pressable testID={'drive-check-' + it.id} accessibilityRole="checkbox" accessibilityState={{checked: on}} accessibilityLabel={(on ? 'Desmarcar ' : 'Marcar ') + it.name} hitSlop={6}
+      onPress={() => { setSel(s => s.includes(it.id) ? s.filter(x => x !== it.id) : [...s, it.id]); anchor.current = it.id; }}
+      style={{width: 22, height: 22, borderRadius: 6, borderWidth: box ? 2 : 0, borderColor: on ? c.accent : c.muted, backgroundColor: on ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>
+      {on ? <Icon name="check" size={14} color={c.onAccent} /> : box ? null : icon}</Pressable>; };
   const card = (it: SdItem) => { const k = KIND[driveKind(it)], on = sel.includes(it.id), target = dragTarget === it.id;
     return <Pressable key={it.id} testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityState={{selected: on}} accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} {...itemPress(it)} style={{width: `${100 / cols}%`, padding: 6}}>
       {({hovered}: any) => <View style={{borderRadius: 12, borderWidth: 1, borderColor: target || on ? c.accent : c.line, backgroundColor: target || on ? c.accentSoft : hovered ? c.input : c.surface, overflow: 'hidden'}}>
-        {it.folder ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12}}><Icon name="folder" size={22} color={it.shared ? '#3B82F6' : k.color} active />{it.shortcut ? <Icon name="external" size={12} color={c.muted} /> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 14, fontWeight: '500'}}>{it.name}</Text>{it.starred ? <Icon name="star" size={14} color="#EAB308" active /> : null}{more(it)}</View>
-          : <><View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10}}><Icon name={k.icon} size={18} color={k.color} active /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '500'}}>{it.name}</Text>{it.starred ? <Icon name="star" size={14} color="#EAB308" active /> : null}{more(it)}</View>
+        {it.folder ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12}}>{check(it, <Icon name="folder" size={22} color={it.shared ? '#3B82F6' : k.color} active />, hovered)}{it.shortcut ? <Icon name="external" size={12} color={c.muted} /> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 14, fontWeight: '500'}}>{it.name}</Text>{it.starred ? <Icon name="star" size={14} color="#EAB308" active /> : null}{more(it)}</View>
+          : <><View style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10}}>{check(it, <Icon name={k.icon} size={18} color={k.color} active />, hovered)}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '500'}}>{it.name}</Text>{it.starred ? <Icon name="star" size={14} color="#EAB308" active /> : null}{more(it)}</View>
             <View style={{marginHorizontal: 8, marginBottom: it.where ? 4 : 8, borderRadius: 8, overflow: 'hidden', height: 120}}><Thumb api={api} item={it} h={120} /></View>
             {it.where ? <Text numberOfLines={1} style={{color: c.muted, fontSize: 12, marginHorizontal: 12, marginBottom: 8}}>em {it.where}</Text> : null}</>}
       </View>}
@@ -278,12 +287,12 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
   const row = (it: SdItem) => { const k = KIND[driveKind(it)], on = sel.includes(it.id), target = dragTarget === it.id;
     return <Pressable key={it.id} testID={'drive-item-' + it.id} accessibilityRole="button" accessibilityState={{selected: on}} accessibilityLabel={(it.folder ? 'Pasta ' : '') + it.name} {...itemPress(it)}
       style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: c.line, backgroundColor: target || on ? c.accentSoft : hovered ? c.input : 'transparent'})}>
-      <Icon name={k.icon} size={20} color={it.folder && it.shared ? '#3B82F6' : k.color} active />
+      {({hovered}: any) => <>{check(it, <Icon name={k.icon} size={20} color={it.folder && it.shared ? '#3B82F6' : k.color} active />, hovered)}
       <View style={{flex: 1, minWidth: 0}}><Text numberOfLines={1} style={{color: c.text, fontSize: 14}}>{it.name}{it.shortcut ? '  ↗' : ''}</Text>{it.where && !wide ? <Text numberOfLines={1} style={{color: c.muted, fontSize: 12}}>em {it.where}</Text> : null}</View>
       {it.starred ? <Icon name="star" size={14} color="#EAB308" active /> : null}
       {wide && (inSearch || view !== 'drive') ? <Text numberOfLines={1} style={{width: 160, color: c.muted, fontSize: 13}}>{it.where || ''}</Text> : null}
       {wide ? <><Text style={{width: 120, color: c.muted, fontSize: 13}}>{when(it.modified)}</Text><Text style={{width: 90, color: c.muted, fontSize: 13, textAlign: 'right'}}>{it.folder ? '—' : size(it.size)}</Text></> : null}
-      {more(it)}
+      {more(it)}</>}
     </Pressable>; };
 
   const notConnected = code === 'DRIVE_NOT_CONNECTED' || code === 'GOOGLE_NOT_CONNECTED' || code === 'DRIVE_NEEDS_PERMISSION';
@@ -335,7 +344,7 @@ export function Drive({api: rawApi, active, onBack}: {api: SofiaApi; active: boo
         {!wide ? <View style={{flexDirection: 'row', gap: 8}}>{searchBox}</View> : null}
         {!wide ? <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>{VIEWS.map(v => { const on = view === v.id && !inSearch; return <Pressable key={v.id} testID={'drive-view-' + v.id} onPress={() => go(v.id)} style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1, borderColor: on ? c.accent : c.line, backgroundColor: on ? c.accentSoft : 'transparent'}}><Icon name={v.icon} size={14} color={on ? c.accent : c.muted} /><Text style={{color: on ? c.accent : c.text, fontSize: 13}}>{v.label}</Text></Pressable>; })}</ScrollView> : null}
         {/* caminho (soltar um item aqui move para a pasta) ou barra da selecao */}
-        {sel.length > (touchWeb || !WEB ? 0 : 1) ? <View testID="drive-selbar" style={{flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.accentSoft, borderRadius: 24, paddingHorizontal: 8, paddingVertical: 4, minHeight: 40}}>
+        {sel.length > 0 && (touchWeb || !WEB || sel.length > 1 || !preview) && selItems.length ? <View testID="drive-selbar" style={{flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.accentSoft, borderRadius: 24, paddingHorizontal: 8, paddingVertical: 4, minHeight: 40}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Limpar seleção" onPress={() => setSel([])} hitSlop={8} style={{padding: 6}}><Icon name="close" size={18} color={c.text} /></Pressable>
           <Text testID="drive-selcount" style={{color: c.text, fontSize: 14, fontWeight: '600', marginRight: 8}}>{sel.length} selecionado{sel.length === 1 ? '' : 's'}</Text>
           {trashView ? <GhostButton icon="restore" label={wide ? 'Restaurar' : undefined} onPress={() => restore(selItems)} testID="drive-sel-restore" /> : <>
