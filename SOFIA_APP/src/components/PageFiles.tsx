@@ -57,6 +57,12 @@ export async function uploadPageFile(api: SofiaApi, pageId: string, file: File):
 }
 
 /** Links assinados (valem 2 h no servidor; aqui 90 min). */
+// 07/11/2026 (Pedro: "memorizar o tamanho da tela que deixei pela ultima vez"): tamanho e posicao da janela flutuante e da
+// janela separada ficam guardados neste navegador (editor e visualizacao separados: editar costuma pedir janela maior).
+type Geo = {x: number; y: number; w: number; h: number};
+const geoKey = (where: 'win' | 'popup', ed: boolean) => 'sofia.janela.' + where + '.' + (ed ? 'editor' : 'ver');
+function readGeo(where: 'win' | 'popup', ed: boolean): Geo | null {try {const g = JSON.parse(localStorage.getItem(geoKey(where, ed)) || 'null'); return g && [g.x, g.y, g.w, g.h].every(Number.isFinite) && g.w > 200 && g.h > 150 ? g : null;} catch {return null;}}
+function saveGeo(where: 'win' | 'popup', ed: boolean, g: Geo) {try {localStorage.setItem(geoKey(where, ed), JSON.stringify({x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h)}));} catch {}}
 const links = new Map<string, {url: string; until: number}>();
 async function signedUrl(api: SofiaApi, id: string, as: '' | 'pdf' | 'download' = '') {
   const hit = links.get(id); let url = hit && hit.until > Date.now() ? hit.url : '';
@@ -77,9 +83,13 @@ function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '') {
  * navegador bloqueia) e preenchida quando o link assinado chega. So imagem, video, audio, PDF, Office (em PDF) e texto. */
 export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}) {
   const k = fileKind(f.mime, f.name), sw = window.screen?.availWidth || 1440, sh = window.screen?.availHeight || 900;
-  const w = Math.round(Math.min(960, sw * 0.5)), hh = Math.round(Math.min(1040, sh * 0.88));
-  const win = window.open('', 'sofia-arquivo-' + f.id, 'popup=yes,width=' + w + ',height=' + hh + ',left=' + Math.max(0, sw - w - 40) + ',top=40');
+  const ed = !!editKind(f.mime, f.name) && !!f.pageId, g = readGeo('popup', ed);
+  const w = g ? g.w : Math.round(Math.min(960, sw * 0.5)), hh = g ? g.h : Math.round(Math.min(1040, sh * 0.88)), left = g ? g.x : Math.max(0, sw - w - 40), top = g ? g.y : 40;
+  const win = window.open('', 'sofia-arquivo-' + f.id, 'popup=yes,width=' + w + ',height=' + hh + ',left=' + left + ',top=' + top);
   if (!win) return false;
+  // a janela nao avisa quando e movida: confere a cada segundo (e ao mudar o tamanho/fechar) e guarda o ultimo lugar
+  {let last = ''; const keep = () => {try {if (win.closed) return; const cur = {x: win.screenX, y: win.screenY, w: win.innerWidth, h: win.innerHeight}, k2 = JSON.stringify(cur); if (k2 !== last && cur.w > 200) {last = k2; saveGeo('popup', ed, cur);}} catch {}};
+    const t = setInterval(() => {if (win.closed) clearInterval(t); else keep();}, 1000); try {win.addEventListener('resize', keep); win.addEventListener('beforeunload', keep);} catch {}}
   const doc = win.document; doc.title = f.name;
   // 07/11/2026 (Pedro): o modo escuro forcado do navegador (Brave) pintava por cima e invertia os temas: a janela declara que
   // ja cuida das proprias cores, entao o navegador nao mexe (Original = o arquivo como ele e).
@@ -113,23 +123,25 @@ const emit = () => subs.forEach(f => f());
 const setWins = (next: Win[]) => {wins = next; emit();};
 export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
   const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, ...(at || {}), z: ++topZ} : w)); return found.key;}
-  const ed = !!editKind(f.mime, f.name) && !!f.pageId, W = window.innerWidth, H = window.innerHeight, w = ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = ed ? H - 90 : Math.min(H - 110, 720), n = wins.length, key = f.id + ':' + Date.now();
-  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: Math.max(12, W - w - 24 - n * 28), y: 70 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
+  const ed = !!editKind(f.mime, f.name) && !!f.pageId, W = window.innerWidth, H = window.innerHeight, g = readGeo('win', ed), n = wins.length, key = f.id + ':' + Date.now();
+  const w = g ? Math.min(g.w, W - 8) : ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = g ? Math.min(g.h, H - 8) : ed ? H - 90 : Math.min(H - 110, 720);
+  const x0 = g ? Math.max(0, Math.min(W - 120, g.x)) : Math.max(12, W - w - 24), y0 = g ? Math.max(0, Math.min(H - 60, g.y)) : 70;
+  setWins([...wins, {key, api, id: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: x0 + n * 28, y: y0 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
   return key;
 }
 const useWins = () => useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
 /** 07/11/2026 (Pedro: "quero que esse bloco seja flutuante igual no iPad, que eu possa mover pelo navegador"): segurar a
  * alca do bloco e arrastar TIRA o arquivo da pagina: vira janela flutuante que segue o mouse e fica onde soltar. */
-function popOut(api: SofiaApi, f: {id: string; name: string; mime: string}, e: any, el: HTMLElement | null) {
+function popOut(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}, e: any, el: HTMLElement | null) {
   if (e.button != null && e.button !== 0) return; e.preventDefault(); e.stopPropagation();
   const sx = e.clientX, sy = e.clientY, r = el?.getBoundingClientRect?.(), bodyStyle = document.body.style, oldSel = bodyStyle.userSelect; let key = '';
   bodyStyle.userSelect = 'none';
   const mv = (ev: PointerEvent) => {const dx = ev.clientX - sx, dy = ev.clientY - sy, W = window.innerWidth, H = window.innerHeight;
-    if (!key) {if (Math.hypot(dx, dy) < 6) return; const w = Math.round(Math.max(360, Math.min(720, r?.width || 520))), hgt = Math.round(Math.max(280, Math.min(H - 40, (r?.height || 480) + 44)));
+    if (!key) {if (Math.hypot(dx, dy) < 6) return; const g = readGeo('win', !!editKind(f.mime, f.name) && !!f.pageId), w = g ? Math.min(g.w, W - 8) : Math.round(Math.max(360, Math.min(720, r?.width || 520))), hgt = g ? Math.min(g.h, H - 8) : Math.round(Math.max(280, Math.min(H - 40, (r?.height || 480) + 44)));
       key = openFileWindow(api, f, {x: (r?.left || sx - 40), y: (r?.top || sy - 20), w, hgt, drag: true});}
     const cur = wins.find(x => x.key === key); if (!cur) return;
     patchWin(key, {x: Math.min(W - 80, Math.max(-cur.w + 120, (r?.left || sx - 40) + dx)), y: Math.min(Math.max(0, H - cur.hgt - 4), Math.max(0, (r?.top || sy - 20) + dy))});};
-  const up = () => {bodyStyle.userSelect = oldSel; if (key) patchWin(key, {drag: false}); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
+  const up = () => {bodyStyle.userSelect = oldSel; if (key) {patchWin(key, {drag: false}); const now = wins.find(x => x.key === key); if (now) saveGeo('win', !!editKind(now.mime, now.name) && !!now.pageId, {x: now.x, y: now.y, w: now.w, h: now.hgt});} window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
 const closeWin = (key: string) => setWins(wins.filter(w => w.key !== key));
@@ -163,7 +175,7 @@ function FileWindow({win}: {win: Win}) {
         if (mode.includes('w')) {const nx = Math.max(0, Math.min(o.x + o.w - 300, o.x + dx)); w = o.w + (o.x - nx); x = nx;}
         if (mode.includes('n')) {const ny = Math.max(0, Math.min(o.y + o.hgt - 220, o.y + dy)); hh = o.hgt + (o.y - ny); y = ny;}
         patchWin(win.key, {x, y, w: Math.max(300, w), hgt: Math.max(220, hh)});}};
-    const up = () => {bodyStyle.userSelect = oldSel; setMoving(false); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
+    const up = () => {bodyStyle.userSelect = oldSel; setMoving(false); const now = wins.find(x => x.key === win.key); if (now && !now.max) saveGeo('win', !!editKind(now.mime, now.name) && !!now.pageId, {x: now.x, y: now.y, w: now.w, h: now.hgt}); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
   const box = win.max ? {left: 12, top: 12, width: 'calc(100vw - 24px)', height: 'calc(100vh - 24px)'} : {left: win.x, top: win.y, width: win.w, height: win.hgt};

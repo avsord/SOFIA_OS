@@ -69,3 +69,8 @@ test('fonte do documento e modo escuro do navegador (Pedro 07/11)',()=>{
  assert.ok(m.includes("if (p === '/api/mobile/fonts.css' && m === 'GET')")&&m.includes("https://fonts.gstatic.com' + path"),'rota de fontes so busca no Google Fonts');
  assert.ok(pf.includes("meta.name = 'color-scheme'"),'janela separada nao recebe o escuro forcado do navegador');
 });
+
+test('janela lembra o tamanho e o lugar da ultima vez (flutuante e separada)',()=>{
+ const pf=read('SOFIA_APP/src/components/PageFiles.tsx');
+ assert.ok(pf.includes("const geoKey = (where: 'win' | 'popup', ed: boolean)")&&pf.includes("readGeo('popup', ed)")&&pf.includes("saveGeo('popup', ed, cur)")&&pf.includes("readGeo('win', ed)"));
+});

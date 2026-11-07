@@ -352,11 +352,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Arquivo da página abre em janela separada do navegador (Pedro: 'sair da Sofia como página avulsa'): botão ↗ na janela flutuante e na barra do arquivo; título = nome do arquivo; dá para levar a outro monitor | testado no navegador; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Editor de Word da Sofia (Pedro): .docx abre com as páginas e edita (negrito, itálico, sublinhado, tachado, marca-texto, cor, tamanho, títulos, listas, alinhamento, recuo); salva sozinho de volta em .docx; '/documento' cria Word novo; também na janela separada; janela muda de tamanho pelos 4 cantos e lados | testado no navegador (criar, grifar, salvar, reabrir); portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Editores de Excel e PowerPoint da Sofia (Pedro): planilha com abas, fórmulas, formatação, R$; apresentação editando o próprio .pptx (slides, caixas móveis, grifo); '/planilha' e '/apresentação'; tema claro/escuro nos 3 editores; sem a opção de janela na página; mouse não some no cinza do Word; teste do APK: semente sem o contador de 200 ms | criar/editar/salvar/reabrir testado; .pptx abre no python-pptx; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Tema dos editores com 3 opções (Pedro): Claro, Escuro e Original (painel escuro, documento nas cores reais); a escolha fica guardada no navegador | testado no navegador; portão verde |
 | 2026-11-07 | (delivery) | Editores (Pedro): janela separada não recebe mais o escuro forçado do Brave (invertia Claro/Escuro); fonte do documento que falta no computador (ex.: Montserrat ExtraBold) vem do Google Fonts pelo site; sem a fonte, cai em sem serifa | fonte testada no navegador; portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Janela do arquivo lembra tamanho e lugar da última vez (Pedro): flutuante e separada (inclusive o monitor), editor e visualização com memória própria | testado (fechar, recarregar, reabrir igual); portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
