@@ -352,11 +352,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Página trancada (Pedro: ficou aberta com 'Não salvo'): cópia velha do editor (outra aba ou rascunho guardado) não vence mais a versão trancada; rascunho de página trancada não fica no navegador (a senha escrita ficava em texto aberto) | reproduzido com 2 abas e corrigido; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Esqueleto na estrutura real também em Finanças, E-mails, Listas, Biblioteca, Notas e Todos os registros (sem o texto @records) | lado a lado computador/celular; portão verde |
 | 2026-11-07 | (delivery) | Arquivos nas Páginas (Pedro): arrastar qualquer arquivo (até 25 MB) ou '/arquivo' → linha com tipo e nome, ou visualização com escala (imagem, vídeo, áudio, PDF, Office); clique abre janela flutuante que move/redimensiona; Office vira PDF pelo Google | servidor e site testados; portão verde; [manual-apk] |
 | 2026-11-07 | (delivery) | Teste do APK no emulador não depende mais de compilações antigas (semente 0.3.60 e bases 0.3.94/105-107 expiraram no GitHub após 30 dias): semente compilada a cada rodada abaixo da versão publicada; comparação de abertura contra a versão publicada (mesmo limite de 100 ms) | testes locais verdes; CI em andamento |
 | 2026-11-07 | (delivery) | Arquivo na página vira janela flutuante tipo iPad (Pedro): alça no topo da visualização; arrastar solta na tela; a página mostra 'Em janela flutuante · Trazer de volta'; botão 'Voltar para a página'; PDF do Word com o nome do arquivo | testado no navegador; portão verde; [manual-apk] |
+| 2026-11-07 | (delivery) | Arquivo da página abre em janela separada do navegador (Pedro: 'sair da Sofia como página avulsa'): botão ↗ na janela flutuante e na barra do arquivo; título = nome do arquivo; dá para levar a outro monitor | testado no navegador; portão verde; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

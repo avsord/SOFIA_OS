@@ -35,5 +35,6 @@ test('site: bloco de arquivo, soltar arquivos, "/arquivo" e janela flutuante',()
  assert.ok(pg.includes("Arquivos ainda não entram em páginas trancadas"),'pagina trancada nao recebe arquivo sem criptografia');
  assert.ok(read('SOFIA_APP/src/lib/page-block-keys.ts').includes("{type:'file',label:'Arquivo'"));
  assert.ok(pf.includes('function popOut(')&&pf.includes("testID=\"page-file-floating\"")&&pf.includes("'Voltar para a página'"),'arrastar a alca solta o bloco como janela flutuante (iPad)');
+ assert.ok(pf.includes('export function detachFile(')&&pf.includes("'Abrir em janela separada (fora da Sofia)'")&&pf.includes("window.open('', 'sofia-arquivo-'"),'janela separada do navegador (outro monitor)');
  assert.ok(read('SOFIA_APP/src/components/PageRichInput.web.tsx').includes('props.onDropFiles(all)'));
 });

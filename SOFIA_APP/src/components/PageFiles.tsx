@@ -60,6 +60,28 @@ function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '') {
     return () => {live = false;};}, [api, id, as]);
   return state;
 }
+/** 07/11/2026 (Pedro: "quero que ela possa sair da Sofia, como uma segunda pagina avulsa, e navegar entre as telas"): abre o
+ * arquivo numa JANELA SEPARADA do navegador (pode ir para outro monitor). A janela e aberta na hora do clique (senao o
+ * navegador bloqueia) e preenchida quando o link assinado chega. So imagem, video, audio, PDF, Office (em PDF) e texto. */
+export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: string}) {
+  const k = fileKind(f.mime, f.name), sw = window.screen?.availWidth || 1440, sh = window.screen?.availHeight || 900;
+  const w = Math.round(Math.min(960, sw * 0.5)), hh = Math.round(Math.min(1040, sh * 0.88));
+  const win = window.open('', 'sofia-arquivo-' + f.id, 'popup=yes,width=' + w + ',height=' + hh + ',left=' + Math.max(0, sw - w - 40) + ',top=40');
+  if (!win) return false;
+  const doc = win.document; doc.title = f.name;
+  doc.body.style.cssText = 'margin:0;height:100vh;background:#1c1c1f;display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;color:#ddd';
+  doc.body.textContent = 'Abrindo ' + f.name + '…';
+  void signedUrl(api, f.id, OFFICE(k) ? 'pdf' : '').then(async url => {
+    doc.body.textContent = ''; doc.title = f.name;
+    const el = (tag: string, css: string) => {const x = doc.createElement(tag); x.style.cssText = css; doc.body.appendChild(x); return x as any;};
+    if (k === 'image') {const img = el('img', 'max-width:100%;max-height:100vh;object-fit:contain'); img.src = url; img.alt = f.name;}
+    else if (k === 'video') {const v = el('video', 'width:100%;height:100vh;background:#000'); v.controls = true; v.src = url;}
+    else if (k === 'audio') {const a = el('audio', 'width:90%'); a.controls = true; a.src = url;}
+    else if (k === 'pdf' || OFFICE(k) || f.mime === 'text/plain') {const fr = el('iframe', 'width:100%;height:100vh;border:0;background:#fff'); fr.title = f.name; fr.src = url;}
+    else {const t = await fetch(url).then(r => r.text()).catch(() => ''); const pre = el('pre', 'margin:0;padding:16px;width:100%;height:100vh;box-sizing:border-box;overflow:auto;white-space:pre-wrap;background:#fff;color:#222;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace'); pre.textContent = t.slice(0, 400000);}
+  }).catch(e => {doc.body.textContent = errorText(e);});
+  return true;
+}
 export async function downloadPageFile(api: SofiaApi, id: string) {
   const url = await signedUrl(api, id, 'download'); const a = document.createElement('a'); a.href = url; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
 }
@@ -122,7 +144,7 @@ function FileWindow({win}: {win: Win}) {
       <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
       {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
       {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
-      {btn('external', win.max ? 'Restaurar tamanho' : 'Ocupar a tela', () => patchWin(win.key, {max: !win.max}))}
+      {windowCapable(k, win.name) ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime})) closeWin(win.key);}) : null}
       {btn('back', 'Voltar para a página', () => closeWin(win.key))}
       {btn('close', 'Fechar', () => closeWin(win.key))}</>
     ),
@@ -175,7 +197,7 @@ export function PageFileBlock({api, data, selected, onSelect, onChange, onRemove
   const bar = (hover || selected) && id ? <View style={{position: 'absolute', top: 6, right: 6, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 3, borderRadius: 9, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 4px 14px rgba(0,0,0,.12)'} as any}>
     {inlineCapable(k) ? <View style={{flexDirection: 'row', padding: 2, borderRadius: 8, backgroundColor: c.input, marginRight: 2}}>{seg('Anexo', 'attach')}{seg('Visualização', 'preview')}</View> : null}
     {preview ? <>{tool('zoomOut', 'Diminuir', () => onChange({...data, scale: Math.max(15, scale - 10)}))}<Text style={{color: c.muted, fontSize: 11, minWidth: 32, textAlign: 'center'}}>{scale}%</Text>{tool('zoomIn', 'Aumentar', () => onChange({...data, scale: Math.min(100, scale + 10)}))}</> : null}
-    {tool('external', 'Abrir em janela', open)}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
+    {tool('external', 'Abrir em janela', open)}{windowCapable(k, data.name || '') ? tool('moveTo', 'Abrir em janela separada (fora da Sofia)', () => {detachFile(api, file);}) : null}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
   </View> : null;
   const hoverDiv = (child: React.ReactNode) => h('div', {onMouseEnter: () => setHover(true), onMouseMove: () => {if (!hover) setHover(true);}, onMouseLeave: () => setHover(false), style: {position: 'relative'}}, child);
   if (!preview) return hoverDiv(<Pressable testID="page-file-row" accessibilityRole="button" accessibilityLabel={'Abrir ' + (data.name || 'arquivo')} onPress={() => {onSelect(); open();}}
