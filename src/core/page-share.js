@@ -128,7 +128,8 @@ function renderSharedPage({root,current,shares,token}){
  const css=(p)=>`--bg:${p.bg};--text:${p.text};--muted:${p.muted};--line:${p.line};--soft:${p.soft};--accent:${p.accent};`;
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title>
 <style>${theme==='dark'?`:root{${css(PALETTE)}color-scheme:dark}`:theme==='light'?`:root{${css(LIGHT)}color-scheme:light}`:`:root{${css(PALETTE)}color-scheme:dark}@media (prefers-color-scheme:light){:root{${css(LIGHT)}color-scheme:light}}`}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}/* 07/11/2026 (Pedro: "era pra ficar assim", print da pagina dentro da Sofia): mesma letra da Sofia */@font-face{font-family:SofiaSans;src:url(/assets/fonts/SofiaSans-Regular.woff2) format("woff2");font-weight:400;font-display:swap}@font-face{font-family:SofiaSans;src:url(/assets/fonts/SofiaSans-SemiBold.woff2) format("woff2");font-weight:600;font-display:swap}@font-face{font-family:SofiaSans;src:url(/assets/fonts/SofiaSans-Bold.woff2) format("woff2");font-weight:700;font-display:swap}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 SofiaSans,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:13px;color:var(--muted);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
 .top a{color:var(--muted);text-decoration:none}.top a:hover{color:var(--text)}.top .sep{opacity:.5}
 .cover{position:relative;height:30vh;min-height:160px;max-height:280px;background:var(--soft);overflow:hidden}
@@ -141,7 +142,7 @@ figure img{opacity:0;animation:reveal .25s ease-out .35s forwards}
 main{max-width:960px;margin:0 auto;padding:0 48px 96px}.icon{font-size:64px;line-height:1;margin-top:${cover?'-36px':'48px'};position:relative}
 h1.title{font-size:40px;line-height:1.2;margin:${icon?'16px':cover?'40px':'72px'} 0 18px;font-weight:700;letter-spacing:-.01em}
 h1,h2,h3,h4{line-height:1.3}main h1{font-size:30px;margin:28px 0 6px}main h2{font-size:24px;margin:24px 0 4px}main h3{font-size:20px;margin:20px 0 4px}
-p{margin:3px 0;min-height:1.65em;overflow-wrap:anywhere}p.empty{min-height:1.2em}a{color:inherit;text-decoration:underline;text-decoration-color:var(--muted);text-underline-offset:2px}
+p{margin:3px 0;min-height:1.65em;overflow-wrap:anywhere}p.empty{min-height:1.2em}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-decoration-color:var(--muted);text-underline-offset:2px} /* como na Sofia: endereco como texto, sublinha so ao passar o mouse */
 ul,ol{margin:4px 0;padding-left:26px}li{margin:2px 0}blockquote{margin:8px 0;padding:2px 14px;border-left:3px solid var(--text)}
 .callout{display:flex;gap:10px;margin:8px 0;padding:14px 16px;border-radius:8px;background:var(--soft)}pre{background:var(--soft);padding:14px 16px;border-radius:8px;overflow:auto;font-size:14px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:88%;background:var(--soft);padding:1px 5px;border-radius:4px}pre code{padding:0;background:none}
