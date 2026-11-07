@@ -49,7 +49,7 @@ function bodyBuffer(req,limitBytes=1024*1024) {
 function plain(res,status,text,type='text/plain; charset=utf-8'){res.statusCode=status;res.setHeader('Content-Type',type);res.end(String(text));}
 function redirect(res,status,location){res.statusCode=status;res.setHeader('Location',location);res.end();}
 function railwayEnv(){return Boolean(process.env.RAILWAY_ENVIRONMENT||process.env.RAILWAY_PROJECT_ID||process.env.RAILWAY_SERVICE_ID);}
-function publicRoute(p,m){if(m==='GET'&&webAppPath(p))return true;return (m==='GET'&&(['/health','/google/oauth/callback','/privacy','/webhook','/whatsapp/onboarding-config','/login','/logout','/forgot-password','/reset-password'].includes(p)||Boolean(PUBLIC_STATIC[p])))||(m==='POST'&&['/webhook','/whatsapp/onboarding-result','/auth/login','/auth/forgot-password','/auth/reset-password'].includes(p));}
+function publicRoute(p,m){if(m==='GET'&&webAppPath(p))return true;return (m==='GET'&&(['/health','/google/oauth/callback','/setup/email-sofia','/privacy','/webhook','/whatsapp/onboarding-config','/login','/logout','/forgot-password','/reset-password'].includes(p)||Boolean(PUBLIC_STATIC[p])))||(m==='POST'&&['/webhook','/whatsapp/onboarding-result','/auth/login','/auth/forgot-password','/auth/reset-password'].includes(p));}
 function publicHeaders(res,p){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');
  // 0.3.247: o site (app no navegador) so carrega scripts, estilos, imagens e dados do proprio servidor; o estilo inline e do Expo
  if(webAppPath(p)){res.setHeader('X-Frame-Options','DENY');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob: data:; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'");return;}
@@ -196,8 +196,9 @@ function createHandler(runtime) {
       }
       if(m==='GET'&&p==='/logout'){if(railwayEnv())clearSession(req,res);return redirect(res,303,railwayEnv()?'/login?logout=1':'/');}
       // 07/11/2026 (Pedro: "esse email precisa chegar pelo email da Sofia e eu nao vou pagar nada"): configuracao da empresa,
-      // feita UMA vez por quem esta logado na conta da Sofia (sofiaos.core). Nao aparece em tela nenhuma do site/app. Exige o
-      // login do dono (rota nao publica). Depois de ligado, so informa que esta pronto.
+      // feita UMA vez por quem esta logado na conta da Sofia (sofiaos.core). Nao aparece em tela nenhuma do site/app. Nao exige
+      // login do site (o site novo guarda o login no app): so a conta da Sofia completa (senderCallback recusa e revoga outra).
+      // Depois de ligado, so informa que esta pronto e nao reabre.
       if(m==='GET'&&p==='/setup/email-sofia'&&runtime.google){if(runtime.google.canSendMail())return plain(res,200,'O e-mail da Sofia ja esta ligado para envio: '+runtime.google.senderEmail());res.statusCode=302;res.setHeader('Location',runtime.google.senderConnectUrl({}).url);res.end();return;}
       if(m==='GET'&&p==='/google/oauth/callback'&&runtime.google){publicHeaders(res,p);const r=await runtime.google.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/stores/mercadolivre/oauth/callback'&&runtime.stores){publicHeaders(res,p);const r=await runtime.stores.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
