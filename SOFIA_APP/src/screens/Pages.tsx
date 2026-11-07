@@ -46,7 +46,7 @@ import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
 import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
 import {pageUrlPath} from '../lib/web-route';
-import {ContentWidth} from '../lib/content-width';
+import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
 import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
 import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
 import {SECRET_OK_TAG} from '../lib/page-editor';
@@ -605,15 +605,15 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
   header={<>
   <ScreenTitle title="Páginas" right={<IconButton name="plus" label="Criar página" disabled={!ready} onPress={()=>{if(desktop)void create();else setCreateParent(null);}}/>}/>
-  {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
+  {api.mdLocalOnly?<Text style={{paddingHorizontal:(desktop?dpx(DESK_LEFT):20) as any,paddingBottom:8,color:c.muted,fontSize:11}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   {/* 0.3.262 (fase 3 — Paginas): no computador, as paginas mexidas por ultimo em cartoes no topo (voltar ao que se estava
       fazendo e um clique); a arvore completa continua logo abaixo, com titulo de secao. */}
-  {desktop&&orderReady&&recentPages.length?<View testID="pages-recent" style={{paddingHorizontal:20,paddingBottom:18,gap:12}}>
+  {desktop&&orderReady&&recentPages.length?<View testID="pages-recent" style={{paddingHorizontal:dpx(DESK_LEFT) as any /* 07/11/2026 (revisao): mesma borda do titulo (eram 3 bordas na tela) */,paddingBottom:18,gap:10}}>
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Recentes</Text>
-   <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} onPress={()=>open(p)} style={({hovered}:any)=>({width:216,minHeight:112,padding:14,borderRadius:14,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:8,justifyContent:'space-between'})}>
-    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:24}}>{String(p.data.icon)}</Text>:<Icon name="note" size={22} color={c.accent} weight="duotone"/>}
-    <View style={{gap:2}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} onPress={()=>open(p)} style={({hovered}:any)=>({width:228,minHeight:58,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:10,flexDirection:'row',alignItems:'center'})} /* 07/11/2026 (revisao + desenho 'cartoezinhos pequenos'): cartao baixo, icone ao lado (era 216x112 com um vao no meio) */>
+    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
+    <View style={{gap:2,flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
    </Pressable>)}</View>
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600',marginTop:10}}>Todas as páginas</Text>
   </View>:null}

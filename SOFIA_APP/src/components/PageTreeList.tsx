@@ -129,7 +129,7 @@ function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}
   onResponderRelease={e=>{stopTimer();if(held.current){latest.current.onMove(e.nativeEvent.pageX,e.nativeEvent.pageY);latest.current.onEnd();}else if(!moved.current)latest.current.onOpen();held.current=false;}}
   onResponderTerminationRequest={()=>!held.current}
   onResponderTerminate={()=>{stopTimer();if(held.current)latest.current.onCancel();held.current=false;}}>
-  <Text style={{fontSize:24,color:c.text,width:30,textAlign:'center'}}>{String(page.data?.icon||'').trim()||'📄'}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,color:c.text,fontWeight:compact?'500':'600'}}>{page.title}</Text>
+  {String(page.data?.icon||'').trim()?<Text style={{fontSize:compact?18:20,color:c.text,width:26,textAlign:'center'}}>{String(page.data?.icon).trim()}</Text>:<View style={{width:26,alignItems:'center'}}><Icon name="note" size={compact?17:19} color={c.accent} weight="duotone"/></View>}{/* 07/11/2026 (revisao): sem icone escolhido, o mesmo icone de linha dos Recentes (era o emoji 📄 colorido) */}<Text numberOfLines={1} style={{flex:1,fontSize:compact?14:16,color:c.text,fontWeight:'500'}}>{page.title}</Text>
  </View>;
 }
 

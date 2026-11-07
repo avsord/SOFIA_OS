@@ -2,7 +2,7 @@
 // zoom de entrar e sair (a tela nova nasce do quadradinho clicado; ao voltar encolhe ate o lugar dela). Medidas em
 // px de computador: o arquivo passa so pelo fator da tela (metro: FLUID), nao pela conversao celular->computador.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Easing, Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import {Animated, Easing, Platform, Pressable, ScrollView, Text, View, useWindowDimensions} from 'react-native';
 import type {AgendaItem} from '../lib/types';
 import type {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -74,12 +74,16 @@ const keeper = (rects: Map<string, Local>) => (k: string, parent?: string) => (e
 function resolve(rects: Map<string, Local>, k: string): Rect | null {let r = rects.get(k); if (!r) return null; let x = r.x, y = r.y; const w = r.w, h = r.h; let guard = 0; while (r && r.parent && guard++ < 6) {const p = rects.get(r.parent); if (!p) return null; x += p.x; y += p.y; r = p;} return {x, y, w, h};}
 function YearView({x, y}: {x: Ctx; y: number}) {
   const {c, marks, today, go} = x, keep = keeper(x.rects);
-  return <View style={{flex: 1, padding: 14}} onLayout={keep('yearpad')}>
+  // 07/11/2026 (robo do site, celular): 3 meses por linha com altura fixa espremiam os numeros ("1011121314") e um mes
+  // encavalava no outro. No celular: 2 meses por linha, altura do proprio mes, e a tela rola.
+  const phone = useWindowDimensions().width < 600;
+  const Wrap: any = phone ? ScrollView : View;
+  return <Wrap style={{flex: 1}} contentContainerStyle={phone ? {padding: 10} : undefined} {...(phone ? {keyboardShouldPersistTaps: 'handled'} : {})}><View style={{flex: 1, padding: phone ? 0 : 14}} onLayout={keep('yearpad')}>
     <View style={{flex: 1, flexDirection: 'row', flexWrap: 'wrap'}} onLayout={keep('yeargrid', 'yearpad')}>
       {Array.from({length: 12}, (_, m) => {
         const first = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate(), cur = m === today.getMonth() && y === today.getFullYear();
         return <Pressable key={m} accessibilityRole="button" accessibilityLabel={'Abrir ' + MONTHS[m] + ' de ' + y} onLayout={keep('m' + m, 'yeargrid')} onPress={() => go('month', new Date(y, m, 1), 'm' + m)}
-          style={({hovered}: any) => ({width: x.p.compact ? '33.33%' : '25%', height: x.p.compact ? '25%' : '33.33%', padding: x.p.compact ? 6 : 10, paddingHorizontal: x.p.compact ? 6 : 12, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
+          style={({hovered}: any) => ({width: phone ? '50%' : x.p.compact ? '33.33%' : '25%', ...(phone ? {paddingBottom: 12} : {height: x.p.compact ? '25%' : '33.33%'}), padding: x.p.compact ? 6 : 10, paddingHorizontal: x.p.compact ? 6 : 12, borderRadius: 10, backgroundColor: hovered ? c.input : 'transparent'})}>
           <Text style={{fontSize: 14, fontWeight: '600', color: cur ? c.accent : c.text, marginBottom: 6}}>{MONTHS[m]}</Text>
           <View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
             {WD.map((w, i) => <Text key={'w' + i} style={{width: '14.2857%', textAlign: 'center', fontSize: 11, color: c.muted, paddingVertical: 2}}>{w[0].toUpperCase()}</Text>)}
@@ -87,7 +91,7 @@ function YearView({x, y}: {x: Ctx; y: number}) {
             {Array.from({length: n}, (_, i) => {
               const d = new Date(y, m, i + 1), k = localDateKey(d), t = localDateKey(today) === k, ev = marks.ev.has(k), hol = marks.hol.get(k);
               return <View key={k} style={{width: '14.2857%', alignItems: 'center', paddingTop: 2, paddingBottom: 4}}>
-                <Text accessibilityLabel={hol ? d.getDate() + ', ' + hol : undefined} style={{minWidth: 20, textAlign: 'center', fontSize: 11, borderRadius: 5, overflow: 'hidden', fontVariant: ['tabular-nums'], color: t ? c.onAccent : ev || hol ? c.text : c.muted, backgroundColor: t ? c.accent : 'transparent', fontWeight: t ? '700' : '400'}}>{d.getDate()}</Text>
+                <Text accessibilityLabel={hol ? d.getDate() + ', ' + hol : undefined} style={{minWidth: phone ? 16 : 20, textAlign: 'center', fontSize: 11, borderRadius: 5, overflow: 'hidden', fontVariant: ['tabular-nums'], color: t ? c.onAccent : ev || hol ? c.text : c.muted, backgroundColor: t ? c.accent : 'transparent', fontWeight: t ? '700' : '400'}}>{d.getDate()}</Text>
                 <View style={{flexDirection: 'row', gap: 2, height: 4, marginTop: 1}}>{hol ? <View style={{width: 4, height: 4, borderRadius: 2, backgroundColor: HOLIDAY_COLOR}} /> : null}{ev ? <View style={{width: 4, height: 4, borderRadius: 2, backgroundColor: t ? c.text : c.accent}} /> : null}</View>
               </View>;
             })}
@@ -95,7 +99,7 @@ function YearView({x, y}: {x: Ctx; y: number}) {
         </Pressable>;
       })}
     </View>
-  </View>;
+  </View></Wrap>;
 }
 function Chip({x, i}: {x: Ctx; i: AgendaItem}) {
   const {c, p} = x;
