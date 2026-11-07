@@ -64,6 +64,8 @@ export const SLASH_ITEMS:SlashItem[]=[
  {type:'code',label:'Código',hint:'Texto monoespaçado',icon:'</>',keys:'codigo code'},
  {type:'divider',label:'Divisor',hint:'Linha de separação',icon:'—',keys:'divisor linha separador hr'},
  {type:'subpage',label:'Subpágina',hint:'Nova página dentro desta',icon:'▤',keys:'pagina subpagina nova page'},
+ {type:'xlsx',label:'Planilha do Excel',hint:'Nova .xlsx para editar aqui',icon:'X',keys:'planilha excel xlsx tabela nova contas'},
+ {type:'pptx',label:'Apresentação do PowerPoint',hint:'Nova .pptx para editar aqui',icon:'P',keys:'apresentacao powerpoint pptx slides slide nova'},
  {type:'docx',label:'Documento do Word',hint:'Novo .docx para escrever aqui',icon:'W',keys:'documento word docx doc novo escrever texto arquivo'},
  {type:'file',label:'Arquivo',hint:'PDF, Word, imagem, vídeo, áudio…',icon:'📎',keys:'arquivo anexo anexar pdf docx word excel imagem foto video audio upload enviar'},
 ];

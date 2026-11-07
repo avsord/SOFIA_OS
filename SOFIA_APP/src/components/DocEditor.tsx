@@ -7,7 +7,7 @@
 //   o arquivo do bloco (o anterior fica guardado como versao antiga no servidor).
 import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
-import {useTheme} from '../lib/theme';
+import {useEditorColors, ThemeToggle} from './EditorChrome';
 import {errorText} from '../lib/chat-model';
 
 const h = React.createElement as any;
@@ -38,7 +38,7 @@ function inlineForDocx(src: HTMLElement): string {
 }
 
 export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void}) {
-  const c = useTheme(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
+  const [c, toggleTheme] = useEditorColors(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [status, setStatus] = useState(''), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false);
   const onSavedRef = useRef(onSaved); onSavedRef.current = onSaved;
   useEffect(() => {let live = true; setState('loading');
@@ -76,8 +76,8 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
     style: {height: 28, minWidth: 28, padding: '0 6px', border: 0, borderRadius: 6, background: 'transparent', color: c.text, cursor: 'pointer', fontSize: 13, ...extra}}, label);
   const sep = (k: string) => h('span', {key: k, style: {width: 1, height: 18, background: c.line, margin: '0 4px'}});
   const swatch = (k: string, color: string, title: string, run: () => void) => h('button', {key: k, type: 'button', title, 'aria-label': title, onMouseDown: (e: any) => {e.preventDefault(); run();}, style: {width: 18, height: 18, borderRadius: 4, border: '1px solid ' + c.line, background: color, cursor: 'pointer', padding: 0}});
-  const selectStyle = {height: 28, borderRadius: 6, border: '1px solid ' + c.line, background: c.surface, color: c.text, fontSize: 12, padding: '0 4px'};
-  const bar = h('div', {style: {display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, padding: '6px 8px', borderBottom: '1px solid ' + c.line, background: c.surface, flexShrink: 0}},
+  const selectStyle = {height: 28, borderRadius: 6, border: '1px solid ' + c.line, background: c.field, color: c.text, fontSize: 12, padding: '0 4px'};
+  const bar = h('div', {style: {display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, padding: '6px 8px', borderBottom: '1px solid ' + c.line, background: c.bar, flexShrink: 0}},
     B('↶', 'Desfazer', () => exec('undo')), B('↷', 'Refazer', () => exec('redo')), sep('s1'),
     h('select', {key: 'style', 'aria-label': 'Estilo', defaultValue: '', onMouseDown: keep, onChange: (e: any) => {const v = e.target.value; if (v) exec('formatBlock', v); e.target.value = '';}, style: selectStyle},
       h('option', {value: ''}, 'Estilo'), h('option', {value: 'p'}, 'Normal'), h('option', {value: 'h1'}, 'Título 1'), h('option', {value: 'h2'}, 'Título 2'), h('option', {value: 'h3'}, 'Título 3')),
@@ -94,13 +94,14 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
     B('⯇≡', 'Alinhar à esquerda', () => exec('justifyLeft'), {fontSize: 11}), B('≡', 'Centralizar', () => exec('justifyCenter')), B('≡⯈', 'Alinhar à direita', () => exec('justifyRight'), {fontSize: 11}), B('☰', 'Justificar', () => exec('justifyFull')), sep('s7'),
     B('Tx', 'Limpar formatação', () => exec('removeFormat'), {textDecoration: 'line-through', fontSize: 12}),
     h('span', {key: 'sp', style: {flex: 1}}),
+    h(ThemeToggle, {key: 'theme', colors: c, toggle: toggleTheme}), h('span', {key: 'gap', style: {width: 6}}),
     h('span', {key: 'st', style: {fontSize: 11, color: /Não salvo/.test(status) ? c.danger : c.muted, marginRight: 6}}, status),
     B('Salvar', 'Salvar agora', () => {dirty.current = true; void save();}, {background: c.accent, color: c.onAccent, fontWeight: 600, padding: '0 10px'}));
   return h('div', {style: {display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0}},
     bar,
-    h('div', {style: {flex: 1, minHeight: 0, overflow: 'auto', background: '#e9e9ee', position: 'relative'}, onKeyUp: keep, onMouseUp: keep, onInput: changed},
+    h('div', {style: {flex: 1, minHeight: 0, overflow: 'auto', background: c.bg, position: 'relative'}, onKeyUp: keep, onMouseUp: keep, onInput: changed},
       h('div', {ref: styles}),
       state === 'loading' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#666', fontSize: 13}}, 'Abrindo o documento…') : null,
       state === 'error' ? h('div', {style: {padding: 40, textAlign: 'center', color: '#a33', fontSize: 13}}, err) : null,
-      h('div', {ref: host, style: {color: '#000', fontFamily: 'Calibri, Carlito, Arial, sans-serif' /* letra padrao do Word (sem herdar a do site) */}})));
+      h('div', {ref: host, style: {color: '#000', filter: c.pageFilter, fontFamily: 'Calibri, Carlito, Arial, sans-serif' /* letra padrao do Word (sem herdar a do site) */}})));
 }

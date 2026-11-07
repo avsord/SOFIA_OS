@@ -1,5 +1,8 @@
 import {PagesLoadingBody} from '../components/ScreenSkeleton';
-import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime,openFileWindow,DOCX_MIME} from '../components/PageFiles';
+import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime,openFileWindow,DOCX_MIME,XLSX_MIME,PPTX_MIME} from '../components/PageFiles';
+import {blankXlsx} from '../components/SheetEditor';
+import {blankPptx} from '../components/SlideEditor';
+import {uploadOfficeBytes} from '../lib/office-save';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
@@ -222,7 +225,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function chooseSlash(b:PageBlock,type:string){const sl=slash;setSlash(null);if(!sl||sl.id!==b.id||!entry)return;
   if(type==='subpage'){void createSubpageHere(b,sl);return;}
   if(type==='file'){applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,'text'));pickFiles(b);return;}
-  if(type==='docx'){applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,'text'));void createDoc(b);return;} /* 07/11/2026: "/documento" cria um Word e abre no editor */ /* 07/11/2026: "/arquivo" escolhe arquivos do computador */
+  if(type==='docx'||type==='xlsx'||type==='pptx'){applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,'text'));void createDoc(b,type);return;} /* 07/11/2026: "/documento" cria um Word e abre no editor */ /* 07/11/2026: "/arquivo" escolhe arquivos do computador */
   applyCaret(applySlash(currentBlocks(),b.id,sl.start,sl.caret,type));}
  function insertWithSlash(b:PageBlock){const blocks=currentBlocks(),i=blocks.findIndex(x=>x.id===b.id);if(i<0)return;const empty=b.type==='text'&&!String(b.text||'').trim();
   const target=empty?b:{...newBlock(),text:'/'};const next=blocks.slice();if(empty)next[i]={...b,text:'/',html:''};else next.splice(i+1,0,target);
@@ -384,12 +387,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "a Sofia consegue criar um arquivo doc na pagina e comecar a editar"): .docx em branco + editor aberto
- async function createDoc(after:PageBlock|null){if(!selectedId||Platform.OS!=='web')return;const pageId=selectedId,cur=store.get(pageId);
+ async function createDoc(after:PageBlock|null,kind:'docx'|'xlsx'|'pptx'='docx'){if(!selectedId||Platform.OS!=='web')return;const pageId=selectedId,cur=store.get(pageId);
   if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
-  const title=String(cur?.draft?.title||'').trim().replace(/[\\/:*?"<>|]/g,'').slice(0,80),name=(title||'Documento')+'.docx',blk={...newBlock('file'),text:'',data:{uploading:true,name,mime:DOCX_MIME}};
+  const title=String(cur?.draft?.title||'').trim().replace(/[\\/:*?"<>|]/g,'').slice(0,80),mime=kind==='xlsx'?XLSX_MIME:kind==='pptx'?PPTX_MIME:DOCX_MIME,name=(title||(kind==='xlsx'?'Planilha':kind==='pptx'?'Apresentação':'Documento'))+'.'+kind,blk={...newBlock('file'),text:'',data:{uploading:true,name,mime}};
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();if(i<0)blocks.push(blk);else if(empty)blocks.splice(i,1,blk);else blocks.splice(i+1,0,blk);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   const put=(a:{id:string;name:string;mime:string;bytes:number})=>store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...(x.data||{}),uploading:false,attachment_id:a.id,name:a.name,mime:a.mime,size:a.bytes,view:'attach'}}:x)}));
-  try{const a=await api.saveDocx(pageId,{html:'<p></p>',name});put(a);void store.flush(pageId);openFileWindow(api,{id:a.id,name:a.name,mime:a.mime,pageId,onSaved:x=>{put(x);void store.flush(pageId);}});}
+  try{const a=kind==='docx'?await api.saveDocx(pageId,{html:'<p></p>',name}):await uploadOfficeBytes(api,pageId,kind==='xlsx'?await blankXlsx():await blankPptx(),name,mime);put(a);void store.flush(pageId);openFileWindow(api,{id:a.id,name:a.name,mime:a.mime,pageId,onSaved:x=>{put(x);void store.flush(pageId);}});}
   catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}
  function pickFiles(after:PageBlock|null){if(Platform.OS!=='web')return;const input=document.createElement('input');input.type='file';input.multiple=true;input.onchange=()=>{const list=[...(input.files||[])] as File[];if(list.length)void dropFiles(after,list);};input.click();}
  const editorDrop=useRef<any>(null),[fileOver,setFileOver]=useState(false);
