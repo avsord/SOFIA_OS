@@ -197,7 +197,7 @@ test('v133: menu de usuário fecha fora e perfil do proprietário é editável',
   assert.ok(app.includes("event.key==='Escape'"));
   assert.ok(app.includes("body:{profileName,profileEmail}"));
   assert.ok(store.includes("profileName: 'Pedro Silva'"));
-  assert.ok(store.includes("profileEmail: 'sofiaos.core@gmail.com'"));
+  assert.ok(!store.includes("profileEmail: 'sofiaos.core@gmail.com'"),'07/11/2026: e-mail da Sofia e corporativo, nunca e-mail de usuario');
 });
 
 
