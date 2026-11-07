@@ -67,6 +67,8 @@ export function DocEditor({api, id, name, url, pageId, onSaved}: {api: SofiaApi;
   const save = async () => {if (saving.current || !dirty.current) return;
     const html = pageHtml(); if (html === initial.current) {dirty.current = false; setStatus(''); return;} // nada mudou de verdade: nao salva
     if (html === blocked.current) {dirty.current = false; return;} // a mesma versao ja foi recusada: nao tenta em loop
+    // 07/11/2026 (Pedro: documento salvo em branco): nunca salva antes de terminar de abrir, nem um documento vazio
+    if (!initial.current || !host.current?.querySelector('.docx-wrapper') || measure(host.current.querySelector('.docx-wrapper')).chars === 0) {dirty.current = false; return;}
     saving.current = true; dirty.current = false; setStatus('Salvando…');
     try {const a = await api.saveDocx(pageId, {html, name});
       // 07/11/2026 (Pedro: "sumiu conteudo aqui"): antes de trocar o arquivo, abre o salvo escondido e compara com a tela.

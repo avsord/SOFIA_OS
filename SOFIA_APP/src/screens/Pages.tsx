@@ -29,7 +29,7 @@ import type {Caret} from '../lib/page-block-keys';
 import {flushNow} from '../lib/flush-sync';
 import {useHoverHold,useHoverKey} from '../lib/hover-hold';
 import {PageRichInput,textToHtml} from '../components/PageRichInput';
-import {PageShareButton} from '../components/PageSharePanel';
+import {PageShareButton,shareUrl} from '../components/PageSharePanel';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
 import {PageRefreshGuard} from '../lib/page-gesture';
@@ -49,7 +49,7 @@ import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
-import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
+import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,sharedPages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
 import {pageUrlPath} from '../lib/web-route';
 import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
 import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
@@ -200,7 +200,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path!==next)w.history?.replaceState?.(w.history.state,'',next);}catch{/* sem endereço */}},[selectedId,active]);
  useEffect(()=>{showTopRef.current=false;setShowTop(false);},[selectedId]);
  function editedLabel(at:string){const d=new Date(at);if(Number.isNaN(d.getTime()))return '';const now=new Date(),same=d.toDateString()===now.toDateString();return 'Editada '+(same?'hoje às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})}));}
- function copyPageLink(id:string){try{const w=globalThis as any;void w.navigator?.clipboard?.writeText?.(w.location.origin+pageUrlPath(id));setFlash('Link copiado');setTimeout(()=>setFlash(''),1600);}catch{/* sem área de transferência */}}
+ // 07/11/2026 (Pedro: "esse simbolo tem que ser pra copiar o compartilhado e nao o meu pessoal"): copia o link PUBLICO da
+ // pagina (ou da pagina de cima que esta compartilhada, apontando para esta). Sem compartilhar: avisa e abre o Compartilhar.
+ async function copyPageLink(id:string){const w=globalThis as any,shared=new Set(sharedPages.get());let cur:Entity|undefined=byId.get(id),root:Entity|undefined;const seen=new Set<string>();
+  while(cur&&!seen.has(cur.id)){seen.add(cur.id);if(shared.has(cur.id)){root=cur;break;}cur=byId.get(String(cur.data?.parent_id||''));}
+  if(!root){setFlash('Esta página ainda não está compartilhada');setTimeout(()=>setFlash(''),2200);try{w.document?.querySelector?.('[data-testid="page-share"]')?.click?.();}catch{}return;}
+  try{const {token}=await api.pageShare(root.id);if(!token)throw Error('sem link');await w.navigator?.clipboard?.writeText?.(shareUrl(token)+(root.id===id?'':'/'+encodeURIComponent(id)));setFlash('Link do compartilhado copiado');}
+  catch{setFlash('Não consegui copiar o link do compartilhado');}setTimeout(()=>setFlash(''),1800);}
  function openAppearance(kind:'icon'|'cover',e?:any){const ne=e?.nativeEvent,t=e?.currentTarget;let at:{x:number;y:number}|null=null;
   try{const r=t?.getBoundingClientRect?.();if(r)at={x:r.left,y:r.bottom};}catch{}if(!at&&ne&&typeof ne.pageX==='number')at={x:ne.pageX,y:ne.pageY};appearanceAnchor.current=at;setAppearance(kind);}
  const [slash,setSlash]=useState<{id:string;start:number;caret:number;active:number}|null>(null),[blockMenu,setBlockMenu]=useState<string|null>(null),slashScroll=useRef<ScrollView>(null);
@@ -717,7 +723,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {desktop?<>
      <Text testID="page-edited" numberOfLines={1} style={{color:c.muted,fontSize:12,marginRight:6}}>{flash||(selected.updated_at?editedLabel(String(selected.updated_at)):'')}</Text>
      <PageShareButton api={api} pageId={selected.id} pageTitle={selected.title}/>
-     <IconButton name="link" label="Copiar link da página" size={34} onPress={()=>copyPageLink(selected.id)}/>
+     <IconButton name="link" label="Copiar link do compartilhado" size={34} onPress={()=>void copyPageLink(selected.id)}/>
      <Pressable testID="page-favorite" accessibilityRole="button" accessibilityLabel={favorites.includes(selected.id)?'Tirar dos favoritos':'Adicionar aos favoritos'} onPress={()=>toggleFavoritePage(selected.id)} style={({hovered}:any)=>({width:34,height:34,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Icon name="star" size={18} color={favorites.includes(selected.id)?'#E9B949':c.muted} weight={favorites.includes(selected.id)?'fill':undefined}/></Pressable>
     </>:null}
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>

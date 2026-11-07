@@ -91,7 +91,7 @@ test('Prints do Pedro: subpágina como link no texto com prévia, espaço → So
  assert.ok(src.includes('testID="page-peek"'),'prévia ao passar o mouse');
  assert.ok(src.includes("const link={...newBlock('page_link'),text:'',data:{page_id:saved.id}};"),'"/Subpágina" cria o link no lugar');
  assert.ok(src.includes("setAi({id:b.id,busy:false,error:''});return;}"),'espaço numa linha vazia chama a Sofia');
- assert.ok(src.includes('testID="page-edited"')&&src.includes('label="Copiar link da página"')&&src.includes('testID="page-favorite"'));
+ assert.ok(src.includes('testID="page-edited"')&&src.includes('label="Copiar link do compartilhado"')&&src.includes('testID="page-favorite"'));
  assert.ok(src.includes('testID="page-back-to-top"'),'botão Topo no centro');
  const route=fs.readFileSync(path.join(__dirname,'..','src/lib/web-route.ts'),'utf8');assert.ok(route.includes("'/paginas/' + id"));
 });
