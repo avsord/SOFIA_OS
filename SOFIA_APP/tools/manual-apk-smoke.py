@@ -90,7 +90,7 @@ try:
  adb('install',str(dist/'QA-ONLY-seed.apk'))
  adb('shell','pm','grant',pkg,'android.permission.POST_NOTIFICATIONS')
  cold('seed-060');time.sleep(3)
- seed=capture('seed-060');assert 'Olá, Teste.' in seed,'Synthetic account did not reach Home'
+ seed=capture_home('seed-060',need_agenda=False,wait=20);assert home_authenticated(seed),'Synthetic account did not reach Home' # 07/11: semente nova usa o Inicio atual (Bom dia/Boa tarde/Boa noite, Teste)
  tap_label(seed,'Conversa');time.sleep(1)
  tap_label(xml(),'Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem')
  tap_label(xml(),'Enviar mensagem');time.sleep(4)

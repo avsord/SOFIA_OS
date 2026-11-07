@@ -367,6 +367,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
+- **07/11: esqueleto com brilho infinito no app quebra o teste do APK.** Aba escondida que ainda não abriu fica com o esqueleto rodando para sempre e o Android nunca vê a tela parada (`UI dump failed`). Já tinha acontecido em 03/11. No app o brilho agora para em ~6 s (`ShimmerGroup`); qualquer animação nova em loop precisa de fim no app.
 - Artefato do GitHub Actions dura 30 dias: nunca fixar `run-id` antigo como base de teste (07/11/2026: semente 0.3.60 sumiu e todo [manual-apk] falhou). Base durável = release publicada; semente = compilada na rodada.
 
 - Depois de publicar, abrir o site compilado e conferir que nenhuma tela mostra "Algo deu errado" (teste local olhava só a parte mudada; 1eb44b2 derrubou todas as telas e passou despercebido) (06/11/2026).

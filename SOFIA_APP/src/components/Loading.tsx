@@ -125,7 +125,9 @@ export function ShimmerGroup({children, duration = 1300, paused = false}: {child
   const x = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (paused) return; // 03/11/2026: esqueleto fora da tela fica parado (o Android nao via a tela parada com o brilho rodando)
-    const loop = Animated.loop(Animated.timing(x, {toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true}));
+    // 07/11/2026 (APK: "screen never idle"): no app o brilho para sozinho depois de ~6 s. Abas escondidas que ainda nao
+    // abriram tinham esqueleto com brilho rodando para sempre: o Android nunca via a tela parada (e gastava bateria).
+    const loop = Animated.loop(Animated.timing(x, {toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true}), Platform.OS === 'web' ? undefined : {iterations: Math.max(1, Math.round(6000 / duration))});
     loop.start();
     return () => loop.stop();
   }, [x, duration, paused]);
