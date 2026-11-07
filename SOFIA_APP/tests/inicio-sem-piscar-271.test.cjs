@@ -14,12 +14,12 @@ test('Inicio: Stat das Financas fica fora do FinanceTile (nao e recriado a cada 
   assert.ok(!/const Stat\s*=/.test(ft),'componente criado dentro do FinanceTile');
   assert.ok(s.indexOf('function Stat(')>=0&&s.indexOf('function Stat(')<s.indexOf('function FinanceTile('));
 });
-test('Inicio: aureola do "agora" pulsa por CSS, sem Animated.loop no JavaScript',()=>{
-  const s=read('src/desktop/HomeBrief.tsx');
-  const nb=s.slice(s.indexOf('function NowBeacon('),s.indexOf('\n}\n',s.indexOf('function NowBeacon(')));
-  assert.ok(!nb.includes('Animated.loop')&&!nb.includes('Animated.View'),'pulso voltou para o JavaScript');
-  assert.ok(nb.includes('NOW_PULSE.halo')&&s.includes("animationIterationCount: 'infinite'"));
-  assert.ok(nb.includes('WEB && !reduced'),'respeita movimento reduzido e fica parado no celular');
+test('Inicio estatico (07/11, Pedro: "tudo estatico"): sem pulso do agora, sem fade/escala no texto, sem bolinha nem fade na abertura',()=>{
+  const b=read('src/desktop/HomeBrief.tsx'),h=read('src/components/HomeHero.tsx'),m=read('src/screens/Home.tsx'),i=read('public/index.html'),l=read('src/lib/launch-handoff.ts');
+  const nb=b.slice(b.indexOf('function NowBeacon('),b.indexOf('\n}\n',b.indexOf('function NowBeacon(')));
+  assert.ok(!nb.includes('Animated.loop')&&!b.includes("animationIterationCount: 'infinite'"),'pulso voltou');
+  assert.ok(h.includes('const fadeIn = (_delay: number) => ({} as any);')&&m.includes('const NO_INTRO=true;'),'texto animado voltou');
+  assert.ok(!i.includes('class="spin"')&&i.includes('#sofia-veil.out { display: none; }')&&l.includes('veil.remove();'),'bolinha ou fade voltou');
 });
 test('Gravador de fluidez: so no site, uma vez, envio direto (sem invalidar caches) e sem conteudo do usuario',()=>{
   const pr=read('src/lib/fluency-probe.ts'),api=read('src/lib/api.ts'),home=read('src/screens/Home.tsx'),srv=fs.readFileSync(path.join(__dirname,'..','..','src/channels/mobile.js'),'utf8');

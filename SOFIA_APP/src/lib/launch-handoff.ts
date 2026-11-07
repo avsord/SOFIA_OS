@@ -24,5 +24,5 @@ export function revealWebVeil(bg?: string){
  if(held){heldBg=bg;return;}
  const veil=document.getElementById('sofia-veil');veilOut=true;veilSubs.forEach(f=>f());if(!veil)return;
  if(bg){veil.style.background=bg;try{localStorage.setItem('sofia.veil.bg',bg);}catch{/* modo privado */}} /* a proxima abertura ja cobre com a cor do tema do app (assets/early.js) */
- requestAnimationFrame(()=>{veil.classList.add('out');setTimeout(()=>veil.remove(),400);});
+ veil.remove(); /* 07/11/2026 (Pedro): sai de uma vez, sem fade */
 }

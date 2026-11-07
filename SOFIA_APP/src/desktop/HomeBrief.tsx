@@ -934,7 +934,8 @@ function PeriodIcon({kind}: {kind: string}) {
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
 /* 06/11/2026 (Pedro: "o Inicio esta piscando as bolinhas"): a aureola do "agora" pulsava pelo JavaScript, reescrevendo o estilo
  * 60 vezes por segundo (e a posicao junto, tremendo em fracoes de pixel). Agora o proprio navegador anima (CSS), sem tocar na pagina. */
-const NOW_PULSE = StyleSheet.create({halo: {animationKeyframes: {'0%': {opacity: 0.35, transform: 'scale(0.4)'}, '100%': {opacity: 0, transform: 'scale(1.4)'}}, animationDuration: '2200ms', animationTimingFunction: 'cubic-bezier(0.5,1,0.89,1)', animationIterationCount: 'infinite', willChange: 'transform, opacity'} as any});
+// 07/11/2026 (Pedro: "tudo estatico" no Inicio): sem o pulso da bolinha do agora
+const NOW_PULSE = StyleSheet.create({halo: {opacity: 0} as any});
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(), reduced = useReducedMotion(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
@@ -1123,7 +1124,7 @@ function ItemDots({n, i, color, done, onGo, what = 'Item'}: {n: number; i: numbe
   </View>;
 }
 /** 03/11/2026: entrada do pronto no lugar do esqueleto (StyleSheet.create: o site so anima por ele). */
-const ENTER = StyleSheet.create({brief: {animationKeyframes: {'0%': {opacity: 0.35}, '100%': {opacity: 1}}, animationDuration: '280ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any});
+const ENTER = StyleSheet.create({brief: {} as any}); // 07/11/2026 (Pedro): blocos entram parados, sem fade
 /** 03/11/2026 (desenho 01): no celular os blocos sao metade da largura e o "‹ 1 de N ›" cobria o titulo; la fica so "1/N"
  * no canto e os pontinhos de baixo trocam o item. */
 const CompactCtx = React.createContext(false);

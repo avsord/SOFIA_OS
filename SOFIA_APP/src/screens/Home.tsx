@@ -339,7 +339,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  // 04/11/2026: a ordem da abertura (saudacao, subida, data digitada, resumo, fileiras, brilho oval) e a linha do tempo INTRO_T, toda em CSS
  // 04/11/2026 (Pedro: "quando entro em uma pagina e volto, da uma flikada no degrade oval"): ao voltar ao Inicio o brilho
  // reaparece com fade curto (o navegador redesenha a camada grande; sem o fade ele surgia de uma vez e piscava)
- useEffect(()=>{const back=active&&!wasActive.current;wasActive.current=active;if(!back||!wideHome)return;glowBack.setValue(0);Animated.timing(glowBack,{toValue:1,duration:350,easing:Easing.out(Easing.quad),useNativeDriver:false}).start();},[active]);
+ useEffect(()=>{const back=active&&!wasActive.current;wasActive.current=active;if(!back||!wideHome)return;/* 07/11/2026 (Pedro): brilho oval parado, sem fade ao voltar */glowBack.setValue(1);},[active]);
  // 04/11/2026 (Pedro: "quando o shimmer finaliza da uma piscada"): o esqueleto fica por cima do conteudo e apaga devagar, em vez de sumir de uma vez
  useEffect(()=>{if(!deskShown||!wideHome)return;saveEarlyPaths();const t=setTimeout(()=>setSkelFade(false),Math.max(400,(swapAt||Date.now())+1250-Date.now())) /* as 3 fileiras do esqueleto apagam uma a uma */;return()=>clearTimeout(t);},[deskShown]);
  useEffect(()=>{if(deskShown||!active)return; /* 03/11/2026: o painel do Inicio so monta com o Inicio na tela; montado com a pessoa em outra aba (modo Antigo) ele travava o processador no meio da abertura dela */if(tasksReady&&calendar.loadedAt&&noticesReady&&seriesReady&&brief.ready&&(!desktop||(calNext1.loadedAt&&calNext2.loadedAt))){setDeskShown(true);return;}

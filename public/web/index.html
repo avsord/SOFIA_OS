@@ -93,14 +93,10 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
       #root { display: flex; height: 100%; flex: 1; }
       /* 04/11/2026 (Pedro: "quando abre o site, um fade rapido de toda a tela com a cor do site"): veu na cor do fundo que cobre
          a montagem e some depressa quando o app esta pronto (launch-handoff.ts); se o app nao avisar, some sozinho em 8 s */
-      #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; will-change: opacity; transform: translateZ(0); background: #F7F6FA; animation: sofia-veil-out 200ms ease-out 8s both; display: flex; align-items: center; justify-content: center; }
-      /* 07/11/2026 (Pedro): bolinha de carregamento no meio enquanto o Inicio carrega; o veu sai num fade curto */
-      #sofia-veil .spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(114,88,232,0.22); border-top-color: #7258E8; animation: sofia-spin 0.8s linear infinite; opacity: 0; animation-delay: 0s; }
-      #sofia-veil .spin { animation: sofia-spin 0.8s linear infinite, sofia-spin-in 200ms ease-out 250ms both; }
-      @keyframes sofia-spin { to { transform: rotate(360deg); } }
-      @keyframes sofia-spin-in { from { opacity: 0; } to { opacity: 1; } }
+      #sofia-veil { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; will-change: opacity; transform: translateZ(0); background: #F7F6FA; animation: sofia-veil-out 1ms linear 8s both; }
+      /* 07/11/2026 (Pedro: "tira a roda de loading e tira o fade"): o veu so cobre a montagem e sai de uma vez, sem bolinha e sem fade */
       @media (prefers-color-scheme: dark) { #sofia-veil { background: #121017; } }
-      #sofia-veil.out { animation: sofia-veil-open 220ms ease-out 0s both; }
+      #sofia-veil.out { display: none; }
       @keyframes sofia-veil-out { from { opacity: 1; } to { opacity: 0; } }
       @keyframes sofia-veil-open { from { opacity: 1; } to { opacity: 0; } }
       ::selection { background: rgba(114, 88, 232, 0.28); }
@@ -112,8 +108,8 @@ div,span,input,textarea{font-variant-numeric:tabular-nums}</style>
   <body>
     <noscript>Para usar a Sofia OS, ative o JavaScript no seu navegador.</noscript>
     <div id="root"></div>
-    <div id="sofia-veil"><div class="spin"></div></div>
+    <div id="sofia-veil"></div>
     <script src="/assets/early.js?v=6"></script>
-  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-c08ff8a06ccb9fb496e8f487fe34864f.js" defer></script><script src="/_expo/static/js/web/index-69d200e6205b3b4361eac77cacb9451b.js" defer></script>
+  <script src="/_expo/static/js/web/__expo-metro-runtime-1f8f5d3ca6b7f58204d51e14506d73fb.js" defer></script><script src="/_expo/static/js/web/__common-c08ff8a06ccb9fb496e8f487fe34864f.js" defer></script><script src="/_expo/static/js/web/index-bf60caa5e7aa955325c327db313c3b5a.js" defer></script>
 </body>
 </html>

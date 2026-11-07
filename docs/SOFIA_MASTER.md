@@ -235,7 +235,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Senha escrita numa página (06/11/2026, Pedro):** a página pergunta se quer trancar com senha; se "não", salva normalmente (marca sofia-secret-ok-v1) e fica fora do que a IA lê.
 - **Drive — clique (07/11, Pedro):** um clique abre arquivo e pasta, no computador também (não o duplo clique do Google Drive). Selecionar: caixinha ao passar o mouse, Ctrl/Shift + clique, Ctrl+A.
 - **Drive desligado (07/11, Pedro):** "acho a função do Drive ruim, tira ela" / "o Drive não existe mais". Fora do menu, da lista de apps e do endereço; escopo `drive` não é mais pedido; teste no Google dele desligado. Código guardado (DRIVE_APP em `SOFIA_APP/src/lib/features.ts`, DRIVE_APP_ON em `src/services/drive-selftest.js`). Não mexer no Drive sem pedido dele.
-- **Abertura do Início (07/11, Pedro, substitui a aprovada em 04/11):** "tira as animações do início e deixa só o fade, rápido, com uma bola de loading no meio". Véu na cor do site com bolinha (aparece só se demorar >250 ms) até o Início ter os dados (`releaseVeil` em Home.tsx; máx. 6 s) e fade de 0,22 s; sem saudação subindo, fileiras, brilho (NO_INTRO em Home.tsx).
+- **Abertura do Início (07/11, Pedro, substitui a aprovada em 04/11):** TUDO ESTÁTICO — "tira a roda de loading e tira o fade", "o círculo oval também fica sem animação e o lettering também, tudo estático". Véu na cor do site só cobre a montagem e some de uma vez quando o Início tem os dados (máx. 6 s); sem bolinha, sem fade, sem saudação subindo, sem fileiras entrando, sem brilho animado, sem pulso da bolinha do agora (NO_INTRO em Home.tsx, fadeIn vazio em HomeHero.tsx, NOW_PULSE/ENTER vazios em HomeBrief.tsx). Não recolocar animação no Início sem pedido dele.
 
 ## 8. Regras que não se quebram
 - **Drive (07/11):** antes de mexer no Drive e depois de publicar, ler `[drive-teste]` e `[drive]` no registro do Railway; defeito que aparecer ali se corrige sem esperar o Pedro relatar.
@@ -347,11 +347,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Drive se testa sozinho: [drive-teste] no Google de verdade a cada versão (pasta escondida, todas as ações, apaga no fim) e [drive] com falhas/demoras do site/app (sem nomes); miniatura não baixa de novo a cada clique (11→1); Enter/setas com item em foco | testes e portão verdes; [manual-apk] |
 | 2026-11-07 | (delivery) | Drive 100% por método: laboratório (tools/drive-lab: Google Drive fiel + servidor real) com 48 sondas e robô de 49 passos (computador e celular) no portão; ~60 defeitos corrigidos (proteção pastas "Sofia OS", PDF/Word em branco no site, duplo clique/arrastar mortos, envio >50 MB, Docs não baixavam etc.) | portão 14/14; [manual-apk] |
 | 2026-11-07 | (delivery) | Drive: um clique já abre arquivo e pasta (Pedro: "por que tenho que apertar duas vezes"); selecionar por caixinha ao passar o mouse, Ctrl ou Shift; robô 52 passos | portão 14/14; [manual-apk] |
 | 2026-11-07 | (delivery) | Drive: seleção arrastando o mouse num lugar vazio (retângulo, Ctrl/Shift soma, rola sozinho); lista de controle contra a Ajuda oficial do Google (docs/drive/matriz-google-drive.md: 85 TEM, 23 PARCIAL, 116 FALTA, 11 N/A) | robô 53/53, portão 14/14 |
 | 2026-11-07 | (delivery) | Drive desligado pelo Pedro ("não existe mais"; código guardado, lib/features.ts DRIVE_APP=false; sem escopo drive nem teste no Google). Início: sem a abertura animada — véu com bolinha de carregamento até o Início ter os dados e fade de 0,22 s | portão 13/13; [manual-apk] |
+| 2026-11-07 | (delivery) | Início todo estático (Pedro): sem bolinha, sem fade, sem animação da saudação/data/frase, do brilho oval e do pulso do agora | portão 13/13; [manual-apk] |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

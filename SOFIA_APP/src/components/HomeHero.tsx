@@ -7,10 +7,11 @@ import {errorText} from '../lib/chat-model';
 import {Icon} from './Icon';
 /** 04/11/2026 (Pedro: "hierarquia da ordem do que aparece: quarta-feira, bom dia Pedro, resumo, blocos"): no site cada
  * linha do topo aparece em seguida da anterior, so com opacidade (sem mover). Os blocos vem depois (Home.tsx). */
-const fadeIn = (delay: number) => ({animationKeyframes: {'0%': {opacity: 0}, '100%': {opacity: 1}}, animationDuration: '420ms', animationDelay: delay + 'ms', animationTimingFunction: 'ease-out', animationFillMode: 'both'} as any);
+// 07/11/2026 (Pedro: "o lettering tambem, tudo estatico"): data, saudacao e frase aparecem parados, sem fade nem escala
+const fadeIn = (_delay: number) => ({} as any);
 const STAGGER = StyleSheet.create({date: fadeIn(0), greet: fadeIn(130), summary: fadeIn(260),
   // 04/11/2026 (Pedro: "o Bom dia aparece com um fade e leve scale suave, um pan frontal"): aproxima de 94% para 100%
-  push: {animationKeyframes: {'0%': {opacity: 0, transform: 'scale(0.94)'}, '100%': {opacity: 1, transform: 'scale(1)'}}, animationDuration: '1100ms', animationTimingFunction: 'cubic-bezier(0.16,1,0.3,1)', animationFillMode: 'both'} as any});
+  push: {} as any});
 /** 0.3.265 (Inicio, desenho aprovado pelo Pedro): saudacao centralizada com o nome em italico de destaque, uma frase que
  * nasce do dia de verdade e a barra da Sofia (mini chat) com atalhos. A resposta aparece num cartao curto logo abaixo;
  * a conversa e a mesma da aba Conversa ("Continuar na Conversa"). Mesmo desenho no app e no site, mais compacto no celular. */
