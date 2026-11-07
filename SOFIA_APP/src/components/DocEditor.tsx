@@ -9,6 +9,8 @@ import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
 import {errorText} from '../lib/chat-model';
+import {saveOfficeTo, type SaveTarget} from '../lib/office-save';
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 import {addSansFallback, ensureDocFonts} from '../lib/doc-fonts';
 
 const h = React.createElement as any;
@@ -38,7 +40,8 @@ function inlineForDocx(src: HTMLElement): string {
   return clone.innerHTML;
 }
 
-export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void; onShowVersions?: () => void}) {
+export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void; onShowVersions?: () => void; target?: SaveTarget}) {
+  const drive = target && target.kind === 'drive' ? target : null;
   const [empty, setEmpty] = useState(false);
   const [zoom, setZoom] = useEditorZoom('docx'), scroller = useRef<HTMLDivElement | null>(null);
   const [c, toggleTheme] = useEditorColors(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
@@ -57,7 +60,7 @@ export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions}:
       // cinza medio. Fora das paginas: fundo do editor e seta normal; cursor de texto so em cima da folha.
       wrap.style.background = 'transparent'; wrap.style.cursor = 'default'; wrap.querySelectorAll('section.docx').forEach(sec => {(sec as HTMLElement).style.cursor = 'text';});
       addSansFallback(styles.current, host.current); initial.current = pageHtml(); setState('ready');
-      if (!((host.current?.innerText || '').replace(/\s+/g, '').length)) void api.entityAttachments(pageId).then(items => {if (live && items.filter(x => /\.docx$/i.test(x.name)).length > 1) setEmpty(true);}).catch(() => {}); // so avisa se ha versao anterior setTimeout(() => ensureDocFonts(host.current), 50);
+      if (!drive && !((host.current?.innerText || '').replace(/\s+/g, '').length)) void api.entityAttachments(pageId).then(items => {if (live && items.filter(x => /\.docx$/i.test(x.name)).length > 1) setEmpty(true);}).catch(() => {}); // so avisa se ha versao anterior setTimeout(() => ensureDocFonts(host.current), 50);
     })().catch(e => {if (live) {setErr(errorText(e)); setState('error');}});
     return () => {live = false;};
   }, [url]);
@@ -72,16 +75,19 @@ export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions}:
     // 07/11/2026 (Pedro: documento salvo em branco): nunca salva antes de terminar de abrir, nem um documento vazio
     if (!initial.current || !host.current?.querySelector('.docx-wrapper') || measure(host.current.querySelector('.docx-wrapper')).chars === 0) {dirty.current = false; return;}
     saving.current = true; dirty.current = false; setStatus('Salvando…');
-    try {const a = await api.saveDocx(pageId, {html, name});
+    try {
+      // Drive (07/11/2026): o servidor so converte; aqui confere e so entao grava no proprio arquivo do Drive
+      const driveBytes = drive ? await api.sdRenderDocx({html, name}) : null;
+      const a = drive ? null : await api.saveDocx(pageId, {html, name});
       // 07/11/2026 (Pedro: "sumiu conteudo aqui"): antes de trocar o arquivo, abre o salvo escondido e compara com a tela.
       // Se faltar linha de tabela ou texto, NAO troca: o documento continua o de antes.
       const now = measure(host.current?.querySelector('.docx-wrapper') || null);
-      try {const bytes = await fetch((await api.attachmentLink(a.id)).url + '&as=download').then(r => r.arrayBuffer()); const d = host.current!.ownerDocument, box = d.createElement('div'), st = d.createElement('div'); box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;visibility:hidden'; d.body.appendChild(st); d.body.appendChild(box);
+      try {const bytes = driveBytes ? driveBytes.slice().buffer : await fetch((await api.attachmentLink(a!.id)).url + '&as=download').then(r => r.arrayBuffer()); const d = host.current!.ownerDocument, box = d.createElement('div'), st = d.createElement('div'); box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;visibility:hidden'; d.body.appendChild(st); d.body.appendChild(box);
         await lib.current.renderAsync(bytes, box, st, {className: 'docxcheck', inWrapper: true, breakPages: false, experimental: true}); const got = measure(box); box.remove(); st.remove();
         if (got.rows < now.rows || got.chars < now.chars * 0.97) {dirty.current = false; blocked.current = html; setStatus('Não salvei para não perder conteúdo (' + (got.rows < now.rows ? 'tabela' : 'texto') + '). O documento continua como estava.'); return;}
       } catch {/* sem como conferir: segue (o servidor ja confere o texto) */}
-      onSavedRef.current(a); initial.current = html; setStatus('Salvo');}
-    catch (e) {dirty.current = true; setStatus('Não salvo: ' + errorText(e));}
+      onSavedRef.current(drive ? await saveOfficeTo(api, drive, driveBytes!, name, DOCX_MIME) : a!); initial.current = html; setStatus(drive ? 'Salvo no Drive' : 'Salvo');}
+    catch (e) {const stop = [403, 409].includes(Number((e as any)?.status)); dirty.current = !stop; setStatus('Não salvo: ' + errorText(e));} // 409/403 do Drive: nao tenta de novo sozinho
     finally {saving.current = false; if (dirty.current) schedule();}};
   const schedule = () => {clearTimeout(timer.current); timer.current = setTimeout(() => void save(), 2000);};
   useEffect(() => () => {clearTimeout(timer.current); if (dirty.current) void save();}, []); // fechou a janela com algo por salvar

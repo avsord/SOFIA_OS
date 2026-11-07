@@ -7,7 +7,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import type {OfficeSaved} from './SheetEditor';
 import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
-import {uploadOfficeBytes} from '../lib/office-save';
+import {saveOfficeTo, type SaveTarget} from '../lib/office-save';
 import {errorText} from '../lib/chat-model';
 import {ensureDocFonts} from '../lib/doc-fonts';
 
@@ -68,7 +68,7 @@ function bodyHtml(sp: Element, title: boolean, scale: number) {
   }).join('');
 }
 
-export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void}) {
+export function SlideEditor({api, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
   const [c, toggleTheme] = useEditorColors(), [userZoom, setUserZoom] = useEditorZoom('pptx');
   const zip = useRef<any>(null), pres = useRef<{doc: Document; rels: Document; ct: Document; cx: number; cy: number} | null>(null), slides = useRef<Slide[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [cur, setCur] = useState(0), [ver, setVer] = useState(0), [status, setStatus] = useState(''), [selBox, setSelBox] = useState<string | null>(null);
@@ -181,8 +181,8 @@ export function SlideEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
       const z = zip.current; for (const s of slides.current) {z.file(s.path, ser(s.doc)); if (s.rels) z.file(s.relsPath, ser(s.rels));}
       z.file('ppt/presentation.xml', ser(pres.current!.doc)); z.file('ppt/_rels/presentation.xml.rels', ser(pres.current!.rels)); z.file('[Content_Types].xml', ser(pres.current!.ct));
       const bytes: Uint8Array = await z.generateAsync({type: 'uint8array', compression: 'DEFLATE'});
-      const a = await uploadOfficeBytes(api, pageId, bytes, name, PPTX_MIME); onSavedRef.current(a); setStatus('Salvo');
-    } catch (e) {dirty.current = true; setStatus('Não salvo: ' + errorText(e));}
+      const a = await saveOfficeTo(api, target || {kind: 'page', pageId}, bytes, name, PPTX_MIME); onSavedRef.current(a); setStatus(target?.kind === 'drive' ? 'Salvo no Drive' : 'Salvo');
+    } catch (e) {const stop = [403, 409].includes(Number((e as any)?.status)); dirty.current = !stop; setStatus('Não salvo: ' + errorText(e));} // 409/403 do Drive: nao tenta de novo sozinho
     finally {saving.current = false; if (dirty.current) schedule();}
   }
   const schedule = () => {clearTimeout(timer.current); timer.current = setTimeout(() => void save(), 2000);};

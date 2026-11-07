@@ -120,6 +120,8 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
   onPaste:(e:any)=>{
    // 05/11/2026 (Pedro): imagem copiada colada no texto vira bloco de imagem
    if(props.onPasteImage){const items=[...(e.clipboardData?.items||[])] as any[];const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));const f=it?.getAsFile?.();if(f){e.preventDefault();props.onPasteImage(f);return;}}
+   // 07/11/2026 (Pedro: colar qualquer tipo de item): arquivo copiado no computador (PDF, Word...) vira bloco de arquivo
+   if(props.onDropFiles){const fl=[...(e.clipboardData?.files||[])] as File[];if(fl.length&&!e.clipboardData?.getData('text/plain')){e.preventDefault();props.onDropFiles(fl);return;}}
    const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
    if(props.onPasteText?.(text,start,end))return;
    const sel=document.getSelection();if(sel&&!sel.isCollapsed&&/^https?:\/\/\S+$/i.test(text.trim())){document.execCommand('createLink',false,text.trim());return;}

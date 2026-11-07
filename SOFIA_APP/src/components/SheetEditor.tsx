@@ -12,7 +12,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import {errorText} from '../lib/chat-model';
-import {uploadOfficeBytes} from '../lib/office-save';
+import {saveOfficeTo, type SaveTarget} from '../lib/office-save';
 import {useEditorColors, ThemeToggle, useEditorZoom, useWheelZoom, ZoomControl} from './EditorChrome';
 
 export type OfficeSaved = {id: string; name: string; mime: string; bytes: number};
@@ -123,7 +123,7 @@ const HIGHLIGHTS: [string, string][] = [['Amarelo', '#fff176'], ['Verde', '#b9f6
 const COLORS: [string, string][] = [['Preto', '#000000'], ['Vermelho', '#d32f2f'], ['Azul', '#1565c0'], ['Verde', '#2e7d32'], ['Roxo', '#6a1b9a'], ['Cinza', '#616161']];
 type Sel = {r: number; c: number; r2: number; c2: number};
 
-export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void}) {
+export function SheetEditor({api, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
   const [c, toggleTheme] = useEditorColors(), [zoom, setZoom] = useEditorZoom('xlsx');
   const wb = useRef<any>(null), [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [, setTick] = useState(0);
   const [sheet, setSheet] = useState(0), [sel, setSel] = useState<Sel>({r: 1, c: 1, r2: 1, c2: 1}), [editing, setEditing] = useState<{text: string; bar: boolean} | null>(null);
@@ -143,8 +143,8 @@ export function SheetEditor({api, name, url, pageId, onSaved}: {api: SofiaApi; i
     return () => {live = false;};}, [url]);
   const ws = () => wb.current?.worksheets[sheet];
   const save = async () => {if (saving.current || !dirty.current || !wb.current) return; saving.current = true; dirty.current = false; setStatus('Salvando…');
-    try {const buf = await wb.current.xlsx.writeBuffer(); const a = await uploadOfficeBytes(api, pageId, new Uint8Array(buf), name, XLSX_MIME); onSavedRef.current(a); setStatus('Salvo');}
-    catch (e) {dirty.current = true; setStatus('Não salvo: ' + errorText(e));}
+    try {const buf = await wb.current.xlsx.writeBuffer(); const a = await saveOfficeTo(api, target || {kind: 'page', pageId}, new Uint8Array(buf), name, XLSX_MIME); onSavedRef.current(a); setStatus(target?.kind === 'drive' ? 'Salvo no Drive' : 'Salvo');}
+    catch (e) {const stop = [403, 409].includes(Number((e as any)?.status)); dirty.current = !stop; setStatus('Não salvo: ' + errorText(e));} // 409/403 do Drive: nao tenta de novo sozinho
     finally {saving.current = false; if (dirty.current) schedule();}};
   const schedule = () => {clearTimeout(timer.current); timer.current = setTimeout(() => void save(), 2000);};
   useEffect(() => () => {clearTimeout(timer.current); if (dirty.current) void save();}, []);

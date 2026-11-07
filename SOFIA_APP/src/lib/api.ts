@@ -330,6 +330,21 @@ export class SofiaApi {
   sdUpdate(id: string, patch: {name?: string; parent?: string; starred?: boolean}) { return this.request<{item: SdItem}>('/md/sofiadrive/items/' + encodeURIComponent(id), patch, 'PATCH'); }
   sdTrash(id: string) { return this.request<{ok: boolean}>('/md/sofiadrive/items/' + encodeURIComponent(id), undefined, 'DELETE'); }
   sdRestore(id: string) { return this.request<{ok: boolean}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/restore', {}, 'POST'); }
+  /** 07/11/2026 (Pedro: copiar e colar entre o Drive e as Paginas): arquivos do Drive viram anexos novos da pagina. */
+  sdToPage(page: string, src: {ids?: string[]; attachments?: string[]}) { return this.request<{items: ({id: string; name: string; mime: string; bytes: number; error?: undefined} | {error: string} | null)[]; skipped: string[]}>('/md/sofiadrive/to-page', {page, ...src}, 'POST', 180000); }
+  /** Anexos de uma pagina viram arquivos novos na pasta do Drive. */
+  async sdFromPage(parent: string, attachments: string[]) { const r = await this.request<{items: SdItem[]}>('/md/sofiadrive/from-page', {parent, attachments}, 'POST', 180000); systemChanged(this); return r; }
+  /** Editar no Drive: data de modificacao ao abrir, e salvar no proprio arquivo (nova revisao no Google). */
+  sdStamp(id: string) { return this.request<{id: string; name: string; mime: string; modified: string}>('/md/sofiadrive/items/' + encodeURIComponent(id) + '/stamp'); }
+  async sdWriteBytes(id: string, bytes: Uint8Array, mime: string, base = '') {
+    const res = await fetch(SITE + '/api/mobile/md/sofiadrive/items/' + encodeURIComponent(id) + '/content?mime=' + encodeURIComponent(mime) + (base ? '&base=' + encodeURIComponent(base) : ''), {method: 'PUT', headers: this.sdHeaders({'Content-Type': 'application/octet-stream'}), body: bytes as any});
+    const d = await this.sdJson(res, 'salvar no Drive'); systemChanged(this); return d as {item: SdItem};
+  }
+  /** HTML do editor de Word -> bytes .docx (o site confere antes de gravar no Drive). */
+  async sdRenderDocx(input: {html: string; name: string}) {
+    const res = await fetch(SITE + '/api/mobile/md/sofiadrive/docx-render', {method: 'POST', headers: this.sdHeaders({'Content-Type': 'application/json'}), body: JSON.stringify(input)});
+    if (!res.ok) await this.sdJson(res, 'preparar o documento'); return new Uint8Array(await res.arrayBuffer());
+  }
   private sdHeaders(extra: Record<string, string> = {}) { return {Accept: 'application/json', ...(this.token ? {Authorization: 'Bearer ' + this.token} : {}), ...extra}; }
   private async sdJson(res: Response, what: string) { const data = await res.json().catch(() => ({})); if (!res.ok) throw new ApiError(data.error || 'Não consegui ' + what + ' (' + res.status + ').', data.code || 'HTTP_ERROR', res.status, data); return data; }
   /** Envia um arquivo de qualquer tamanho, como o Google Drive: pequeno de uma vez, grande em partes de 8 MB (com

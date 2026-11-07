@@ -18,6 +18,8 @@ import {Dialog, GhostButton, PrimaryButton, openMore} from '../components/AppKit
 import {contextMenu, type MenuItem} from '../components/ContextMenu';
 import {DrivePreview, KIND, cachedBlobUrl, driveKind, openNative, viewable} from '../components/DrivePreview';
 import {driveDiagInit, note, trackedDriveApi} from '../lib/drive-diag';
+import {clipFromPaste, parseSofiaClip, peekSofiaClip, setSofiaClip, type SofiaClip} from '../lib/sofia-clipboard';
+import {FileWindowHost, editKind, openFileWindow} from '../components/PageFiles';
 import {droppedSources, fromBrowserFile, fromNativeAsset, isFileDrag, type UploadSource} from '../lib/drive-upload';
 import {DriveLock, driveLockedNow, isDriveLocked} from '../components/DriveLock';
 export {driveKind} from '../components/DrivePreview';
@@ -149,6 +151,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
     if (it.folder) { go('drive', it.id); return; }
     const k = driveKind(it);
     if (!viewable(k)) { void download(it); return; }
+    if (WEB && editKindOf(it)) { editItem(it); return; }
     if (!WEB) { void openNative(api, it).then(r => { if (r === 'inapp') setPreview(it); }).catch(e => appAlert('Não consegui abrir', errorText(e))); return; }
     setPreview(it); setSel([it.id]);
   };
@@ -162,17 +165,50 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
     void act(async () => { for (const it of real) await busted(api).sdUpdate(it.id, {parent: dest}); setSel([]); }, (real.length === 1 ? '“' + real[0].name + '”' : real.length + ' itens') + ' movido' + (real.length === 1 ? '' : 's') + ' para “' + destName + '”',
       from ? async () => { for (const it of real) await busted(api).sdUpdate(it.id, {parent: from}); } : undefined); };
   const rename = (it: SdItem) => setNaming({mode: 'rename', item: it, value: it.name});
+  // 07/11/2026 (Pedro: "integracao com as paginas: poder copiar e colar la qualquer tipo de item"): Copiar aqui e colar numa
+  // Pagina (Ctrl+V) vira arquivo da pagina; copiar arquivos de uma Pagina e colar aqui cria os arquivos na pasta aberta.
+  const copyItems = (list: SdItem[]) => { const real = list.filter(x => !x.folder); if (!real.length) { say('Pastas não são copiadas: abra a pasta e copie os arquivos.'); return; }
+    setSofiaClip({sofia: 'drive-items', ids: real.map(x => x.id), names: real.map(x => x.name)});
+    say((real.length === 1 ? '“' + real[0].name + '” copiado' : real.length + ' arquivos copiados') + '. Cole numa página com Ctrl+V.' + (real.length < list.length ? ' (Pastas ficaram de fora.)' : '')); };
+  const pasteClip = (clip: SofiaClip | null, files: any[] = []) => { // files: arquivos do navegador (File da web)
+    if (view !== 'drive' || inSearch || data?.shared) { say('Abra uma pasta do Meu Drive para colar.'); return; }
+    const dest = folder, destName = data?.folder.name || 'Meu Drive';
+    if (clip?.sofia === 'page-files') { const n = clip.items.length; void act(() => api.sdFromPage(dest, clip.items.map(x => x.attachment_id)), (n === 1 ? '“' + clip.items[0].name + '” colado' : n + ' arquivos colados') + ' em “' + destName + '”'); return; }
+    if (files.length) { void sendFiles(files.map(f => fromBrowserFile(f)), dest, destName); return; }
+    if (clip?.sofia === 'drive-items') { say('Esses arquivos já estão no Drive. Cole numa página para levá-los para lá.'); return; }
+    say('Nada para colar. Copie arquivos de uma página (botão Copiar no arquivo) ou do computador.');
+  };
+  const pasteMenu = (): MenuItem[] => !WEB ? [] : [{label: peekSofiaClip()?.sofia === 'page-files' ? 'Colar arquivos da página' : 'Colar', icon: 'copy', run: () => {
+    void (async () => { let clip = peekSofiaClip(); try { const t = await (navigator as any).clipboard?.readText?.(); clip = parseSofiaClip(t) || (t ? null : clip); } catch { /* sem permissao: vale o desta aba */ } pasteClip(clip); })(); }}];
+  // Word/Excel/PowerPoint do Drive abrem no editor da Sofia; salvar grava no proprio arquivo (nova revisao no Google)
+  const editKindOf = (it: SdItem) => !it.folder && !String(it.mime || '').startsWith('application/vnd.google-apps.') ? editKind(it.mime, it.name) : null;
+  const editItem = (it: SdItem) => { setSel([it.id]); openFileWindow(api, {id: it.id, name: it.name, mime: it.mime, drive: true, onSaved: () => { void refresh(); }}); };
+  useEffect(() => {
+    if (!WEB || !active) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const ae = document.activeElement as HTMLElement | null;
+      if (!rootRef.current?.isConnected || keyState.current.busy || (ae && (ae.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(ae.tagName)))) return;
+      if (document.querySelector('[role=dialog],[role=alertdialog],[role=menu],[aria-modal=true]')) return;
+      const files = Array.from(e.clipboardData?.files || []), clip = clipFromPaste(e);
+      if (!clip && !files.length) return;
+      e.preventDefault(); keyFns.current.pasteClip(clip, files);
+    };
+    window.addEventListener('paste', onPaste); return () => window.removeEventListener('paste', onPaste);
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   const menu = (it: SdItem): MenuItem[] => { const many = sel.includes(it.id) && sel.length > 1 ? selItems : [it];
     if (trashView) return [{label: many.length > 1 ? 'Restaurar ' + many.length + ' itens' : 'Restaurar', icon: 'restore', run: () => restore(many)}];
     if (many.length > 1) return [
+      {label: 'Copiar ' + many.length + ' itens', icon: 'copy', run: () => copyItems(many)},
       {label: 'Mover ' + many.length + ' itens para…', icon: 'moveTo', run: () => setMoving(many)},
       {label: 'Baixar ' + many.filter(x => !x.folder).length + ' arquivos', icon: 'download', run: () => { for (const x of many) if (!x.folder) void download(x); }},
       {label: 'Adicionar estrela', icon: 'star', run: () => star(many, true)},
       {label: 'Mandar ' + many.length + ' itens para a lixeira', icon: 'trash', danger: true, run: () => trash(many)}];
     return [
-      {label: it.folder ? 'Abrir' : viewable(driveKind(it)) ? 'Visualizar' : 'Baixar', icon: it.folder ? 'folder' : 'eye', run: () => openItem(it)},
+      ...(WEB && editKindOf(it) ? [{label: 'Abrir no editor da Sofia', icon: 'rename' as IconName, run: () => editItem(it)}, {label: 'Visualizar', icon: 'eye' as IconName, run: () => { setPreview(it); setSel([it.id]); }}]
+        : [{label: it.folder ? 'Abrir' : viewable(driveKind(it)) ? 'Visualizar' : 'Baixar', icon: (it.folder ? 'folder' : 'eye') as IconName, run: () => openItem(it)}]),
       ...(it.folder ? [] : [{label: 'Baixar', icon: 'download' as IconName, run: () => void download(it)}]),
       ...(it.web ? [{label: 'Abrir no Google', icon: 'external' as IconName, run: () => { if (WEB) window.open(it.web, '_blank', 'noopener'); else void WebBrowser.openBrowserAsync(it.web!); }}] : []),
+      ...(it.folder ? [] : [{label: 'Copiar', icon: 'copy' as IconName, run: () => copyItems([it])}]),
       {label: 'Renomear', icon: 'rename', run: () => rename(it)},
       {label: 'Mover para…', icon: 'moveTo', run: () => setMoving([it])},
       {label: it.starred ? 'Remover estrela' : 'Adicionar estrela', icon: 'star', run: () => star([it], !it.starred)},
@@ -279,6 +315,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
       const handled = () => { e.preventDefault(); e.stopPropagation(); };
       const list = st.ordered; if (!list.length) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { handled(); setSel(list.map(x => x.id)); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && st.sel.length && !st.trashView) { handled(); keyFns.current.copyItems(list.filter(x => st.sel.includes(x.id))); return; }
       if (e.ctrlKey || e.metaKey) return;
       const curId = st.sel[st.sel.length - 1] || '', cur = list.find(x => x.id === curId) || null;
       if (e.key.startsWith('Arrow')) { handled(); const nextId = cur ? neighbour(curId, e.key) : list[0].id; if (!nextId) return;
@@ -295,7 +332,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
     };
     window.addEventListener('keydown', onKey, true); return () => window.removeEventListener('keydown', onKey, true);
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
-  const keyFns = useRef({openItem, trash, restore, rename}); keyFns.current = {openItem, trash, restore, rename};
+  const keyFns = useRef({openItem, trash, restore, rename, copyItems, pasteClip}); keyFns.current = {openItem, trash, restore, rename, copyItems, pasteClip};
   function neighbour(id: string, key: string): string {
     const els = Array.from(document.querySelectorAll('[data-testid^="drive-item-"]')) as HTMLElement[]; const i = els.findIndex(x => x.getAttribute('data-testid') === 'drive-item-' + id); if (i < 0) return '';
     const idOf = (el?: HTMLElement) => el ? String(el.getAttribute('data-testid')).slice('drive-item-'.length) : '';
@@ -409,7 +446,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
       {/* conteudo */}
       <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={{flex: 1}} contentContainerStyle={{paddingHorizontal: wide ? 18 : 10, paddingBottom: 90, paddingTop: 4, flexGrow: 1}}
         scrollEventThrottle={200} onScroll={(e: any) => { const n = e.nativeEvent; if (n.contentOffset.y + n.layoutMeasurement.height > n.contentSize.height - 800 && limit < items.length) setLimit(l => l + 300); }}
-        {...(contextMenu(() => canWrite && !notConnected ? newMenu : []) as any)}>
+        {...(contextMenu(() => canWrite && !notConnected ? [...newMenu, ...pasteMenu()] : []) as any)}>
         {!notConnected && (data || viewItems) ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 6, marginBottom: 4, minHeight: 30}}>
           <Text testID="drive-status" style={{flex: 1, color: searchErr ? c.danger : c.muted, fontSize: 13}}>{inSearch ? (searchErr ? 'A pesquisa falhou: ' + searchErr : searching && !found ? 'Pesquisando no seu Drive…' : items.length + (items.length === 1 ? ' resultado' : ' resultados') + ' no seu Drive para “' + query.trim() + '”') : trashView ? 'Itens na lixeira são apagados pelo Google depois de 30 dias.' : data?.shared && view === 'drive' ? 'Pasta compartilhada com você' : ''}</Text>
           {searchErr ? <GhostButton icon="refresh" label="Tentar de novo" onPress={() => void runSearch(query.trim())} /> : null}
@@ -456,6 +493,7 @@ function DriveInner({api: rawApi, active, onBack}: {api: SofiaApi; active: boole
       {naming ? <NameInput key={(naming.item?.id || 'nova') + naming.mode} initial={naming.value} folder={naming.mode === 'folder' || !!naming.item?.folder} onChange={v => setNaming(n => n ? {...n, value: v} : n)} onSubmit={() => submitName()} /> : null}
     </Dialog>
     {moving ? <MoveDialog api={api} items={moving} start={view === 'drive' ? folder : 'root'} onClose={() => setMoving(null)} onPick={(dest, name) => { const list = moving; setMoving(null); moveTo(list, dest, name); }} /> : null}
+    {WEB ? <FileWindowHost /> : null}
     {preview ? <DrivePreview api={api} item={preview} list={viewList} onGo={it => { setPreview(it); setSel([it.id]); }} onClose={() => setPreview(null)} onDownload={() => void download(preview)} /> : null}
   </View>;
   function submitName() { const n = naming; if (!n || !n.value.trim()) return; setNaming(null);

@@ -18,6 +18,8 @@ function createFakeGoogle({rootId = 'raizMeuDrive0001', seed = true} = {}) {
   const nid = () => 'lab' + (++n).toString(36).padStart(6, '0') + crypto.randomBytes(4).toString('hex');
   const tick = () => new Date(clock += 60000).toISOString();
   const put = (f, data) => { const id = f.id || nid(); const rec = {kind: 'drive#file', id, name: '', mimeType: 'application/octet-stream', parents: [rootId], trashed: false, appProperties: {}, spaces: ['drive'], ownedByMe: true, owners: [{me: true, emailAddress: 'usuario@gmail.com'}], createdTime: tick(), modifiedTime: tick(), ...f, id};
+    // area oculta do app (appDataFolder): o arquivo e os de dentro das pastas dela nao aparecem no Drive
+    { const par = (rec.parents || [])[0]; if (par === 'appDataFolder' || (files.get(par)?.spaces || []).includes('appDataFolder')) rec.spaces = ['appDataFolder']; }
     if (data != null) { const b = Buffer.isBuffer(data) ? data : Buffer.from(String(data)); bytes.set(id, b); rec.size = String(b.length); }
     if (rec.mimeType === FOLDER || rec.mimeType.startsWith('application/vnd.google-apps.')) delete rec.size;
     if (/^(image|video)\//.test(rec.mimeType) || rec.mimeType === 'application/pdf' || rec.mimeType.startsWith('application/vnd.google-apps.') && rec.mimeType !== FOLDER && rec.mimeType !== SHORTCUT) rec.thumbnailLink = 'https://lh3.googleusercontent.com/drive-thumb/' + id + '=s220';
@@ -121,7 +123,7 @@ function createFakeGoogle({rootId = 'raizMeuDrive0001', seed = true} = {}) {
           const s = bodyBuf.toString('latin1'), parts = s.split('--' + bnd).slice(1, -1); if (parts.length !== 2) return ERR(400, 'Esperava 2 partes', 'badRequest');
           const meta = JSON.parse(Buffer.from(parts[0].split('\r\n\r\n').slice(1).join('\r\n\r\n'), 'latin1').toString('utf8').trim());
           const raw = parts[1].slice(parts[1].indexOf('\r\n\r\n') + 4).replace(/\r\n$/, ''); const data = Buffer.from(raw, 'latin1');
-          for (const par of meta.parents || []) if (!files.get(par) || files.get(par).mimeType !== FOLDER) return ERR(404, 'File not found: ' + par + '.');
+          for (const par of meta.parents || []) if (par !== 'appDataFolder' && (!files.get(par) || files.get(par).mimeType !== FOLDER)) return ERR(404, 'File not found: ' + par + '.');
           return J(200, pub(put({name: meta.name, mimeType: meta.mimeType || 'application/octet-stream', parents: meta.parents || [rootId], appProperties: meta.appProperties || {}}, data))); }
         if (type === 'resumable') { const sid = nid(); uploads.set(sid, {meta: js || {}, chunks: [], total: Number(hd['x-upload-content-length'] || 0)}); return new Response(null, {status: 200, headers: {location: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=' + sid}}); }
         return ERR(400, 'uploadType invalido', 'badRequest');
@@ -130,6 +132,14 @@ function createFakeGoogle({rootId = 'raizMeuDrive0001', seed = true} = {}) {
         const cr = /bytes (\d+)-(\d+)\/(\d+|\*)/.exec(String(hd['content-range'] || '')); if (bodyBuf) up.chunks.push(bodyBuf); const got = up.chunks.reduce((a, b) => a + b.length, 0);
         if (cr && cr[3] !== '*' && got < Number(cr[3])) return new Response(null, {status: 308, headers: {range: 'bytes=0-' + (got - 1)}});
         uploads.delete(u.searchParams.get('upload_id')); return J(200, pub(put({name: up.meta.name, mimeType: up.meta.mimeType || 'application/octet-stream', parents: up.meta.parents || [rootId], appProperties: up.meta.appProperties || {}}, Buffer.concat(up.chunks)))); }
+      // nova revisao do mesmo arquivo (o editor da Sofia salva no proprio arquivo do Drive)
+      { const um = /^\/upload\/drive\/v3\/files\/([^/]+)$/.exec(p);
+        if (um && m === 'PATCH') { const f = files.get(um[1]); if (!f) return ERR(404, 'File not found: ' + um[1] + '.');
+          if (u.searchParams.get('uploadType') !== 'media') return ERR(400, 'uploadType invalido', 'badRequest');
+          if (f.mimeType.startsWith('application/vnd.google-apps.')) return ERR(400, 'Cannot upload content to Docs Editors files.', 'badRequest');
+          if (f.readonly) return ERR(403, 'The user does not have sufficient permissions for this file.', 'insufficientFilePermissions');
+          bytes.set(f.id, bodyBuf || Buffer.alloc(0)); f.size = String((bodyBuf || Buffer.alloc(0)).length); f.revisions = (f.revisions || 1) + 1; f.headRevisionId = 'rev' + f.revisions;
+          f.modifiedTime = tick(); return J(200, pub(f)); } }
       if (!p.startsWith('/drive/v3/')) return J(200, {});
       p = p.slice('/drive/v3'.length);
       if (p === '/about') return J(200, {user: {emailAddress: 'usuario@gmail.com'}, storageQuota: {limit: '16106127360', usage: '1000000'}});
@@ -141,7 +151,7 @@ function createFakeGoogle({rootId = 'raizMeuDrive0001', seed = true} = {}) {
         const size = Math.min(1000, Number(u.searchParams.get('pageSize') || 100)), start = Number(u.searchParams.get('pageToken') || 0);
         const page = list.slice(start, start + size); return J(200, {kind: 'drive#fileList', files: page.map(pub), ...(start + size < list.length ? {nextPageToken: String(start + size)} : {})});
       }
-      if (p === '/files' && m === 'POST') { for (const par of js?.parents || []) if (!files.get(par)) return ERR(404, 'File not found: ' + par + '.');
+      if (p === '/files' && m === 'POST') { for (const par of js?.parents || []) if (par !== 'appDataFolder' && !files.get(par)) return ERR(404, 'File not found: ' + par + '.');
         return J(200, pub(put({name: js?.name || 'Sem título', mimeType: js?.mimeType || 'application/octet-stream', parents: js?.parents || [rootId], appProperties: js?.appProperties || {}}, js?.mimeType === FOLDER || String(js?.mimeType || '').startsWith('application/vnd.google-apps.') ? null : ''))); }
       let mm = /^\/files\/([^/]+)$/.exec(p);
       if (mm) { let id = mm[1]; if (id === 'root') id = rootId; const f = files.get(id); if (!f) return ERR(404, 'File not found: ' + mm[1] + '.');

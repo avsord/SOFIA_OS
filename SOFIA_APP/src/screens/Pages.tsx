@@ -3,6 +3,7 @@ import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMi
 import {blankXlsx} from '../components/SheetEditor';
 import {blankPptx} from '../components/SlideEditor';
 import {uploadOfficeBytes} from '../lib/office-save';
+import {clipFromPaste,parseSofiaClip,setSofiaClip,type SofiaClip} from '../lib/sofia-clipboard';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
@@ -274,7 +275,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());return;}
    if(e.key==='Enter'){e.preventDefault();const first=blocks[idx[0]];setPicked(new Set());if(first&&TEXT_BLOCKS.has(first.type)){setFocus(first.id);placeCaret(first.id,'end');}return;}
    if(mod&&k==='a'){e.preventDefault();pickRange(0,last);return;}
-   if(mod&&(k==='c'||k==='x')){e.preventDefault();const text=blocksText(idx);void (globalThis as any).navigator?.clipboard?.writeText?.(text);if(k==='x'){const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());}return;}
+   if(mod&&(k==='c'||k==='x')){e.preventDefault();const files=idx.map(i=>blocks[i]).filter(x=>x.type==='file'&&x.data?.attachment_id);
+    // arquivos selecionados: Copiar leva o arquivo (colar no Drive ou em outra pagina); so texto: copia o texto
+    if(files.length)setSofiaClip({sofia:'page-files',items:files.map(x=>({attachment_id:String(x.data!.attachment_id),name:String(x.data!.name||'arquivo'),mime:String(x.data!.mime||'')}))});
+    else void (globalThis as any).navigator?.clipboard?.writeText?.(blocksText(idx));if(k==='x'){const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());}return;}
    if(mod&&k==='d'){e.preventDefault();const copies=idx.map(i=>({...JSON.parse(JSON.stringify(blocks[i])),id:newBlock().id}));const at=idx[idx.length-1]+1;edit(dr=>{const next=dr.blocks.slice();next.splice(at,0,...copies);return {...dr,blocks:next};});setPicked(new Set(copies.map(x=>x.id)));return;}
   };
   // arrastar o mouse de um bloco para outro (ou a partir da margem) seleciona os blocos do caminho
@@ -285,8 +289,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(t?.closest?.('button,[role="button"],[role="checkbox"]')&&!t?.closest?.('textarea'))return;press={start:rowAt(e.clientY),x:e.clientX,y:e.clientY};};
   const moveSel=(e:MouseEvent)=>{if(!press||!(e.buttons&1))return;const i=rowAt(e.clientY);if(press.start<0){if(Math.hypot(e.clientX-press.x,e.clientY-press.y)<8||i<0)return;press.start=i;}if(i>=0&&i!==press.start){e.preventDefault();if(!pickedRef.current.size)enterPick(press.start,i);else pickRange(press.start,i);}};
   const upSel=()=>{press=null;};
-  d.addEventListener('keydown',key);d.addEventListener('mousedown',down,true);d.addEventListener('mousemove',moveSel);d.addEventListener('mouseup',upSel);
-  return()=>{d.removeEventListener('keydown',key);d.removeEventListener('mousedown',down,true);d.removeEventListener('mousemove',moveSel);d.removeEventListener('mouseup',upSel);};
+  // colar fora do texto (nada em edicao): arquivos do Drive/de outra pagina entram depois dos blocos escolhidos (ou no fim)
+  const paste=(e:ClipboardEvent)=>{const t=e.target as HTMLElement;if(!selectedId||t?.closest?.('textarea,input,[contenteditable="true"]')||d.querySelector('[role=dialog],[aria-modal=true]'))return;if(!(d.querySelector('[data-testid="page-blocks"]') as HTMLElement|null)?.isConnected)return;
+   const clip=clipFromPaste(e),files=Array.from(e.clipboardData?.files||[]) as File[];if(!clip&&!files.length)return;e.preventDefault();const idx=pickedIndexes(),blocks=currentBlocks(),after=idx.length?blocks[idx[idx.length-1]]:blocks[blocks.length-1]||null;
+   if(clip)void pasteClipBlocks(after,clip);else void dropFiles(after,files);};
+  d.addEventListener('keydown',key);d.addEventListener('mousedown',down,true);d.addEventListener('mousemove',moveSel);d.addEventListener('mouseup',upSel);d.addEventListener('paste',paste);
+  return()=>{d.removeEventListener('paste',paste);d.removeEventListener('keydown',key);d.removeEventListener('mousedown',down,true);d.removeEventListener('mousemove',moveSel);d.removeEventListener('mouseup',upSel);};
  },[webKeys,active,selectedId]);
  useEffect(()=>{setPicked(new Set());},[selectedId]);
  // menu do ⋮⋮ fecha com Esc ou clique fora
@@ -395,6 +403,20 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   await Promise.all(files.map(async(f,n)=>{const blk=made[n];try{const up=await uploadPageFile(api,pageId,f);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...up,view:defaultView(fileKind(up.mime,up.name))}}:x)}));}
    catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
+  void store.flush(pageId);}
+ // 07/11/2026 (Pedro: "integracao com as paginas: poder copiar e colar la qualquer tipo de item"): colar o que foi copiado no
+ // Drive (ou arquivos de outra pagina) cria blocos de arquivo; o servidor copia o arquivo (nada passa pelo navegador).
+ async function pasteClipBlocks(after:PageBlock|null,clip:SofiaClip){if(!selectedId)return;const pageId=selectedId,cur=store.get(pageId);
+  if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
+  const names=clip.sofia==='drive-items'?clip.names:clip.items.map(x=>x.name);if(!names.length)return;
+  const made=names.map((n,i)=>({...newBlock('file'),text:'',data:{uploading:true,name:n,mime:clip.sofia==='page-files'?clip.items[i].mime:guessMime({name:n})}}));
+  edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
+   if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
+  const drop=(ids:Set<string>)=>store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>!ids.has(x.id))}));
+  try{const r=await api.sdToPage(pageId,clip.sofia==='drive-items'?{ids:clip.ids}:{attachments:clip.items.map(x=>x.attachment_id)});const gone=new Set<string>(),errs:string[]=[];
+   store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>{const n=made.findIndex(m=>m.id===x.id);if(n<0)return x;const up=r.items[n] as any;if(!up||up.error){gone.add(x.id);if(up?.error)errs.push(String(up.error));return x;}return {...x,data:{attachment_id:up.id,name:up.name,mime:up.mime,size:up.bytes,view:defaultView(fileKind(up.mime,up.name))}};})}));
+   if(gone.size)drop(gone);if(errs.length)setError(errs[0]);else if(r.skipped.length)setError('Pastas não entram na página: '+r.skipped.join(', ')+'.');}
+  catch(e){drop(new Set(made.map(x=>x.id)));setError(errorText(e));}
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "a Sofia consegue criar um arquivo doc na pagina e comecar a editar"): .docx em branco + editor aberto
  async function createDoc(after:PageBlock|null,kind:'docx'|'xlsx'|'pptx'='docx'){if(!selectedId||Platform.OS!=='web')return;const pageId=selectedId,cur=store.get(pageId);
@@ -573,7 +595,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     onChange={(text:string,html:string)=>onBlockText(b,text,html)} onKeyPress={preview?undefined:(e:any)=>onBlockKey(e,b)} onFocus={()=>setFocus(b.id)}
     onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}}
     onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)} onDropFiles={(files:File[])=>void dropFiles(b,files)}
-    onPasteText={(pasted:string,a:number,z:number)=>{if(!pasted.includes('\n'))return false;const before=String(b.text||'');return applyCaret(pastedLines(currentBlocks(),b.id,before,before.slice(0,a)+pasted+before.slice(z)));}}
+    onPasteText={(pasted:string,a:number,z:number)=>{const clip=parseSofiaClip(pasted);if(clip){void pasteClipBlocks(b,clip);return true;}if(!pasted.includes('\n'))return false;const before=String(b.text||'');return applyCaret(pastedLines(currentBlocks(),b.id,before,before.slice(0,a)+pasted+before.slice(z)));}}
     style={{flex:1,minHeight:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
    :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
     onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}

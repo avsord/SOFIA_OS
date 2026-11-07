@@ -20,6 +20,8 @@ import {DocEditor} from './DocEditor';
 import {SheetEditor, XLSX_MIME} from './SheetEditor';
 import {SlideEditor, PPTX_MIME} from './SlideEditor';
 import {mountInWindow} from '../lib/popup-root';
+import type {SaveTarget} from '../lib/office-save';
+import {setSofiaClip} from '../lib/sofia-clipboard';
 
 const WEB = Platform.OS === 'web';
 const h = React.createElement as any;
@@ -34,8 +36,14 @@ export const isDocx = (mime?: string, name?: string) => String(mime || '') === D
 /** 07/11/2026: Word, Excel e PowerPoint abrem nos editores da Sofia. */
 export const editKind = (mime?: string, name?: string): 'docx' | 'xlsx' | 'pptx' | null => isDocx(mime, name) ? 'docx' : String(mime || '') === XLSX_MIME || /\.xlsx$/i.test(String(name || '')) ? 'xlsx' : String(mime || '') === PPTX_MIME || /\.pptx$/i.test(String(name || '')) ? 'pptx' : null;
 export {XLSX_MIME, PPTX_MIME};
-function officeEditor(kind: 'docx' | 'xlsx' | 'pptx', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {return kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
+function officeEditor(kind: 'docx' | 'xlsx' | 'pptx', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void; target?: SaveTarget}) {return kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
 type SavedFile = {id: string; name: string; mime: string; bytes: number};
+/** Abre no editor: arquivo de pagina, ou do Drive que nao seja do Google Docs (esse so abre para ver). */
+const canEdit = (f: {mime: string; name: string; pageId?: string; drive?: boolean}) => !!editKind(f.mime, f.name) && (!!f.pageId || (!!f.drive && !String(f.mime || '').startsWith('application/vnd.google-apps.')));
+/** O alvo fica o mesmo enquanto o editor estiver aberto (guarda a data de modificacao do ultimo salvamento). */
+function DriveEdit({kind, p, base}: {kind: 'docx' | 'xlsx' | 'pptx'; p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void}; base: string}) {
+  const target = useRef<SaveTarget>({kind: 'drive', fileId: p.id, base}).current; return officeEditor(kind, {...p, target});
+}
 /** Pode aparecer dentro da pagina (modo visualizacao). */
 export const inlineCapable = (k: Kind) => k === 'image' || k === 'video' || k === 'audio' || k === 'pdf' || OFFICE(k);
 /** Abre na janela (o resto: so baixar). */
@@ -69,13 +77,15 @@ async function signedUrl(api: SofiaApi, id: string, as: '' | 'pdf' | 'download' 
   if (!url) {url = (await api.attachmentLink(id)).url; links.set(id, {url, until: Date.now() + 90 * 60000});}
   return url + (as ? '&as=' + as : '');
 }
-function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '') {
-  const [state, setState] = useState<{url: string; error: string}>({url: '', error: ''});
+function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '', drive = false) {
+  const [state, setState] = useState<{url: string; error: string; base?: string}>({url: '', error: ''});
   useEffect(() => {let live = true; setState({url: '', error: ''}); if (!id) return;
+    // 07/11/2026: arquivo do Drive (editar no proprio Drive): link assinado do Drive e a data de modificacao de agora
+    if (drive) {void Promise.all([api.sdSignedUrl(id, as === 'pdf' ? 'preview' : ''), api.sdStamp(id)]).then(([url, st]) => {if (live) setState({url, error: '', base: st.modified});}).catch(e => {if (live) setState({url: '', error: errorText(e)});}); return () => {live = false;};}
     (async () => {const url = await signedUrl(api, id, as);
       if (as === 'pdf') {const r = await fetch(url, {method: 'HEAD'}); if (!r.ok) {const j = await fetch(url).then(x => x.json()).catch(() => null); throw new Error(j?.error || 'Não consegui abrir este arquivo (' + r.status + ').');}}
       return url;})().then(url => {if (live) setState({url, error: ''});}).catch(e => {if (live) setState({url: '', error: errorText(e)});});
-    return () => {live = false;};}, [api, id, as]);
+    return () => {live = false;};}, [api, id, as, drive]);
   return state;
 }
 /** 07/11/2026 (Pedro: "quero que ela possa sair da Sofia, como uma segunda pagina avulsa, e navegar entre as telas"): abre o
@@ -116,17 +126,19 @@ export async function downloadPageFile(api: SofiaApi, id: string) {
 }
 
 // ---------------- Janelas flutuantes ----------------
-type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean; pageId?: string; onSaved?: (a: SavedFile) => void; editId?: string; rev?: number};
+type Win = {key: string; api: SofiaApi; id: string; name: string; mime: string; x: number; y: number; w: number; hgt: number; z: number; max: boolean; drag?: boolean; pageId?: string; onSaved?: (a: SavedFile) => void; editId?: string; rev?: number; drive?: boolean};
 let wins: Win[] = [], topZ = 1;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
 const setWins = (next: Win[]) => {wins = next; emit();};
-export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
+/** `drive`: arquivo do Google Drive do usuario (07/11/2026, Pedro: "posso alterar os itens dentro do drive tambem"): Word, Excel
+ * e PowerPoint abrem no editor da Sofia e salvar grava no proprio arquivo do Drive. */
+export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void; drive?: boolean}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
   const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, ...(at || {}), z: ++topZ} : w)); return found.key;}
-  const ed = !!editKind(f.mime, f.name) && !!f.pageId, W = window.innerWidth, H = window.innerHeight, g = readGeo('win', ed), n = wins.length, key = f.id + ':' + Date.now();
+  const ed = canEdit(f), W = window.innerWidth, H = window.innerHeight, g = readGeo('win', ed), n = wins.length, key = f.id + ':' + Date.now();
   const w = g ? Math.min(g.w, W - 8) : ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = g ? Math.min(g.h, H - 8) : ed ? H - 90 : Math.min(H - 110, 720);
   const x0 = g ? Math.max(0, Math.min(W - 120, g.x)) : Math.max(12, W - w - 24), y0 = g ? Math.max(0, Math.min(H - 60, g.y)) : 70;
-  setWins([...wins, {key, api, id: f.id, editId: f.id, name: f.name, mime: f.mime, pageId: f.pageId, onSaved: f.onSaved, x: x0 + n * 28, y: y0 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
+  setWins([...wins, {key, api, id: f.id, editId: f.id, name: f.name, mime: f.mime, pageId: f.pageId, drive: f.drive, onSaved: f.onSaved, x: x0 + n * 28, y: y0 + n * 28, w, hgt, z: ++topZ, max: false, ...(at || {})}]);
   return key;
 }
 const useWins = () => useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => wins, () => wins);
@@ -148,10 +160,13 @@ const closeWin = (key: string) => setWins(wins.filter(w => w.key !== key));
 const patchWin = (key: string, p: Partial<Win>) => setWins(wins.map(w => w.key === key ? {...w, ...p} : w));
 
 /** Fica montado na tela de Paginas: as janelas abertas aparecem por cima de tudo (e continuam ao trocar de pagina). */
+// 07/11/2026: Paginas e Drive montam o seu; so o primeiro desenha (a mesma janela nao aparece duas vezes).
+const hosts: object[] = [];
 export function FileWindowHost() {
-  const list = useWins();
-  useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) closeWin(top.key);}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
-  if (!WEB || !list.length) return null;
+  const list = useWins(), me = useRef({}).current, lead = useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => hosts[0] === me, () => hosts[0] === me);
+  useEffect(() => {hosts.push(me); emit(); return () => {hosts.splice(hosts.indexOf(me), 1); emit();};}, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length || hosts[0] !== me) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) closeWin(top.key);}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
+  if (!WEB || !list.length || !lead) return null;
   return <OverAll>{list.map(w => <FileWindow key={w.key} win={w} />)}</OverAll>;
 }
 
@@ -188,29 +203,30 @@ function FileWindow({win}: {win: Win}) {
       <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13, fontWeight: '600'}}>{win.name}</Text>
       {k === 'image' ? <>{btn('zoomOut', 'Diminuir', () => setZoom(z => Math.max(25, (z || 100) - 25)))}<Text style={{color: c.muted, fontSize: 11, minWidth: 34, textAlign: 'center'}}>{zoom ? zoom + '%' : 'Ajust.'}</Text>{btn('zoomIn', 'Aumentar', () => setZoom(z => Math.min(400, (z || 100) + 25)))}</> : null}
       {win.pageId ? btn('history', 'Versões anteriores', () => setVers(v => !v)) : null}
-      {btn('download', 'Baixar', () => void downloadPageFile(win.api, win.id))}
-      {windowCapable(k, win.name) ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime, pageId: win.pageId, onSaved: win.onSaved})) closeWin(win.key);}) : null}
+      {btn('download', 'Baixar', () => void (win.drive ? win.api.sdSignedUrl(win.id, 'download').then(u => {const a = document.createElement('a'); a.href = u; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();}) : downloadPageFile(win.api, win.id)))}
+      {windowCapable(k, win.name) && !win.drive ? btn('external', 'Abrir em janela separada (fora da Sofia)', () => {if (detachFile(win.api, {id: win.id, name: win.name, mime: win.mime, pageId: win.pageId, onSaved: win.onSaved})) closeWin(win.key);}) : null}
       {btn('back', 'Voltar para a página', () => closeWin(win.key))}
       {btn('close', 'Fechar', () => closeWin(win.key))}</>
     ),
     <View style={{flex: 1, minHeight: 0, backgroundColor: k === 'image' || k === 'video' ? '#111' : c.bg}}>
       {vers ? <Versions win={win} onClose={() => setVers(false)} /> : null}
-      <FileBody key={win.rev || 0} api={win.api} id={win.id} firstId={win.editId || firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} onShowVersions={() => setVers(true)} />
+      <FileBody key={win.rev || 0} api={win.api} id={win.id} firstId={win.editId || firstId.current} name={win.name} mime={win.mime} zoom={zoom} onZoom={setZoom} pageId={win.pageId} drive={win.drive} onSaved={a => {patchWin(win.key, {id: a.id, name: a.name}); win.onSaved?.(a);}} onShowVersions={() => setVers(true)} />
       {moving || win.drag ? <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} /> /* o quadro do PDF nao rouba o arrastar */ : null}
     </View>),
     win.max ? null : HANDLES.map(([mode, css, cursor]) => h('div', {key: mode, onPointerDown: drag(mode), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', zIndex: 3, cursor, ...css}},
       mode === 'se' ? h('div', {style: {position: 'absolute', right: 10, bottom: 10, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}}) : null)));
 }
 
-function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
-  const ek = editKind(mime, name), editable = !!ek && !!pageId; /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
-  const c = useTheme(), k = fileKind(mime, name), {url, error} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : ''), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
+function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, drive, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; drive?: boolean; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
+  const ek = editKind(mime, name), editable = canEdit({mime, name, pageId, drive}); /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
+  const c = useTheme(), k = fileKind(mime, name), {url, error, base} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : '', !!drive), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
   const textual = !inlineCapable(k) && windowCapable(k, name);
   useEffect(() => {if (!textual || !url) return; let live = true; fetch(url).then(r => r.text()).then(t => {if (live) setText(t.slice(0, 400000));}).catch(() => {if (live) setText('');}); return () => {live = false;};}, [url, textual]);
   if (error) return <Center><Icon name="warning" size={22} color={c.muted} /><Text style={{color: c.text, fontSize: 13, textAlign: 'center', maxWidth: 320}}>{error}</Text><DownloadButton api={api} id={id} /></Center>;
   if (!windowCapable(k, name)) return <Center><Icon name={KIND[k].icon} size={30} color={KIND[k].color} /><Text style={{color: c.text, fontSize: 13}}>Este tipo de arquivo não tem visualização.</Text><DownloadButton api={api} id={id} /></Center>;
   if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
+  if (editable && drive && ek) return <DriveEdit kind={ek} p={{api, id: firstId, name, url, pageId: '', onSaved}} base={base || ''} />;
   if (editable && pageId && ek) return officeEditor(ek, {api, id: firstId, name, url, pageId, onSaved, onShowVersions});
   if (k === 'image') return h('div', {style: {width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: zoom ? 'flex-start' : 'center', justifyContent: zoom ? 'flex-start' : 'center'},
     onWheel: (e: any) => {if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); onZoom(Math.max(25, Math.min(400, (zoom || 100) + (e.deltaY < 0 ? 15 : -15))));}},
@@ -251,6 +267,9 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
   const wrap = useRef<any>(null), floating = useWins().some(w => w.id === id && !!id);
   const file = {id, name: data.name || 'arquivo', mime: data.mime || '', pageId, onSaved: (a: SavedFile) => latest.current.onChange({...latest.current.data, attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes})};
   const open = () => {if (id) openFileWindow(api, file);};
+  // 07/11/2026 (Pedro: copiar e colar entre paginas e Drive): Copiar leva o arquivo; colar no Drive ou em outra pagina
+  const [copied, setCopied] = useState(false); useEffect(() => {if (!copied) return; const t = setTimeout(() => setCopied(false), 1600); return () => clearTimeout(t);}, [copied]);
+  const copy = () => {setSofiaClip({sofia: 'page-files', items: [{attachment_id: id, name: data.name || 'arquivo', mime: data.mime || ''}]}); setCopied(true);};
   if (data.uploading) return <View testID="page-file-uploading" style={{marginVertical: 6, height: 52, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12}}>
     <Spinner size={16} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name || 'Arquivo'}</Text><Text style={{color: c.muted, fontSize: 11}}>Enviando… {sizeLabel(data.size)}</Text></View>;
   const resize = (e: any) => {e.preventDefault(); e.stopPropagation(); const el = wrap.current as HTMLElement | null, col = el?.parentElement?.getBoundingClientRect?.(); if (!el || !col) return; const sx = e.clientX, w0 = el.getBoundingClientRect().width;
@@ -261,7 +280,7 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
   const bar = (hover || selected) && id ? <View style={{position: 'absolute', top: 6, right: 6, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 3, borderRadius: 9, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 4px 14px rgba(0,0,0,.12)'} as any}>
     {inlineCapable(k) ? <View style={{flexDirection: 'row', padding: 2, borderRadius: 8, backgroundColor: c.input, marginRight: 2}}>{seg('Anexo', 'attach')}{seg('Visualização', 'preview')}</View> : null}
     {preview ? <>{tool('zoomOut', 'Diminuir', () => onChange({...data, scale: Math.max(15, scale - 10)}))}<Text style={{color: c.muted, fontSize: 11, minWidth: 32, textAlign: 'center'}}>{scale}%</Text>{tool('zoomIn', 'Aumentar', () => onChange({...data, scale: Math.min(100, scale + 10)}))}</> : null}
-    {windowCapable(k, data.name || '') ? tool('external', 'Abrir em janela separada (fora da Sofia)', () => {detachFile(api, file);}) : null /* 07/11/2026 (Pedro): sem a opcao da janela dentro da pagina aqui */}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
+    {windowCapable(k, data.name || '') ? tool('external', 'Abrir em janela separada (fora da Sofia)', () => {detachFile(api, file);}) : null /* 07/11/2026 (Pedro): sem a opcao da janela dentro da pagina aqui */}{tool(copied ? 'check' : 'copy', copied ? 'Copiado: cole no Drive ou em outra página (Ctrl+V)' : 'Copiar (para colar no Drive ou em outra página)', copy, copied)}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
   </View> : null;
   const hoverDiv = (child: React.ReactNode) => h('div', {onMouseEnter: () => setHover(true), onMouseMove: () => {if (!hover) setHover(true);}, onMouseLeave: () => setHover(false), style: {position: 'relative', width: '100%', alignSelf: 'stretch', display: 'flex', flexDirection: 'column'}}, child);
   if (!preview) return hoverDiv(<Pressable testID="page-file-row" accessibilityRole="button" accessibilityLabel={'Abrir ' + (data.name || 'arquivo')} onPress={() => {onSelect(); open();}}

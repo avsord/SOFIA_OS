@@ -430,6 +430,47 @@ function makeMobileApi(runtime, deps) {
       if (mm && m === 'GET') { rate(session, 'sofiadrive-thumb', 2000); const out = await g.sdThumb(mm[1], url.searchParams.get('s')); res.setHeader('Cache-Control', 'private, max-age=3600'); await GoogleService.sendFile(res, out, {inline: true}); return true; }
       mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/(content|preview|download)$/);
       if (mm && m === 'GET') { rate(session, 'sofiadrive', 240); const out = mm[2] === 'preview' ? await g.sdPreview(mm[1]) : mm[2] === 'download' ? await g.sdDownload(mm[1]) : await g.sdContent(mm[1]); res.setHeader('X-Content-Type-Options', 'nosniff'); await GoogleService.sendFile(res, out, {inline: mm[2] !== 'download'}); return true; }
+      // 07/11/2026 (Pedro: "integracao com as paginas: copiar e colar la qualquer tipo de item"): Drive -> Pagina
+      if (sd === 'to-page' && m === 'POST') {
+        rate(session, 'sofiadrive-write', 120); const b = await bodyJson(req, 16384), pageId = validId(String(b.page || '')), page = workspace.get(pageId);
+        if ((page.tags || []).includes('sofia-lock-v1')) fail('LOCKED', 'Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.', 409);
+        // ids: arquivos do Drive; attachments: arquivos de outra pagina (copiar de uma pagina e colar em outra). items fica na
+        // mesma ordem do pedido (null = pasta, que nao entra); um erro num arquivo nao derruba os outros.
+        const src = [...(Array.isArray(b.ids) ? b.ids : []).map(x => ({drive: String(x)})), ...(Array.isArray(b.attachments) ? b.attachments : []).map(x => ({att: String(x)}))].slice(0, 30), items = [], skipped = [];
+        for (const s of src) {
+          try {
+            let f; if (s.drive) f = await g.sdFileBytes(s.drive); else { const a0 = workspace.attachment(validId(s.att)); f = {name: a0.name, mime: a0.mime, bytes: await g.attachmentBytes(a0)}; }
+            if (f.folder) { skipped.push(f.name); items.push(null); continue; }
+            const a = workspace.attach(pageId, {name: f.name, mime: f.mime, base64: f.bytes.toString('base64')});
+            try { await g.attachmentToDrive(a.id); } catch (e) { try { workspace.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id); } catch {} throw e; }
+            items.push({id: a.id, name: a.name, mime: a.mime, bytes: a.bytes});
+          } catch (e) { if (e.code === 'NO_DRIVE' || src.length === 1) throw e; items.push({error: e.message || 'Não consegui copiar este arquivo.'}); }
+        }
+        return send({items, skipped});
+      }
+      // Pagina -> Drive: anexos da pagina viram arquivos novos na pasta aberta (o anexo continua na pagina)
+      if (sd === 'from-page' && m === 'POST') {
+        rate(session, 'sofiadrive-write', 120); const b = await bodyJson(req, 16384), parent = String(b.parent || 'root'), items = [];
+        for (const id of (Array.isArray(b.attachments) ? b.attachments : []).map(String).slice(0, 30)) items.push(await g.sdFromAttachment(parent, workspace.attachment(validId(id))));
+        return send({items});
+      }
+      // 07/11/2026 (Pedro: "posso alterar os itens dentro do drive tambem"): o editor da Sofia salva no proprio arquivo do Drive
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/stamp$/);
+      if (mm && m === 'GET') { rate(session, 'sofiadrive', 240); return send(await g.sdStamp(mm[1])); }
+      mm = sd.match(/^items\/([A-Za-z0-9_-]+)\/content$/);
+      if (mm && m === 'PUT') {
+        rate(session, 'sofiadrive-write', 240); const MAX = 50 * 1024 * 1024, chunks = []; let size = 0;
+        await new Promise((ok, bad) => { req.on('data', c => { size += c.length; if (size > MAX) { bad(new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413)); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', bad); });
+        return send({item: await g.sdWrite(mm[1], Buffer.concat(chunks), {mime: String(url.searchParams.get('mime') || ''), base: String(url.searchParams.get('base') || '')})});
+      }
+      // Word do Drive: o HTML do editor vira .docx e volta para o site, que confere se nada sumiu ANTES de gravar no Drive
+      if (sd === 'docx-render' && m === 'POST') {
+        rate(session, 'docx-save', 240); const b = await bodyJson(req, 30 * 1024 * 1024), H = require('@turbodocx/html-to-docx'), html = String(b.html || '').trim();
+        if (!html) fail('BAD_FILE', 'Documento vazio não é salvo.', 400);
+        const out = await (H.default || H)(html, null, {title: String(b.name || 'Documento').replace(/\.docx$/i, '').slice(0, 150), font: 'Calibri', fontSize: 22, margins: {top: 1440, right: 1440, bottom: 1440, left: 1440}});
+        const buf = Buffer.isBuffer(out) ? out : Buffer.from(out instanceof ArrayBuffer ? new Uint8Array(out) : await out.arrayBuffer());
+        res.statusCode = 200; res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Length', String(buf.length)); res.setHeader('Cache-Control', 'no-store'); res.end(buf); return true;
+      }
       fail('NOT_FOUND', 'Rota do Drive não existe.', 404);
     }
     // 0.3.244: Arquivos da Sofia (área oculta do Drive): resumo, lista por categoria, conteúdo e cópia visível.

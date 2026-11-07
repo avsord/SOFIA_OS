@@ -1491,6 +1491,43 @@ class GoogleService {
     } finally { this.call('DELETE', DRIVE + '/files/' + copy.id).catch(() => {}); }
   }
 
+  /** 07/11/2026 (Pedro: "integracao com as paginas: copiar e colar la qualquer tipo de item"): bytes de um arquivo do Drive
+   * para virar anexo de uma Pagina. Docs/Planilhas/Apresentacoes do Google saem como Word/Excel/PowerPoint. Pasta nao entra. */
+  async sdFileBytes(id, max = 25 * 1024 * 1024) {
+    const at = await this.sdResolve(id), mt = String(at.meta.mimeType || '');
+    if (mt === GoogleService.SD_FOLDER) return {folder: true, name: at.meta.name};
+    const big = () => new AppError('TOO_LARGE', '"' + at.meta.name + '" é maior que 25 MB e não entra numa página.', 413);
+    if (at.meta.size != null && Number(at.meta.size) > max) throw big();
+    const out = await this.sdDownload(at.meta.id), buf = Buffer.from(await out.res.arrayBuffer());
+    if (buf.length > max) throw big();
+    return {name: String(out.meta.name || at.meta.name || 'arquivo').replace(/[\\/]/g, '_').slice(0, 160), mime: String(out.meta.mimeType || 'application/octet-stream'), bytes: buf};
+  }
+  /** Arquivo novo numa pasta do Drive (ate 5 MB de uma vez; acima, por partes). */
+  async sdPutNew(parent, name, mime, bytes) {
+    if (bytes.length <= 5 * 1024 * 1024) return this.sdUpload(parent, name, mime, bytes);
+    const s = await this.sdUploadStart(parent, name, mime, bytes.length); let at = 0, r = null;
+    for (let i = 0; i < 400 && !r; i++) { const part = bytes.subarray(at, Math.min(bytes.length, at + 8 * 1024 * 1024)); const x = await this.sdUploadChunk(s.upload, at, part); if (x.item) r = x.item; else at = x.next; }
+    if (!r) throw new AppError('GOOGLE_API', 'O Google não terminou o envio. Tente de novo.', 502); return r;
+  }
+  /** Pagina -> Drive: o anexo da pagina vira um arquivo novo na pasta aberta do Drive (o anexo continua na pagina). */
+  async sdFromAttachment(parent, a) { const bytes = await this.attachmentBytes(a); return this.sdPutNew(parent, a.name || 'arquivo', a.mime, bytes); }
+  /** 07/11/2026 (Pedro: "posso alterar os itens dentro do drive tambem"): o editor da Sofia salva NO MESMO arquivo do Drive
+   * (nova revisao: o Google guarda a anterior em Gerenciar versoes). Mesmo id e nome. Recusa se o arquivo mudou desde que
+   * foi aberto (outra pessoa ou outro aparelho salvou), para nao apagar o trabalho de ninguem. */
+  async sdWrite(id, bytes, {mime, base = ''} = {}) {
+    const at = await this.sdResolve(id), mt = String(at.meta.mimeType || '');
+    if (mt.startsWith('application/vnd.google-apps.')) throw new AppError('BAD_FILE', 'Arquivo do Google Docs só é editado no Google. Aqui ele abre para ver.', 400);
+    if (!bytes || !bytes.length) throw new AppError('BAD_FILE', 'Arquivo vazio não é salvo.', 400);
+    if (bytes.length > 50 * 1024 * 1024) throw new AppError('TOO_LARGE', 'Arquivo maior que 50 MB.', 413);
+    if (base && at.meta.modifiedTime && String(base) !== String(at.meta.modifiedTime)) throw new AppError('CONFLICT', 'Esse arquivo mudou no Drive desde que você abriu. Feche e abra de novo para não apagar a outra alteração.', 409);
+    const r = await this.fetch(UPLOAD + '/files/' + at.meta.id + '?uploadType=media&fields=' + encodeURIComponent(GoogleService.SD_FIELDS), {method: 'PATCH', headers: {Authorization: 'Bearer ' + await this.token(), 'Content-Type': GoogleService.sdMime(mime || mt), 'Content-Length': String(bytes.length)}, body: bytes});
+    if (!r.ok) { const t = await r.text().catch(() => ''); throw new AppError('GOOGLE_API', r.status === 403 ? 'O Google não deixou salvar: você só pode ver esse arquivo.' : 'O Google recusou salvar o arquivo (' + r.status + '). ' + t.slice(0, 120), 502); }
+    if (this.sdStreamMemo) { this.sdStreamMemo.delete(id); this.sdStreamMemo.delete(at.meta.id); }
+    return this.sdItem(await r.json());
+  }
+  /** Data de modificacao atual: o editor guarda ao abrir e manda ao salvar. */
+  async sdStamp(id) { const at = await this.sdResolve(id); return {id: at.meta.id, name: at.meta.name, mime: at.meta.mimeType, modified: at.meta.modifiedTime || ''}; }
+
   /** 07/11/2026 (Pedro: arquivos nas Paginas): Word/Excel/PowerPoint anexado a uma pagina -> PDF para ver na janela flutuante.
    * O Google converte uma copia temporaria (apagada logo depois; a varredura apaga sobras). Guarda os ultimos 20. */
   async attachmentPdf(a) {
