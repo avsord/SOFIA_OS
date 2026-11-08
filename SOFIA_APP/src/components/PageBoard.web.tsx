@@ -46,7 +46,7 @@ function size(b: PageBlock): {w: number; h: number} {
   const k = fileKind(b.data?.mime, b.data?.name), preview = b.data?.view === 'preview' || (!b.data?.view && defaultView(k) === 'preview');
   if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
-  if (b.type === 'page_link') return {w: 300, h: 220};
+  if (b.type === 'page_link') return {w: 520, h: 420}; // 08/11/2026: a pagina de verdade dentro do cartao
   if (b.type === 'bookmark' && b.data?.link) return b.data.link.image ? {w: 300, h: 240} : {w: 300, h: 110};
   if (b.type === 'bookmark' && b.data?.live) return b.data.live.kind === 'list' || b.data.live.kind === 'mail' ? {w: 300, h: 230} : {w: 280, h: 150};
   if (b.type === 'todo') return {w: 260, h: 180};
@@ -61,7 +61,7 @@ type Props = {
   api: SofiaApi; pageId: string; blocks: PageBlock[]; locked: boolean;
   edit: (fn: (blocks: PageBlock[]) => PageBlock[], group?: string) => void; flush: () => void;
   pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>;
-  title: string; onTitle: (v: string) => void;
+  title: string; onTitle: (v: string) => void; onPageChanged?: (id: string) => void;
   pickFiles: () => void; createDoc: () => void; dropFiles: (files: File[]) => void; pasteClip: (clip: SofiaClip) => void; onError: (m: string) => void;
 };
 
@@ -84,6 +84,10 @@ export function PageBoard(p: Props) {
   const fail = (m: string) => {diag('aviso', false, {msg: m}); p.onError(m);};
   const opened = useRef(Date.now());
   useEffect(() => boardDiagInit(p.api), [p.api]);
+  // copias antigas trazidas para o quadro (de antes da etiqueta) ganham a etiqueta 'board-copy': somem das listas de Paginas
+  useEffect(() => {const ids = new Set(p.blocks.filter(b => b.type === 'page_link' && b.data?.copy_id).map(b => String(b.data!.copy_id)));
+    for (const pg of p.pages) if (ids.has(pg.id) && !(pg.tags || []).includes('board-copy')) void p.api.saveEntity({id: pg.id, revision: pg.revision, tags: [...(pg.tags || []), 'board-copy']} as any).then(() => p.onPageChanged?.(pg.id)).catch(() => undefined);
+  }, [p.pages.length, p.blocks.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {const ms = Date.now() - opened.current; diag('abrir', true, {ms, n: p.blocks.filter(onBoard).length});}, []); // eslint-disable-line react-hooks/exhaustive-deps
   const blocksRef = useRef(p.blocks); blocksRef.current = p.blocks;
   const shown = useMemo(() => p.blocks.filter(onBoard), [p.blocks]);
@@ -124,7 +128,7 @@ export function PageBoard(p: Props) {
     return () => {el.removeEventListener('pointerdown', down, true); window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true); window.removeEventListener('pointercancel', up, true);};}, []);
   // zoom pela rodinha (no ponto do mouse); dentro de algo em edicao a rodinha rola o que esta sendo editado
   useEffect(() => {const el = host.current; if (!el) return;
-    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing]')) return; e.preventDefault();
+    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui]')) return; e.preventDefault(); // 08/11/2026: rodinha em cima de janela/lista rola a lista, nao da zoom
       const r = el.getBoundingClientRect(), v = viewRef.current, k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), z = Math.min(MAX_Z, Math.max(MIN_Z, v.z * k)), mx = e.clientX - r.left, my = e.clientY - r.top;
       setView({z, x: mx - (mx - v.x) * (z / v.z), y: my - (my - v.y) * (z / v.z)});};
     el.addEventListener('wheel', on, {passive: false}); return () => el.removeEventListener('wheel', on);}, []);
@@ -135,6 +139,8 @@ export function PageBoard(p: Props) {
   // fundo: arrastar anda; Shift+arrastar seleciona; no modo desenho, desenha
   const onBgDown = (e: any) => {
     if (e.button !== 0 && e.button !== 1) return; const t = e.target as HTMLElement; if (t.closest('[data-board-item],[data-board-ui]')) return;
+    // 08/11/2026 (Pedro: "mexer com o mouse ta selecionando o titulo"): arrastar o fundo nunca seleciona texto
+    e.preventDefault(); try {window.getSelection()?.removeAllRanges();} catch {} (document.activeElement as HTMLElement | null)?.blur?.();
     host.current?.focus({preventScroll: true}); setEditing(null);
     const sx = e.clientX, sy = e.clientY, v0 = viewRef.current;
     if (mode === 'draw') {const pts = [toBoard(sx, sy)]; setInk(pts);
@@ -190,7 +196,7 @@ export function PageBoard(p: Props) {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'bookmark' && b.data?.link?.url) {window.open(String(b.data.link.url), '_blank', 'noopener'); return;}
-    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (t) p.onOpenPage(t); return;}
+    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json) {p.onOpenPage(t); return;} focusOn(geo(b)); setEditing(b.id); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
     const id = String(b.data?.attachment_id || ''); if (!id) return;
     if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); if (g.w < 600 || g.h < 700) patchGeo([b.id], g2 => ({...g2, w: Math.max(g2.w, 680), h: Math.max(g2.h, 860)}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); setEditing(b.id); return;} // editar: o cartao vira uma pagina
     openFileWindow(p.api, {id, name: String(b.data?.name || 'arquivo'), mime: String(b.data?.mime || (b.type === 'image' ? 'image/jpeg' : '')), pageId: p.pageId,
@@ -275,7 +281,8 @@ export function PageBoard(p: Props) {
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
       if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
       if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
-      items.push(btn('external', 'Abrir a página', () => openItem(one)));}
+      items.push(btn('edit', 'Usar a página aqui no quadro (dois cliques)', () => openItem(one)));
+      items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
     items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
     if (one?.type === 'bookmark' && one.data?.live?.kind === 'mail') items.push(btn('clip', 'Anexos deste e-mail', () => {const hit = String(one.data!.live.id), card = one.id; setMailAtt({card, hit, items: null, err: '', busy: ''}); track('anexo-email-listar', () => p.api.mailAttachments(hit)).then(r => setMailAtt(m => m && m.card === card ? {...m, items: r.items} : m)).catch(e => setMailAtt(m => m && m.card === card ? {...m, err: String(e?.message || 'Não deu para ler os anexos.')} : m));}, !!mailAtt, false, 'board-mail-att'));
@@ -290,7 +297,7 @@ export function PageBoard(p: Props) {
     return bar(items, {left, top, height: 48}, 'Item selecionado');})() : null;
 
   return h('div', {ref: host, 'data-testid': 'page-board', tabIndex: 0, onKeyDown: onKey, onPointerDown: onBgDown, onDoubleClick: onBgDouble,
-    style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', outline: 'none', touchAction: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default', backgroundColor: c.bg,
+    style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default', backgroundColor: c.bg,
       backgroundImage: 'radial-gradient(' + c.line + ' ' + Math.max(0.8, 1.2 * Math.min(1.4, view.z)) + 'px, transparent ' + Math.max(0.8, 1.2 * Math.min(1.4, view.z)) + 'px)', backgroundSize: 24 * view.z + 'px ' + 24 * view.z + 'px', backgroundPosition: view.x + 'px ' + view.y + 'px'}},
     h('div', {style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'}},
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
@@ -301,18 +308,22 @@ export function PageBoard(p: Props) {
               onPointerDown: (e: any) => {e.stopPropagation(); setSel([]); setSelLink({from: l.from, to: l.to});}}),
             l.label ? h('text', {x: (ca.x + end.x) / 2, y: (ca.y + end.y) / 2 - 6 / view.z, fill: c.text, fontSize: 13 / Math.max(0.6, view.z), textAnchor: 'middle', style: {paintOrder: 'stroke', stroke: c.bg, strokeWidth: 4 / Math.max(0.6, view.z)}}, l.label) : null);}),
         ink ? h('path', {d: ink.map((q, i) => (i ? 'L' : 'M') + q.x + ' ' + q.y).join(' '), fill: 'none', stroke: c.accent, strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round'}) : null),
+      // 08/11/2026 (Pedro: "o ponto central da pagina pra nao se perder no infinito"): eixos discretos e o 0 no centro
+      h('div', {key: 'ox', 'aria-hidden': true, style: {position: 'absolute', left: 0, top: -100000, width: 1 / view.z, height: 200000, background: c.line, opacity: 0.9, pointerEvents: 'none'}}),
+      h('div', {key: 'oy', 'aria-hidden': true, style: {position: 'absolute', top: 0, left: -100000, height: 1 / view.z, width: 200000, background: c.line, opacity: 0.9, pointerEvents: 'none'}}),
+      h('div', {key: 'o0', 'data-testid': 'board-origin', 'aria-hidden': true, style: {position: 'absolute', left: 8 / view.z, top: 6 / view.z, color: c.muted, fontSize: 18 / view.z, fontWeight: 600, pointerEvents: 'none', userSelect: 'none'}}, '0'),
       guides.x != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', left: guides.x, top: -100000, width: 1 / view.z, height: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
         onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
-        onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush();}} />),
+        onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush(); if (b.type === 'page_link' && b.data?.page_id) p.onPageChanged?.(String(b.data.page_id));}} />),
       box ? h('div', {style: {position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, border: '1px solid ' + c.accent, background: c.accent + '22', pointerEvents: 'none'}}) : null),
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
       h('div', {style: {fontSize: 18, fontWeight: 700, color: c.text, marginBottom: 6}}, 'Quadro vazio'), 'Solte fotos e arquivos aqui, cole qualquer coisa (Ctrl+V)', h('br'), 'ou dê dois cliques no fundo para escrever uma nota.') : null,
     selBar,
     h('input', {'data-board-ui': '1', 'data-testid': 'board-title', value: p.title, placeholder: 'Sem título', 'aria-label': 'Título do quadro', onPointerDown: (e: any) => e.stopPropagation(), onChange: (e: any) => p.onTitle(e.target.value),
       onKeyDown: (e: any) => {if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();},
-      style: {position: 'absolute', left: 16, top: 12, zIndex: 30, width: 'min(420px, 50%)', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: c.bg + 'cc', color: c.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit'},
+      style: {userSelect: 'text', WebkitUserSelect: 'text', position: 'absolute', left: 16, top: 12, zIndex: 30, width: 'min(420px, 50%)', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: c.bg + 'cc', color: c.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit'},
       onFocus: (e: any) => {e.target.style.borderColor = c.accent;}, onBlur: (e: any) => {e.target.style.borderColor = 'transparent'; p.flush();}}),
     bar([btn('T', 'Texto', () => {const nb = addBlock({id: uid(), type: 'text', text: '', data: {}}); setEditing(nb.id);}, false, false, 'board-add-text'),
       btn('edit', mode === 'draw' ? 'Parar de desenhar' : 'Desenhar', () => setMode(mode === 'draw' ? '' : 'draw'), mode === 'draw', false, 'board-draw'),
@@ -324,7 +335,7 @@ export function PageBoard(p: Props) {
       btn('book', 'Página existente (entra como cópia)', () => setPicker(true), picker, false, 'board-add-page'),
       btn('grid', 'Do app: Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca', () => setLivePick(true), livePick, false, 'board-add-live')], {left: '50%', bottom: 20, transform: 'translateX(-50%)', height: 54}, 'Inserir no quadro'),
     bar([btn('zoomOut', 'Afastar', () => zoomBy(1 / 1.25)), h('button', {key: 'pct', type: 'button', title: 'Voltar para 100%', onClick: () => zoomBy(1 / view.z), 'data-testid': 'board-zoom',
-      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar', () => zoomBy(1.25)), btn('expand', 'Ver tudo', fitAll), btn('search', 'Buscar no quadro (Ctrl+F)', () => setFind(f => f ? null : {q: '', i: 0}), !!find, false, 'board-find-open')],
+      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar', () => zoomBy(1.25)), btn('home', 'Voltar ao centro (0)', () => setView(v => ({...v, x: size2.w / 2, y: size2.h / 2})), false, false, 'board-center'), btn('expand', 'Ver tudo', fitAll), btn('search', 'Buscar no quadro (Ctrl+F)', () => setFind(f => f ? null : {q: '', i: 0}), !!find, false, 'board-find-open')],
       {left: 16, bottom: 20, height: 46}, 'Zoom do quadro'),
     rec ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', bottom: 84, transform: 'translateX(-50%)', padding: '6px 12px', borderRadius: 10, background: c.dangerBg, color: c.danger, fontSize: 12, fontWeight: 600}}, '● Gravando… clique no microfone para parar') : null,
     selLink ? (() => {const l = links.find(x => x.from === selLink.from && x.to === selLink.to); if (!l) return null; const mx = ((l.a.x + l.a.w / 2) + (l.b.x + l.b.w / 2)) / 2 * view.z + view.x, my = ((l.a.y + l.a.h / 2) + (l.b.y + l.b.h / 2)) / 2 * view.z + view.y;
@@ -398,7 +409,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
-  else if (b.type === 'page_link') body = <PageCard b={b} pages={pages} />;
+  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} />;
   else if (b.type === 'bookmark' && b.data?.link) {const L = b.data.link; body = h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     L.image && !light ? h('div', {style: {flex: 1, minHeight: 0, backgroundColor: c.input, backgroundImage: 'url("' + String(L.image).replace(/["\\)]/g, '') + '")', backgroundSize: 'cover', backgroundPosition: 'center'}}) : null,
     h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3}}, h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, L.title || L.url),
@@ -425,7 +436,7 @@ function TextCard({b, g, editing, onChange, onDone}: any) {
   const save = () => {const el = ref.current; if (!el) return; const html = sanitizeRich(el.innerHTML), text = plainOf(html).slice(0, 12000); onChange((x: PageBlock) => ({...x, text, html: html.length < 24000 ? html : ''}));};
   const style: any = {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'auto', padding: note ? 14 : 6, borderRadius: note ? 12 : 6, background: note ? (g.color || NOTE_COLORS[0]) : 'transparent', border: note ? '1px solid ' + c.line : 0,
     color: c.text, fontSize: head ? 28 : note ? 14 : 18, fontWeight: head ? 700 : 400, lineHeight: 1.45, outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word'};
-  if (editing) return h('div', {key: 'edit', ref, 'data-board-editing': '1', contentEditable: true, suppressContentEditableWarning: true, role: 'textbox', 'aria-multiline': true, 'aria-label': note ? 'Nota' : 'Texto', onBlur: () => {save(); onDone();}, onInput: save, onPointerDown: (e: any) => e.stopPropagation(), style: {...style, cursor: 'text', boxShadow: '0 0 0 2px ' + c.accent}});
+  if (editing) return h('div', {key: 'edit', ref, 'data-board-editing': '1', contentEditable: true, suppressContentEditableWarning: true, role: 'textbox', 'aria-multiline': true, 'aria-label': note ? 'Nota' : 'Texto', onBlur: () => {save(); onDone();}, onInput: save, onPointerDown: (e: any) => e.stopPropagation(), style: {...style, userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text', boxShadow: '0 0 0 2px ' + c.accent}});
   const empty = !String(b.text || '').trim();
   return h('div', {key: 'view', style}, empty ? h('span', {style: {color: c.muted}}, note ? 'Nota vazia — dois cliques para escrever' : 'Texto — dois cliques para escrever') : b.html ? h('div', {dangerouslySetInnerHTML: {__html: sanitizeRich(b.html)}}) : String(b.text || ''));
 }
@@ -442,28 +453,63 @@ function ListCard({b, editing, onChange}: any) {
         : h('span', {style: {flex: 1, textDecoration: it.done ? 'line-through' : 'none', color: it.done ? c.muted : c.text}}, it.text || h('span', {style: {color: c.muted}}, 'Item')))));
 }
 
-function PageCard({b, pages}: {b: PageBlock; pages: Entity[]}) {
-  const c = useTheme(), t = pages.find(x => x.id === String(b.data?.page_id || '')), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced;
+// 08/11/2026 (Pedro: "como se fosse o iframe dessas paginas: abro os arquivos que tem ali dentro, edito, e com o zoom do quadro
+// tenho uma visao ampla de varias coisas"): o cartao mostra a PAGINA DE VERDADE (o proprio site em /paginas/<id>?embed=1, sem
+// barras), desenhada como no computador (1100 px de largura) e reduzida ao tamanho do cartao; o zoom do quadro aproxima.
+// Parado: so olha (o quadro move e seleciona). Dois cliques: entra na pagina (abrir PDF/Word, editar, tudo da pagina).
+// Muito afastado (zoom < 15%) ou pagina trancada: so o resumo em texto (leve).
+const PAGE_VIRTUAL_W = 1100;
+function PageCard({b, g, pages, editing, light, onDone}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void}) {
+  const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [loaded, setLoaded] = useState(false);
   let lines: string[] = [];
   if (t) {try {const bs = JSON.parse(String(t.data?.blocks_json || '[]')); lines = (Array.isArray(bs) ? bs : []).map((x: any) => String(x.text || x.data?.name || '').trim()).filter(Boolean).slice(0, 10);} catch {}}
-  const lockedPage = !!t?.data?.lock_json;
-  return h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
-    h('div', {style: {display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid ' + c.line}}, <Icon name="book" size={15} color={c.accent} />,
+  const lockedPage = !!t?.data?.lock_json, live = !!t && !lockedPage && (!light || editing), head = 40, s = Math.max(0.05, g.w / PAGE_VIRTUAL_W);
+  useEffect(() => {if (!live) setLoaded(false);}, [live]);
+  useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onDone();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
+  return h('div', {'data-board-editing': editing ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + (editing ? c.accent : c.line), display: 'flex', flexDirection: 'column', position: 'relative'}},
+    h('div', {style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderBottom: '1px solid ' + c.line, background: c.surface}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
-      synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null),
-    h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden'}}, lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada') : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, 'Página vazia')),
-    h('div', {style: {marginTop: 'auto', padding: '6px 12px 10px', color: c.muted, fontSize: 11}}, 'Dois cliques: abrir e editar'));
+      synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,
+      editing ? h('button', {type: 'button', 'data-testid': 'board-page-done', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); onDone();}, style: {border: 0, borderRadius: 7, padding: '4px 10px', background: c.accent, color: c.onAccent, fontWeight: 700, fontSize: 12, cursor: 'pointer'}}, 'Pronto') : null),
+    h('div', {style: {flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden'}},
+      !loaded || !live ? h('div', {style: {position: 'absolute', inset: 0, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden'}},
+        lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, live ? 'Abrindo a página…' : 'Página vazia')) : null,
+      live ? h('iframe', {key: id, src: '/paginas/' + encodeURIComponent(id) + '?embed=1', title: 'Página ' + (t?.title || ''), 'data-testid': 'board-page-frame', onLoad: () => setLoaded(true),
+        style: {position: 'absolute', left: 0, top: 0, border: 0, width: PAGE_VIRTUAL_W, height: Math.max(200, (g.h - head) / s), transform: 'scale(' + s + ')', transformOrigin: '0 0', opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
+    !editing && live ? h('div', {style: {position: 'absolute', right: 10, bottom: 8, padding: '2px 8px', borderRadius: 6, background: c.surface + 'e6', color: c.muted, fontSize: 11, pointerEvents: 'none'}}, 'Dois cliques: usar a página aqui') : null);
 }
 
+// 08/11/2026 (Pedro: "essa janela esta bem zuada, pode estar mais proxima disso" - a lista de Paginas da barra lateral):
+// a mesma arvore (espacos e subpaginas, icone, setinha para abrir/fechar, cadeado nas trancadas); buscando, vira lista com o caminho.
+const isEmojiIcon = (v: unknown) => typeof v === 'string' && v.length > 0 && v.length <= 8 && !/^[a-z0-9_-]+$/i.test(v);
 function PagePicker({pages, exclude, onPick, onClose, title = 'Trazer página para o quadro', hint = 'Entra como uma cópia independente (mexer nela não muda a original). Se quiser, depois é só clicar em sincronizar.', extra}: {pages: Entity[]; exclude: string; onPick: (p: Entity) => void; onClose: () => void; title?: string; hint?: string; extra?: {label: string; run: () => void}}) {
-  const c = useTheme(), [q, setQ] = useState(''), list = pages.filter(x => x.id !== exclude && x.state !== 'archived' && (!q || String(x.title || '').toLowerCase().includes(q.toLowerCase()))).slice(0, 40);
+  const c = useTheme(), [q, setQ] = useState(''), [open, setOpen] = useState<Record<string, boolean>>({}), [hover, setHover] = useState('');
+  const live = useMemo(() => pages.filter(x => x.state !== 'archived'), [pages]);
+  const byParent = useMemo(() => {const m = new Map<string, Entity[]>(), ids = new Set(live.map(x => x.id)); for (const x of live) {const par = String(x.data?.parent_id || ''), key = ids.has(par) ? par : ''; if (!m.has(key)) m.set(key, []); m.get(key)!.push(x);}
+    for (const l of m.values()) l.sort((a, b) => (Number(a.data?.sort_order) || 0) - (Number(b.data?.sort_order) || 0) || String(a.title || '').localeCompare(String(b.title || ''), 'pt-BR')); return m;}, [live]);
+  const pathOf = (x: Entity) => {const out: string[] = []; let cur = live.find(y => y.id === String(x.data?.parent_id || '')), guard = 0; while (cur && guard++ < 20) {out.unshift(cur.title || 'Sem título'); cur = live.find(y => y.id === String(cur!.data?.parent_id || ''));} return out.join(' / ');};
   useEffect(() => {const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onClose();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [onClose]);
-  return h('div', {'data-board-ui': '1', onPointerDown: (e: any) => {e.stopPropagation(); if (e.target === e.currentTarget) onClose();}, style: {position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 70}},
-    h('div', {role: 'dialog', 'aria-label': 'Trazer página para o quadro', 'data-testid': 'board-page-picker', style: {width: 520, maxWidth: 'calc(100% - 32px)', maxHeight: '70%', display: 'flex', flexDirection: 'column', gap: 12, padding: 20, boxSizing: 'border-box', borderRadius: 18, background: c.surface, border: '1px solid ' + c.line, boxShadow: '0 24px 60px rgba(0,0,0,.5)'}},
-      h('div', {style: {color: c.text, fontSize: 18, fontWeight: 700}}, title),
-      h('div', {style: {color: c.muted, fontSize: 12, lineHeight: 1.5}}, hint),
-      extra ? h('button', {type: 'button', onClick: extra.run, style: {alignSelf: 'flex-start', border: 0, background: 'transparent', color: c.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0}}, extra.label) : null,
-      h('input', {autoFocus: true, value: q, onChange: (e: any) => setQ(e.target.value), placeholder: 'Buscar página', 'aria-label': 'Buscar página', style: {height: 40, borderRadius: 9, border: '1px solid ' + c.accent, background: c.input, color: c.text, padding: '0 12px', fontSize: 14, outline: 'none'}}),
-      h('div', {style: {overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2}}, ...list.map(x => h('button', {key: x.id, type: 'button', onClick: () => onPick(x), style: {textAlign: 'left', padding: '10px 12px', borderRadius: 10, border: 0, background: 'transparent', color: c.text, fontSize: 14, cursor: 'pointer'},
-        onMouseEnter: (e: any) => {e.currentTarget.style.background = c.input;}, onMouseLeave: (e: any) => {e.currentTarget.style.background = 'transparent';}}, x.title || 'Sem título')), list.length ? null : h('div', {style: {color: c.muted, fontSize: 13, padding: 10}}, 'Nenhuma página com esse nome.'))));
+  const row = (x: Entity, depth: number, sub = ''): any => {const kids = byParent.get(x.id) || [], isOpen = open[x.id] ?? depth === 0, me = x.id === exclude, ic = x.data?.icon;
+    return h('div', {key: x.id}, h('div', {role: 'treeitem', 'aria-expanded': kids.length ? isOpen : undefined, 'data-testid': 'picker-row', onMouseEnter: () => setHover(x.id), onMouseLeave: () => setHover(''),
+        style: {display: 'flex', alignItems: 'center', gap: 6, height: 36, paddingLeft: 8 + depth * 18, paddingRight: 10, borderRadius: 9, background: hover === x.id && !me ? c.input : 'transparent', opacity: me ? 0.45 : 1}},
+      kids.length && !q ? h('button', {type: 'button', 'aria-label': isOpen ? 'Fechar ' + (x.title || '') : 'Abrir ' + (x.title || ''), onClick: () => setOpen(o => ({...o, [x.id]: !isOpen})), style: {width: 20, height: 20, border: 0, padding: 0, background: 'transparent', color: c.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s'}},
+        h('svg', {width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, 'aria-hidden': true}, h('path', {d: 'M9 6l6 6-6 6'}))) : h('span', {style: {width: 20, flexShrink: 0}}),
+      h('button', {type: 'button', disabled: me, title: me ? 'É este quadro' : undefined, onClick: () => onPick(x), style: {flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: '100%', border: 0, padding: 0, background: 'transparent', color: c.text, cursor: me ? 'default' : 'pointer', fontSize: 14, fontFamily: 'inherit', textAlign: 'left'}},
+        isEmojiIcon(ic) ? h('span', {style: {width: 20, textAlign: 'center', fontSize: 16, lineHeight: 1}}, String(ic)) : <Icon name="book" size={17} color={c.muted} />,
+        h('span', {style: {flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column'}}, h('span', {style: {whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: depth === 0 ? 600 : 500}}, x.title || 'Sem título'),
+          sub ? h('span', {style: {color: c.muted, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, sub) : null),
+        x.data?.lock_json ? <Icon name="lock" size={13} color={c.warn} /> : null)),
+      kids.length && isOpen && !q ? kids.map(k => row(k, depth + 1)) : null);};
+  const found = q.trim() ? live.filter(x => String(x.title || '').toLowerCase().includes(q.trim().toLowerCase())).slice(0, 60) : null;
+  return h('div', {'data-board-ui': '1', onPointerDown: (e: any) => {e.stopPropagation(); if (e.target === e.currentTarget) onClose();}, style: {position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60}},
+    h('div', {role: 'dialog', 'aria-label': title, 'data-testid': 'board-page-picker', style: {width: 560, maxWidth: 'calc(100% - 32px)', maxHeight: '76%', display: 'flex', flexDirection: 'column', gap: 12, padding: 20, boxSizing: 'border-box', borderRadius: 18, background: c.surface, border: '1px solid ' + c.line, boxShadow: '0 24px 60px rgba(0,0,0,.5)'}},
+      h('div', {style: {display: 'flex', alignItems: 'center', gap: 8}}, h('div', {style: {flex: 1, color: c.text, fontSize: 18, fontWeight: 700}}, title),
+        h('button', {type: 'button', 'aria-label': 'Fechar', onClick: onClose, style: {width: 32, height: 32, border: 0, borderRadius: 8, background: 'transparent', color: c.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}, <Icon name="close" size={16} color={c.muted} />)),
+      h('div', {style: {color: c.muted, fontSize: 12, lineHeight: 1.5, marginTop: -6}}, hint),
+      extra ? h('button', {type: 'button', onClick: extra.run, style: {alignSelf: 'flex-start', border: 0, background: 'transparent', color: c.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, fontFamily: 'inherit'}}, extra.label) : null,
+      h('label', {style: {display: 'flex', alignItems: 'center', gap: 8, height: 42, boxSizing: 'border-box', padding: '0 12px', borderRadius: 10, border: '1px solid ' + c.line, background: c.input}},
+        <Icon name="search" size={16} color={c.muted} />,
+        h('input', {autoFocus: true, value: q, onChange: (e: any) => setQ(e.target.value), placeholder: 'Buscar página', 'aria-label': 'Buscar página', style: {flex: 1, minWidth: 0, height: 40, border: 0, outline: 'none', background: 'transparent', color: c.text, fontSize: 14, fontFamily: 'inherit', padding: 0}})),
+      h('div', {role: 'tree', style: {flex: 1, minHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain', margin: '0 -6px', padding: '0 6px'}},
+        found ? (found.length ? found.map(x => row(x, 0, pathOf(x))) : h('div', {style: {color: c.muted, fontSize: 13, padding: 10}}, 'Nenhuma página com esse nome.')) : (byParent.get('') || []).map(x => row(x, 0)))));
 }

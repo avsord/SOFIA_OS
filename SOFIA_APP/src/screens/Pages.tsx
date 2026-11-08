@@ -79,7 +79,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 0.3.251 (computador): barra e capa na largura toda; o texto fica numa coluna de leitura centralizada
  const desktop=useDesktop();
  const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>api.pageOrderApply(cachedPageRows(api)||[])||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false),[pageMenu,setPageMenu]=useState(false);
- const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
+ const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined),[templateHere,setTemplateHere]=useState(false),setLayoutRef=useRef<(v:'board'|'notes')=>void>(()=>undefined); /* 08/11/2026: true = 'Usar um modelo nesta pagina' (aplica aqui); false = cria subpagina com o template */
  // 0.3.256: as paginas nunca aparecem fora da ordem escolhida (antes "sambavam" ao abrir): ate a ordem guardada no
  // aparelho ser lida, a lista mostra o esqueleto com shimmer; depois ja aparece no lugar certo
  const [orderReady,setOrderReady]=useState(()=>api.pageOrderReady);
@@ -174,7 +174,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
- const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
+ const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){if((p.tags||[]).includes('board-copy'))continue; /* 08/11/2026 (Pedro): copia que entrou num Quadro nao aparece duplicada nas listas */const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
  // 06/11/2026 (pagina com senha): Maxima tranca ao sair da pagina (subpagina da mesma chave nao conta como sair); Media
  // conta 5 min. Com a chave aberta, o texto e decifrado em segundo plano e entra no editor.
@@ -730,9 +730,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80}}>{/* 07/11/2026 (Pedro: esqueleto na estrutura real): Recentes + lista, igual ao esqueleto da aba */}<PagesLoadingBody/></View>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Um lugar para ideias, roteiros e anotações. Toque em + para começar.")}/>:null}
   </>}/>;
- const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
-  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}
-  onBoard={Platform.OS==='web'&&desktop&&BOARD_SUPPORTED?()=>void create(createParent||undefined,undefined,'board'):undefined}/>;
+ const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>{setCreateParent(undefined);setTemplateHere(false);}}
+  // 08/11/2026 (Pedro: "quando coloco um template ele nao cria uma subpagina, joga naquela pagina"): so "Usar um modelo nesta
+  // pagina" (e o Modelos de "Comece a usar") aplica na propria pagina; o resto cria uma subpagina com o template
+  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)applyTemplate(template);else void create(createParent||undefined,template);}}
+  onBoard={Platform.OS==='web'&&desktop&&BOARD_SUPPORTED?()=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)setLayoutRef.current('board');else void create(createParent||undefined,undefined,'board');}:undefined}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada
@@ -759,11 +761,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 08/11/2026 (Pedro: paginas guardam versoes): Versoes anteriores no menu da pagina (computador e celular)
  // 08/11/2026 (Pedro: Pagina Quadro): a mesma pagina, com os blocos soltos num quadro com zoom (so no site, no computador)
  const isBoard=Platform.OS==='web'&&desktop&&BOARD_SUPPORTED&&draft.appearance.layout==='board';
- const setLayout=(v:'board'|'notes')=>{edit(d=>({...d,appearance:{...d.appearance,layout:v}}),'layout');void store.flush(selected.id);};
+ const setLayout=(v:'board'|'notes')=>{edit(d=>({...d,appearance:{...d.appearance,layout:v}}),'layout');void store.flush(selected.id);};setLayoutRef.current=setLayout;
  // toda duplicacao e independente (Pedro, 08/11): pagina trazida para o quadro vira uma copia nova, filha do quadro
  const copyPage=async(src:Entity)=>{if(isLocked(src))throw Error('Página trancada não pode ser copiada para o quadro. Tire a senha dela antes.');
   const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
-  const saved=await api.saveEntity({kind:'user_page',title:(src.title||'Sem título')+' (cópia)',content:'',area:selected.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
+  const saved=await api.saveEntity({kind:'user_page',title:(src.title||'Sem título')+' (cópia)',content:'',area:selected.area||'Pessoal',privacy:'private',state:'active',tags:['board-copy'],data:{
    icon:src.data?.icon||'',icon_mode:src.data?.icon_mode||'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:selected.id,node_type:'page',blocks_json:blocks}});
   mutationEpoch.current++;setPages(old=>[...old,saved]);return saved;};
  const copyInto=async(copy:Entity,src:Entity)=>{if(isLocked(src))throw Error('A original está trancada.');const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
@@ -771,7 +773,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const boardView=isBoard?<PageBoard api={api} pageId={selected.id} blocks={draft.blocks} locked={!!lk} pages={pages} title={draft.title} onTitle={(v:string)=>edit(d=>({...d,title:v}),'title')}
   edit={(fn:(b:PageBlock[])=>PageBlock[],group='')=>edit(d=>({...d,blocks:fn(d.blocks)}),group)} flush={()=>void store.flush(selected.id)}
   onOpenPage={(pg:Entity)=>open(pg)} copyPage={copyPage} copyInto={copyInto} pickFiles={()=>pickFiles(null)} createDoc={()=>void createDoc(null,'docx')}
-  dropFiles={(files:File[])=>void dropFiles(null,files)} pasteClip={(clip:any)=>void pasteClipBlocks(null,clip)} onError={(m:string)=>setError(m)}/>:null;
+  dropFiles={(files:File[])=>void dropFiles(null,files)} pasteClip={(clip:any)=>void pasteClipBlocks(null,clip)} onError={(m:string)=>setError(m)}
+  onPageChanged={(id:string)=>void api.entity(id).then(e=>{mutationEpoch.current++;setPages(old=>old.map(x=>x.id===e.id?e:x));}).catch(()=>undefined)}/>:null;
  const pageItems:{label:string;icon:any;run:()=>void;danger?:boolean}[]=[...(BOARD_SUPPORTED&&Platform.OS==='web'&&desktop?[isBoard?{label:'Ver como página',icon:'listView',run:()=>setLayout('notes')}:{label:'Ver como quadro',icon:'gridView',run:()=>setLayout('board')}]:[]),...lockItems,{label:'Versões anteriores…',icon:'history',run:()=>setVersionsOpen(true)}];
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
@@ -796,14 +799,14 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     <IconButton name="more" label="Opções da página" size={34} onPress={()=>{if(!desktop){setPageMenu(true);return;}
      // 0.3.267 (computador): menu pequeno junto do ⋯, como no Notion (antes: painel de baixo na largura toda)
      const vw=typeof window!=='undefined'?window.innerWidth:1200,imageCoverNow=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id,blk=focus?draft.blocks.find(x=>x.id===focus):undefined;
-     openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)},{label:'Usar um modelo nesta página',icon:'grid',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
+     openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)},{label:'Usar um modelo nesta página',icon:'grid',run:()=>{setTemplateHere(true);setCreateParent(selected);}},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
       ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),...pageItems,{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
    </View>
   </View>
   {/* 0.3.230: opcoes da pagina no ⋯ do topo, como no Notion (antes: icones soltos e "segure para excluir" nos blocos) */}
   <Sheet visible={pageMenu} onClose={()=>setPageMenu(false)} label="Fechar opções da página">
    <Text style={{fontSize:20,fontWeight:'600',color:c.text,marginBottom:12}}>{selected.title||'Página'}</Text>
-   <Button title="Nova subpágina ou template" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setCreateParent(selected),120);}}/><View style={{height:8}}/>
+   <Button title="Nova subpágina ou template" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>{setTemplateHere(false);setCreateParent(selected);},120);}}/><View style={{height:8}}/>
    <Button title="Ícone" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('icon'),120);}}/><View style={{height:8}}/>
    <Button title={hasCover?'Alterar capa':'Adicionar capa'} secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('cover'),120);}}/>
    {draft.appearance.cover_type==='attachment'&&draft.appearance.cover_attachment_id?<><View style={{height:8}}/><Button title="Reposicionar capa" secondary onPress={()=>{setPageMenu(false);setTimeout(startCoverMove,120);}}/></>:null}
@@ -824,7 +827,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
      {[{label:'Pedir à Sofia',icon:'sofia' as const,run:()=>{const first=draft.blocks[0];if(first){setFocus(first.id);placeCaret(first.id,0);setAiText('');setAi({id:first.id,busy:false,error:''});}}},
        ...PAGE_TEMPLATES.map(t=>({label:t.title,icon:undefined,glyph:t.icon,run:()=>applyTemplate(t)})),
-       ...(BOARD_SUPPORTED&&Platform.OS==='web'?[{label:'Quadro',icon:'gridView' as const,run:()=>setLayout('board')}]:[]),{label:'Modelos',icon:'grid' as const,run:()=>setCreateParent(selected)}].map((x:any)=><Pressable key={x.label} accessibilityRole="button" accessibilityLabel={x.label} onPress={x.run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:34,paddingHorizontal:14,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
+       ...(BOARD_SUPPORTED&&Platform.OS==='web'?[{label:'Quadro',icon:'gridView' as const,run:()=>setLayout('board')}]:[]),{label:'Modelos',icon:'grid' as const,run:()=>{setTemplateHere(true);setCreateParent(selected);}}].map((x:any)=><Pressable key={x.label} accessibilityRole="button" accessibilityLabel={x.label} onPress={x.run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:34,paddingHorizontal:14,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
       {x.icon?<Icon name={x.icon} size={15} color={x.icon==='sofia'?c.accent:c.muted}/>:<Text style={{fontSize:13}}>{x.glyph}</Text>}<Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>{x.label}</Text></Pressable>)}
     </View>
    </View>

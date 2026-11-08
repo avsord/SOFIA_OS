@@ -251,6 +251,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 - **Quadro: duplicação sempre independente (08/11, Pedro):** página trazida ou duplicada no quadro vira cópia nova; sincronizar com a original só quando a pessoa clica. Páginas guardam versões (voltar sem perder nada).
 
+- **Quadro (08/11, Pedro):** o cartão de página é a página de verdade dentro do quadro (`/paginas/<id>?embed=1`, site sem barras; X-Frame-Options SAMEORIGIN + frame-ancestors 'self' só no site); cópias trazidas ao quadro levam a etiqueta `board-copy` e não aparecem nas listas de Páginas; apagar uma página citada só dentro do conteúdo de outra (cartão, link, menção) é permitido e o cartão sai; template aplica na própria página só em "Usar um modelo nesta página"/"Modelos", o resto cria subpágina.
+
 ## 8. Regras que não se quebram
 - **Drive (07/11):** antes de mexer no Drive e depois de publicar, ler `[drive-teste]` e `[drive]` no registro do Railway; defeito que aparecer ali se corrige sem esperar o Pedro relatar.
 - **Drive — laboratório obrigatório (07/11):** o portão (`tools/release-check.cjs`) agora roda `tools/drive-lab/run-all.cjs`: servidor de verdade + Google Drive fiel (`fake-google.cjs`: Docs nativos, atalhos, compartilhados, 250 arquivos, vídeo/áudio reais, área da Sofia), 48 sondas (`api-probe.cjs`) e robô de 49 passos na tela (`robot.cjs`). Caso novo que o Google real mostrar entra primeiro no laboratório (sonda/robô), depois a correção. Nunca testar o Drive só com respostas simuladas na página.
@@ -367,11 +369,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-07 | (delivery) | Drive flutuante (barra de cima), telas de senha iguais (LockFrame), colar/copiar com negrito/itálico nas Páginas, barra da imagem pequena inteira; APK: esqueleto parado no app, teste da semente e da base corrigidos | colar formatado 1 e várias linhas ok (e após recarregar); Drive flutuante: 14 itens, mover, 4 cantos, colar na página, lembra lugar, Esc fecha; portão 14/14 |
 | 2026-11-08 | (delivery) | Página Quadro (entrega 1: zoom, mover, cantos, notas, lista, desenho, áudio, arquivos, Word no lugar, página como cópia + sincronizar) e Versões das páginas | robô do quadro 17/17, versões ok (voltou para a 1ª e manteve após recarregar), trancada ok, portão 14/14; APK 0.3.266 verde (run 42428422862) |
 | 2026-11-08 | (delivery) | Quadro: cartões vivos (Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca), Pedir à Sofia, busca Ctrl+F, quadro só leitura no compartilhado | robô do quadro 22/22 (tarefa marcada pelo cartão ficou done no app), compartilhado 2/2 + zoom no navegador, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro fechado: linhas-guia, legenda, mencionar, ligação com seta/texto, link vira prévia, pinça no celular, anexo de e-mail vira cartão (Gmail/IMAP sob pedido) | robô do quadro 30/30, teste de anexos (Gmail simulado) ok, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro com o método do Drive: robôs no portão (etapa 5), registro [quadro] do site e teste de produção [quadro-teste] a cada versão | teste de produção no laboratório 8/8 (apaga tudo no fim), portão 18/18 |
+| 2026-11-08 | (delivery) | Quadro: página de verdade no cartão (iframe da própria Sofia, dois cliques usa), 0 no centro + botão recentralizar, janela de páginas igual à barra lateral, rodinha na janela não dá zoom, arrastar não seleciona texto, Quadro em Templates, template cria subpágina, cópias fora das listas, excluir cópia sem trava | robô do quadro 39/39, teste de exclusão ok, portão 18/18 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

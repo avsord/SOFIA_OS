@@ -27,9 +27,13 @@ export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate,o
       </Pressable>:null}
       <Pressable accessibilityRole="button" accessibilityLabel="Usar template de conteúdo" onPress={()=>setMode('templates')} style={{padding:16,borderRadius:14,backgroundColor:c.accentSoft,borderWidth:1,borderColor:c.accent}}>
        <Text style={{fontSize:18,fontWeight:'600',color:c.accent}}>▦ Usar template</Text>
-       <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Kanban, Notas ou Formulário.</Text>
+       <Text style={{fontSize:12,color:c.muted,marginTop:5}}>{onBoard?'Quadro, Kanban, Notas ou Formulário.':'Kanban, Notas ou Formulário.'}</Text>
       </Pressable>
     </View>:<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:10,paddingBottom:10}}>
+      {/* 08/11/2026 (Pedro: "template de quadro tem que estar aqui com eles") */}
+      {onBoard?<Pressable accessibilityRole="button" accessibilityLabel="Aplicar template Quadro" testID="template-board" onPress={()=>{close();onBoard();}} style={{padding:15,borderRadius:14,backgroundColor:c.input,borderWidth:1,borderColor:c.line,flexDirection:'row',gap:12,alignItems:'center'}}>
+       <Text style={{fontSize:32}}>🗺️</Text><View style={{flex:1}}><Text style={{fontSize:16,fontWeight:'600',color:c.text}}>Quadro</Text><Text style={{fontSize:12,lineHeight:17,color:c.muted,marginTop:3}}>Livre, com zoom: fotos, arquivos, notas, Word e páginas soltos onde você quiser.</Text></View>
+      </Pressable>:null}
       {PAGE_TEMPLATES.map(template=><Pressable key={template.id} accessibilityRole="button" accessibilityLabel={'Aplicar template '+template.title}
        onPress={()=>{close();onTemplate(template);}} style={{padding:15,borderRadius:14,backgroundColor:c.input,borderWidth:1,borderColor:c.line,flexDirection:'row',gap:12,alignItems:'center'}}>
        <Text style={{fontSize:32}}>{template.icon}</Text><View style={{flex:1}}><Text style={{fontSize:16,fontWeight:'600',color:c.text}}>{template.title}</Text><Text style={{fontSize:12,lineHeight:17,color:c.muted,marginTop:3}}>{template.description}</Text></View>

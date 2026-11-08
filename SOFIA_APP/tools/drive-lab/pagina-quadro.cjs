@@ -43,12 +43,27 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  // andar arrastando o fundo
  const b4=await n.boundingBox(); await page.mouse.move(bb.x+1150,bb.y+130); await page.mouse.down(); await page.mouse.move(bb.x+1050,bb.y+80,{steps:5}); await page.mouse.up(); await page.waitForTimeout(300);
  const b5=await n.boundingBox(); ok(Math.abs(b5.x-b4.x+100)<6,'arrastar o fundo anda pelo quadro');
+ {await page.mouse.move(bb.x+80,bb.y+300); await page.mouse.down(); await page.mouse.move(bb.x+700,bb.y+40,{steps:8}); await page.mouse.up(); await page.waitForTimeout(200); const selTxt=await page.evaluate(()=>String(window.getSelection()||'')); ok(selTxt==='','arrastar o fundo não seleciona texto (título, cartões)'); await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300);}
  // duplicar (Ctrl+D) e apagar
  await n.click({position:{x:12,y:12}}); await page.keyboard.press('Control+d'); await page.waitForTimeout(500); ok((await items().count())===4,'Ctrl+D duplica');
  await page.keyboard.press('Delete'); await page.waitForTimeout(400); ok((await items().count())===3,'Delete apaga');
  // pagina existente: entra como copia, sincronizar
- await page.getByTestId('board-add-page').click(); await page.waitForTimeout(500); await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(2500);
- const pc=page.locator('[data-testid=board-item][data-type=page_link]'); ok(await pc.count()===1 && /Cópia/.test(await pc.innerText()) && /linha da original/.test(await pc.innerText()),'página entra como cópia com o conteúdo');
+ await page.getByTestId('board-add-page').click(); await page.waitForTimeout(500);
+ {const z0=await page.getByTestId('board-zoom').innerText(); const pb=await page.getByTestId('board-page-picker').boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+pb.height-60); await page.mouse.wheel(0,400); await page.waitForTimeout(300);
+  ok(await page.getByTestId('board-zoom').innerText()===z0,'rodinha em cima da janela não mexe no zoom do quadro'); await page.screenshot({path:O+'picker.png'});} await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(2500);
+ const pc=page.locator('[data-testid=board-item][data-type=page_link]'); ok(await pc.count()===1 && /Cópia/.test(await pc.innerText()),'página entra como cópia');
+ ok(!/\(cópia\)/.test(await page.getByTestId('sidebar-page-tree').innerText().catch(()=>'')),'cópia do quadro não aparece duplicada na lista de Páginas');
+ // 08/11 (Pedro: "como um iframe dessas paginas"): o cartao mostra a pagina de verdade, sem as barras do site
+ {const fr=pc.locator('iframe[data-testid=board-page-frame]'); await fr.waitFor({timeout:15000}); const fh=await fr.elementHandle(); const f=await fh.contentFrame();
+  await f.waitForSelector('[contenteditable="true"]',{timeout:20000}).catch(()=>null); await page.waitForTimeout(1500);
+  const inner=await f.evaluate(()=>({txt:document.body.innerText,side:!!document.querySelector('[data-testid="desktop-sidebar"]')&&getComputedStyle(document.querySelector('[data-testid="desktop-sidebar"]')).display!=='none'}));
+  ok(/linha da original/.test(inner.txt)&&!inner.side,'cartão mostra a página de verdade, sem barra lateral');
+  ok(await fr.evaluate(e=>getComputedStyle(e).pointerEvents)==='none','parado: a página só aparece (o quadro move e seleciona)');
+  await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(800);
+  ok(await page.locator('iframe[data-testid=board-page-frame]').first().evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','dois cliques: entra na página para usar');
+  const ed=await f.$('[contenteditable="true"]'); if(ed){await ed.click(); await f.evaluate(()=>{});} await page.keyboard.type(' +editado no quadro'); await page.waitForTimeout(2500);
+  await page.getByTestId('board-page-done').click(); await page.waitForTimeout(1500);
+  ok(/editado no quadro/.test(await f.evaluate(()=>document.body.innerText)),'editou a página dentro do cartão');}
  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(600); ok(/Sincronizada/.test(await pc.innerText()),'sincronizar liga a original');
  // desenho
  await page.getByTestId('board-draw').click(); await page.mouse.move(bb.x+200,bb.y+600); await page.mouse.down(); await page.mouse.move(bb.x+260,bb.y+640,{steps:5}); await page.mouse.move(bb.x+330,bb.y+600,{steps:5}); await page.mouse.up(); await page.getByTestId('board-draw').click(); await page.waitForTimeout(400);
@@ -71,6 +86,12 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  const nt=items().first(); await nt.click({position:{x:12,y:12}}); await page.getByTestId('board-ask').click(); await page.getByLabel('Pedido para a Sofia').fill('resume'); await page.getByTestId('board-ask-go').click(); await page.waitForTimeout(4000);
  ok(/Pedindo|pensando|nota ao lado|[A-Za-z]/.test(await page.getByTestId('board-ask-box').innerText().catch(()=>'fechou')),'pedir à Sofia envia (no laboratório não há a Sofia: mostra o aviso)');
  await page.keyboard.press('Escape');
+ // 08/11 (Pedro: ponto central): 0 no centro e botao de recentralizar
+ ok(await page.getByTestId('board-origin').count()===1,'marca do centro (0) no quadro');
+ await page.mouse.move(bb.x+1150,bb.y+130); await page.mouse.down(); await page.mouse.move(bb.x+600,bb.y+500,{steps:6}); await page.mouse.up();
+ await page.getByTestId('board-center').click(); await page.waitForTimeout(300);
+ {const o=await page.getByTestId('board-origin').boundingBox(); ok(Math.abs(o.x-(bb.x+bb.width/2))<40&&Math.abs(o.y-(bb.y+bb.height/2))<40,'botão de centro traz o 0 para o meio da tela');}
+ await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(400);
  // 08/11 itens finais: linhas-guia, legenda, mencionar, ligacao com seta e texto, link vira previa, pinca
  {const its=items(); const A=await its.nth(0).boundingBox(), Bb=await its.nth(1).boundingBox();
   await page.evaluate(([x,y])=>{document.querySelectorAll('[data-dbg]').forEach(e=>e.removeAttribute('data-dbg'));const e=document.elementFromPoint(x,y)?.closest('[data-board-item]');if(e)e.setAttribute('data-dbg','1');},[Bb.x+10,Bb.y+10]);
