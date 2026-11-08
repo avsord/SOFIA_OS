@@ -88,7 +88,7 @@ async function main() {
     // 08/11/2026 (Pedro: "faz o mesmo metodo pro quadro"): Paginas no laboratorio - quadro inteiro, versoes e pagina trancada
     if (!process.argv.includes('--sem-quadro')) {
       console.log('\n5) Paginas no laboratorio (servidor de verdade: Quadro, versoes, pagina trancada)');
-      for (const [file, okRe, label] of [['pagina-quadro.cjs', /QUADRO OK/, 'Quadro'], ['paginas-versoes.cjs', /VERSOES OK/, 'Versões das páginas'], ['pagina-trancada-shift-enter.cjs', /PAGINA TRANCADA OK/, 'Página trancada'], ['quadro-selftest-lab.cjs', /QUADRO-TESTE OK/, 'Teste de produção do Quadro (no laboratório)']]) {
+      for (const [file, okRe, label] of [['pagina-quadro.cjs', /QUADRO OK/, 'Quadro'], ['quadro-anexo-word.cjs', /QUADRO-WORD OK/, 'Quadro: anexo Word'], ['paginas-versoes.cjs', /VERSOES OK/, 'Versões das páginas'], ['pagina-trancada-shift-enter.cjs', /PAGINA TRANCADA OK/, 'Página trancada'], ['quadro-selftest-lab.cjs', /QUADRO-TESTE OK/, 'Teste de produção do Quadro (no laboratório)']]) {
         const r = spawnSync(process.execPath, [path.join(APP, 'tools/drive-lab', file)], {encoding: 'utf8', timeout: 12 * 60000});
         const out = (r.stdout || '') + (r.stderr || ''), tail = (out.match(/\(\d+ verificacoes\)/) || [''])[0];
         okRe.test(out) ? pass(label + ' sem falhas ' + tail) : fail(label + ': ' + out.split('\n').filter(l => /^FALHA|✗/.test(l)).slice(0, 10).join('\n'));

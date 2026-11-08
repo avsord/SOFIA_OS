@@ -94,7 +94,7 @@ export function PageBoard(p: Props) {
   void viewKey;
   const [sel, setSel] = useState<string[]>([]), [editing, setEditing] = useState<string | null>(null), [live, setLive] = useState<Record<string, Geo>>({});
   const liveRef = useRef(live); liveRef.current = live;
-  const [box, setBox] = useState<{x: number; y: number; w: number; h: number} | null>(null), [mode, setMode] = useState<'' | 'draw' | 'link'>(''), [ink, setInk] = useState<{x: number; y: number}[] | null>(null);
+  const [box, setBox] = useState<{x: number; y: number; w: number; h: number} | null>(null), [mode, setMode] = useState<'' | 'draw' | 'link' | 'hand'>(''), [ink, setInk] = useState<{x: number; y: number}[] | null>(null);
   const [guides, setGuides] = useState<{x?: number; y?: number}>({}), [selLink, setSelLink] = useState<{from: string; to: string} | null>(null), [capEdit, setCapEdit] = useState<string | null>(null), [mention, setMention] = useState<{id: string; mode: 'page' | 'app'} | null>(null);
   const pinching = useRef(false), [mailAtt, setMailAtt] = useState<{card: string; hit: string; items: {part: string; name: string; mime: string; bytes: number}[] | null; err: string; busy: string} | null>(null);
   const [livePick, setLivePick] = useState(false), [ask, setAsk] = useState<{q: string; busy: boolean; err: string} | null>(null), [find, setFind] = useState<{q: string; i: number} | null>(null);
@@ -163,9 +163,14 @@ export function PageBoard(p: Props) {
       const nv = {z, x: a.mx - (a.mx - v.x) * (z / v.z), y: a.my - (a.my - v.y) * (z / v.z)}; viewRef.current = nv; setView(nv); if (near) zoomAnim.current = null; else requestAnimationFrame(step);};
     requestAnimationFrame(step);};
   const wheelZoom = (dy: number, cx: number, cy: number) => {const r = host.current?.getBoundingClientRect(); if (!r) return; const d = Math.max(-60, Math.min(60, dy)), base = zoomAnim.current?.z ?? viewRef.current.z; zoomTo(base * Math.exp(-d * 0.0018), cx - r.left, cy - r.top);};
+  const lastBoardWheel = useRef(0);
   const panFrom = (sx: number, sy: number) => {const v0 = viewRef.current; zoomAnim.current = null; return (x: number, y: number) => {const nv = {...viewRef.current, x: v0.x + x - sx, y: v0.y + y - sy}; viewRef.current = nv; setView(nv);};};
   useEffect(() => {const el = host.current; if (!el) return;
-    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault();
+    // 08/11/2026 (Pedro: "quando eu tiver movendo ainda as vezes confunde o scroll movimentando o conteudo, tem que travar"):
+    // arrastando (item, fundo ou rodinha segurada) ou no meio de um giro de rodinha que ja estava andando o quadro, a rodinha
+    // continua no quadro mesmo passando por cima de uma janela; o conteudo das janelas so rola num giro que comecou nele.
+    const on = (e: WheelEvent) => {const t = e.target as HTMLElement, now = performance.now(), boardGesture = el.hasAttribute('data-board-drag') || now - lastBoardWheel.current < 700;
+      if (!boardGesture && t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); lastBoardWheel.current = now;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
       if (e.ctrlKey || e.metaKey) {e.stopPropagation(); wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;} // 08/11 (Pedro): Ctrl+rodinha SO da zoom no quadro (nada rola, nem a janela por baixo)
       const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
@@ -207,8 +212,8 @@ export function PageBoard(p: Props) {
       const up = () => {setBox(null); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); return;}
     let moved = false;
-    const mv = (ev: PointerEvent) => {if (pinching.current) return; const dx = ev.clientX - sx, dy = ev.clientY - sy; if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return; moved = true; setView({...v0, x: v0.x + dx, y: v0.y + dy});};
-    const up = () => {if (!moved) {setSel([]); setSelLink(null); if (mode === 'link') setMode('');} window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
+    const mv = (ev: PointerEvent) => {if (pinching.current) return; const dx = ev.clientX - sx, dy = ev.clientY - sy; if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return; if (!moved) dragOn(); moved = true; setView({...v0, x: v0.x + dx, y: v0.y + dy});};
+    const up = () => {if (!moved) {setSel([]); setSelLink(null); if (mode === 'link') setMode('');} dragOff(); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
   const onBgDouble = (e: any) => {const t = e.target as HTMLElement; if (t.closest('[data-board-item],[data-board-ui]')) return; const at = toBoard(e.clientX, e.clientY);
@@ -284,6 +289,18 @@ export function PageBoard(p: Props) {
   };
 
   // teclado (com o foco no quadro, fora de edicao)
+  // 08/11/2026 (Pedro: "a letra H vira a maozinha pra arrastar o mapa: com ela so arrasta, clicar em qualquer coisa fica bloqueado"):
+  // H liga/desliga a maozinha (Esc ou V tambem desligam). Com ela, qualquer clique no quadro so arrasta; nada e clicado nem editado.
+  useEffect(() => {const on = (e: KeyboardEvent) => {if (e.ctrlKey || e.metaKey || e.altKey) return; const a = document.activeElement as HTMLElement | null;
+      if (a && (a.tagName === 'IFRAME' || a.closest('input,textarea,select,[contenteditable="true"],[data-board-editing]'))) return; if (!host.current?.isConnected) return;
+      const k = e.key.toLowerCase(); if (k === 'h') {e.preventDefault(); setMode(m => m === 'hand' ? '' : 'hand'); setEditing(null);} else if ((k === 'v' || k === 'escape') && modeRef.current === 'hand') setMode('');};
+    window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, []);
+  const modeRef = useRef(mode); modeRef.current = mode;
+  const [grabbing, setGrabbing] = useState(false);
+  const handDown = (e: any) => {if (e.button !== 0 && e.button !== 1) return; e.preventDefault(); e.stopPropagation(); try {window.getSelection()?.removeAllRanges();} catch {}
+    dragOn(); setGrabbing(true); const go = panFrom(e.screenX, e.screenY), mv = (ev: PointerEvent) => go(ev.screenX, ev.screenY),
+      up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff(); setGrabbing(false);};
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);};
   const onKey = (e: any) => {
     const t = e.target as HTMLElement; if (t.closest('input,textarea,[contenteditable="true"],[data-board-editing]')) {if (e.key === 'Escape') {setEditing(null); setAsk(null); host.current?.focus();} return;}
     const mod = (e.ctrlKey || e.metaKey) && !e.altKey, k = e.key;
@@ -346,7 +363,7 @@ export function PageBoard(p: Props) {
 
   // so desenha o que esta na tela (com folga de meia tela)
   const vis = useMemo(() => {const v = view, mx = size2.w / v.z / 2, my = size2.h / v.z / 2, x1 = -v.x / v.z - mx, y1 = -v.y / v.z - my, x2 = (size2.w - v.x) / v.z + mx, y2 = (size2.h - v.y) / v.z + my;
-    return shown.filter(b => {if (sel.includes(b.id) || editing === b.id) return true; const g = geo(b); return g.x < x2 && g.x + g.w > x1 && g.y < y2 && g.y + g.h > y1;}).sort((a, b) => (geo(a).z || 0) - (geo(b).z || 0));
+    return shown.filter(b => {if (sel.includes(b.id) || editing === b.id) return true; const g = geo(b); return g.x < x2 && g.x + g.w > x1 && g.y < y2 && g.y + g.h > y1;}); // 08/11 (Pedro: "trazer pra frente mexe no tamanho do texto"): ordem fixa; quem fica por cima e so o zIndex (reordenar recriava o conteudo das janelas)
   }, [shown, view, size2, live, sel, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   // 08/11/2026 (Pedro: "mudando de forma" no zoom): so muito afastado (< 15%) o conteudo vira resumo; antes, abaixo de 45%, a janela
   // do Word virava linha de arquivo e as imagens viravam caixa vazia no meio do zoom
@@ -396,6 +413,7 @@ export function PageBoard(p: Props) {
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
     h('style', null, '[data-board-drag] iframe{pointer-events:none!important}'),
+    mode === 'hand' ? h('div', {key: 'hand', 'data-testid': 'board-hand', title: 'Mãozinha (H): arrastar o quadro. Aperte H ou Esc para voltar', onPointerDown: handDown, onDoubleClick: (e: any) => e.stopPropagation(), style: {position: 'absolute', inset: 0, zIndex: 29, cursor: grabbing ? 'grabbing' : 'grab', touchAction: 'none'}}) : null,
     // camada do quadro: anda (translate) e cresce (scale) sem nunca mudar o desenho por dentro (ver comentario do zoom no topo)
     h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'} as any},
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
@@ -486,6 +504,9 @@ export function PageBoard(p: Props) {
 }
 
 function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove}: any) {
+  // 08/11/2026 (Pedro: "eu digito, ele salva e da um pulo nos conteudos"): o salvamento automatico cria um anexo novo e antes o
+  // editor recebia esse anexo e recarregava inteiro (pulo). O editor fica com o arquivo de quando abriu e so grava por tras.
+  const editBase = useRef(''); if (b.type === 'file' && !editBase.current && b.data?.attachment_id) editBase.current = String(b.data.attachment_id);
   const c = useTheme(), k = b.type === 'file' ? fileKind(b.data?.mime, b.data?.name) : b.type === 'image' ? 'image' : 'other';
   const preview = b.type === 'file' && (b.data?.view || defaultView(k)) === 'preview';
   let body: any;
@@ -497,13 +518,16 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
   else if (b.type === 'file') {
     if (b.data?.uploading || !b.data?.attachment_id) body = <Loading c={c} label={'Enviando ' + (b.data?.name || 'arquivo') + '…'} />;
     else if ((editing || (isWin(b) && !light)) && editKind(b.data?.mime, b.data?.name) && !locked) body = h('div', {'data-board-editing': '1', style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: c.surface, borderRadius: 8, overflow: 'hidden'}, onPointerDown: (e: any) => {if (!(e.target as HTMLElement).closest?.('[data-board-handle]')) e.stopPropagation();}},
-      h('div', {'data-board-handle': '1', 'data-testid': 'board-file-head', title: 'Arraste por aqui para mover', style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted, cursor: 'grab'}}, h('span', {style: {flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Editando ' + (b.data?.name || '') + (b.data?.from_page ? ' · da página ' + (pages.find((x: Entity) => x.id === String(b.data.from_page))?.title || '') : '')), (() => {const fp = String(b.data?.from_page || ''), fb = String(b.data?.from_block || ''), cur = String(b.data?.attachment_id || ''), orig = String(b.data?.orig_attachment || '');
-          if (!fp || !fb || !orig || cur === orig || !patchPageBlock) return null; // 08/11 (Pedro): mexeu no anexo aberto da pagina? sincroniza com o anexo original so se quiser
-          return h('button', {type: 'button', 'data-testid': 'board-file-sync', title: 'Levar estas mudanças para o anexo original da página', onPointerDown: (e: any) => e.stopPropagation(),
-            onClick: () => void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: cur, name: b.data?.name, mime: b.data?.mime, size: b.data?.size}})).then(() => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), orig_attachment: cur}}))).catch(() => undefined),
-            style: {border: '1px solid ' + c.accent, background: 'transparent', color: c.accent, borderRadius: 7, padding: '3px 9px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap'}}, 'Sincronizar com o original');})(),
+      h('div', {'data-board-handle': '1', 'data-testid': 'board-file-head', title: 'Arraste por aqui para mover', style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted, cursor: 'grab'}}, h('span', {style: {flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Editando ' + (b.data?.name || '') + (b.data?.from_page ? ' · da página ' + (pages.find((x: Entity) => x.id === String(b.data.from_page))?.title || '') : '')), (() => {const fp = String(b.data?.from_page || ''), fb = String(b.data?.from_block || ''), cur = String(b.data?.attachment_id || '');
+          if (!fp || !fb || !patchPageBlock) return null; // 08/11 (Pedro): anexo aberto da pagina de um cartao: sincroniza com o anexo da pagina so quando ele quiser
+          // o original e o anexo que esta AGORA no bloco da pagina (serve tambem para janelas abertas antes desta versao)
+          let orig = String(b.data?.orig_attachment || ''); try {const pg = pages.find((x: Entity) => x.id === fp), bs = JSON.parse(String(pg?.data?.blocks_json || '[]')); const blk = (Array.isArray(bs) ? bs : []).find((x: any) => String(x?.id) === fb); if (blk?.data?.attachment_id) orig = String(blk.data.attachment_id);} catch {}
+          const same = !!orig && cur === orig;
+          return h('button', {type: 'button', 'data-testid': 'board-file-sync', disabled: same, title: same ? 'O anexo da página já está igual a esta janela' : 'Levar estas mudanças para o anexo original da página', onPointerDown: (e: any) => e.stopPropagation(),
+            onClick: () => {if (same) return; void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: cur, name: b.data?.name, mime: b.data?.mime, size: b.data?.size}})).then(() => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), orig_attachment: cur}}))).catch(() => undefined);},
+            style: {border: '1px solid ' + (same ? c.line : c.accent), background: 'transparent', color: same ? c.muted : c.accent, borderRadius: 7, padding: '3px 9px', fontWeight: 700, cursor: same ? 'default' : 'pointer', whiteSpace: 'nowrap'}}, same ? 'Sincronizado com o original' : 'Sincronizar com o original');})(),
         h('button', {type: 'button', 'data-testid': 'board-file-done', title: isWin(b) ? 'Fechar a janela (o arquivo fica no quadro como anexo; dois cliques abre de novo)' : undefined, onPointerDown: (e: any) => e.stopPropagation(), onClick: () => {if (isWin(b)) onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), window: false, board: {...(x.data?.board || {}), w: 280, h: 64}}})); onDone();}, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
-      h('div', {style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column'}}, <FileBody api={api} id={String(b.data.attachment_id)} firstId={String(b.data.attachment_id)} name={String(b.data?.name || '')} mime={String(b.data?.mime || '')} zoom={0} onZoom={() => {}} pageId={pageId}
+      h('div', {style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column'}}, <FileBody api={api} id={String(b.data.attachment_id)} firstId={editBase.current || String(b.data.attachment_id)} name={String(b.data?.name || '')} mime={String(b.data?.mime || '')} zoom={0} onZoom={() => {}} pageId={pageId}
         onSaved={(a: any) => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}))} />)); // 08/11 (Pedro): salvar fica so na janela; o anexo da pagina so muda com Sincronizar
     else if (preview && !light) body = h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: k === 'audio' ? c.surface : '#000', display: 'flex', alignItems: 'center'}},
       h('div', {style: {width: '100%', height: k === 'audio' ? 'auto' : '100%', pointerEvents: selected ? 'auto' : 'none'}, className: 'board-media'}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind={k} name={String(b.data?.name || '')} />));

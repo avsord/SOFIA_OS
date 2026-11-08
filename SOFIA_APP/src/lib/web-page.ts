@@ -39,6 +39,9 @@ export function installWebPage() {
   });
   // 0.3.263: a rodinha rola a area principal de qualquer lugar (antes, fora da caixa que rola, nada acontecia)
   document.addEventListener('wheel', e => {
+    // 08/11/2026 (Pedro: "o scroll confunde movimentando o conteudo"): no Quadro a rodinha e do quadro (ele ja tratou); antes isto rolava
+    // tambem o conteudo de uma janela (o Word) achando que era a area principal
+    if (e.defaultPrevented || (e.target as HTMLElement | null)?.closest?.('[data-testid="page-board"]')) return;
     let el = e.target as HTMLElement | null;
     while (el && el !== document.body) { const st = getComputedStyle(el); if (/(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 2) return; el = el.parentElement; }
     if (document.querySelector('[aria-modal="true"]')) return;

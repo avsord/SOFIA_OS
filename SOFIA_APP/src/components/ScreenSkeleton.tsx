@@ -1,6 +1,7 @@
 import React,{useContext} from 'react';
 import {Text,View,useWindowDimensions} from 'react-native';
 import {useTheme} from '../lib/theme';
+import {EMBED} from '../lib/embed';
 import {useDesktop,contentMaxWidth} from '../lib/desktop';
 import {ContentWidth,DESK_LEFT,dpx,edgePadding} from '../lib/content-width';
 import {LoadingLines,useSkeletonDelay,LoadingCaption,ShimmerBlock,ShimmerGroup} from './Loading';
@@ -20,7 +21,7 @@ const APP_COUNT=11;
 
 export function ScreenSkeleton({tab}:{tab:string}){
  const c=useTheme(),show=useSkeletonDelay();
- if(!show)return <View testID={'screen-wait-'+tab} style={{flex:1,backgroundColor:c.bg}}/>;
+ if(!show||EMBED)return <View testID={'screen-wait-'+tab} style={{flex:1,backgroundColor:c.bg}}/>; // 08/11/2026 (Pedro): dentro do cartao do Quadro, nunca esqueleto com brilho
  const body=tab==='agenda'?<AgendaSkeleton/>:tab==='chat'?<ChatSkeleton/>:tab==='pages'?<PagesSkeleton/>:tab==='apps'?<AppsSkeleton/>:tab==='profile'?<ProfileSkeleton/>:null;
  if(body)return <View testID={'screen-skeleton-'+tab} pointerEvents="none" accessibilityLabel={'Abrindo '+(TITLES[tab]||'')} style={{flex:1,backgroundColor:c.bg}}><ShimmerGroup>{body}</ShimmerGroup></View>;
  return <View testID={'screen-skeleton-'+tab} style={{flex:1,backgroundColor:c.bg,paddingHorizontal:20,paddingTop:48,gap:14}}>
