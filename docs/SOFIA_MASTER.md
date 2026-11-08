@@ -369,14 +369,15 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-08 | (delivery) | Quadro fechado: linhas-guia, legenda, mencionar, ligação com seta/texto, link vira prévia, pinça no celular, anexo de e-mail vira cartão (Gmail/IMAP sob pedido) | robô do quadro 30/30, teste de anexos (Gmail simulado) ok, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro com o método do Drive: robôs no portão (etapa 5), registro [quadro] do site e teste de produção [quadro-teste] a cada versão | teste de produção no laboratório 8/8 (apaga tudo no fim), portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro: página de verdade no cartão (iframe da própria Sofia, dois cliques usa), 0 no centro + botão recentralizar, janela de páginas igual à barra lateral, rodinha na janela não dá zoom, arrastar não seleciona texto, Quadro em Templates, template cria subpágina, cópias fora das listas, excluir cópia sem trava | robô do quadro 39/39, teste de exclusão ok, portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro abre afastado mostrando tudo (até 60%), fundo de grade de quadrados discreta (site e compartilhado), centro só com + e 0, título sem caixa | robô 39/39, portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro: cartão de página adaptado (arquivos em linha com selo, abrir/fechar anexo, clique abre a janela flutuante e edita; página inteira opcional), fundo/linhas exatos da referência (#252525, #2A2A2A a 22 px, #363636 a cada 4), quadro não rola sozinho ao focar | robô 42/42 |
+| 2026-11-08 | (delivery) | Quadro: página de verdade no cartão por padrão (um clique usa, arrasta pelo título), zoom nítido (CSS zoom), resumo opcional com Office pela janela; CORRIGIDO: página do cartão regravava rascunhos de outras páginas (rascunhos separados no ?embed) e Ctrl+Z do Chrome apagava o título | robô 44/44 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
+- **08/11: site dentro do site divide o armazenamento.** A página aberta num cartão do Quadro (`?embed=1`) usava a mesma chave de rascunhos do site e regravou o título de outra página. Qualquer coisa que abra o app dentro dele mesmo precisa de rascunhos/cache separados.
 - **07/11: esqueleto com brilho infinito no app quebra o teste do APK.** Aba escondida que ainda não abriu fica com o esqueleto rodando para sempre e o Android nunca vê a tela parada (`UI dump failed`). Já tinha acontecido em 03/11. No app o brilho agora para em ~6 s (`ShimmerGroup`); qualquer animação nova em loop precisa de fim no app.
 - Artefato do GitHub Actions dura 30 dias: nunca fixar `run-id` antigo como base de teste (07/11/2026: semente 0.3.60 sumiu e todo [manual-apk] falhou). Base durável = release publicada; semente = compilada na rodada.
 

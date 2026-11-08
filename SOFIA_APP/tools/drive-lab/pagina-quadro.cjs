@@ -51,10 +51,12 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  // pagina existente: entra como copia, sincronizar
  await page.getByTestId('board-add-page').click(); await page.waitForTimeout(500);
  {const z0=await page.getByTestId('board-zoom').innerText(); const pb=await page.getByTestId('board-page-picker').boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+pb.height-60); await page.mouse.wheel(0,400); await page.waitForTimeout(300);
-  ok(await page.getByTestId('board-zoom').innerText()===z0,'rodinha em cima da janela não mexe no zoom do quadro'); await page.screenshot({path:O+'picker.png'});} await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(2500);
+  ok(await page.getByTestId('board-zoom').innerText()===z0,'rodinha em cima da janela não mexe no zoom do quadro'); await page.screenshot({path:O+'picker.png'});} await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título',exact:true}).first().click(); await page.waitForTimeout(2500);
  const pc=page.locator('[data-testid=board-item][data-type=page_link]'); ok(await pc.count()===1 && /Cópia/.test(await pc.innerText()),'página entra como cópia');
  ok(!/\(cópia\)/.test(await page.getByTestId('sidebar-page-tree').innerText().catch(()=>'')),'cópia do quadro não aparece duplicada na lista de Páginas');
  // 08/11 (Pedro: "versao adaptada"): resumo da pagina - arquivo em linha, abrir/fechar o anexo, clicar abre a janela flutuante
+ await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(500);
+ await pc.click({position:{x:60,y:20}}); await page.getByTestId('board-page-view').click(); await page.waitForTimeout(800);
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); {const pb=await pc.boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+40); await page.mouse.wheel(0,-250); await page.waitForTimeout(400); const pb2=await pc.boundingBox(); if(pb2.y+pb2.height>bb.y+bb.height-120){await page.mouse.move(bb.x+40,bb.y+200); await page.mouse.down(); await page.mouse.move(bb.x+40,bb.y+200-(pb2.y+pb2.height-(bb.y+bb.height-140)),{steps:5}); await page.mouse.up();}}
  ok(/linha da original/.test(await pc.innerText()) && await pc.getByTestId('page-card-file').count()===1,'cartão mostra o resumo: texto e o arquivo em linha');
  {const tg=pc.getByTestId('page-card-toggle'); const before=await pc.locator('img').count(); await tg.click(); await page.waitForTimeout(2500); const after=await pc.locator('img').count();
@@ -66,12 +68,13 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   await f.waitForSelector('[contenteditable="true"]',{timeout:20000}).catch(()=>null); await page.waitForTimeout(1500);
   const inner=await f.evaluate(()=>({txt:document.body.innerText,side:!!document.querySelector('[data-testid="desktop-sidebar"]')&&getComputedStyle(document.querySelector('[data-testid="desktop-sidebar"]')).display!=='none'}));
   ok(/linha da original/.test(inner.txt)&&!inner.side,'cartão mostra a página de verdade, sem barra lateral');
-  ok(await fr.evaluate(e=>getComputedStyle(e).pointerEvents)==='none','parado: a página só aparece (o quadro move e seleciona)');
-  await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(800);
-  ok(await page.locator('iframe[data-testid=board-page-frame]').first().evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','dois cliques: entra na página para usar');
-  const ed=await f.$('[contenteditable="true"]'); if(ed){await ed.click(); await f.evaluate(()=>{});} await page.keyboard.type(' +editado no quadro'); await page.waitForTimeout(2500);
+  {const e=await page.evaluate(([x0,y0,w,h])=>{for(let y=y0+120;y<y0+h-120;y+=37)for(let x=x0+40;x<x0+w-40;x+=41){const el=document.elementFromPoint(x,y);if(el&&el.getAttribute('data-testid')==='page-board')return {x,y};}return null;},[bb.x,bb.y,bb.width,bb.height]); if(e) await page.mouse.click(e.x,e.y);} await page.waitForTimeout(300); ok(await fr.evaluate(e=>getComputedStyle(e).pointerEvents)==='none','sem selecionar: a página só aparece (o quadro move e seleciona)');
+  await pc.click({position:{x:60,y:20}}); await page.waitForTimeout(800);
+  ok(await page.locator('iframe[data-testid=board-page-frame]').first().evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','um clique: a página fica pronta para usar');
+  await f.evaluate(()=>{const e=[...document.querySelectorAll('[contenteditable="true"]')].find(x=>/linha da original/.test(x.innerText));if(!e)return;e.focus();const r=document.createRange();r.selectNodeContents(e);r.collapse(false);const sl=getSelection();sl.removeAllRanges();sl.addRange(r);}); await page.keyboard.type(' +editado no quadro'); await page.waitForTimeout(2500);
   await page.getByTestId('board-page-done').click(); await page.waitForTimeout(1500);
   ok(/editado no quadro/.test(await f.evaluate(()=>document.body.innerText)),'editou a página dentro do cartão');}
+ await page.waitForTimeout(3000); ok(await page.getByTestId('board-title').inputValue()==='Hacker','editar a página do cartão não mexe no quadro (título continua)');
  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(600); ok(/Sincronizada/.test(await pc.innerText()),'sincronizar liga a original');
  // desenho
  await page.getByTestId('board-draw').click(); await page.mouse.move(bb.x+200,bb.y+600); await page.mouse.down(); await page.mouse.move(bb.x+260,bb.y+640,{steps:5}); await page.mouse.move(bb.x+330,bb.y+600,{steps:5}); await page.mouse.up(); await page.getByTestId('board-draw').click(); await page.waitForTimeout(400);
@@ -101,14 +104,14 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  {const o=await page.getByTestId('board-origin').boundingBox(); ok(Math.abs(o.x-(bb.x+bb.width/2))<40&&Math.abs(o.y-(bb.y+bb.height/2))<40,'botão de centro traz o 0 para o meio da tela');}
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(400);
  // 08/11 itens finais: linhas-guia, legenda, mencionar, ligacao com seta e texto, link vira previa, pinca
- {const its=items(); const A=await its.nth(0).boundingBox(), Bb=await its.nth(1).boundingBox();
+ await page.keyboard.press('Escape'); {const its=items(); const A=await page.locator('[data-testid=board-item][data-type=callout]').first().boundingBox(), Bb=await page.locator('[data-testid=board-item][data-type=todo]').first().boundingBox();
   await page.evaluate(([x,y])=>{document.querySelectorAll('[data-dbg]').forEach(e=>e.removeAttribute('data-dbg'));const e=document.elementFromPoint(x,y)?.closest('[data-board-item]');if(e)e.setAttribute('data-dbg','1');},[Bb.x+10,Bb.y+10]);
   await page.mouse.move(Bb.x+10,Bb.y+10); await page.mouse.down(); await page.mouse.move(Bb.x+10+(A.x-Bb.x)+2,Bb.y+10+40,{steps:12}); const gl=await page.getByTestId('board-guide').count(); const gb=gl?await page.getByTestId('board-guide').first().boundingBox():null; const Bm=await page.locator('[data-dbg]').boundingBox(); await page.mouse.up(); await page.waitForTimeout(300);
   ok(gl>=1,'linha-guia aparece ao alinhar com o vizinho'); const edges=Bm?[Bm.x,Bm.x+Bm.width/2,Bm.x+Bm.width,Bm.y,Bm.y+Bm.height/2,Bm.y+Bm.height]:[]; ok(!!gb&&edges.some(e=>Math.abs(e-(gb.width<5?gb.x:gb.y))<2),'item encaixa na linha-guia');
-  await page.keyboard.press('Control+z'); await page.waitForTimeout(400);}
+  await page.keyboard.press('Control+z'); await page.waitForTimeout(400); ok(await page.getByTestId('board-title').inputValue()==='Hacker','Ctrl+Z desfaz o movimento sem mexer no título');}
  await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-caption').click(); await page.getByTestId('board-caption-input').fill('legenda da nota'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
  ok(/legenda da nota/.test(await page.getByTestId('board-caption-text').first().innerText().catch(()=>'')),'legenda embaixo do item');
- await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-mention').click(); await page.waitForTimeout(400); await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(500);
+ await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-mention').click(); await page.waitForTimeout(400); await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título',exact:true}).first().click(); await page.waitForTimeout(500);
  ok(await page.getByTestId('board-mention-chip').count()>=1,'mencionar página: @ embaixo do item');
  await items().nth(0).click({position:{x:12,y:12}}); await page.getByLabel('Ligar a outro item (clique no outro item)').click(); await page.locator('[data-testid=board-item][data-type=file]').filter({has:page.locator('img')}).first().click({position:{x:20,y:20}}); await page.waitForTimeout(500);
  ok(await page.locator('[data-testid=page-board] line[marker-end]').count()>=1,'ligação nasce com seta');
@@ -117,7 +120,7 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  ok(await page.locator('[data-testid=page-board] svg text').filter({hasText:'depois'}).count()===1,'texto na ligação');
  await page.mouse.click(bb.x+1150,bb.y+160); await page.evaluate(()=>{const dt=new DataTransfer();dt.setData('text/plain','https://example.com/produto');document.querySelector('[data-testid=page-board]').focus();document.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));}); await page.waitForTimeout(1500);
  ok(await page.locator('[data-testid=board-item][data-type=bookmark]').filter({hasText:'example.com'}).count()===1,'link colado vira cartão de prévia');
- {const cdp=await page.context().newCDPSession(page); const z0=await page.getByTestId('board-zoom').innerText(); const cx=bb.x+700, cy=bb.y+420;
+ {const cdp=await page.context().newCDPSession(page); const z0=await page.getByTestId('board-zoom').innerText(); const em=await page.evaluate(([x0,y0,w,h])=>{for(let y=y0+160;y<y0+h-160;y+=37)for(let x=x0+180;x<x0+w-180;x+=41){const ok=[[-160,0],[160,0],[0,0]].every(([dx,dy])=>{const el=document.elementFromPoint(x+dx,y+dy);return el&&el.getAttribute('data-testid')==='page-board';});if(ok)return {x,y};}return {x:x0+w/2,y:y0+h/2};},[bb.x,bb.y,bb.width,bb.height]); const cx=em.x, cy=em.y;
   const tp=(d)=>[{x:cx-d,y:cy,id:1},{x:cx+d,y:cy,id:2}];
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:tp(40)}); for(let d=50;d<=160;d+=15){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:tp(d)}); await page.waitForTimeout(16);} await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await page.waitForTimeout(300);
   const z1=await page.getByTestId('board-zoom').innerText(); ok(parseInt(z1)>parseInt(z0),'pinça com dois dedos aproxima ('+z0+' -> '+z1+')'); await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(500);}

@@ -1,3 +1,4 @@
+import {EMBED} from '../lib/embed';
 import Svg,{Path} from 'react-native-svg';
 import {PagesLoadingBody} from '../components/ScreenSkeleton';
 import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime,openFileWindow,DOCX_MIME,XLSX_MIME,PPTX_MIME} from '../components/PageFiles';
@@ -101,7 +102,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function endPageTouch(){if(kanbanInteractionRef.current||!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
  function refreshPages(){if(refreshGuard.current.canRefresh()&&!selectedRef.current)void load(true);}
  const pagesRef=useRef<Entity[]>([]);selectedRef.current=selectedId;pagesRef.current=pages;
- const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope);
+ // 08/11/2026: a pagina aberta DENTRO de um cartao do Quadro (?embed=1) tem rascunhos SEPARADOS - antes ela lia e regravava os
+ // rascunhos das outras paginas abertas no site (o titulo do quadro chegou a voltar para um rascunho antigo)
+ const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope)+(EMBED?':embed:'+(typeof location!=='undefined'?(location.pathname.split('/')[2]||''):''):'');
  // 06/11/2026 (pagina com senha): pagina trancada (ou subpagina nova de uma trancada e aberta) sai daqui cifrada; o servidor
  // so recebe lock_json. Trancada e fechada nunca salva (o texto aberto nao existe aqui).
  const apiRef=useRef(api);apiRef.current=api;

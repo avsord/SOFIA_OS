@@ -58,7 +58,7 @@ function size(b: PageBlock): {w: number; h: number} {
   const k = fileKind(b.data?.mime, b.data?.name), preview = b.data?.view === 'preview' || (!b.data?.view && defaultView(k) === 'preview');
   if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
-  if (b.type === 'page_link') return b.data?.view === 'page' ? {w: 520, h: 420} : {w: 360, h: 420}; // 08/11/2026: resumo adaptado (ou a pagina inteira)
+  if (b.type === 'page_link') return b.data?.view === 'list' ? {w: 360, h: 420} : {w: 640, h: 520}; // 08/11/2026: resumo adaptado (ou a pagina inteira)
   if (b.type === 'bookmark' && b.data?.link) return b.data.link.image ? {w: 300, h: 240} : {w: 300, h: 110};
   if (b.type === 'bookmark' && b.data?.live) return b.data.live.kind === 'list' || b.data.live.kind === 'mail' ? {w: 300, h: 230} : {w: 280, h: 150};
   if (b.type === 'todo') return {w: 260, h: 180};
@@ -216,7 +216,7 @@ export function PageBoard(p: Props) {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'bookmark' && b.data?.link?.url) {window.open(String(b.data.link.url), '_blank', 'noopener'); return;}
-    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json) {p.onOpenPage(t); return;} if (b.data?.view !== 'page') {p.onOpenPage(t); return;} focusOn(geo(b)); setEditing(b.id); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
+    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json || b.data?.view === 'list') {p.onOpenPage(t); return;} focusOn(geo(b)); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
     const id = String(b.data?.attachment_id || ''); if (!id) return;
     if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); if (g.w < 600 || g.h < 700) patchGeo([b.id], g2 => ({...g2, w: Math.max(g2.w, 680), h: Math.max(g2.h, 860)}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); setEditing(b.id); return;} // editar: o cartao vira uma pagina
     openFileWindow(p.api, {id, name: String(b.data?.name || 'arquivo'), mime: String(b.data?.mime || (b.type === 'image' ? 'image/jpeg' : '')), pageId: p.pageId,
@@ -301,7 +301,7 @@ export function PageBoard(p: Props) {
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
       if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
       if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
-      items.push(btn(one.data?.view === 'page' ? 'listView' : 'book', one.data?.view === 'page' ? 'Mostrar o resumo (arquivos em lista)' : 'Mostrar a página inteira aqui', () => {const toPage = one.data?.view !== 'page', s2 = toPage ? {w: 520, h: 420} : {w: 360, h: 420}; patchBlock(one.id, x => ({...x, data: {...(x.data || {}), view: toPage ? 'page' : 'list', board: {...geo(x), w: Math.max(geo(x).w, s2.w), h: Math.max(geo(x).h, s2.h)}}}), 'board-view');}, one.data?.view === 'page', false, 'board-page-view'));
+      items.push(btn(one.data?.view === 'list' ? 'book' : 'listView', one.data?.view === 'list' ? 'Mostrar a página de verdade (editar aqui)' : 'Mostrar só o resumo (arquivos em lista)', () => {const toList = one.data?.view !== 'list', s2 = toList ? {w: 360, h: 420} : {w: 640, h: 520}; patchBlock(one.id, x => ({...x, data: {...(x.data || {}), view: toList ? 'list' : 'page', board: {...geo(x), w: toList ? s2.w : Math.max(geo(x).w, s2.w), h: Math.max(geo(x).h, s2.h)}}}), 'board-view');}, one.data?.view === 'list', false, 'board-page-view'));
       items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
     items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
@@ -321,7 +321,9 @@ export function PageBoard(p: Props) {
     onScroll: (e: any) => {const el = e.currentTarget as HTMLElement; if (el.scrollTop || el.scrollLeft) {el.scrollTop = 0; el.scrollLeft = 0;}},
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
-    h('div', {style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'}},
+    // 08/11/2026 (Pedro: "o conteudo ta com a qualidade ruim"): zoom do navegador (CSS zoom) em vez de esticar a imagem (scale):
+    // o texto e redesenhado no tamanho certo e fica nitido em qualquer zoom; a camada anda com translate (sem escala)
+    h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x / view.z + 'px,' + view.y / view.z + 'px)', zoom: view.z} as any}, // o translate tambem passa pelo zoom: divide
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
         h('defs', null, h('marker', {id: 'board-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'}, h('path', {d: 'M0 0 L10 5 L0 10 z', fill: c.muted}))),
         ...links.map(l => {const ca = {x: l.a.x + l.a.w / 2, y: l.a.y + l.a.h / 2}, end = l.arrow ? edgePoint(ca, l.b) : {x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h / 2}, on = selLink?.from === l.from && selLink?.to === l.to, sw = 2 / Math.max(0.5, view.z);
@@ -343,8 +345,8 @@ export function PageBoard(p: Props) {
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
       h('div', {style: {fontSize: 18, fontWeight: 700, color: c.text, marginBottom: 6}}, 'Quadro vazio'), 'Solte fotos e arquivos aqui, cole qualquer coisa (Ctrl+V)', h('br'), 'ou dê dois cliques no fundo para escrever uma nota.') : null,
     selBar,
-    h('input', {'data-board-ui': '1', 'data-testid': 'board-title', value: p.title, placeholder: 'Sem título', 'aria-label': 'Título do quadro', onPointerDown: (e: any) => e.stopPropagation(), onChange: (e: any) => p.onTitle(e.target.value),
-      onKeyDown: (e: any) => {if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();},
+    h('input', {'data-board-ui': '1', 'data-testid': 'board-title', value: p.title, placeholder: 'Sem título', 'aria-label': 'Título do quadro', onPointerDown: (e: any) => e.stopPropagation(), onChange: (e: any) => {if (/^history/.test(String(e.nativeEvent?.inputType || ''))) {e.target.blur(); return;} p.onTitle(e.target.value);}, // o Ctrl+Z do Chrome pula para este campo e desfaz o titulo: ignora
+      onKeyDown: (e: any) => {if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur(); if ((e.ctrlKey || e.metaKey) && /^[zy]$/i.test(e.key)) {e.preventDefault(); (e.target as HTMLInputElement).blur();} /* 08/11/2026: o desfazer do navegador no titulo voltava o titulo antigo (o desfazer certo e o da pagina) */},
       style: {userSelect: 'text', WebkitUserSelect: 'text', position: 'absolute', left: 16, top: 12, zIndex: 30, width: 'min(420px, 50%)', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: c.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit'},
       onFocus: (e: any) => {e.target.style.borderColor = c.accent; e.target.style.background = c.surface;}, onBlur: (e: any) => {e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; p.flush();}}),
     bar([btn('T', 'Texto', () => {const nb = addBlock({id: uid(), type: 'text', text: '', data: {}}); setEditing(nb.id);}, false, false, 'board-add-text'),
@@ -431,7 +433,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
-  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} />;
+  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing || (selected && single)} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} />;
   else if (b.type === 'bookmark' && b.data?.link) {const L = b.data.link; body = h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     L.image && !light ? h('div', {style: {flex: 1, minHeight: 0, backgroundColor: c.input, backgroundImage: 'url("' + String(L.image).replace(/["\\)]/g, '') + '")', backgroundSize: 'cover', backgroundPosition: 'center'}}) : null,
     h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3}}, h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, L.title || L.url),
@@ -480,9 +482,9 @@ function ListCard({b, editing, onChange}: any) {
 // barras), desenhada como no computador (1100 px de largura) e reduzida ao tamanho do cartao; o zoom do quadro aproxima.
 // Parado: so olha (o quadro move e seleciona). Dois cliques: entra na pagina (abrir PDF/Word, editar, tudo da pagina).
 // Muito afastado (zoom < 15%) ou pagina trancada: so o resumo em texto (leve).
-const PAGE_VIRTUAL_W = 1100;
+const PAGE_VIRTUAL_W = 980; // largura em que a pagina e desenhada (como no computador); o cartao aplica o zoom
 function PageCard(props: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>}) {
-  return props.b.data?.view === 'page' ? <PageFrameCard {...props} /> : <PageListCard {...props} />;
+  return props.b.data?.view === 'list' ? <PageListCard {...props} /> : <PageFrameCard {...props} />; // 08/11/2026 (Pedro): padrao = a pagina de verdade, editavel
 }
 // 08/11/2026 (Pedro: "versao mais ampla, adaptada, seguindo esse esquema" + "clicar e abrir o docx na janela flutuante, abrir ou
 // fechar o anexo e editar como la"): resumo da pagina no esquema do desenho - arquivo = linha com selo colorido, nome e
@@ -502,7 +504,7 @@ function PageListCard({b, pages, api, selected, patchPageBlock}: {b: PageBlock; 
     openFileWindow(api, {id: aid, name: String(fb.data?.name || 'arquivo'), mime: String(fb.data?.mime || ''), pageId: lockedPage ? undefined : t.id,
       onSaved: a => {void patchPageBlock?.(t.id, fb.id, x => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));}});};
   const row = (x: PageBlock) => {
-    if (x.type === 'file' && x.data?.attachment_id) {const k = fileKind(x.data?.mime, x.data?.name), bd = BADGE[k] || BADGE.other, on = (x.data?.view || defaultView(k)) === 'preview', canOpen = ['image', 'video', 'audio', 'pdf', 'doc', 'sheet', 'slides'].includes(k);
+    if (x.type === 'file' && x.data?.attachment_id) {const k = fileKind(x.data?.mime, x.data?.name), bd = BADGE[k] || BADGE.other, on = (x.data?.view || defaultView(k)) === 'preview', canOpen = ['image', 'video', 'audio', 'pdf'].includes(k); // Office: so pela janela, no editor da Sofia (o PDF do navegador ficava ruim)
       return h('div', {key: x.id, style: {display: 'flex', flexDirection: 'column', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, overflow: 'hidden', flexShrink: 0}},
         h('div', {style: {display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px'}},
           h('button', {type: 'button', 'data-testid': 'page-card-file', title: 'Abrir na janela flutuante' + (editKind(x.data?.mime, x.data?.name) ? ' (editar)' : ''), onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); open(x);},
@@ -544,8 +546,8 @@ function PageFrameCard({b, g, pages, editing, light, onDone}: {b: PageBlock; g: 
       !loaded || !live ? h('div', {style: {position: 'absolute', inset: 0, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden'}},
         lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, live ? 'Abrindo a página…' : 'Página vazia')) : null,
       live ? h('iframe', {key: id, src: '/paginas/' + encodeURIComponent(id) + '?embed=1', title: 'Página ' + (t?.title || ''), 'data-testid': 'board-page-frame', onLoad: () => setLoaded(true),
-        style: {position: 'absolute', left: 0, top: 0, border: 0, width: PAGE_VIRTUAL_W, height: Math.max(200, (g.h - head) / s), transform: 'scale(' + s + ')', transformOrigin: '0 0', opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
-    !editing && live ? h('div', {style: {position: 'absolute', right: 10, bottom: 8, padding: '2px 8px', borderRadius: 6, background: c.surface + 'e6', color: c.muted, fontSize: 11, pointerEvents: 'none'}}, 'Dois cliques: usar a página aqui') : null);
+        style: {position: 'absolute', left: 0, top: 0, border: 0, width: PAGE_VIRTUAL_W, height: Math.max(200, (g.h - head) / s), zoom: s, opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
+    !editing && live ? h('div', {style: {position: 'absolute', right: 10, bottom: 8, padding: '2px 8px', borderRadius: 6, background: c.surface + 'e6', color: c.muted, fontSize: 11, pointerEvents: 'none'}}, 'Um clique: usar a página aqui · arraste pelo título') : null);
 }
 
 // 08/11/2026 (Pedro: "essa janela esta bem zuada, pode estar mais proxima disso" - a lista de Paginas da barra lateral):
