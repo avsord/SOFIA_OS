@@ -35,12 +35,14 @@ const MIN_Z = 0.1, MAX_Z = 4;
 // 08/11/2026 (Pedro: "imita o quadrado deles, o nosso ficou muito sujo, poluido"): grade de quadrados bem discreta - linha fina a
 // cada 24 px e uma um pouco mais marcada a cada 5 quadrados; afastado, so as linhas grandes (sem chuvisco).
 function gridBg(v: View, bg: string): any {
+  // 08/11/2026 (Pedro: "exatamente essa cor de fundo e exatamente as linhas iguais"): no escuro, as cores medidas na referencia -
+  // fundo #252525, linha fina #2A2A2A a cada 22 px (no 100%) e linha marcada #363636 a cada 4 quadrados
   const m = /^#?([0-9a-f]{6})$/i.exec(String(bg || '')), n = m ? parseInt(m[1], 16) : 0, dark = !m || ((n >> 16) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) < 128;
-  const minor = dark ? 'rgba(255,255,255,0.028)' : 'rgba(0,0,0,0.04)', major = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)';
-  const S = 24 * v.z, B = S * 5, pos = v.x + 'px ' + v.y + 'px', showMinor = S >= 9;
+  const minor = dark ? '#2a2a2a' : 'rgba(0,0,0,0.05)', major = dark ? '#363636' : 'rgba(0,0,0,0.09)';
+  const S = 22 * v.z, B = S * 4, pos = v.x + 'px ' + v.y + 'px', showMinor = S >= 8;
   const layers = ['linear-gradient(to right, ' + major + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + major + ' 1px, transparent 1px)'], sizes = [B + 'px ' + B + 'px', B + 'px ' + B + 'px'];
   if (showMinor) {layers.push('linear-gradient(to right, ' + minor + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + minor + ' 1px, transparent 1px)'); sizes.push(S + 'px ' + S + 'px', S + 'px ' + S + 'px');}
-  return {backgroundImage: layers.join(','), backgroundSize: sizes.join(','), backgroundPosition: layers.map(() => pos).join(',')};
+  return {backgroundColor: dark ? '#252525' : bg, backgroundImage: layers.join(','), backgroundSize: sizes.join(','), backgroundPosition: layers.map(() => pos).join(',')};
 }
 const NOTE_COLORS = ['#2A2636', '#3A2C1A', '#1D3329', '#1E2A44', '#3B2330'];
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -56,7 +58,7 @@ function size(b: PageBlock): {w: number; h: number} {
   const k = fileKind(b.data?.mime, b.data?.name), preview = b.data?.view === 'preview' || (!b.data?.view && defaultView(k) === 'preview');
   if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
-  if (b.type === 'page_link') return {w: 520, h: 420}; // 08/11/2026: a pagina de verdade dentro do cartao
+  if (b.type === 'page_link') return b.data?.view === 'page' ? {w: 520, h: 420} : {w: 360, h: 420}; // 08/11/2026: resumo adaptado (ou a pagina inteira)
   if (b.type === 'bookmark' && b.data?.link) return b.data.link.image ? {w: 300, h: 240} : {w: 300, h: 110};
   if (b.type === 'bookmark' && b.data?.live) return b.data.live.kind === 'list' || b.data.live.kind === 'mail' ? {w: 300, h: 230} : {w: 280, h: 150};
   if (b.type === 'todo') return {w: 260, h: 180};
@@ -72,6 +74,7 @@ type Props = {
   edit: (fn: (blocks: PageBlock[]) => PageBlock[], group?: string) => void; flush: () => void;
   pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>;
   title: string; onTitle: (v: string) => void; onPageChanged?: (id: string) => void;
+  patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>;
   pickFiles: () => void; createDoc: () => void; dropFiles: (files: File[]) => void; pasteClip: (clip: SofiaClip) => void; onError: (m: string) => void;
 };
 
@@ -145,7 +148,7 @@ export function PageBoard(p: Props) {
     return () => {el.removeEventListener('pointerdown', down, true); window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true); window.removeEventListener('pointercancel', up, true);};}, []);
   // zoom pela rodinha (no ponto do mouse); dentro de algo em edicao a rodinha rola o que esta sendo editado
   useEffect(() => {const el = host.current; if (!el) return;
-    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui]')) return; e.preventDefault(); // 08/11/2026: rodinha em cima de janela/lista rola a lista, nao da zoom
+    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]')) return; e.preventDefault(); // 08/11/2026: rodinha em cima de janela/lista rola a lista, nao da zoom
       const r = el.getBoundingClientRect(), v = viewRef.current, k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), z = Math.min(MAX_Z, Math.max(MIN_Z, v.z * k)), mx = e.clientX - r.left, my = e.clientY - r.top;
       setView({z, x: mx - (mx - v.x) * (z / v.z), y: my - (my - v.y) * (z / v.z)});};
     el.addEventListener('wheel', on, {passive: false}); return () => el.removeEventListener('wheel', on);}, []);
@@ -213,7 +216,7 @@ export function PageBoard(p: Props) {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'bookmark' && b.data?.link?.url) {window.open(String(b.data.link.url), '_blank', 'noopener'); return;}
-    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json) {p.onOpenPage(t); return;} focusOn(geo(b)); setEditing(b.id); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
+    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json) {p.onOpenPage(t); return;} if (b.data?.view !== 'page') {p.onOpenPage(t); return;} focusOn(geo(b)); setEditing(b.id); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
     const id = String(b.data?.attachment_id || ''); if (!id) return;
     if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); if (g.w < 600 || g.h < 700) patchGeo([b.id], g2 => ({...g2, w: Math.max(g2.w, 680), h: Math.max(g2.h, 860)}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); setEditing(b.id); return;} // editar: o cartao vira uma pagina
     openFileWindow(p.api, {id, name: String(b.data?.name || 'arquivo'), mime: String(b.data?.mime || (b.type === 'image' ? 'image/jpeg' : '')), pageId: p.pageId,
@@ -298,7 +301,7 @@ export function PageBoard(p: Props) {
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
       if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
       if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
-      items.push(btn('edit', 'Usar a página aqui no quadro (dois cliques)', () => openItem(one)));
+      items.push(btn(one.data?.view === 'page' ? 'listView' : 'book', one.data?.view === 'page' ? 'Mostrar o resumo (arquivos em lista)' : 'Mostrar a página inteira aqui', () => {const toPage = one.data?.view !== 'page', s2 = toPage ? {w: 520, h: 420} : {w: 360, h: 420}; patchBlock(one.id, x => ({...x, data: {...(x.data || {}), view: toPage ? 'page' : 'list', board: {...geo(x), w: Math.max(geo(x).w, s2.w), h: Math.max(geo(x).h, s2.h)}}}), 'board-view');}, one.data?.view === 'page', false, 'board-page-view'));
       items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
     items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
@@ -314,7 +317,9 @@ export function PageBoard(p: Props) {
     return bar(items, {left, top, height: 48}, 'Item selecionado');})() : null;
 
   return h('div', {ref: host, 'data-testid': 'page-board', tabIndex: 0, onKeyDown: onKey, onPointerDown: onBgDown, onDoubleClick: onBgDouble,
-    style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default', backgroundColor: c.bg,
+    // 08/11/2026: o navegador rolava o quadro sozinho ao focar algo dentro (as barras subiam para o meio): 'clip' nao rola, e o onScroll desfaz
+    onScroll: (e: any) => {const el = e.currentTarget as HTMLElement; if (el.scrollTop || el.scrollLeft) {el.scrollTop = 0; el.scrollLeft = 0;}},
+    style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
     h('div', {style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'}},
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
@@ -332,7 +337,7 @@ export function PageBoard(p: Props) {
       guides.x != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', left: guides.x, top: -100000, width: 1 / view.z, height: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
-        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
+        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
         onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush(); if (b.type === 'page_link' && b.data?.page_id) p.onPageChanged?.(String(b.data.page_id));}} />),
       box ? h('div', {style: {position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, border: '1px solid ' + c.accent, background: c.accent + '22', pointerEvents: 'none'}}) : null),
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
@@ -404,7 +409,7 @@ export function PageBoard(p: Props) {
     picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await track('copiar-pagina', () => p.copyPage(src)); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {fail(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
-function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention}: any) {
+function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock}: any) {
   const c = useTheme(), k = b.type === 'file' ? fileKind(b.data?.mime, b.data?.name) : b.type === 'image' ? 'image' : 'other';
   const preview = b.type === 'file' && (b.data?.view || defaultView(k)) === 'preview';
   let body: any;
@@ -426,7 +431,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
-  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} />;
+  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} />;
   else if (b.type === 'bookmark' && b.data?.link) {const L = b.data.link; body = h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     L.image && !light ? h('div', {style: {flex: 1, minHeight: 0, backgroundColor: c.input, backgroundImage: 'url("' + String(L.image).replace(/["\\)]/g, '') + '")', backgroundSize: 'cover', backgroundPosition: 'center'}}) : null,
     h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3}}, h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, L.title || L.url),
@@ -476,7 +481,54 @@ function ListCard({b, editing, onChange}: any) {
 // Parado: so olha (o quadro move e seleciona). Dois cliques: entra na pagina (abrir PDF/Word, editar, tudo da pagina).
 // Muito afastado (zoom < 15%) ou pagina trancada: so o resumo em texto (leve).
 const PAGE_VIRTUAL_W = 1100;
-function PageCard({b, g, pages, editing, light, onDone}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void}) {
+function PageCard(props: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>}) {
+  return props.b.data?.view === 'page' ? <PageFrameCard {...props} /> : <PageListCard {...props} />;
+}
+// 08/11/2026 (Pedro: "versao mais ampla, adaptada, seguindo esse esquema" + "clicar e abrir o docx na janela flutuante, abrir ou
+// fechar o anexo e editar como la"): resumo da pagina no esquema do desenho - arquivo = linha com selo colorido, nome e
+// "Word · 38 KB · editavel"; clique abre na janela flutuante (Word/Excel/PowerPoint com os editores; salvar volta para o
+// bloco da propria pagina); a setinha abre/fecha o anexo ali mesmo (foto, video, audio, PDF). Texto, titulo, tarefa e foto
+// aparecem como na pagina. Com o cartao selecionado, a rodinha rola a lista.
+const BADGE: Record<string, {t: string; bg: string; fg: string}> = {pdf: {t: 'PDF', bg: '#3B2330', fg: '#F5A0AE'}, doc: {t: 'W', bg: '#1E2A44', fg: '#7DB6FF'}, sheet: {t: 'X', bg: '#1D3329', fg: '#5FD3A2'}, slides: {t: 'P', bg: '#3A2C1A', fg: '#F2B45C'},
+  video: {t: '▶', bg: '#2E2644', fg: '#B5A2FF'}, audio: {t: '♪', bg: '#2E2644', fg: '#B5A2FF'}, image: {t: 'IMG', bg: '#24303A', fg: '#9ED0F0'}, text: {t: 'TXT', bg: '#2A2A30', fg: '#C8C8D0'}, zip: {t: 'ZIP', bg: '#2A2A30', fg: '#C8C8D0'}, other: {t: '•••', bg: '#2A2A30', fg: '#C8C8D0'}};
+const KIND_LABEL: Record<string, string> = {pdf: 'PDF', doc: 'Word', sheet: 'Excel', slides: 'PowerPoint', video: 'Vídeo', audio: 'Áudio', image: 'Imagem', text: 'Texto', zip: 'Compactado', other: 'Arquivo'};
+function PageListCard({b, pages, api, selected, patchPageBlock}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>}) {
+  const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [busy, setBusy] = useState('');
+  let blocks: PageBlock[] = []; try {const bs = JSON.parse(String(t?.data?.blocks_json || '[]')); blocks = Array.isArray(bs) ? bs : [];} catch {}
+  const lockedPage = !!t?.data?.lock_json;
+  const toggle = async (fb: PageBlock) => {if (!patchPageBlock || !t) return; const k = fileKind(fb.data?.mime, fb.data?.name), on = (fb.data?.view || defaultView(k)) === 'preview'; setBusy(fb.id);
+    try {await patchPageBlock(t.id, fb.id, x => ({...x, data: {...(x.data || {}), view: on ? 'attach' : 'preview'}}));} catch {} finally {setBusy('');}};
+  const open = (fb: PageBlock) => {const aid = String(fb.data?.attachment_id || ''); if (!aid || !t) return;
+    openFileWindow(api, {id: aid, name: String(fb.data?.name || 'arquivo'), mime: String(fb.data?.mime || ''), pageId: lockedPage ? undefined : t.id,
+      onSaved: a => {void patchPageBlock?.(t.id, fb.id, x => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));}});};
+  const row = (x: PageBlock) => {
+    if (x.type === 'file' && x.data?.attachment_id) {const k = fileKind(x.data?.mime, x.data?.name), bd = BADGE[k] || BADGE.other, on = (x.data?.view || defaultView(k)) === 'preview', canOpen = ['image', 'video', 'audio', 'pdf', 'doc', 'sheet', 'slides'].includes(k);
+      return h('div', {key: x.id, style: {display: 'flex', flexDirection: 'column', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, overflow: 'hidden', flexShrink: 0}},
+        h('div', {style: {display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px'}},
+          h('button', {type: 'button', 'data-testid': 'page-card-file', title: 'Abrir na janela flutuante' + (editKind(x.data?.mime, x.data?.name) ? ' (editar)' : ''), onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); open(x);},
+              style: {flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 0, padding: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit'}},
+            h('span', {style: {width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: bd.bg, color: bd.fg, fontSize: bd.t.length > 2 ? 10 : 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'}}, bd.t),
+            h('span', {style: {flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2}}, h('span', {style: {color: c.text, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, x.data?.name || 'Arquivo'),
+              h('span', {style: {color: c.muted, fontSize: 11}}, [KIND_LABEL[k] || 'Arquivo', sizeLabel(x.data?.size), editKind(x.data?.mime, x.data?.name) && !lockedPage ? 'editável' : ''].filter(Boolean).join(' · ')))),
+          canOpen ? h('button', {type: 'button', 'data-testid': 'page-card-toggle', 'aria-label': on ? 'Fechar o anexo' : 'Abrir o anexo aqui', title: on ? 'Fechar o anexo' : 'Abrir o anexo aqui', disabled: busy === x.id, onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); void toggle(x);},
+            style: {width: 28, height: 28, flexShrink: 0, border: 0, borderRadius: 7, background: on ? c.accentSoft : 'transparent', color: on ? c.accent : c.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: on ? 'rotate(180deg)' : 'none'}},
+            h('svg', {width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, 'aria-hidden': true}, h('path', {d: 'M6 9l6 6 6-6'}))) : null),
+        on && canOpen ? h('div', {style: {borderTop: '1px solid ' + c.line, background: k === 'audio' ? c.surface : '#000', maxHeight: k === 'pdf' || OFFICE_K(k) ? 360 : undefined, overflow: 'hidden'}, onPointerDown: (e: any) => e.stopPropagation()},
+          <InlineMedia api={api} id={String(x.data.attachment_id)} kind={k} name={String(x.data?.name || '')} />) : null);}
+    if (x.type === 'image' && x.data?.attachment_id) return h('div', {key: x.id, style: {borderRadius: 10, overflow: 'hidden', flexShrink: 0}}, <InlineMedia api={api} id={String(x.data.attachment_id)} kind="image" name="imagem" />);
+    const txt = String(x.text || '').trim(); if (!txt) return null;
+    if (x.type === 'todo') return h('div', {key: x.id, style: {display: 'flex', gap: 8, alignItems: 'flex-start', color: x.checked ? c.muted : c.text, fontSize: 13, textDecoration: x.checked ? 'line-through' : 'none'}}, h('span', {style: {width: 13, height: 13, marginTop: 2, flexShrink: 0, borderRadius: 3, border: '1.5px solid ' + c.muted, background: x.checked ? c.accent : 'transparent'}}), txt);
+    const head = /^heading/.test(x.type);
+    return h('div', {key: x.id, style: {color: head ? c.text : c.text, fontSize: x.type === 'heading1' ? 18 : head ? 16 : 13, fontWeight: head ? 700 : 400, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', opacity: x.type === 'quote' ? 0.8 : 1}}, (x.type === 'bullet' ? '• ' : '') + txt);};
+  return h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 14, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
+    h('div', {style: {height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid ' + c.line}}, <Icon name="book" size={15} color={c.accent} />,
+      h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
+      synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null),
+    h('div', {'data-board-scroll': selected ? 'on' : 'off', style: {flex: 1, minHeight: 0, overflowY: selected ? 'auto' : 'hidden', padding: 12, display: 'flex', flexDirection: 'column', gap: 8}},
+      lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : !t ? null : blocks.map(row).filter(Boolean).length ? blocks.map(row) : h('span', {style: {color: c.muted, fontSize: 12}}, 'Página vazia')));
+}
+const OFFICE_K = (k: string) => k === 'doc' || k === 'sheet' || k === 'slides';
+function PageFrameCard({b, g, pages, editing, light, onDone}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void}) {
   const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [loaded, setLoaded] = useState(false);
   let lines: string[] = [];
   if (t) {try {const bs = JSON.parse(String(t.data?.blocks_json || '[]')); lines = (Array.isArray(bs) ? bs : []).map((x: any) => String(x.text || x.data?.name || '').trim()).filter(Boolean).slice(0, 10);} catch {}}

@@ -770,11 +770,17 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   mutationEpoch.current++;setPages(old=>[...old,saved]);return saved;};
  const copyInto=async(copy:Entity,src:Entity)=>{if(isLocked(src))throw Error('A original está trancada.');const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
   const cur=store.get(copy.id)?.base||copy;putSaved(await api.saveEntity({id:copy.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:blocks}} as any));setFlash('Cópia atualizada com a original');setTimeout(()=>setFlash(''),2500);};
+ // 08/11/2026 (Quadro, cartao de pagina adaptado): abrir/fechar o anexo e salvar o arquivo editado vao para o bloco da PROPRIA pagina
+ const patchPageBlock=async(pageId:string,blockId:string,f:(b:PageBlock)=>PageBlock)=>{
+  const e=store.get(pageId);if(e&&!isLocked(e.base)){store.edit(pageId,d=>({...d,blocks:d.blocks.map(b=>b.id===blockId?f(b):b)}),'board-card');await store.flush(pageId);const now=store.get(pageId);if(now)setPages(old=>old.map(x=>x.id===pageId?{...x,revision:now.base.revision,data:{...x.data,blocks_json:JSON.stringify(now.draft.blocks)}}:x));return;}
+  const cur=await api.entity(pageId);if(isLocked(cur))throw Error('Página trancada.');let bs:PageBlock[]=[];try{bs=JSON.parse(String(cur.data?.blocks_json||'[]'));}catch{bs=[];}
+  const saved=await api.saveEntity({id:cur.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:JSON.stringify(bs.map(b=>b.id===blockId?f(b):b))}} as any);mutationEpoch.current++;setPages(old=>old.map(x=>x.id===saved.id?saved:x));};
  const boardView=isBoard?<PageBoard api={api} pageId={selected.id} blocks={draft.blocks} locked={!!lk} pages={pages} title={draft.title} onTitle={(v:string)=>edit(d=>({...d,title:v}),'title')}
   edit={(fn:(b:PageBlock[])=>PageBlock[],group='')=>edit(d=>({...d,blocks:fn(d.blocks)}),group)} flush={()=>void store.flush(selected.id)}
   onOpenPage={(pg:Entity)=>open(pg)} copyPage={copyPage} copyInto={copyInto} pickFiles={()=>pickFiles(null)} createDoc={()=>void createDoc(null,'docx')}
   dropFiles={(files:File[])=>void dropFiles(null,files)} pasteClip={(clip:any)=>void pasteClipBlocks(null,clip)} onError={(m:string)=>setError(m)}
-  onPageChanged={(id:string)=>void api.entity(id).then(e=>{mutationEpoch.current++;setPages(old=>old.map(x=>x.id===e.id?e:x));}).catch(()=>undefined)}/>:null;
+  onPageChanged={(id:string)=>void api.entity(id).then(e=>{mutationEpoch.current++;setPages(old=>old.map(x=>x.id===e.id?e:x));}).catch(()=>undefined)}
+  patchPageBlock={patchPageBlock}/>:null;
  const pageItems:{label:string;icon:any;run:()=>void;danger?:boolean}[]=[...(BOARD_SUPPORTED&&Platform.OS==='web'&&desktop?[isBoard?{label:'Ver como página',icon:'listView',run:()=>setLayout('notes')}:{label:'Ver como quadro',icon:'gridView',run:()=>setLayout('board')}]:[]),...lockItems,{label:'Versões anteriores…',icon:'history',run:()=>setVersionsOpen(true)}];
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}

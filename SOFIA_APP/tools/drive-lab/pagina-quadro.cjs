@@ -13,7 +13,8 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  await page.goto(B+'/paginas'); await page.waitForTimeout(3000);
  // pagina original para trazer depois
  await page.getByLabel('Nova página').first().click(); await page.waitForTimeout(2000);
- await page.locator('[contenteditable="true"]').last().click(); await page.keyboard.type('linha da original'); await page.waitForTimeout(1500);
+ await page.locator('[contenteditable="true"]').last().click(); await page.keyboard.type('linha da original'); await page.waitForTimeout(800);
+ await page.keyboard.press('Enter'); {const fc0=page.waitForEvent('filechooser',{timeout:10000}); await page.keyboard.type('/arquivo'); await page.waitForTimeout(500); await page.keyboard.press('Enter'); await (await fc0).setFiles(require('path').join(__dirname,'fixtures','retrato.png')); await page.waitForTimeout(4000);}
  // o quadro
  await page.getByLabel('Nova página').first().click(); await page.waitForTimeout(2000);
  await page.getByLabel('Quadro',{exact:true}).click(); await page.waitForTimeout(1500);
@@ -53,7 +54,14 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   ok(await page.getByTestId('board-zoom').innerText()===z0,'rodinha em cima da janela não mexe no zoom do quadro'); await page.screenshot({path:O+'picker.png'});} await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(2500);
  const pc=page.locator('[data-testid=board-item][data-type=page_link]'); ok(await pc.count()===1 && /Cópia/.test(await pc.innerText()),'página entra como cópia');
  ok(!/\(cópia\)/.test(await page.getByTestId('sidebar-page-tree').innerText().catch(()=>'')),'cópia do quadro não aparece duplicada na lista de Páginas');
- // 08/11 (Pedro: "como um iframe dessas paginas"): o cartao mostra a pagina de verdade, sem as barras do site
+ // 08/11 (Pedro: "versao adaptada"): resumo da pagina - arquivo em linha, abrir/fechar o anexo, clicar abre a janela flutuante
+ await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); {const pb=await pc.boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+40); await page.mouse.wheel(0,-250); await page.waitForTimeout(400); const pb2=await pc.boundingBox(); if(pb2.y+pb2.height>bb.y+bb.height-120){await page.mouse.move(bb.x+40,bb.y+200); await page.mouse.down(); await page.mouse.move(bb.x+40,bb.y+200-(pb2.y+pb2.height-(bb.y+bb.height-140)),{steps:5}); await page.mouse.up();}}
+ ok(/linha da original/.test(await pc.innerText()) && await pc.getByTestId('page-card-file').count()===1,'cartão mostra o resumo: texto e o arquivo em linha');
+ {const tg=pc.getByTestId('page-card-toggle'); const before=await pc.locator('img').count(); await tg.click(); await page.waitForTimeout(2500); const after=await pc.locator('img').count();
+  ok(before!==after,'abrir/fechar o anexo dentro do cartão ('+before+' -> '+after+')');
+  await pc.getByTestId('page-card-file').click(); await page.waitForTimeout(1500); ok(await page.getByTestId('file-window').count()===1,'clicar no arquivo abre a janela flutuante');
+  await page.getByTestId('file-window').getByLabel('Fechar').first().click(); await page.waitForTimeout(400);}
+ await pc.click({position:{x:60,y:20}}); await page.getByTestId('board-page-view').click(); await page.waitForTimeout(800);
  {const fr=pc.locator('iframe[data-testid=board-page-frame]'); await fr.waitFor({timeout:15000}); const fh=await fr.elementHandle(); const f=await fh.contentFrame();
   await f.waitForSelector('[contenteditable="true"]',{timeout:20000}).catch(()=>null); await page.waitForTimeout(1500);
   const inner=await f.evaluate(()=>({txt:document.body.innerText,side:!!document.querySelector('[data-testid="desktop-sidebar"]')&&getComputedStyle(document.querySelector('[data-testid="desktop-sidebar"]')).display!=='none'}));

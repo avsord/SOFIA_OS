@@ -369,11 +369,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-08 | (delivery) | Quadro: cartões vivos (Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca), Pedir à Sofia, busca Ctrl+F, quadro só leitura no compartilhado | robô do quadro 22/22 (tarefa marcada pelo cartão ficou done no app), compartilhado 2/2 + zoom no navegador, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro fechado: linhas-guia, legenda, mencionar, ligação com seta/texto, link vira prévia, pinça no celular, anexo de e-mail vira cartão (Gmail/IMAP sob pedido) | robô do quadro 30/30, teste de anexos (Gmail simulado) ok, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro com o método do Drive: robôs no portão (etapa 5), registro [quadro] do site e teste de produção [quadro-teste] a cada versão | teste de produção no laboratório 8/8 (apaga tudo no fim), portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro: página de verdade no cartão (iframe da própria Sofia, dois cliques usa), 0 no centro + botão recentralizar, janela de páginas igual à barra lateral, rodinha na janela não dá zoom, arrastar não seleciona texto, Quadro em Templates, template cria subpágina, cópias fora das listas, excluir cópia sem trava | robô do quadro 39/39, teste de exclusão ok, portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro abre afastado mostrando tudo (até 60%), fundo de grade de quadrados discreta (site e compartilhado), centro só com + e 0, título sem caixa | robô 39/39, portão 18/18 |
+| 2026-11-08 | (delivery) | Quadro: cartão de página adaptado (arquivos em linha com selo, abrir/fechar anexo, clique abre a janela flutuante e edita; página inteira opcional), fundo/linhas exatos da referência (#252525, #2A2A2A a 22 px, #363636 a cada 4), quadro não rola sozinho ao focar | robô 42/42 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
