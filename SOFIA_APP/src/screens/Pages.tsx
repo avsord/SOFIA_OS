@@ -200,7 +200,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const handledOpen=useRef(0);
  useLayoutEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;let page=byId.get(openPageId);
   if(!page){const fresh=createdPage.get();if(fresh&&fresh.id===openPageId){page=fresh;setPages(old=>old.some(x=>x.id===fresh.id)?old:[...old,fresh]);createdPage.set(null);}}
-  if(!page)return;handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
+  // 08/11/2026 (Pedro: no cartao do Quadro aparecia a lista de Paginas): pagina que nao veio na lista (copia do quadro, lista
+  // ainda incompleta) e buscada direto no servidor e aberta
+  if(!page){if(fetchedOpen.current!==openPageKey){fetchedOpen.current=openPageKey;void api.entity(openPageId).then((e:any)=>{if(e&&e.id===openPageId&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old:[...old,e]);}).catch(()=>{});}return;}
+  handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
+ const fetchedOpen=useRef(0);
  const handledCreate=useRef(0);
  useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}if(desktop)void create();else setCreateParent(null);},[createPageKey,ready]);
  useEffect(()=>{if(Platform.OS!=='web')return;const trail:{id:string;title:string}[]=[];let cur=selectedId?byId.get(selectedId):undefined;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&trail.length<40){seen.add(cur.id);trail.unshift({id:cur.id,title:cur.title||'Sem título'});cur=byId.get(String(cur.data?.parent_id||''));}const prev=pagePath.get();if(prev.length!==trail.length||prev.some((x,i)=>x.id!==trail[i].id||x.title!==trail[i].title))pagePath.set(trail);},[selectedId,byId]);

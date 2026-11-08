@@ -32,9 +32,15 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  const fc=page.waitForEvent('filechooser'); await page.getByTestId('board-add-file').click(); await (await fc).setFiles(require('path').join(__dirname,'fixtures','retrato.png')); await page.waitForTimeout(5000);
  ok((await items().count())===3 && await page.locator('[data-testid=board-item] img').count()>=1,'foto entrou aberta no quadro');
  // zoom pela rodinha
- const z0=await page.getByTestId('board-zoom').innerText(); await page.mouse.move(bb.x+600,bb.y+400); await page.mouse.wheel(0,-300); await page.waitForTimeout(300); const z1=await page.getByTestId('board-zoom').innerText();
+ const z0=await page.getByTestId('board-zoom').innerText(); await page.mouse.move(bb.x+600,bb.y+400); await page.keyboard.down('Control'); for(let i=0;i<3;i++){await page.mouse.wheel(0,-100); await page.waitForTimeout(40);} await page.keyboard.up('Control'); await page.waitForTimeout(600); const z1=await page.getByTestId('board-zoom').innerText();
  ok(z0!==z1,'rodinha muda o zoom ('+z0+' -> '+z1+')');
- await page.mouse.wheel(0,300); await page.waitForTimeout(300);
+ await page.keyboard.down('Control'); for(let i=0;i<3;i++){await page.mouse.wheel(0,100); await page.waitForTimeout(40);} await page.keyboard.up('Control'); await page.waitForTimeout(600);
+ // 08/11 (Pedro, "igual ao Weje"): rodinha sozinha anda so na vertical; segurar a rodinha e arrastar anda pelo quadro (em cima de item tambem)
+ {const z0=await page.getByTestId('board-zoom').innerText(), o0=await page.getByTestId('board-origin').boundingBox(); await page.mouse.wheel(0,120); await page.waitForTimeout(300); const o1=await page.getByTestId('board-origin').boundingBox();
+  ok(await page.getByTestId('board-zoom').innerText()===z0 && Math.abs(o1.y-(o0.y-120))<3 && Math.abs(o1.x-o0.x)<1,'rodinha anda só na vertical (sem zoom)');
+  const it=items().first(), a=await it.boundingBox(); await page.mouse.move(a.x+a.width/2,a.y+a.height/2); await page.mouse.down({button:'middle'}); await page.mouse.move(a.x+a.width/2+90,a.y+a.height/2+60,{steps:6}); await page.mouse.up({button:'middle'}); await page.waitForTimeout(300);
+  const o2=await page.getByTestId('board-origin').boundingBox(), a2=await it.boundingBox(); ok(Math.abs(o2.x-o1.x-90)<3 && Math.abs(o2.y-o1.y-60)<3 && Math.abs((a2.x-a.x)-90)<3,'segurar a rodinha em cima de um item e arrastar anda pelo quadro');
+  await page.mouse.wheel(0,-120); await page.waitForTimeout(300);}
  // mover a nota
  const n=items().first(); const a=await n.boundingBox(); await page.mouse.move(a.x+20,a.y+20); await page.mouse.down(); await page.mouse.move(a.x+220,a.y+120,{steps:8}); await page.mouse.up(); await page.waitForTimeout(500);
  const a2=await n.boundingBox(); ok(Math.abs(a2.x-a.x-200)<6,'arrastar move a nota');
@@ -57,7 +63,7 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  // 08/11 (Pedro: "versao adaptada"): resumo da pagina - arquivo em linha, abrir/fechar o anexo, clicar abre a janela flutuante
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(500);
  await pc.click({position:{x:60,y:20}}); await page.getByTestId('board-page-view').click(); await page.waitForTimeout(800);
- await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); {const pb=await pc.boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+40); await page.mouse.wheel(0,-250); await page.waitForTimeout(400); const pb2=await pc.boundingBox(); if(pb2.y+pb2.height>bb.y+bb.height-120){await page.mouse.move(bb.x+40,bb.y+200); await page.mouse.down(); await page.mouse.move(bb.x+40,bb.y+200-(pb2.y+pb2.height-(bb.y+bb.height-140)),{steps:5}); await page.mouse.up();}}
+ await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); {const pb=await pc.boundingBox(); await page.mouse.move(pb.x+pb.width/2,pb.y+40); await page.keyboard.down('Control'); await page.mouse.wheel(0,-100); await page.mouse.wheel(0,-100); await page.keyboard.up('Control'); await page.waitForTimeout(400); await page.waitForTimeout(400); const pb2=await pc.boundingBox(); if(pb2.y+pb2.height>bb.y+bb.height-120){await page.mouse.move(bb.x+40,bb.y+200); await page.mouse.down(); await page.mouse.move(bb.x+40,bb.y+200-(pb2.y+pb2.height-(bb.y+bb.height-140)),{steps:5}); await page.mouse.up();}}
  ok(/linha da original/.test(await pc.innerText()) && await pc.getByTestId('page-card-file').count()===1,'cartão mostra o resumo: texto e o arquivo em linha');
  {const tg=pc.getByTestId('page-card-toggle'); const before=await pc.locator('img').count(); await tg.click(); await page.waitForTimeout(2500); const after=await pc.locator('img').count();
   ok(before!==after,'abrir/fechar o anexo dentro do cartão ('+before+' -> '+after+')');
@@ -82,6 +88,11 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   // qualidade: a pagina e desenhada no tamanho do cartao (nada de 35% da resolucao)
   {const z=parseInt(await page.getByTestId('board-zoom').innerText())/100, q=await f.evaluate(()=>({dpr:devicePixelRatio,w:innerWidth})), cw=(await pc.boundingBox()).width;
    ok(Math.abs(q.dpr-z)<0.05 && Math.abs(q.w*z-cw)<40,'página do cartão desenhada no tamanho real (resolução '+q.dpr.toFixed(2)+' com zoom '+z+')');}
+  await pc.click({position:{x:60,y:20}}); await page.waitForTimeout(500); ok(await pc.locator('iframe').evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','(página do cartão ativa para o teste da rodinha)');
+  {const o0=await page.getByTestId('board-origin').boundingBox(), r=await pc.boundingBox(); await page.mouse.move(r.x+r.width/2,r.y+r.height/2); await page.mouse.down({button:'middle'}); await page.mouse.move(r.x+r.width/2+70,r.y+r.height/2+40,{steps:6}); await page.mouse.up({button:'middle'}); await page.waitForTimeout(400);
+   const o1=await page.getByTestId('board-origin').boundingBox(); ok(Math.abs(o1.x-o0.x-70)<4 && Math.abs(o1.y-o0.y-40)<4,'segurar a rodinha em cima da página aberta no cartão anda pelo quadro');
+   const z0=await page.getByTestId('board-zoom').innerText(); await page.mouse.move(r.x+r.width/2+70,r.y+r.height/2+40); await page.keyboard.down('Control'); await page.mouse.wheel(0,-100); await page.keyboard.up('Control'); await page.waitForTimeout(700); const z1=await page.getByTestId('board-zoom').innerText();
+   ok(z1!==z0,'Ctrl+rodinha em cima da página do cartão dá zoom no quadro ('+z0+' -> '+z1+')'); await page.keyboard.down('Control'); await page.mouse.wheel(0,100); await page.keyboard.up('Control'); await page.waitForTimeout(700);}
   // Anexo | Visualizacao, como no arquivo da pagina
   await pc.click({position:{x:60,y:20}}); await page.waitForTimeout(400); await pc.getByTestId('page-card-view-attach').click(); await page.waitForTimeout(800);
   ok((await pc.boundingBox()).height<90 && await pc.locator('iframe').count()===0,'Anexo: a página vira uma linha');

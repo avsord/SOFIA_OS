@@ -45,6 +45,9 @@ function gridBg(v: View, bg: string): any {
   return {backgroundColor: dark ? '#252525' : bg, backgroundImage: layers.join(','), backgroundSize: sizes.join(','), backgroundPosition: layers.map(() => pos).join(',')};
 }
 const NOTE_COLORS = ['#2A2636', '#3A2C1A', '#1D3329', '#1E2A44', '#3B2330'];
+// 08/11/2026: arquivo editavel que e "janela" do quadro (aberto da pagina de um cartao, ou grande): o editor fica sempre a mostra.
+// Pronto grava window:false e encolhe para anexo.
+const isWin = (b: PageBlock) => b.type === 'file' && !!editKind(b.data?.mime, b.data?.name) && b.data?.window !== false && (!!b.data?.window || !!b.data?.from_page || ((b.data?.board?.w || 0) >= 500 && (b.data?.board?.h || 0) >= 500));
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 /** Bloco que aparece no quadro: tem lugar guardado, ou tem conteudo (linha de texto vazia que a pagina poe no fim fica de fora). */
@@ -146,13 +149,35 @@ export function PageBoard(p: Props) {
     const up = (e: PointerEvent) => {if (!pts.delete(e.pointerId)) return; if (pts.size < 2) start = null; if (!pts.size) setTimeout(() => {pinching.current = false;}, 0);};
     el.addEventListener('pointerdown', down, true); window.addEventListener('pointermove', move, true); window.addEventListener('pointerup', up, true); window.addEventListener('pointercancel', up, true);
     return () => {el.removeEventListener('pointerdown', down, true); window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true); window.removeEventListener('pointercancel', up, true);};}, []);
-  // zoom pela rodinha (no ponto do mouse); dentro de algo em edicao a rodinha rola o que esta sendo editado
+  // 08/11/2026 (Pedro, "igual ao Weje"): rodinha sozinha anda na vertical (Shift: na horizontal); Ctrl+rodinha da zoom SUAVE
+  // e progressivo (~10% por dente, animado, no ponto do mouse); segurar a rodinha e arrastar anda pelo quadro em cima de
+  // qualquer coisa - ate da pagina aberta num cartao (ela avisa o quadro, ver lib/embed.ts). Em cima de lista/janela, rola ela.
+  const zoomAnim = useRef<{z: number; mx: number; my: number} | null>(null);
+  const zoomTo = (target: number, mx: number, my: number) => {const run = !zoomAnim.current; zoomAnim.current = {z: Math.min(MAX_Z, Math.max(MIN_Z, target)), mx, my}; if (!run) return;
+    const step = () => {const a = zoomAnim.current; if (!a) return; const v = viewRef.current, near = Math.abs(a.z - v.z) < a.z * 0.003, z = near ? a.z : v.z + (a.z - v.z) * 0.3;
+      const nv = {z, x: a.mx - (a.mx - v.x) * (z / v.z), y: a.my - (a.my - v.y) * (z / v.z)}; viewRef.current = nv; setView(nv); if (near) zoomAnim.current = null; else requestAnimationFrame(step);};
+    requestAnimationFrame(step);};
+  const wheelZoom = (dy: number, cx: number, cy: number) => {const r = host.current?.getBoundingClientRect(); if (!r) return; const d = Math.max(-60, Math.min(60, dy)), base = zoomAnim.current?.z ?? viewRef.current.z; zoomTo(base * Math.exp(-d * 0.0018), cx - r.left, cy - r.top);};
+  const panFrom = (sx: number, sy: number) => {const v0 = viewRef.current; zoomAnim.current = null; return (x: number, y: number) => {const nv = {...viewRef.current, x: v0.x + x - sx, y: v0.y + y - sy}; viewRef.current = nv; setView(nv);};};
   useEffect(() => {const el = host.current; if (!el) return;
-    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]')) return; e.preventDefault(); // 08/11/2026: rodinha em cima de janela/lista rola a lista, nao da zoom
-      const r = el.getBoundingClientRect(), v = viewRef.current, k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), z = Math.min(MAX_Z, Math.max(MIN_Z, v.z * k)), mx = e.clientX - r.left, my = e.clientY - r.top;
-      setView({z, x: mx - (mx - v.x) * (z / v.z), y: my - (my - v.y) * (z / v.z)});};
-    el.addEventListener('wheel', on, {passive: false}); return () => el.removeEventListener('wheel', on);}, []);
-  const zoomBy = (k: number) => {const v = viewRef.current, z = Math.min(MAX_Z, Math.max(MIN_Z, v.z * k)), mx = size2.w / 2, my = size2.h / 2; setView({z, x: mx - (mx - v.x) * (z / v.z), y: my - (my - v.y) * (z / v.z)});};
+    const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault();
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+      if (e.ctrlKey || e.metaKey) {wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;}
+      const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
+    const noAuto = (e: MouseEvent) => {if (e.button === 1) e.preventDefault();}; // sem o "auto-rolar" do navegador
+    const mid = (e: PointerEvent) => {if (e.button !== 1) return; e.preventDefault(); e.stopPropagation(); dragOn(); const go = panFrom(e.screenX, e.screenY);
+      const mv = (ev: PointerEvent) => go(ev.screenX, ev.screenY), up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff();};
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);};
+    el.addEventListener('wheel', on, {passive: false}); el.addEventListener('mousedown', noAuto, true); el.addEventListener('pointerdown', mid, true);
+    return () => {el.removeEventListener('wheel', on); el.removeEventListener('mousedown', noAuto, true); el.removeEventListener('pointerdown', mid, true);};}, []);
+  // a pagina aberta no cartao (iframe) manda: segurar a rodinha e arrastar / Ctrl+rodinha (o navegador entrega o mouse a ela)
+  useEffect(() => {let go: ((x: number, y: number) => void) | null = null;
+    const on = (e: MessageEvent) => {const d = e.data; if (e.origin !== location.origin || !d || d.sofia !== 'board-nav') return;
+      const fr = Array.from(host.current?.querySelectorAll('iframe[data-testid=board-page-frame]') || []).find(x => (x as HTMLIFrameElement).contentWindow === e.source) as HTMLIFrameElement | undefined; if (!fr) return;
+      if (d.kind === 'pan-start') go = panFrom(Number(d.sx), Number(d.sy)); else if (d.kind === 'pan-move') go?.(Number(d.sx), Number(d.sy)); else if (d.kind === 'pan-end') go = null;
+      else if (d.kind === 'zoom') {const r = fr.getBoundingClientRect(), iw = fr.contentWindow?.innerWidth || r.width, ih = fr.contentWindow?.innerHeight || r.height; wheelZoom(Number(d.dy) || 0, r.left + Number(d.x) * r.width / iw, r.top + Number(d.y) * r.height / ih);}};
+    window.addEventListener('message', on); return () => window.removeEventListener('message', on);}, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const zoomBy = (k: number) => zoomTo((zoomAnim.current?.z ?? viewRef.current.z) * k, size2.w / 2, size2.h / 2);
   const fitAll = () => {if (!shown.length) {setView({x: 80, y: 60, z: 1}); return;} const gs = shown.map(geo), x1 = Math.min(...gs.map(g => g.x)), y1 = Math.min(...gs.map(g => g.y)), x2 = Math.max(...gs.map(g => g.x + g.w)), y2 = Math.max(...gs.map(g => g.y + g.h));
     const z = Math.min(MAX_Z, Math.max(MIN_Z, Math.min((size2.w - 120) / Math.max(1, x2 - x1), (size2.h - 180) / Math.max(1, y2 - y1)))); setView({z, x: (size2.w - (x2 - x1) * z) / 2 - x1 * z, y: (size2.h - 60 - (y2 - y1) * z) / 2 - y1 * z});};
 
@@ -453,8 +478,8 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
   else if (b.type === 'image') body = b.data?.attachment_id ? (light ? h('div', {style: {width: '100%', height: '100%', background: c.input}}) : h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 6}}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind="image" name={String(b.data?.caption || 'imagem')} />)) : <Loading c={c} label="Enviando…" />;
   else if (b.type === 'file') {
     if (b.data?.uploading || !b.data?.attachment_id) body = <Loading c={c} label={'Enviando ' + (b.data?.name || 'arquivo') + '…'} />;
-    else if ((editing || (b.data?.window && !light)) && editKind(b.data?.mime, b.data?.name) && !locked) body = h('div', {'data-board-editing': '1', style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: c.surface, borderRadius: 8, overflow: 'hidden'}, onPointerDown: (e: any) => {if (!(e.target as HTMLElement).closest?.('[data-board-handle]')) e.stopPropagation();}},
-      h('div', {'data-board-handle': '1', 'data-testid': 'board-file-head', title: 'Arraste por aqui para mover', style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted, cursor: 'grab'}}, h('span', {style: {flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Editando ' + (b.data?.name || '') + (b.data?.from_page ? ' · da página ' + (pages.find((x: Entity) => x.id === String(b.data.from_page))?.title || '') : '')), h('button', {type: 'button', 'data-testid': 'board-file-done', title: b.data?.window ? 'Fechar a janela (o arquivo fica no quadro como anexo; dois cliques abre de novo)' : undefined, onPointerDown: (e: any) => e.stopPropagation(), onClick: () => {if (b.data?.window) onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), window: false, board: {...(x.data?.board || {}), w: 280, h: 64}}})); onDone();}, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
+    else if ((editing || (isWin(b) && !light)) && editKind(b.data?.mime, b.data?.name) && !locked) body = h('div', {'data-board-editing': '1', style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: c.surface, borderRadius: 8, overflow: 'hidden'}, onPointerDown: (e: any) => {if (!(e.target as HTMLElement).closest?.('[data-board-handle]')) e.stopPropagation();}},
+      h('div', {'data-board-handle': '1', 'data-testid': 'board-file-head', title: 'Arraste por aqui para mover', style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted, cursor: 'grab'}}, h('span', {style: {flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Editando ' + (b.data?.name || '') + (b.data?.from_page ? ' · da página ' + (pages.find((x: Entity) => x.id === String(b.data.from_page))?.title || '') : '')), h('button', {type: 'button', 'data-testid': 'board-file-done', title: isWin(b) ? 'Fechar a janela (o arquivo fica no quadro como anexo; dois cliques abre de novo)' : undefined, onPointerDown: (e: any) => e.stopPropagation(), onClick: () => {if (isWin(b)) onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), window: false, board: {...(x.data?.board || {}), w: 280, h: 64}}})); onDone();}, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
       h('div', {style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column'}}, <FileBody api={api} id={String(b.data.attachment_id)} firstId={String(b.data.attachment_id)} name={String(b.data?.name || '')} mime={String(b.data?.mime || '')} zoom={0} onZoom={() => {}} pageId={pageId}
         onSaved={(a: any) => {onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));
           if (b.data?.from_page && b.data?.from_block) void patchPageBlock?.(String(b.data.from_page), String(b.data.from_block), (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));}} />)); // aberto da pagina de um cartao: salvar grava tambem na pagina
@@ -475,7 +500,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
   const handle = (corner: string, css: any) => h('div', {key: corner, onPointerDown: onResize(corner), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', width: 14 / zoom, height: 14 / zoom, borderRadius: 4 / zoom, background: c.surface, border: (2 / zoom) + 'px solid ' + c.accent, cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize', zIndex: 3, ...css}});
   const o = -7 / zoom;
   return h('div', {'data-board-item': '1', 'data-id': b.id, 'data-testid': 'board-item', 'data-type': b.type, 'aria-label': String(b.data?.name || b.text || b.type).slice(0, 80), onPointerDown: onDown, onDoubleClick: (e: any) => {e.stopPropagation(); onOpen();},
-    style: {position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, zIndex: selected || editing ? 1000000 : g.z || 0, outline: selected && !(editing && b.type === 'page_link') ? (2 / zoom) + 'px solid ' + c.accent : 'none' /* 08/11 (Pedro): usando a pagina, sem contorno */, outlineOffset: 3 / zoom, borderRadius: 10, cursor: editing ? 'auto' : 'grab', userSelect: editing ? 'text' : 'none'}},
+    style: {position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, zIndex: selected || editing ? 1000000 : g.z || 0, outline: selected && b.type !== 'page_link' && !isWin(b) ? (2 / zoom) + 'px solid ' + c.accent : 'none' /* 08/11 (Pedro): cartao de pagina e janela nao ganham contorno (ja tem moldura) */, outlineOffset: 3 / zoom, borderRadius: 10, cursor: editing ? 'auto' : 'grab', userSelect: editing ? 'text' : 'none'}},
     body,
     g.caption || (g.mentions || []).length ? h('div', {style: {position: 'absolute', left: 0, top: '100%', marginTop: 6, width: '100%', display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', pointerEvents: 'auto'}},
       g.caption ? h('span', {'data-testid': 'board-caption-text', style: {color: c.muted, fontSize: 12, width: '100%', lineHeight: 1.4}}, g.caption) : null,
