@@ -183,6 +183,54 @@ class MailWatcher {
   }
 
   /** Leitura do Gmail (remetente, assunto, trecho) com a chamada da conta certa. */
+  // 08/11/2026 (Pedro: Quadro - "anexo de um e-mail vira cartao"): os anexos sao buscados SO quando a pessoa pede (nada fica
+  // guardado antes): lista os anexos da mensagem e baixa um deles. Gmail pela Conta Google (API) ou IMAP (senha de app).
+  gmailCaller(account) {
+    const g = this.google, own = g && g.mailLink && g.mailLink(account.id);
+    if (own && own.refresh) return (method, url) => g.mailCall(account.id, method, url);
+    const link = g && g.link && g.link(); if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google para ver os anexos.');
+    return (method, url) => g.call(method, url);
+  }
+  mailRef(hitId) {
+    const hit = this.w.get(hitId); if (hit.kind !== 'mail_hit') throw new AppError('NOT_FOUND', 'E-mail não encontrado.', 404);
+    const account = this.w.get(String(hit.data.account_id || '')), key = String(hit.data.message_key || '');
+    if (account.data.provider === 'gmail_google') {const id = key.split(':gmail:')[1]; if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw new AppError('MAIL_REF', 'Não achei a mensagem no Gmail.'); return {account, gmail: id};}
+    const m = /^[^:]+:([^:]*):(\d+)$/.exec(key); if (!m) throw new AppError('MAIL_REF', 'Não achei a mensagem na caixa.'); return {account, validity: m[1], uid: Number(m[2])};
+  }
+  async withImap(ref, run) {
+    const pass = this.secret(ref.account.id); if (!pass) throw new AppError('MAIL_SECRET', 'Falta a senha de app desta conta.');
+    const opts = this.server(ref.account); opts.auth.pass = pass; const client = await this.connect(opts);
+    try { const box = await client.mailboxOpen('INBOX', {readOnly: true}); if (String(box.uidValidity || '') !== ref.validity) throw new AppError('MAIL_GONE', 'A caixa mudou desde que o e-mail chegou; a mensagem não está mais lá.'); return await run(client); }
+    finally { await client.logout().catch(() => {}); }
+  }
+  async attachmentsOf(hitId) {
+    const ref = this.mailRef(hitId), out = [];
+    if (ref.gmail) {
+      const msg = await this.gmailCaller(ref.account)('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + ref.gmail + '?format=full');
+      const walk = p => { if (!p) return; if (p.filename && p.body && p.body.attachmentId) out.push({part: String(p.body.attachmentId), name: String(p.filename).slice(0, 200), mime: String(p.mimeType || 'application/octet-stream'), bytes: Number(p.body.size) || 0}); for (const c of p.parts || []) walk(c); };
+      walk(msg.payload); return out;
+    }
+    return this.withImap(ref, async client => {
+      const msg = await client.fetchOne(String(ref.uid), {bodyStructure: true}, {uid: true}); if (!msg) throw new AppError('MAIL_GONE', 'A mensagem não está mais na caixa.');
+      const walk = n => { if (!n) return; const name = (n.dispositionParameters && n.dispositionParameters.filename) || (n.parameters && n.parameters.name); if (name && n.part) out.push({part: String(n.part), name: String(name).slice(0, 200), mime: String(n.type || 'application/octet-stream'), bytes: Number(n.size) || 0}); for (const c of n.childNodes || []) walk(c); };
+      walk(msg.bodyStructure); return out;
+    });
+  }
+  async attachmentBytes(hitId, part, max = 25 * 1024 * 1024) {
+    const ref = this.mailRef(hitId), list = await this.attachmentsOf(hitId), item = list.find(a => a.part === String(part));
+    if (!item) throw new AppError('NOT_FOUND', 'Anexo não encontrado neste e-mail.', 404);
+    if (item.bytes > max) throw new AppError('TOO_LARGE', 'Anexo grande demais (máximo 25 MB).', 413);
+    if (ref.gmail) {
+      const r = await this.gmailCaller(ref.account)('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + ref.gmail + '/attachments/' + encodeURIComponent(item.part));
+      return {...item, data: Buffer.from(String(r.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64')};
+    }
+    return this.withImap(ref, async client => {
+      const {content} = await client.download(String(ref.uid), item.part, {uid: true}); const chunks = []; let n = 0;
+      for await (const ch of content) { n += ch.length; if (n > max) throw new AppError('TOO_LARGE', 'Anexo grande demais (máximo 25 MB).', 413); chunks.push(ch); }
+      return {...item, data: Buffer.concat(chunks)};
+    });
+  }
+
   async readGmail(account, rules, rescanDays, call) {
     const g = {call};
     const API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';

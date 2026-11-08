@@ -273,6 +273,19 @@ function makeMobileApi(runtime, deps) {
       }
       match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/forget$/);
       if (match && m === 'POST') { runtime.mailWatch.dropSecret(match[1]); return send({ok: true}); }
+      // 08/11/2026 (Pedro: Quadro): anexos de um e-mail encontrado, buscados so quando pedidos; "para a pagina" grava no Drive do usuario
+      { const am = p.match(/^\/api\/mobile\/mail\/hits\/([\w-]{6,80})\/attachments$/);
+        if (am && m === 'GET') { rate(session, 'mail-att', 60); return send({items: await runtime.mailWatch.attachmentsOf(validId(am[1]))}); }
+        const tm = p.match(/^\/api\/mobile\/mail\/hits\/([\w-]{6,80})\/attachments\/to-page$/);
+        if (tm && m === 'POST') {
+          rate(session, 'mail-att', 60); const b = await bodyJson(req, 4096), pageId = validId(String(b.page || '')), page = workspace.get(pageId);
+          if (page.kind !== 'user_page') fail('NOT_FOUND', 'Página não encontrada.', 404);
+          if ((page.tags || []).includes('sofia-lock-v1')) fail('LOCKED', 'Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.', 409);
+          const f = await runtime.mailWatch.attachmentBytes(validId(tm[1]), String(b.part || ''));
+          const a = workspace.attach(pageId, {name: f.name, mime: f.mime, base64: f.data.toString('base64')});
+          try { await runtime.google.attachmentToDrive(a.id); } catch (e) { try { workspace.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id); } catch {} throw e; }
+          return send({id: a.id, name: a.name, mime: a.mime, bytes: a.bytes});
+        } }
       if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined, Math.min(60, Math.max(0, Number(b.rescan_days) || 0)))); }
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }

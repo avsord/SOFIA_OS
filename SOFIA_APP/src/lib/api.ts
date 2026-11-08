@@ -406,6 +406,9 @@ export class SofiaApi {
   /** 0.3.269: titulo, imagem, site e preco de um link colado (Listas, Biblioteca). Nunca falha: sem leitura volta so o link. */
   librarySearch(q: string, prefer = '') { return this.request<{items: CatalogHit[]}>('/library/search', {q, prefer}, 'POST', 15000); }
   readReceipt(mime: string, base64: string) { return this.request<{receipt: {desc: string; amount: number; date: string; category: string; items: string}}>('/finance/read-receipt', {mime, base64}, 'POST', 60000); }
+  // 08/11/2026 (Quadro): anexos de um e-mail encontrado (buscados so quando pedidos) e copia de um deles para a pagina (Drive)
+  mailAttachments(hitId: string) { return this.request<{items: {part: string; name: string; mime: string; bytes: number}[]}>('/mail/hits/' + encodeURIComponent(hitId) + '/attachments', undefined, 'GET', 40000); }
+  mailAttachmentToPage(hitId: string, page: string, part: string) { return this.request<{id: string; name: string; mime: string; bytes: number}>('/mail/hits/' + encodeURIComponent(hitId) + '/attachments/to-page', {page, part}, 'POST', 120000); }
   linkPreview(url: string) { return this.request<LinkPreview>('/link/preview', {url}, 'POST', 15000); }
   profilePhoto() { return this.request<{photo: ProfilePhoto | null}>('/profile/photo'); }
   saveProfilePhoto(mime: string, base64: string) { return this.request<{ok: boolean; updated_at: string}>('/profile/photo', {mime, base64}, 'POST', 60000); }

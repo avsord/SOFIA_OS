@@ -11,5 +11,6 @@ test('quadro: layout guardado na pagina e duplicacao independente', () => {
   assert.ok(read('src/components/PageBoard.tsx').includes('BOARD_SUPPORTED = false'), 'no app (Android) nao ha quadro');
   const l = read('src/components/BoardLive.web.tsx');
   for (const k of ['event', 'task', 'note', 'reminder', 'list', 'monitor', 'mail', 'library']) assert.ok(l.includes("id: '" + k + "'"), 'fonte viva: ' + k);
+  assert.ok(b.includes("'data-testid': 'board-guide'") && b.includes('caption') && b.includes('mentions') && b.includes("marker") && b.includes('linkPreview(') && b.includes("pointerType !== 'touch'") && b.includes('mailAttachmentToPage('), 'linhas-guia, legenda, mencionar, seta/texto, link com previa, pinca, anexo de e-mail');
   assert.ok(l.includes('api.taskState(') && b.includes("data-testid': 'board-find'") && b.includes('askSofiaAbout('), 'tarefa marca no app, busca e pedir a Sofia');
 });

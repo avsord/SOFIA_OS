@@ -71,6 +71,27 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  const nt=items().first(); await nt.click({position:{x:12,y:12}}); await page.getByTestId('board-ask').click(); await page.getByLabel('Pedido para a Sofia').fill('resume'); await page.getByTestId('board-ask-go').click(); await page.waitForTimeout(4000);
  ok(/Pedindo|pensando|nota ao lado|[A-Za-z]/.test(await page.getByTestId('board-ask-box').innerText().catch(()=>'fechou')),'pedir à Sofia envia (no laboratório não há a Sofia: mostra o aviso)');
  await page.keyboard.press('Escape');
+ // 08/11 itens finais: linhas-guia, legenda, mencionar, ligacao com seta e texto, link vira previa, pinca
+ {const its=items(); const A=await its.nth(0).boundingBox(), Bb=await its.nth(1).boundingBox();
+  await page.evaluate(([x,y])=>{document.querySelectorAll('[data-dbg]').forEach(e=>e.removeAttribute('data-dbg'));const e=document.elementFromPoint(x,y)?.closest('[data-board-item]');if(e)e.setAttribute('data-dbg','1');},[Bb.x+10,Bb.y+10]);
+  await page.mouse.move(Bb.x+10,Bb.y+10); await page.mouse.down(); await page.mouse.move(Bb.x+10+(A.x-Bb.x)+2,Bb.y+10+40,{steps:12}); const gl=await page.getByTestId('board-guide').count(); const gb=gl?await page.getByTestId('board-guide').first().boundingBox():null; const Bm=await page.locator('[data-dbg]').boundingBox(); await page.mouse.up(); await page.waitForTimeout(300);
+  ok(gl>=1,'linha-guia aparece ao alinhar com o vizinho'); const edges=Bm?[Bm.x,Bm.x+Bm.width/2,Bm.x+Bm.width,Bm.y,Bm.y+Bm.height/2,Bm.y+Bm.height]:[]; ok(!!gb&&edges.some(e=>Math.abs(e-(gb.width<5?gb.x:gb.y))<2),'item encaixa na linha-guia');
+  await page.keyboard.press('Control+z'); await page.waitForTimeout(400);}
+ await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-caption').click(); await page.getByTestId('board-caption-input').fill('legenda da nota'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+ ok(/legenda da nota/.test(await page.getByTestId('board-caption-text').first().innerText().catch(()=>'')),'legenda embaixo do item');
+ await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-mention').click(); await page.waitForTimeout(400); await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título'}).first().click(); await page.waitForTimeout(500);
+ ok(await page.getByTestId('board-mention-chip').count()>=1,'mencionar página: @ embaixo do item');
+ await items().nth(0).click({position:{x:12,y:12}}); await page.getByLabel('Ligar a outro item (clique no outro item)').click(); await page.locator('[data-testid=board-item][data-type=file]').filter({has:page.locator('img')}).first().click({position:{x:20,y:20}}); await page.waitForTimeout(500);
+ ok(await page.locator('[data-testid=page-board] line[marker-end]').count()>=1,'ligação nasce com seta');
+ const pt=await page.evaluate(()=>{const l=document.querySelector('[data-testid=board-link]');const L=l.getTotalLength?null:null;const x1=+l.getAttribute('x1'),y1=+l.getAttribute('y1'),x2=+l.getAttribute('x2'),y2=+l.getAttribute('y2');const m=l.getScreenCTM();for(let t=0.05;t<0.96;t+=0.05){const p=new DOMPoint(x1+(x2-x1)*t,y1+(y2-y1)*t).matrixTransform(m);const e=document.elementFromPoint(p.x,p.y);if(e===l)return {x:p.x,y:p.y};}return null;}); if(pt) await page.mouse.click(pt.x,pt.y); await page.waitForTimeout(300);
+ if(await page.getByTestId('board-link-bar').count()){await page.getByTestId('board-link-label').fill('depois'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);} 
+ ok(await page.locator('[data-testid=page-board] svg text').filter({hasText:'depois'}).count()===1,'texto na ligação');
+ await page.mouse.click(bb.x+1150,bb.y+160); await page.evaluate(()=>{const dt=new DataTransfer();dt.setData('text/plain','https://example.com/produto');document.querySelector('[data-testid=page-board]').focus();document.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));}); await page.waitForTimeout(1500);
+ ok(await page.locator('[data-testid=board-item][data-type=bookmark]').filter({hasText:'example.com'}).count()===1,'link colado vira cartão de prévia');
+ {const cdp=await page.context().newCDPSession(page); const z0=await page.getByTestId('board-zoom').innerText(); const cx=bb.x+700, cy=bb.y+420;
+  const tp=(d)=>[{x:cx-d,y:cy,id:1},{x:cx+d,y:cy,id:2}];
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:tp(40)}); for(let d=50;d<=160;d+=15){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:tp(d)}); await page.waitForTimeout(16);} await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await page.waitForTimeout(300);
+  const z1=await page.getByTestId('board-zoom').innerText(); ok(parseInt(z1)>parseInt(z0),'pinça com dois dedos aproxima ('+z0+' -> '+z1+')'); await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(500);}
  await page.screenshot({path:O+'q1.png'});
  // recarregar: tudo no lugar
  const before=await items().count(); await page.waitForTimeout(2500); await page.reload(); await page.waitForTimeout(4500);
