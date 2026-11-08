@@ -73,7 +73,21 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   ok(await page.locator('iframe[data-testid=board-page-frame]').first().evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','um clique: a página fica pronta para usar');
   await f.evaluate(()=>{const e=[...document.querySelectorAll('[contenteditable="true"]')].find(x=>/linha da original/.test(x.innerText));if(!e)return;e.focus();const r=document.createRange();r.selectNodeContents(e);r.collapse(false);const sl=getSelection();sl.removeAllRanges();sl.addRange(r);}); await page.keyboard.type(' +editado no quadro'); await page.waitForTimeout(2500);
   await page.getByTestId('board-page-done').click(); await page.waitForTimeout(1500);
-  ok(/editado no quadro/.test(await f.evaluate(()=>document.body.innerText)),'editou a página dentro do cartão');}
+  ok(/editado no quadro/.test(await f.evaluate(()=>document.body.innerText)),'editou a página dentro do cartão');
+  // 08/11 (Pedro: "clico nele e ele fica grudado no mouse"): arrastar pelo titulo e soltar em cima da pagina nao gruda
+  {const p0=await pc.boundingBox(); await page.mouse.move(p0.x+60,p0.y+20); await page.mouse.down(); await page.mouse.move(p0.x+60,p0.y+140,{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);
+   const p1=await pc.boundingBox(); await page.mouse.move(p0.x+300,p0.y+300,{steps:6}); await page.waitForTimeout(400); const p2=await pc.boundingBox();
+   ok(Math.abs(p1.y-p0.y)>40 && Math.abs(p2.x-p1.x)<2 && Math.abs(p2.y-p1.y)<2,'arrastar o cartão de página e soltar: não fica grudado no mouse');
+   await page.mouse.move(p2.x+60,p2.y+20); await page.mouse.down(); await page.mouse.move(p2.x+60+(p0.x-p2.x),p2.y+20+(p0.y-p2.y),{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);}
+  // qualidade: a pagina e desenhada no tamanho do cartao (nada de 35% da resolucao)
+  {const z=parseInt(await page.getByTestId('board-zoom').innerText())/100, q=await f.evaluate(()=>({dpr:devicePixelRatio,w:innerWidth})), cw=(await pc.boundingBox()).width;
+   ok(Math.abs(q.dpr-z)<0.05 && Math.abs(q.w*z-cw)<40,'página do cartão desenhada no tamanho real (resolução '+q.dpr.toFixed(2)+' com zoom '+z+')');}
+  // Anexo | Visualizacao, como no arquivo da pagina
+  await pc.click({position:{x:60,y:20}}); await page.waitForTimeout(400); await pc.getByTestId('page-card-view-attach').click(); await page.waitForTimeout(800);
+  ok((await pc.boundingBox()).height<90 && await pc.locator('iframe').count()===0,'Anexo: a página vira uma linha');
+  await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(2500);
+  ok(await pc.locator('iframe[data-testid=board-page-frame]').count()===1 && await pc.locator('iframe[data-testid=board-page-frame]').evaluate(e=>getComputedStyle(e).pointerEvents)==='auto' && page.url().includes('/paginas/'),'dois cliques no anexo: a página abre no cartão com edição (sem aba nova)');
+  await page.getByTestId('board-page-done').click(); await page.waitForTimeout(800);}
  await page.waitForTimeout(3000); ok(await page.getByTestId('board-title').inputValue()==='Hacker','editar a página do cartão não mexe no quadro (título continua)');
  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(600); ok(/Sincronizada/.test(await pc.innerText()),'sincronizar liga a original');
  // desenho
@@ -105,8 +119,8 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(400);
  // 08/11 itens finais: linhas-guia, legenda, mencionar, ligacao com seta e texto, link vira previa, pinca
  await page.keyboard.press('Escape'); {const its=items(); const A=await page.locator('[data-testid=board-item][data-type=callout]').first().boundingBox(), Bb=await page.locator('[data-testid=board-item][data-type=todo]').first().boundingBox();
-  await page.evaluate(([x,y])=>{document.querySelectorAll('[data-dbg]').forEach(e=>e.removeAttribute('data-dbg'));const e=document.elementFromPoint(x,y)?.closest('[data-board-item]');if(e)e.setAttribute('data-dbg','1');},[Bb.x+10,Bb.y+10]);
-  await page.mouse.move(Bb.x+10,Bb.y+10); await page.mouse.down(); await page.mouse.move(Bb.x+10+(A.x-Bb.x)+2,Bb.y+10+40,{steps:12}); const gl=await page.getByTestId('board-guide').count(); const gb=gl?await page.getByTestId('board-guide').first().boundingBox():null; const Bm=await page.locator('[data-dbg]').boundingBox(); await page.mouse.up(); await page.waitForTimeout(300);
+  await page.evaluate(([x,y])=>{document.querySelectorAll('[data-dbg]').forEach(e=>e.removeAttribute('data-dbg'));const e=document.elementFromPoint(x,y)?.closest('[data-board-item]');if(e)e.setAttribute('data-dbg','1');},[Bb.x+Bb.width/2,Bb.y+Bb.height-8]);
+  await page.mouse.move(Bb.x+Bb.width/2,Bb.y+Bb.height-8); await page.mouse.down(); await page.mouse.move(Bb.x+Bb.width/2+(A.x-Bb.x)+2,Bb.y+Bb.height-8+40,{steps:12}); /* segura numa parte vazia (nao na caixinha) */ const gl=await page.getByTestId('board-guide').count(); const gb=gl?await page.getByTestId('board-guide').first().boundingBox():null; const Bm=await page.locator('[data-dbg]').boundingBox(); await page.mouse.up(); await page.waitForTimeout(300);
   ok(gl>=1,'linha-guia aparece ao alinhar com o vizinho'); const edges=Bm?[Bm.x,Bm.x+Bm.width/2,Bm.x+Bm.width,Bm.y,Bm.y+Bm.height/2,Bm.y+Bm.height]:[]; ok(!!gb&&edges.some(e=>Math.abs(e-(gb.width<5?gb.x:gb.y))<2),'item encaixa na linha-guia');
   await page.keyboard.press('Control+z'); await page.waitForTimeout(400); ok(await page.getByTestId('board-title').inputValue()==='Hacker','Ctrl+Z desfaz o movimento sem mexer no título');}
  await items().nth(0).click({position:{x:12,y:12}}); await page.getByTestId('board-caption').click(); await page.getByTestId('board-caption-input').fill('legenda da nota'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);

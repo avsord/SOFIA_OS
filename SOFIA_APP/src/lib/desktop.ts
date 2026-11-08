@@ -1,3 +1,4 @@
+import {EMBED} from './embed';
 import {DRIVE_APP} from './features';
 // 0.3.250: layout de computador (estilo Notion). No navegador com tela larga o app troca a barra de abas de baixo
 // por uma barra lateral fixa + barra de cima, e o conteudo ocupa a largura da tela. No celular nada muda:
@@ -20,7 +21,8 @@ export function contentArea():{left:number;right:number;top:number;bottom:number
  const el=document.querySelector('[data-testid="desktop-pages"]') as HTMLElement|null;if(!el)return null;
  const r=el.getBoundingClientRect();return r.width>0?{left:r.left,right:r.right,top:r.top,bottom:r.bottom}:null;
 }
-export function isDesktopWidth(width:number):boolean{return Platform.OS==='web'&&Number.isFinite(width)&&width>=DESKTOP_MIN;}
+// 08/11/2026: a pagina dentro do cartao do Quadro (?embed=1) e sempre o layout do computador, mesmo num cartao estreito
+export function isDesktopWidth(width:number):boolean{return Platform.OS==='web'&&(EMBED||(Number.isFinite(width)&&width>=DESKTOP_MIN));}
 export function useDesktop():boolean{const {width}=useWindowDimensions();return isDesktopWidth(width);}
 
 /** Largura maxima do conteudo por aba: so onde a leitura pede (texto de Paginas, Conversa). O resto e fluido. */

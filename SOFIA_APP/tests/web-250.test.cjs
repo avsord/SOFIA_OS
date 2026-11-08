@@ -5,7 +5,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('breakpoint so na web, a partir de 1024 px',()=>{
   const d=read('src/lib/desktop.ts');
   assert.ok(d.includes('export const DESKTOP_MIN=900;')); // 0.3.260: metade da tela (~960) ja e computador
-  assert.ok(d.includes("return Platform.OS==='web'&&Number.isFinite(width)&&width>=DESKTOP_MIN;"));
+  assert.ok(d.includes("return Platform.OS==='web'&&(EMBED||(Number.isFinite(width)&&width>=DESKTOP_MIN));")) // 08/11/2026: pagina dentro do Quadro (?embed=1) sempre no layout do computador;
   assert.ok(d.includes("if(Platform.OS!=='web')return 2;"),'grade de Apps no celular continua com 2 colunas');
 });
 test('App: moldura e pager de computador so carregam na web; barra de baixo some no computador',()=>{

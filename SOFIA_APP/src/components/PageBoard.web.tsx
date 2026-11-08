@@ -58,7 +58,7 @@ function size(b: PageBlock): {w: number; h: number} {
   const k = fileKind(b.data?.mime, b.data?.name), preview = b.data?.view === 'preview' || (!b.data?.view && defaultView(k) === 'preview');
   if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
-  if (b.type === 'page_link') return b.data?.view === 'list' ? {w: 360, h: 420} : {w: 640, h: 520}; // 08/11/2026: resumo adaptado (ou a pagina inteira)
+  if (b.type === 'page_link') return b.data?.view === 'attach' ? {w: 300, h: 64} : b.data?.view === 'list' ? {w: 360, h: 420} : {w: 640, h: 520}; // 08/11: Anexo (linha) ou Visualização (a página) // 08/11/2026: resumo adaptado (ou a pagina inteira)
   if (b.type === 'bookmark' && b.data?.link) return b.data.link.image ? {w: 300, h: 240} : {w: 300, h: 110};
   if (b.type === 'bookmark' && b.data?.live) return b.data.live.kind === 'list' || b.data.live.kind === 'mail' ? {w: 300, h: 230} : {w: 280, h: 150};
   if (b.type === 'todo') return {w: 260, h: 180};
@@ -184,11 +184,22 @@ export function PageBoard(p: Props) {
   const onBgDouble = (e: any) => {const t = e.target as HTMLElement; if (t.closest('[data-board-item],[data-board-ui]')) return; const at = toBoard(e.clientX, e.clientY);
     const nb = addBlock({id: uid(), type: 'callout', text: '', html: '', data: {}}, at); setEditing(nb.id);};
 
+  const dragOn = () => host.current?.setAttribute('data-board-drag', '1'), dragOff = () => host.current?.removeAttribute('data-board-drag');
+  // 08/11/2026 (Pedro: "os mesmos mecanismos de la"): cartao de pagina com Anexo (linha) ou Visualizacao (a pagina de verdade,
+  // editavel ali mesmo - nao abre aba do navegador)
+  const setPageView = (b: PageBlock, v: 'attach' | 'page' | 'list') => {const s2 = size({...b, data: {...(b.data || {}), view: v}});
+    patchBlock(b.id, x => ({...x, data: {...(x.data || {}), view: v, board: {...geo(x), w: v === 'attach' ? s2.w : Math.max(geo(x).w, s2.w), h: v === 'attach' ? s2.h : Math.max(geo(x).h, s2.h)}}}), 'board-view'); if (v !== 'page') setEditing(null);};
+  const usePageHere = (b: PageBlock) => {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json || p.locked) {p.onOpenPage(t); return;}
+    const g = geo(b), s2 = size({...b, data: {...(b.data || {}), view: 'page'}}), g2 = {...g, w: Math.max(g.w, s2.w), h: Math.max(g.h, s2.h)};
+    if (pageView(b) !== 'page') setPageView(b, 'page'); setSel([b.id]); focusOn(g2); setEditing(b.id);};
   // item: clique seleciona, arrastar move (todos os selecionados), no modo ligar liga
   const onItemDown = (b: PageBlock) => (e: any) => {
-    if (e.button !== 0) return; if (editing === b.id) return; e.stopPropagation(); host.current?.focus({preventScroll: true});
+    if (e.button !== 0) return; if (editing === b.id && !(e.target as HTMLElement).closest?.('[data-board-handle]')) return; e.stopPropagation(); host.current?.focus({preventScroll: true});
     if (mode === 'link') {const from = sel[0]; if (from && from !== b.id) {patchGeo([from], g => ({...g, links: [...(g.links || []).filter(l => linkTo(l) !== b.id), {to: b.id, arrow: true}]}), 'board-link');} setMode(''); setSel([b.id]); return;}
-    const already = sel.includes(b.id), ids = e.shiftKey ? (already ? sel.filter(x => x !== b.id) : [...sel, b.id]) : already ? sel : [b.id]; setSel(ids); if (e.shiftKey) return;
+    // 08/11/2026 (Pedro: "clico nele e ele fica grudado no mouse"): soltar o botao em cima da pagina do cartao (iframe) nao chegava
+    // ao quadro e o item seguia o mouse. Durante o arrasto nenhum iframe recebe o mouse, e a pagina so passa a aceitar cliques
+    // DEPOIS de soltar (um clique sem mover = usar a pagina aqui). Sair da janela tambem solta.
+    const already = sel.includes(b.id), ids = e.shiftKey ? (already ? sel.filter(x => x !== b.id) : [...sel, b.id]) : already ? sel : [b.id]; setSel(ids); if (e.shiftKey) return; dragOn();
     const sx = e.clientX, sy = e.clientY, start = new Map(ids.map(id => [id, geo(byId.get(id)!)])); let moved = false;
     // linhas-guia: a borda ou o meio do que se move encaixa na borda ou no meio de um vizinho (Alt solta o encaixe)
     const gs0 = [...start.values()], bx = Math.min(...gs0.map(g => g.x)), by = Math.min(...gs0.map(g => g.y)), bw = Math.max(...gs0.map(g => g.x + g.w)) - bx, bh = Math.max(...gs0.map(g => g.y + g.h)) - by;
@@ -197,9 +208,10 @@ export function PageBoard(p: Props) {
     const mv = (ev: PointerEvent) => {if (pinching.current) return; const z = viewRef.current.z; let dx = (ev.clientX - sx) / z, dy = (ev.clientY - sy) / z; if (!moved && Math.abs(dx) + Math.abs(dy) < 3 / z) return; moved = true;
       let gx: number | undefined, gy: number | undefined; if (!ev.altKey) {const tol = 6 / z, sxp = snap(bx + dx, bw, ox, tol), syp = snap(by + dy, bh, oy, tol); if (sxp) {dx += sxp.d; gx = sxp.line;} if (syp) {dy += syp.d; gy = syp.line;}} setGuides({x: gx, y: gy});
       const next: Record<string, Geo> = {}; start.forEach((g, id) => {next[id] = {...g, x: Math.round(g.x + dx), y: Math.round(g.y + dy)};}); setLive(next);};
-    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff();
+      if (!moved && b.type === 'page_link' && pageView(b) === 'page' && !p.locked && ids.length === 1) {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (t && !t.data?.lock_json) setEditing(b.id);}
       setGuides({}); if (moved) {const fin = liveRef.current; p.edit(bs => bs.map(x => fin[x.id] ? {...x, data: {...(x.data || {}), board: {...(geoOf(x) || {}), ...fin[x.id]}}} : x), 'board-move'); setLive({});}};
-    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);
   };
   const onResize = (b: PageBlock, corner: string) => (e: any) => {
     e.stopPropagation(); e.preventDefault(); const sx = e.clientX, sy = e.clientY, g0 = geo(b), ratio = g0.w / Math.max(1, g0.h), keep = (b.type === 'image' || (b.type === 'file' && ['image', 'video'].includes(fileKind(b.data?.mime, b.data?.name)))) && !e.shiftKey;
@@ -207,8 +219,9 @@ export function PageBoard(p: Props) {
       if (corner.includes('e')) w = g0.w + dx; if (corner.includes('w')) {w = g0.w - dx; x = g0.x + dx;} if (corner.includes('s')) hh = g0.h + dy; if (corner.includes('n')) {hh = g0.h - dy; y = g0.y + dy;}
       w = Math.max(60, w); hh = Math.max(36, hh); if (keep) {hh = w / ratio; if (corner.includes('n')) y = g0.y + g0.h - hh;} if (corner.includes('w')) x = g0.x + g0.w - w;
       setLive({[b.id]: {...g0, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(hh)}});};
-    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); const g = liveRef.current[b.id]; if (g) patchGeo([b.id], () => g, 'board-size'); setLive({});};
-    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    dragOn();
+    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff(); const g = liveRef.current[b.id]; if (g) patchGeo([b.id], () => g, 'board-size'); setLive({});};
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);
   };
   // leva a camera ate o item (cabe na tela, no maximo 100%), como quem aproxima o documento para editar
   const focusOn = (g: Geo) => {const z = Math.min(1, Math.max(MIN_Z, Math.min((size2.w - 80) / g.w, (size2.h - 150) / g.h))); setView({z, x: (size2.w - g.w * z) / 2 - g.x * z, y: Math.max(60, (size2.h - 90 - g.h * z) / 2) - g.y * z});};
@@ -216,7 +229,7 @@ export function PageBoard(p: Props) {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'bookmark' && b.data?.link?.url) {window.open(String(b.data.link.url), '_blank', 'noopener'); return;}
-    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json || b.data?.view === 'list') {p.onOpenPage(t); return;} focusOn(geo(b)); return;} // entra na pagina dentro do cartao (abrir arquivos, editar)
+    if (b.type === 'page_link') {usePageHere(b); return;} // entra na pagina dentro do cartao (abrir arquivos, editar), nunca numa aba nova
     const id = String(b.data?.attachment_id || ''); if (!id) return;
     if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); if (g.w < 600 || g.h < 700) patchGeo([b.id], g2 => ({...g2, w: Math.max(g2.w, 680), h: Math.max(g2.h, 860)}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); setEditing(b.id); return;} // editar: o cartao vira uma pagina
     openFileWindow(p.api, {id, name: String(b.data?.name || 'arquivo'), mime: String(b.data?.mime || (b.type === 'image' ? 'image/jpeg' : '')), pageId: p.pageId,
@@ -294,14 +307,14 @@ export function PageBoard(p: Props) {
     icon === ('@' as any) ? h('span', {style: {fontSize: 18, fontWeight: 700, lineHeight: 1}}, '@') : icon === 'T' ? h('svg', {width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', 'aria-hidden': true}, h('path', {d: 'M5 6V4h14v2M12 4v16M9 20h6'})) : <Icon name={icon} size={19} color={danger ? c.danger : on ? c.accent : c.text} />);
   const bar = (children: any[], style: any, label: string) => h('div', {'data-board-ui': '1', role: 'toolbar', 'aria-label': label, onPointerDown: (e: any) => e.stopPropagation(), style: {position: 'absolute', display: 'flex', alignItems: 'center', gap: 2, padding: '0 6px', background: c.surface, border: '1px solid ' + c.line, borderRadius: 14, boxShadow: '0 10px 24px rgba(0,0,0,.28)', zIndex: 30, ...style}}, ...children);
 
-  const selBar = (one || sel.length > 1) && !editing ? (() => {const gs = sel.map(id => byId.get(id)).filter(Boolean).map(b => geo(b!)), x = Math.min(...gs.map(g => g.x)), y2 = Math.max(...gs.map(g => g.y + g.h)), x2 = Math.max(...gs.map(g => g.x + g.w));
+  const selBar = (one || sel.length > 1) && (!editing || byId.get(editing)?.type === 'page_link') ? (() => {const gs = sel.map(id => byId.get(id)).filter(Boolean).map(b => geo(b!)), x = Math.min(...gs.map(g => g.x)), y2 = Math.max(...gs.map(g => g.y + g.h)), x2 = Math.max(...gs.map(g => g.x + g.w));
     const y1 = Math.min(...gs.map(g => g.y)), left = Math.max(8, Math.min(size2.w - 420, ((x + x2) / 2) * view.z + view.x - 200)), under = Math.max(0, ...sel.map(id => byId.get(id)).filter(Boolean).map(b => {const g = geo(b!); return g.y + g.h >= y2 - 1 ? (g.caption ? 22 : 0) + ((g.mentions || []).length ? 26 : 0) : 0;})), below = y2 * view.z + view.y + 14 + under, top = below + 48 > size2.h - 92 ? Math.max(8, y1 * view.z + view.y - 62) : below; // perto do rodape: a barra sobe para cima do item (nao fica sob a barra de inserir)
     const items: any[] = [];
     if (one?.type === 'file') {const k = fileKind(one.data?.mime, one.data?.name), pv = (one.data?.view || defaultView(k)) === 'preview'; items.push(btn(pv ? 'file' : 'eye', pv ? 'Mostrar como anexo' : 'Abrir no quadro (visualização)', () => {const s = size({...one, data: {...one.data, view: pv ? 'attach' : 'preview'}}); patchBlock(one.id, b => ({...b, data: {...b.data, view: pv ? 'attach' : 'preview', board: {...geo(b), w: s.w, h: s.h}}}), 'board-view');}));}
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
       if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
       if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
-      items.push(btn(one.data?.view === 'list' ? 'book' : 'listView', one.data?.view === 'list' ? 'Mostrar a página de verdade (editar aqui)' : 'Mostrar só o resumo (arquivos em lista)', () => {const toList = one.data?.view !== 'list', s2 = toList ? {w: 360, h: 420} : {w: 640, h: 520}; patchBlock(one.id, x => ({...x, data: {...(x.data || {}), view: toList ? 'list' : 'page', board: {...geo(x), w: toList ? s2.w : Math.max(geo(x).w, s2.w), h: Math.max(geo(x).h, s2.h)}}}), 'board-view');}, one.data?.view === 'list', false, 'board-page-view'));
+      items.push(btn(one.data?.view === 'list' ? 'book' : 'listView', one.data?.view === 'list' ? 'Mostrar a página de verdade (editar aqui)' : 'Mostrar só o resumo (arquivos em lista)', () => setPageView(one, one.data?.view === 'list' ? 'page' : 'list'), one.data?.view === 'list', false, 'board-page-view'));
       items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
     items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
@@ -321,6 +334,7 @@ export function PageBoard(p: Props) {
     onScroll: (e: any) => {const el = e.currentTarget as HTMLElement; if (el.scrollTop || el.scrollLeft) {el.scrollTop = 0; el.scrollLeft = 0;}},
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
+    h('style', null, '[data-board-drag] iframe{pointer-events:none!important}'),
     // 08/11/2026 (Pedro: "o conteudo ta com a qualidade ruim"): zoom do navegador (CSS zoom) em vez de esticar a imagem (scale):
     // o texto e redesenhado no tamanho certo e fica nitido em qualquer zoom; a camada anda com translate (sem escala)
     h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x / view.z + 'px,' + view.y / view.z + 'px)', zoom: view.z} as any}, // o translate tambem passa pelo zoom: divide
@@ -339,7 +353,7 @@ export function PageBoard(p: Props) {
       guides.x != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', left: guides.x, top: -100000, width: 1 / view.z, height: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
-        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
+        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onPageView={(v: any) => setPageView(b, v)} onUseHere={() => usePageHere(b)} onDup={() => void duplicate([b.id])} onRemove={() => remove([b.id])} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
         onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush(); if (b.type === 'page_link' && b.data?.page_id) p.onPageChanged?.(String(b.data.page_id));}} />),
       box ? h('div', {style: {position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, border: '1px solid ' + c.accent, background: c.accent + '22', pointerEvents: 'none'}}) : null),
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
@@ -411,7 +425,7 @@ export function PageBoard(p: Props) {
     picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await track('copiar-pagina', () => p.copyPage(src)); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {fail(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
-function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock}: any) {
+function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove}: any) {
   const c = useTheme(), k = b.type === 'file' ? fileKind(b.data?.mime, b.data?.name) : b.type === 'image' ? 'image' : 'other';
   const preview = b.type === 'file' && (b.data?.view || defaultView(k)) === 'preview';
   let body: any;
@@ -433,7 +447,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
-  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing || (selected && single)} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} />;
+  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} tools={{onView: onPageView, onUse: onUseHere, onDup, onRemove}} />;
   else if (b.type === 'bookmark' && b.data?.link) {const L = b.data.link; body = h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     L.image && !light ? h('div', {style: {flex: 1, minHeight: 0, backgroundColor: c.input, backgroundImage: 'url("' + String(L.image).replace(/["\\)]/g, '') + '")', backgroundSize: 'cover', backgroundPosition: 'center'}}) : null,
     h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3}}, h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, L.title || L.url),
@@ -478,13 +492,42 @@ function ListCard({b, editing, onChange}: any) {
 }
 
 // 08/11/2026 (Pedro: "como se fosse o iframe dessas paginas: abro os arquivos que tem ali dentro, edito, e com o zoom do quadro
-// tenho uma visao ampla de varias coisas"): o cartao mostra a PAGINA DE VERDADE (o proprio site em /paginas/<id>?embed=1, sem
-// barras), desenhada como no computador (1100 px de largura) e reduzida ao tamanho do cartao; o zoom do quadro aproxima.
-// Parado: so olha (o quadro move e seleciona). Dois cliques: entra na pagina (abrir PDF/Word, editar, tudo da pagina).
-// Muito afastado (zoom < 15%) ou pagina trancada: so o resumo em texto (leve).
-const PAGE_VIRTUAL_W = 980; // largura em que a pagina e desenhada (como no computador); o cartao aplica o zoom
-function PageCard(props: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>}) {
-  return props.b.data?.view === 'list' ? <PageListCard {...props} /> : <PageFrameCard {...props} />; // 08/11/2026 (Pedro): padrao = a pagina de verdade, editavel
+// tenho uma visao ampla de varias coisas" + "os mesmos mecanismos de la, a pagina nao vira aba do navegador, vira o conteudo com
+// edicao"): o cartao de pagina tem Anexo (linha, como um arquivo) ou Visualizacao (a PAGINA DE VERDADE: o proprio site em
+// /paginas/<id>?embed=1, sem barras, no tamanho do cartao). Um clique (sem arrastar) usa a pagina ali; arrasta pelo titulo.
+// Qualidade: a pagina e desenhada no tamanho real do cartao (antes era desenhada a 980 px e encolhida com zoom, e o navegador
+// passava a desenhar o conteudo - PDF, fotos - com 35% da resolucao). Muito afastado (zoom < 15%) ou trancada: so o resumo.
+export const pageView = (b: PageBlock): 'attach' | 'list' | 'page' => b.data?.view === 'attach' ? 'attach' : b.data?.view === 'list' ? 'list' : 'page';
+type PageTools = {onView: (v: 'attach' | 'page') => void; onUse: () => void; onDup: () => void; onRemove: () => void};
+type PageCardProps = {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>; tools?: PageTools};
+function PageCard(props: PageCardProps) {
+  const v = pageView(props.b);
+  return v === 'attach' ? <PageAttachCard {...props} /> : v === 'list' ? <PageListCard {...props} /> : <PageFrameCard {...props} />;
+}
+// a mesma barra do arquivo na pagina: Anexo | Visualizacao, usar aqui (editar), duplicar, remover
+function PageHeadTools({view, tools, editing}: {view: 'attach' | 'list' | 'page'; tools?: PageTools; editing: boolean}) {
+  const c = useTheme(); if (!tools) return null;
+  const stop = (e: any) => e.stopPropagation();
+  const seg = (label: string, v: 'attach' | 'page') => {const on = view === v || (v === 'page' && view === 'list');
+    return h('button', {key: v, type: 'button', role: 'radio', 'aria-checked': on, 'data-testid': 'page-card-view-' + v, onPointerDown: stop, onClick: (e: any) => {e.stopPropagation(); if (!on) tools.onView(v);},
+      style: {height: 24, padding: '0 9px', border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: on ? 600 : 500, color: on ? c.text : c.muted, background: on ? c.surface : 'transparent', boxShadow: on ? '0 1px 2px rgba(0,0,0,.18)' : 'none'}}, label);};
+  const tool = (icon: any, label: string, run: () => void, id: string, danger = false) => h('button', {key: id, type: 'button', 'aria-label': label, title: label, 'data-testid': id, onPointerDown: stop, onClick: (e: any) => {e.stopPropagation(); run();},
+    style: {width: 26, height: 26, border: 0, borderRadius: 6, cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center'}}, <Icon name={icon} size={14} color={danger ? c.danger : c.muted} />);
+  return h('div', {'data-board-ui': '1', style: {display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0}},
+    h('div', {role: 'radiogroup', 'aria-label': 'Como mostrar a página', style: {display: 'flex', padding: 2, borderRadius: 8, background: c.input, marginRight: 2}}, seg('Anexo', 'attach'), seg('Visualização', 'page')),
+    editing ? null : tool('external', 'Usar a página aqui (editar no próprio cartão)', tools.onUse, 'page-card-use'),
+    tool('copy', 'Duplicar (cópia independente)', tools.onDup, 'page-card-dup'),
+    tool('trash', 'Remover do quadro', tools.onRemove, 'page-card-remove', true));
+}
+// Anexo: a pagina como uma linha (igual ao arquivo anexado); dois cliques ou "usar aqui" abre a pagina no proprio cartao
+function PageAttachCard({b, pages, selected, editing, tools}: PageCardProps) {
+  const c = useTheme(), t = pages.find(x => x.id === String(b.data?.page_id || '')), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced;
+  return h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', background: c.surface, border: '1px solid ' + c.line, borderRadius: 12}},
+    h('div', {style: {width: 34, height: 34, flexShrink: 0, borderRadius: 8, background: c.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center'}}, <Icon name="book" size={17} color={c.accent} />),
+    h('div', {style: {flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2}},
+      h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
+      h('span', {style: {color: c.muted, fontSize: 11, whiteSpace: 'nowrap'}}, ['Página', synced ? 'sincronizada' : copy ? 'cópia' : '', 'dois cliques abre aqui'].filter(Boolean).join(' · '))),
+    selected ? h('div', {style: {position: 'absolute', right: 0, bottom: '100%', marginBottom: 8, padding: 3, borderRadius: 9, background: c.surface, border: '1px solid ' + c.line, boxShadow: '0 4px 14px rgba(0,0,0,.25)'}}, <PageHeadTools view="attach" tools={tools} editing={editing} />) : null);
 }
 // 08/11/2026 (Pedro: "versao mais ampla, adaptada, seguindo esse esquema" + "clicar e abrir o docx na janela flutuante, abrir ou
 // fechar o anexo e editar como la"): resumo da pagina no esquema do desenho - arquivo = linha com selo colorido, nome e
@@ -494,7 +537,7 @@ function PageCard(props: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolea
 const BADGE: Record<string, {t: string; bg: string; fg: string}> = {pdf: {t: 'PDF', bg: '#3B2330', fg: '#F5A0AE'}, doc: {t: 'W', bg: '#1E2A44', fg: '#7DB6FF'}, sheet: {t: 'X', bg: '#1D3329', fg: '#5FD3A2'}, slides: {t: 'P', bg: '#3A2C1A', fg: '#F2B45C'},
   video: {t: '▶', bg: '#2E2644', fg: '#B5A2FF'}, audio: {t: '♪', bg: '#2E2644', fg: '#B5A2FF'}, image: {t: 'IMG', bg: '#24303A', fg: '#9ED0F0'}, text: {t: 'TXT', bg: '#2A2A30', fg: '#C8C8D0'}, zip: {t: 'ZIP', bg: '#2A2A30', fg: '#C8C8D0'}, other: {t: '•••', bg: '#2A2A30', fg: '#C8C8D0'}};
 const KIND_LABEL: Record<string, string> = {pdf: 'PDF', doc: 'Word', sheet: 'Excel', slides: 'PowerPoint', video: 'Vídeo', audio: 'Áudio', image: 'Imagem', text: 'Texto', zip: 'Compactado', other: 'Arquivo'};
-function PageListCard({b, pages, api, selected, patchPageBlock}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>}) {
+function PageListCard({b, pages, api, selected, editing, patchPageBlock, tools}: PageCardProps) {
   const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [busy, setBusy] = useState('');
   let blocks: PageBlock[] = []; try {const bs = JSON.parse(String(t?.data?.blocks_json || '[]')); blocks = Array.isArray(bs) ? bs : [];} catch {}
   const lockedPage = !!t?.data?.lock_json;
@@ -525,28 +568,30 @@ function PageListCard({b, pages, api, selected, patchPageBlock}: {b: PageBlock; 
   return h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 14, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     h('div', {style: {height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid ' + c.line}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
-      synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null),
+      synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,
+      selected ? <PageHeadTools view="list" tools={tools} editing={editing} /> : null),
     h('div', {'data-board-scroll': selected ? 'on' : 'off', style: {flex: 1, minHeight: 0, overflowY: selected ? 'auto' : 'hidden', padding: 12, display: 'flex', flexDirection: 'column', gap: 8}},
       lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : !t ? null : blocks.map(row).filter(Boolean).length ? blocks.map(row) : h('span', {style: {color: c.muted, fontSize: 12}}, 'Página vazia')));
 }
 const OFFICE_K = (k: string) => k === 'doc' || k === 'sheet' || k === 'slides';
-function PageFrameCard({b, g, pages, editing, light, onDone}: {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void}) {
+function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: PageCardProps) {
   const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [loaded, setLoaded] = useState(false);
   let lines: string[] = [];
   if (t) {try {const bs = JSON.parse(String(t.data?.blocks_json || '[]')); lines = (Array.isArray(bs) ? bs : []).map((x: any) => String(x.text || x.data?.name || '').trim()).filter(Boolean).slice(0, 10);} catch {}}
-  const lockedPage = !!t?.data?.lock_json, live = !!t && !lockedPage && (!light || editing), head = 40, s = Math.max(0.05, g.w / PAGE_VIRTUAL_W);
+  const lockedPage = !!t?.data?.lock_json, live = !!t && !lockedPage && (!light || editing), head = 40;
   useEffect(() => {if (!live) setLoaded(false);}, [live]);
   useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onDone();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
   return h('div', {'data-board-editing': editing ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + (editing ? c.accent : c.line), display: 'flex', flexDirection: 'column', position: 'relative'}},
-    h('div', {style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderBottom: '1px solid ' + c.line, background: c.surface}}, <Icon name="book" size={15} color={c.accent} />,
+    h('div', {'data-board-handle': '1', style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 12px', borderBottom: '1px solid ' + c.line, background: c.surface, cursor: 'grab'}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
       synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,
+      selected || editing ? <PageHeadTools view="page" tools={tools} editing={editing} /> : null,
       editing ? h('button', {type: 'button', 'data-testid': 'board-page-done', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); onDone();}, style: {border: 0, borderRadius: 7, padding: '4px 10px', background: c.accent, color: c.onAccent, fontWeight: 700, fontSize: 12, cursor: 'pointer'}}, 'Pronto') : null),
     h('div', {style: {flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden'}},
       !loaded || !live ? h('div', {style: {position: 'absolute', inset: 0, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden'}},
         lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, live ? 'Abrindo a página…' : 'Página vazia')) : null,
       live ? h('iframe', {key: id, src: '/paginas/' + encodeURIComponent(id) + '?embed=1', title: 'Página ' + (t?.title || ''), 'data-testid': 'board-page-frame', onLoad: () => setLoaded(true),
-        style: {position: 'absolute', left: 0, top: 0, border: 0, width: PAGE_VIRTUAL_W, height: Math.max(200, (g.h - head) / s), zoom: s, opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
+        style: {position: 'absolute', left: 0, top: 0, border: 0, width: '100%', height: '100%', opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
     !editing && live ? h('div', {style: {position: 'absolute', right: 10, bottom: 8, padding: '2px 8px', borderRadius: 6, background: c.surface + 'e6', color: c.muted, fontSize: 11, pointerEvents: 'none'}}, 'Um clique: usar a página aqui · arraste pelo título') : null);
 }
 
