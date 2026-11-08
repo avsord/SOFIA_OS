@@ -18,6 +18,7 @@ import {FileBody, InlineMedia, fileKind, editKind, openFileWindow, downloadPageF
 import {KIND} from './DrivePreview';
 import {sanitizeRich} from './PageRichInput';
 import {parseSofiaClip, clipFromPaste, type SofiaClip} from '../lib/sofia-clipboard';
+import {boardDiagInit, note as diag, track} from '../lib/board-diag';
 import {LiveCard, LivePicker, askSofiaAbout, mdToHtml, liveText, liveTitleNow, bustLive, type LiveItem, type LiveKind} from './BoardLive.web';
 
 export const BOARD_SUPPORTED = true;
@@ -79,6 +80,11 @@ export function PageBoard(p: Props) {
   useEffect(() => {if (!ask && !selLink) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') {setAsk(null); setSelLink(null);}}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [!!ask, !!selLink]); // trocou a selecao: fecha a caixa da Sofia e a da legenda
   const [picker, setPicker] = useState(false), [rec, setRec] = useState<MediaRecorder | null>(null), [size2, setSize2] = useState({w: 1200, h: 800});
   const anchor = useRef<{x: number; y: number} | null>(null);
+  // 08/11/2026: registro do Quadro ("[quadro]" no servidor): cada aviso de erro mostrado tambem entra no registro (sem textos do usuario)
+  const fail = (m: string) => {diag('aviso', false, {msg: m}); p.onError(m);};
+  const opened = useRef(Date.now());
+  useEffect(() => boardDiagInit(p.api), [p.api]);
+  useEffect(() => {const ms = Date.now() - opened.current; diag('abrir', true, {ms, n: p.blocks.filter(onBoard).length});}, []); // eslint-disable-line react-hooks/exhaustive-deps
   const blocksRef = useRef(p.blocks); blocksRef.current = p.blocks;
   const shown = useMemo(() => p.blocks.filter(onBoard), [p.blocks]);
   const byId = useMemo(() => new Map(p.blocks.map(b => [b.id, b])), [p.blocks]);
@@ -216,7 +222,7 @@ export function PageBoard(p: Props) {
   // toda duplicacao e independente (Pedro, 08/11): pagina duplicada vira uma copia nova; arquivo e nota sao copiados
   const duplicate = async (ids: string[]) => {const made: PageBlock[] = []; let z = topZ();
     for (const id of ids) {const b = byId.get(id); if (!b) continue; const g = geo(b); let data: any = {...JSON.parse(JSON.stringify(b.data || {})), board: {...g, links: [], x: g.x + 30, y: g.y + 30, z: z++}};
-      if (b.type === 'page_link') {const src = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!src) continue; try {const copy = await p.copyPage(src); data = {...data, page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false};} catch (e: any) {p.onError(String(e?.message || 'Não deu para duplicar a página.')); continue;}}
+      if (b.type === 'page_link') {const src = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!src) continue; try {const copy = await track('copiar-pagina', () => p.copyPage(src)); data = {...data, page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false};} catch (e: any) {fail(String(e?.message || 'Não deu para duplicar a página.')); continue;}}
       made.push({...JSON.parse(JSON.stringify(b)), id: uid(), data});}
     if (made.length) {p.edit(bs => [...bs, ...made], 'board-dup'); setSel(made.map(x => x.id));}};
   const bringFront = () => {let z = topZ(); patchGeo(sel, g => ({...g, z: z++}), 'board-z');};
@@ -227,10 +233,10 @@ export function PageBoard(p: Props) {
       const clip = clipFromPaste(e) || parseSofiaClip(e.clipboardData?.getData('text/plain')); const files = Array.from(e.clipboardData?.files || []);
       anchor.current = center();
       if (clip) {e.preventDefault(); p.pasteClip(clip); return;}
-      if (files.length) {e.preventDefault(); if (p.locked) {p.onError('Arquivos ainda não entram em páginas trancadas.'); return;} p.dropFiles(files); return;}
+      if (files.length) {e.preventDefault(); if (p.locked) {fail('Arquivos ainda não entram em páginas trancadas.'); return;} p.dropFiles(files); return;}
       const html = e.clipboardData?.getData('text/html') || '', text = e.clipboardData?.getData('text/plain') || ''; if (!text.trim()) return; e.preventDefault();
       if (/^https?:\/\/\S+$/i.test(text.trim())) {const url = text.trim(); const nb = addBlock({id: uid(), type: 'bookmark', text: url, url, data: {link: {url, title: '', site: '', image: ''}}} as any);
-        p.api.linkPreview(url).then(pr => patchBlock(nb.id, x => ({...x, text: (pr.title ? pr.title + ' — ' : '') + url, data: {...(x.data || {}), link: {url, title: pr.title || '', site: pr.site || '', image: pr.image || '', description: String(pr.description || '').slice(0, 300)}, board: {...(geoOf(x) || {x: 0, y: 0, w: 300, h: 110}), h: pr.image ? 240 : 110}}}), 'board-link-preview')).catch(() => {}); return;} // link colado vira cartao com previa
+        track('previa-link', () => p.api.linkPreview(url)).then(pr => patchBlock(nb.id, x => ({...x, text: (pr.title ? pr.title + ' — ' : '') + url, data: {...(x.data || {}), link: {url, title: pr.title || '', site: pr.site || '', image: pr.image || '', description: String(pr.description || '').slice(0, 300)}, board: {...(geoOf(x) || {x: 0, y: 0, w: 300, h: 110}), h: pr.image ? 240 : 110}}}), 'board-link-preview')).catch(() => {}); return;} // link colado vira cartao com previa
       const rich = html ? sanitizeRich(html) : ''; addBlock({id: uid(), type: 'callout', text: text.slice(0, 12000), html: rich && rich.length < 24000 ? rich : '', data: {}});};
     document.addEventListener('paste', on); return () => document.removeEventListener('paste', on);}, [p.blocks, p.locked]); // eslint-disable-line react-hooks/exhaustive-deps
   // arquivo arrastado: guarda o ponto para o cartao nascer onde caiu (quem recebe o arquivo e a pagina)
@@ -239,13 +245,13 @@ export function PageBoard(p: Props) {
   // gravar audio (botao do microfone): vira um arquivo de audio no quadro (vai para o Drive como os outros)
   const toggleRec = async () => {
     if (rec) {rec.stop(); return;}
-    if (p.locked) {p.onError('Arquivos ainda não entram em páginas trancadas.'); return;}
+    if (p.locked) {fail('Arquivos ainda não entram em páginas trancadas.'); return;}
     try {const stream = await navigator.mediaDevices.getUserMedia({audio: true}), r = new MediaRecorder(stream), parts: Blob[] = [];
       r.ondataavailable = ev => {if (ev.data.size) parts.push(ev.data);};
       r.onstop = () => {stream.getTracks().forEach(t => t.stop()); setRec(null); const type = r.mimeType || 'audio/webm', ext = /ogg/.test(type) ? 'ogg' : /mp4/.test(type) ? 'm4a' : 'webm', now = new Date();
         const name = 'Áudio ' + now.toLocaleDateString('pt-BR').replace(/\//g, '-') + ' ' + now.toTimeString().slice(0, 5).replace(':', 'h') + '.' + ext;
         anchor.current = center(); p.dropFiles([new File(parts, name, {type})]);};
-      r.start(); setRec(r);} catch {p.onError('Sem acesso ao microfone. Libere o microfone para o site e tente de novo.');}
+      r.start(); setRec(r);} catch {fail('Sem acesso ao microfone. Libere o microfone para o site e tente de novo.');}
   };
 
   // so desenha o que esta na tela (com folga de meia tela)
@@ -268,11 +274,11 @@ export function PageBoard(p: Props) {
     if (one?.type === 'file') {const k = fileKind(one.data?.mime, one.data?.name), pv = (one.data?.view || defaultView(k)) === 'preview'; items.push(btn(pv ? 'file' : 'eye', pv ? 'Mostrar como anexo' : 'Abrir no quadro (visualização)', () => {const s = size({...one, data: {...one.data, view: pv ? 'attach' : 'preview'}}); patchBlock(one.id, b => ({...b, data: {...b.data, view: pv ? 'attach' : 'preview', board: {...geo(b), w: s.w, h: s.h}}}), 'board-view');}));}
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
       if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
-      if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void p.copyInto(cp, src).catch(e => p.onError(String(e?.message || e)));}));
+      if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
       items.push(btn('external', 'Abrir a página', () => openItem(one)));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
     items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
-    if (one?.type === 'bookmark' && one.data?.live?.kind === 'mail') items.push(btn('clip', 'Anexos deste e-mail', () => {const hit = String(one.data!.live.id), card = one.id; setMailAtt({card, hit, items: null, err: '', busy: ''}); p.api.mailAttachments(hit).then(r => setMailAtt(m => m && m.card === card ? {...m, items: r.items} : m)).catch(e => setMailAtt(m => m && m.card === card ? {...m, err: String(e?.message || 'Não deu para ler os anexos.')} : m));}, !!mailAtt, false, 'board-mail-att'));
+    if (one?.type === 'bookmark' && one.data?.live?.kind === 'mail') items.push(btn('clip', 'Anexos deste e-mail', () => {const hit = String(one.data!.live.id), card = one.id; setMailAtt({card, hit, items: null, err: '', busy: ''}); track('anexo-email-listar', () => p.api.mailAttachments(hit)).then(r => setMailAtt(m => m && m.card === card ? {...m, items: r.items} : m)).catch(e => setMailAtt(m => m && m.card === card ? {...m, err: String(e?.message || 'Não deu para ler os anexos.')} : m));}, !!mailAtt, false, 'board-mail-att'));
     if (one?.type === 'bookmark' && one.data?.live) items.push(btn('refresh', 'Atualizar com o app agora', () => bustLive(one.data!.live.kind)));
     if (one) items.push(btn('rename', 'Legenda', () => setCapEdit(one.id), capEdit === one.id, false, 'board-caption'));
     if (one) items.push(btn('@' as any, 'Mencionar uma página ou item do app (@)', () => setMention({id: one.id, mode: 'page'}), !!mention, false, 'board-mention'));
@@ -335,8 +341,8 @@ export function PageBoard(p: Props) {
       onClose={() => setMention(null)} onPick={(pg: Entity) => {const id = mention.id; setMention(null); patchGeo([id], g => ({...g, mentions: [...(g.mentions || []).filter(m => m.id !== pg.id), {kind: 'page', id: pg.id, title: pg.title || 'Sem título'}]}), 'board-mention'); p.flush();}} /> : null,
     mention && mention.mode === 'app' ? <LivePicker api={p.api} onClose={() => setMention(null)} onPick={(x: LiveItem) => {const id = mention.id; setMention(null); patchGeo([id], g => ({...g, mentions: [...(g.mentions || []).filter(m => m.id !== x.id), {kind: x.kind, id: x.id, title: liveText(x).slice(0, 120)}]}), 'board-mention'); p.flush();}} /> : null,
     mailAtt && byId.get(mailAtt.card) ? (() => {const g = geo(byId.get(mailAtt.card)!), left = Math.max(8, Math.min(size2.w - 380, (g.x + g.w) * view.z + view.x + 14)), top = Math.max(8, Math.min(size2.h - 260, g.y * view.z + view.y));
-      const take = async (it: {part: string; name: string; mime: string; bytes: number}) => {if (p.locked) {p.onError('Arquivos ainda não entram em páginas trancadas.'); return;} setMailAtt(m => m ? {...m, busy: it.part, err: ''} : m);
-        try {const a = await p.api.mailAttachmentToPage(mailAtt.hit, p.pageId, it.part); const k = fileKind(a.mime, a.name), nb = addBlock({id: uid(), type: 'file', text: '', data: {attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes, view: defaultView(k)}}, {x: g.x + g.w + 200, y: g.y + 80});
+      const take = async (it: {part: string; name: string; mime: string; bytes: number}) => {if (p.locked) {fail('Arquivos ainda não entram em páginas trancadas.'); return;} setMailAtt(m => m ? {...m, busy: it.part, err: ''} : m);
+        try {const a = await track('anexo-email-trazer', () => p.api.mailAttachmentToPage(mailAtt.hit, p.pageId, it.part), {file: {name: it.name, size: it.bytes}}); const k = fileKind(a.mime, a.name), nb = addBlock({id: uid(), type: 'file', text: '', data: {attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes, view: defaultView(k)}}, {x: g.x + g.w + 200, y: g.y + 80});
           patchGeo([mailAtt.card], x => ({...x, links: [...(x.links || []), {to: nb.id, arrow: true}]}), 'board-link'); setMailAtt(m => m ? {...m, busy: ''} : m); p.flush();}
         catch (e: any) {setMailAtt(m => m ? {...m, busy: '', err: String(e?.message || 'Não deu para trazer o anexo.')} : m);}};
       return h('div', {'data-board-ui': '1', 'data-testid': 'board-mail-att-box', onPointerDown: (e: any) => e.stopPropagation(), style: {position: 'absolute', left, top, zIndex: 40, width: 360, maxHeight: 300, overflow: 'auto', padding: 12, borderRadius: 14, background: c.surface, border: '1px solid ' + c.line, boxShadow: '0 16px 40px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', gap: 6}},
@@ -349,7 +355,7 @@ export function PageBoard(p: Props) {
     ask && sel.length ? (() => {const gs = sel.map(id => byId.get(id)).filter(Boolean).map(b => geo(b!)), x2 = Math.max(...gs.map(g => g.x + g.w)), y1 = Math.min(...gs.map(g => g.y));
       const left = Math.max(8, Math.min(size2.w - 440, x2 * view.z + view.x + 16)), top = Math.max(8, Math.min(size2.h - 200, y1 * view.z + view.y));
       const go = async () => {if (!ask.q.trim() || ask.busy) return; setAsk({...ask, busy: true, err: ''}); const chosen = sel.map(id => byId.get(id)).filter(Boolean) as PageBlock[];
-        try {const reply = await askSofiaAbout(p.api, p.title, ask.q, chosen.map(textOf).filter(Boolean).join('\n\n').slice(0, 8000)); const html = mdToHtml(reply);
+        try {const reply = await track('pedir-sofia', () => askSofiaAbout(p.api, p.title, ask.q, chosen.map(textOf).filter(Boolean).join('\n\n').slice(0, 8000)), {n: chosen.length}); const html = mdToHtml(reply);
           addBlock({id: uid(), type: 'callout', text: reply.slice(0, 12000), html: html.length < 24000 ? html : '', data: {}}, {x: x2 + 180, y: y1 + 90}); setAsk(null); p.flush();}
         catch (e: any) {setAsk(a => a ? {...a, busy: false, err: String(e?.message || 'A Sofia não respondeu.')} : a);}};
       return h('div', {'data-board-ui': '1', 'data-testid': 'board-ask-box', onPointerDown: (e: any) => e.stopPropagation(), style: {position: 'absolute', left, top, zIndex: 40, width: 420, padding: 12, borderRadius: 14, background: c.surface, border: '1px solid ' + c.accent, boxShadow: '0 16px 40px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', gap: 8}},
@@ -367,7 +373,7 @@ export function PageBoard(p: Props) {
           style: {width: 220, height: 34, borderRadius: 8, border: '1px solid ' + c.line, background: c.input, color: c.text, padding: '0 10px', fontSize: 13, outline: 'none'}}),
         h('span', {style: {color: c.muted, fontSize: 12, minWidth: 54, textAlign: 'center'}}, q ? (hits.length ? (find.i + 1) + ' de ' + hits.length : 'nada') : ''),
         btn('close', 'Fechar a busca', () => setFind(null)));})() : null,
-    picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await p.copyPage(src); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {p.onError(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
+    picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await track('copiar-pagina', () => p.copyPage(src)); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {fail(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
 function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention}: any) {

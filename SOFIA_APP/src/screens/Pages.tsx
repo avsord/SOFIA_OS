@@ -33,6 +33,7 @@ import {useHoverHold,useHoverKey} from '../lib/hover-hold';
 import {PageVersions} from '../components/PageVersions';
 import {PageRichInput,textToHtml,htmlLines} from '../components/PageRichInput';
 import {PageBoard,BOARD_SUPPORTED} from '../components/PageBoard';
+import {note as boardNote} from '../lib/board-diag';
 import {PageShareButton,shareUrl} from '../components/PageSharePanel';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
@@ -419,8 +420,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const made=files.map(f=>({...newBlock('file'),text:'',data:{uploading:true,name:f.name,size:f.size,mime:guessMime(f)}}));
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
    if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
-  await Promise.all(files.map(async(f,n)=>{const blk=made[n];try{const up=await uploadPageFile(api,pageId,f);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...up,view:defaultView(fileKind(up.mime,up.name))}}:x)}));}
-   catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
+  const onBoardPage=cur?.draft.appearance.layout==='board';/* 08/11/2026: no Quadro, envio que falha ou demora entra no registro [quadro] */
+  await Promise.all(files.map(async(f,n)=>{const blk=made[n],s0=Date.now();try{const up=await uploadPageFile(api,pageId,f);if(onBoardPage)boardNote('enviar',true,{ms:Date.now()-s0,file:{name:f.name,size:f.size}});store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...up,view:defaultView(fileKind(up.mime,up.name))}}:x)}));}
+   catch(e){if(onBoardPage)boardNote('enviar',false,{ms:Date.now()-s0,file:{name:f.name,size:f.size},error:e});store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "integracao com as paginas: poder copiar e colar la qualquer tipo de item"): colar o que foi copiado no
  // Drive (ou arquivos de outra pagina) cria blocos de arquivo; o servidor copia o arquivo (nada passa pelo navegador).
@@ -434,7 +436,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   try{const r=await api.sdToPage(pageId,clip.sofia==='drive-items'?{ids:clip.ids}:{attachments:clip.items.map(x=>x.attachment_id)});const gone=new Set<string>(),errs:string[]=[];
    store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>{const n=made.findIndex(m=>m.id===x.id);if(n<0)return x;const up=r.items[n] as any;if(!up||up.error){gone.add(x.id);if(up?.error)errs.push(String(up.error));return x;}return {...x,data:{attachment_id:up.id,name:up.name,mime:up.mime,size:up.bytes,view:defaultView(fileKind(up.mime,up.name))}};})}));
    if(gone.size)drop(gone);if(errs.length)setError(errs[0]);else if(r.skipped.length)setError('Pastas não entram na página: '+r.skipped.join(', ')+'.');}
-  catch(e){drop(new Set(made.map(x=>x.id)));setError(errorText(e));}
+  catch(e){if(cur?.draft.appearance.layout==='board')boardNote('colar-arquivo',false,{error:e,n:names.length});drop(new Set(made.map(x=>x.id)));setError(errorText(e));}
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "a Sofia consegue criar um arquivo doc na pagina e comecar a editar"): .docx em branco + editor aberto
  async function createDoc(after:PageBlock|null,kind:'docx'|'xlsx'|'pptx'='docx'){if(!selectedId||Platform.OS!=='web')return;const pageId=selectedId,cur=store.get(pageId);

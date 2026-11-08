@@ -2,6 +2,7 @@
 // a ligacao (data.live = {kind, id}) e mostra o item de verdade do app; mudou no app, muda aqui. Tarefa e lembrete marcam
 // feito pelo proprio cartao (e marca no app). Fontes: Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails,
 // Biblioteca. Na pagina vista como lista, o bloco e um 'bookmark' com o texto "Tarefa: ..." (nada se perde).
+import {track, note as diagNote} from '../lib/board-diag';
 import React, {useEffect, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -44,7 +45,7 @@ async function fetchSource(api: SofiaApi, kind: LiveKind): Promise<LiveItem[]> {
 }
 export function loadSource(api: SofiaApi, kind: LiveKind, fresh = false): Promise<LiveItem[]> {
   const c = cache.get(kind); if (c && !fresh && Date.now() - c.at < 60000) return c.p || Promise.resolve(c.items);
-  const p = fetchSource(api, kind).then(items => {cache.set(kind, {at: Date.now(), items}); subs.forEach(f => f()); return items;}).catch(e => {cache.delete(kind); throw e;});
+  const p = track('vivo-' + kind, () => fetchSource(api, kind)).then(items => {cache.set(kind, {at: Date.now(), items}); subs.forEach(f => f()); return items;}).catch(e => {cache.delete(kind); throw e;});
   cache.set(kind, {at: Date.now(), items: c?.items || [], p}); return p;
 }
 export function useLive(api: SofiaApi, kind: LiveKind, id: string) {
@@ -60,7 +61,7 @@ export function LiveCard({api, kind, id, text}: {api: SofiaApi; kind: LiveKind; 
   const toggle = async () => {if (!item || busy) return; setBusy(true); try {
     if (kind === 'task') await api.taskState(item.raw, item.done ? 'todo' : 'done');
     else if (kind === 'reminder') await api.saveEntity({...item.raw, state: item.done ? 'active' : 'done', revision: item.raw.revision});
-    bustLive(kind); await loadSource(api, kind, true);} catch {/* o proximo carregamento mostra o estado real */} finally {setBusy(false);}};
+    bustLive(kind); await loadSource(api, kind, true);} catch (e) {diagNote('vivo-marcar', false, {kind, error: e}); /* o proximo carregamento mostra o estado real */} finally {setBusy(false);}};
   const canCheck = kind === 'task' || kind === 'reminder';
   return h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     h('div', {style: {display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: '1px solid ' + c.line}}, <Icon name={s.icon} size={15} color={c.accent} />,

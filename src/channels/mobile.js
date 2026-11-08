@@ -228,6 +228,11 @@ function makeMobileApi(runtime, deps) {
     }
     // 07/11/2026 (Pedro: "como faz pra voce resolver sem eu falar item por item"): o Drive do site/app manda o que falhou ou
     // demorou (acao, tipo de arquivo, codigo do erro, tempo). Sem nome nem conteudo de arquivo. So vai para o registro.
+    // 08/11/2026 (Pedro: o mesmo metodo do Drive para o Quadro): falhas e demoras do Quadro no site (sem nomes nem conteudo)
+    if (p === '/api/mobile/diag/board' && m === 'POST') {
+      rate(session, 'diag-board', 30); const b = await bodyJson(req, 30000);
+      console.log('[quadro] ' + JSON.stringify(b).slice(0, 30000)); return send({ ok: true });
+    }
     if (p === '/api/mobile/diag/drive' && m === 'POST') {
       rate(session, 'diag-drive', 30); const b = await bodyJson(req, 30000);
       console.log('[drive] ' + JSON.stringify(b).slice(0, 30000)); return send({ ok: true });
