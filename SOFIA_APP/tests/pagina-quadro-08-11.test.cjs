@@ -9,4 +9,7 @@ test('quadro: layout guardado na pagina e duplicacao independente', () => {
   assert.ok(b.includes("'data-board-editing'") && b.includes('<FileBody'), 'Word/Excel/PowerPoint editam no lugar');
   assert.ok(p.includes("isBoard?boardView:documentContent(selected,draft)") && p.includes("label:'Ver como página'"), 'pagina vira quadro e volta');
   assert.ok(read('src/components/PageBoard.tsx').includes('BOARD_SUPPORTED = false'), 'no app (Android) nao ha quadro');
+  const l = read('src/components/BoardLive.web.tsx');
+  for (const k of ['event', 'task', 'note', 'reminder', 'list', 'monitor', 'mail', 'library']) assert.ok(l.includes("id: '" + k + "'"), 'fonte viva: ' + k);
+  assert.ok(l.includes('api.taskState(') && b.includes("data-testid': 'board-find'") && b.includes('askSofiaAbout('), 'tarefa marca no app, busca e pedir a Sofia');
 });

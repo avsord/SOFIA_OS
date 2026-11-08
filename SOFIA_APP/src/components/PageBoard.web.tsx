@@ -18,6 +18,7 @@ import {FileBody, InlineMedia, fileKind, editKind, openFileWindow, downloadPageF
 import {KIND} from './DrivePreview';
 import {sanitizeRich} from './PageRichInput';
 import {parseSofiaClip, clipFromPaste, type SofiaClip} from '../lib/sofia-clipboard';
+import {LiveCard, LivePicker, askSofiaAbout, mdToHtml, liveText, liveTitleNow, bustLive, type LiveItem, type LiveKind} from './BoardLive.web';
 
 export const BOARD_SUPPORTED = true;
 const h = React.createElement as any;
@@ -39,6 +40,7 @@ function size(b: PageBlock): {w: number; h: number} {
   if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
   if (b.type === 'page_link') return {w: 300, h: 220};
+  if (b.type === 'bookmark' && b.data?.live) return b.data.live.kind === 'list' || b.data.live.kind === 'mail' ? {w: 300, h: 230} : {w: 280, h: 150};
   if (b.type === 'todo') return {w: 260, h: 180};
   if (b.type === 'callout') return {w: 240, h: 150};
   if (b.type.startsWith('heading')) return {w: 420, h: 60};
@@ -63,6 +65,7 @@ export function PageBoard(p: Props) {
   const [sel, setSel] = useState<string[]>([]), [editing, setEditing] = useState<string | null>(null), [live, setLive] = useState<Record<string, Geo>>({});
   const liveRef = useRef(live); liveRef.current = live;
   const [box, setBox] = useState<{x: number; y: number; w: number; h: number} | null>(null), [mode, setMode] = useState<'' | 'draw' | 'link'>(''), [ink, setInk] = useState<{x: number; y: number}[] | null>(null);
+  const [livePick, setLivePick] = useState(false), [ask, setAsk] = useState<{q: string; busy: boolean; err: string} | null>(null), [find, setFind] = useState<{q: string; i: number} | null>(null);
   const [picker, setPicker] = useState(false), [rec, setRec] = useState<MediaRecorder | null>(null), [size2, setSize2] = useState({w: 1200, h: 800});
   const anchor = useRef<{x: number; y: number} | null>(null);
   const blocksRef = useRef(p.blocks); blocksRef.current = p.blocks;
@@ -154,6 +157,7 @@ export function PageBoard(p: Props) {
   const focusOn = (g: Geo) => {const z = Math.min(1, Math.max(MIN_Z, Math.min((size2.w - 80) / g.w, (size2.h - 150) / g.h))); setView({z, x: (size2.w - g.w * z) / 2 - g.x * z, y: Math.max(60, (size2.h - 90 - g.h * z) / 2) - g.y * z});};
   const openItem = (b: PageBlock) => {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
+    if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (t) p.onOpenPage(t); return;}
     const id = String(b.data?.attachment_id || ''); if (!id) return;
     if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); if (g.w < 600 || g.h < 700) patchGeo([b.id], g2 => ({...g2, w: Math.max(g2.w, 680), h: Math.max(g2.h, 860)}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); setEditing(b.id); return;} // editar: o cartao vira uma pagina
@@ -165,6 +169,7 @@ export function PageBoard(p: Props) {
   const onKey = (e: any) => {
     const t = e.target as HTMLElement; if (t.closest('input,textarea,[contenteditable="true"],[data-board-editing]')) {if (e.key === 'Escape') {setEditing(null); host.current?.focus();} return;}
     const mod = (e.ctrlKey || e.metaKey) && !e.altKey, k = e.key;
+    if (mod && k.toLowerCase() === 'f') {e.preventDefault(); setFind({q: '', i: 0}); return;}
     if (k === 'Escape') {setSel([]); setMode(''); return;}
     if (mod && k.toLowerCase() === 'a') {e.preventDefault(); setSel(shown.map(b => b.id)); return;}
     if (!sel.length) return;
@@ -174,6 +179,12 @@ export function PageBoard(p: Props) {
     const step = e.shiftKey ? 20 : 4, d = k === 'ArrowLeft' ? [-step, 0] : k === 'ArrowRight' ? [step, 0] : k === 'ArrowUp' ? [0, -step] : k === 'ArrowDown' ? [0, step] : null;
     if (d) {e.preventDefault(); patchGeo(sel, g => ({...g, x: g.x + d[0], y: g.y + d[1]}), 'board-nudge');}
   };
+  const textOf = (b: PageBlock): string => {
+    if (b.type === 'bookmark' && b.data?.live) return liveTitleNow(b.data.live.kind, b.data.live.id) || String(b.text || '');
+    if (b.type === 'page_link') {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return ''; let lines = ''; try {lines = (JSON.parse(String(t.data?.blocks_json || '[]')) as any[]).map(x => String(x.text || '')).filter(Boolean).join('\n');} catch {} return 'Página "' + (t.title || 'Sem título') + '":\n' + lines;}
+    if (b.type === 'todo' && Array.isArray(b.data?.items)) return b.data.items.map((i: any) => (i.done ? '[x] ' : '[ ] ') + i.text).join('\n');
+    if (b.type === 'file' || b.type === 'image') return b.data?.drawing ? '' : 'Arquivo: ' + String(b.data?.name || b.data?.caption || 'imagem');
+    return String(b.text || '');};
   const remove = (ids: string[]) => {const set = new Set(ids); p.edit(bs => {const rest = bs.filter(b => !set.has(b.id)).map(b => {const g = geoOf(b); return g?.links?.some(l => set.has(l)) ? {...b, data: {...b.data, board: {...g, links: g.links.filter(l => !set.has(l))}}} : b;}); return rest.length ? rest : [{id: uid(), type: 'text', text: ''}];}, 'board-remove'); setSel([]); setEditing(null);};
   // toda duplicacao e independente (Pedro, 08/11): pagina duplicada vira uma copia nova; arquivo e nota sao copiados
   const duplicate = async (ids: string[]) => {const made: PageBlock[] = []; let z = topZ();
@@ -231,6 +242,8 @@ export function PageBoard(p: Props) {
       if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void p.copyInto(cp, src).catch(e => p.onError(String(e?.message || e)));}));
       items.push(btn('external', 'Abrir a página', () => openItem(one)));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
+    items.unshift(btn('sofia', 'Pedir à Sofia sobre ' + (sel.length > 1 ? 'estes itens' : 'este item') + ' (resumir, organizar, virar tarefas…)', () => setAsk({q: '', busy: false, err: ''}), !!ask, false, 'board-ask'));
+    if (one?.type === 'bookmark' && one.data?.live) items.push(btn('refresh', 'Atualizar com o app agora', () => bustLive(one.data!.live.kind)));
     if (one) items.push(btn('link', 'Ligar a outro item (clique no outro item)', () => setMode(mode === 'link' ? '' : 'link'), mode === 'link'));
     items.push(btn('moveTo', 'Trazer para a frente', bringFront));
     if (one && (one.type === 'file' || (one.type === 'image' && one.data?.attachment_id))) items.push(btn('download', 'Baixar', () => void downloadPageFile(p.api, String(one.data?.attachment_id))));
@@ -263,11 +276,34 @@ export function PageBoard(p: Props) {
       btn('checkSquare', 'Lista', () => {const nb = addBlock({id: uid(), type: 'todo', text: '', data: {items: [{id: uid(), text: '', done: false}]}}); setEditing(nb.id);}, false, false, 'board-add-list'),
       btn('mic', rec ? 'Parar e guardar o áudio' : 'Gravar áudio', () => void toggleRec(), !!rec, false, 'board-rec'),
       btn('fileDoc', 'Documento Word', () => {anchor.current = center(); p.createDoc();}, false, false, 'board-add-doc'),
-      btn('book', 'Página existente (entra como cópia)', () => setPicker(true), picker, false, 'board-add-page')], {left: '50%', bottom: 20, transform: 'translateX(-50%)', height: 54}, 'Inserir no quadro'),
+      btn('book', 'Página existente (entra como cópia)', () => setPicker(true), picker, false, 'board-add-page'),
+      btn('grid', 'Do app: Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca', () => setLivePick(true), livePick, false, 'board-add-live')], {left: '50%', bottom: 20, transform: 'translateX(-50%)', height: 54}, 'Inserir no quadro'),
     bar([btn('zoomOut', 'Afastar', () => zoomBy(1 / 1.25)), h('button', {key: 'pct', type: 'button', title: 'Voltar para 100%', onClick: () => zoomBy(1 / view.z), 'data-testid': 'board-zoom',
-      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar', () => zoomBy(1.25)), btn('expand', 'Ver tudo', fitAll)],
+      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar', () => zoomBy(1.25)), btn('expand', 'Ver tudo', fitAll), btn('search', 'Buscar no quadro (Ctrl+F)', () => setFind(f => f ? null : {q: '', i: 0}), !!find, false, 'board-find-open')],
       {left: 16, bottom: 20, height: 46}, 'Zoom do quadro'),
     rec ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', bottom: 84, transform: 'translateX(-50%)', padding: '6px 12px', borderRadius: 10, background: c.dangerBg, color: c.danger, fontSize: 12, fontWeight: 600}}, '● Gravando… clique no microfone para parar') : null,
+    livePick ? <LivePicker api={p.api} onClose={() => setLivePick(false)} onPick={(x: LiveItem) => {setLivePick(false); addBlock({id: uid(), type: 'bookmark', text: liveText(x).slice(0, 12000), data: {live: {kind: x.kind as LiveKind, id: x.id}}});}} /> : null,
+    ask && sel.length ? (() => {const gs = sel.map(id => byId.get(id)).filter(Boolean).map(b => geo(b!)), x2 = Math.max(...gs.map(g => g.x + g.w)), y1 = Math.min(...gs.map(g => g.y));
+      const left = Math.max(8, Math.min(size2.w - 440, x2 * view.z + view.x + 16)), top = Math.max(8, Math.min(size2.h - 200, y1 * view.z + view.y));
+      const go = async () => {if (!ask.q.trim() || ask.busy) return; setAsk({...ask, busy: true, err: ''}); const chosen = sel.map(id => byId.get(id)).filter(Boolean) as PageBlock[];
+        try {const reply = await askSofiaAbout(p.api, p.title, ask.q, chosen.map(textOf).filter(Boolean).join('\n\n').slice(0, 8000)); const html = mdToHtml(reply);
+          addBlock({id: uid(), type: 'callout', text: reply.slice(0, 12000), html: html.length < 24000 ? html : '', data: {}}, {x: x2 + 180, y: y1 + 90}); setAsk(null); p.flush();}
+        catch (e: any) {setAsk(a => a ? {...a, busy: false, err: String(e?.message || 'A Sofia não respondeu.')} : a);}};
+      return h('div', {'data-board-ui': '1', 'data-testid': 'board-ask-box', onPointerDown: (e: any) => e.stopPropagation(), style: {position: 'absolute', left, top, zIndex: 40, width: 420, padding: 12, borderRadius: 14, background: c.surface, border: '1px solid ' + c.accent, boxShadow: '0 16px 40px rgba(0,0,0,.4)', display: 'flex', flexDirection: 'column', gap: 8}},
+        h('div', {style: {color: c.text, fontSize: 13, fontWeight: 700}}, 'Pedir à Sofia sobre ' + (sel.length > 1 ? sel.length + ' itens' : 'este item')),
+        h('input', {autoFocus: true, value: ask.q, disabled: ask.busy, placeholder: 'Ex.: resume, organiza por cena, vira tarefas…', 'aria-label': 'Pedido para a Sofia', onChange: (e: any) => setAsk({...ask, q: e.target.value}), onKeyDown: (e: any) => {if (e.key === 'Enter') void go(); if (e.key === 'Escape') setAsk(null);},
+          style: {height: 38, borderRadius: 9, border: '1px solid ' + c.line, background: c.input, color: c.text, padding: '0 10px', fontSize: 14, outline: 'none'}}),
+        h('div', {style: {display: 'flex', alignItems: 'center', gap: 8}}, h('span', {style: {flex: 1, color: ask.err ? c.danger : c.muted, fontSize: 12}}, ask.err || (ask.busy ? 'A Sofia está pensando… a resposta entra como nota ao lado.' : 'A resposta entra como uma nota ao lado.')),
+          h('button', {type: 'button', onClick: () => setAsk(null), style: {height: 32, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: c.muted, cursor: 'pointer'}}, 'Cancelar'),
+          h('button', {type: 'button', 'data-testid': 'board-ask-go', disabled: ask.busy || !ask.q.trim(), onClick: () => void go(), style: {height: 32, padding: '0 12px', border: 0, borderRadius: 8, background: c.accent, color: c.onAccent, fontWeight: 700, cursor: 'pointer', opacity: ask.busy || !ask.q.trim() ? 0.6 : 1}}, ask.busy ? 'Pedindo…' : 'Pedir')));})() : null,
+    find ? (() => {const q = find.q.trim().toLowerCase(), hits = q ? shown.filter(b => (textOf(b) + ' ' + String(b.data?.name || '')).toLowerCase().includes(q)) : [];
+      const jump = (i: number) => {const b = hits[(i + hits.length) % hits.length]; if (!b) return; setFind({...find, i: (i + hits.length) % hits.length}); setSel([b.id]); focusOn(geo(b));};
+      return h('div', {'data-board-ui': '1', 'data-testid': 'board-find', onPointerDown: (e: any) => e.stopPropagation(), style: {position: 'absolute', right: 16, top: 12, zIndex: 35, display: 'flex', alignItems: 'center', gap: 6, padding: 6, borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, boxShadow: '0 10px 24px rgba(0,0,0,.28)'}},
+        h('input', {autoFocus: true, value: find.q, placeholder: 'Buscar no quadro', 'aria-label': 'Buscar no quadro', 'data-testid': 'board-find-input', onChange: (e: any) => setFind({q: e.target.value, i: 0}),
+          onKeyDown: (e: any) => {if (e.key === 'Enter') {e.preventDefault(); jump(e.shiftKey ? find.i - 1 : (sel.length && hits[find.i]?.id === sel[0] ? find.i + 1 : find.i));} if (e.key === 'Escape') {setFind(null); host.current?.focus();}},
+          style: {width: 220, height: 34, borderRadius: 8, border: '1px solid ' + c.line, background: c.input, color: c.text, padding: '0 10px', fontSize: 13, outline: 'none'}}),
+        h('span', {style: {color: c.muted, fontSize: 12, minWidth: 54, textAlign: 'center'}}, q ? (hits.length ? (find.i + 1) + ' de ' + hits.length : 'nada') : ''),
+        btn('close', 'Fechar a busca', () => setFind(null)));})() : null,
     picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await p.copyPage(src); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {p.onError(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
@@ -294,6 +330,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
   else if (b.type === 'page_link') body = <PageCard b={b} pages={pages} />;
+  else if (b.type === 'bookmark' && b.data?.live) body = <LiveCard api={api} kind={b.data.live.kind} id={String(b.data.live.id)} text={String(b.text || '')} />;
   else body = h('div', {style: {padding: 12, background: c.surface, border: '1px solid ' + c.line, borderRadius: 12, color: c.muted, fontSize: 12, width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden'}}, String(b.text || b.type));
   const handle = (corner: string, css: any) => h('div', {key: corner, onPointerDown: onResize(corner), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', width: 14 / zoom, height: 14 / zoom, borderRadius: 4 / zoom, background: c.surface, border: (2 / zoom) + 'px solid ' + c.accent, cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize', zIndex: 3, ...css}});
   const o = -7 / zoom;

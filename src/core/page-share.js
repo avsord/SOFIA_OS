@@ -120,6 +120,68 @@ function blocksHtml(blocks,ctx){const {token,linkable,imgUrl}=ctx;
  }
  closeList();return out.join('\n');
 }
+// ---------- 08/11/2026 (Pedro: "Compartilhado: quem recebe so olha, com zoom e mover"): Pagina Quadro so leitura ----------
+// Cada bloco fica no lugar guardado em data.board {x,y,w,h,z,color,links}; os sem lugar vao numa coluna a esquerda.
+// Zoom pela rodinha (no ponto do mouse), mover arrastando o fundo, "Ver tudo". O script vai com nonce (CSP so libera ele).
+const num=(v,d,lo,hi)=>{const n=Number(v);return Number.isFinite(n)?Math.max(lo,Math.min(hi,n)):d;};
+const HEX=/^#[0-9a-f]{3,8}$/i;
+function onBoardShared(b){if(b.data&&b.data.board)return true;const t=String(b.type||'text');if(t==='divider')return false;
+ if(t==='text'||/^heading/.test(t)||t==='bullet'||t==='number')return !!String(b.text||'').trim();return true;}
+function sizeShared(b){const t=String(b.type||'text'),d=b.data||{};
+ if(t==='file'){const k=fileKind(d.mime,d.name),pv=(d.view||((k==='image'||k==='video'||k==='audio')?'preview':'attach'))==='preview';return !pv?{w:280,h:64}:k==='audio'?{w:320,h:70}:k==='image'||k==='video'?{w:320,h:240}:{w:280,h:360};}
+ if(t==='image')return d.drawing?{w:num(d.drawing.w,200,8,20000),h:num(d.drawing.h,120,8,20000)}:{w:320,h:240};
+ if(t==='page_link')return {w:300,h:220};if(t==='todo')return {w:260,h:180};if(t==='callout')return {w:240,h:150};if(/^heading/.test(t))return {w:420,h:60};return {w:300,h:90};}
+function boardItemHtml(b,ctx){const t=String(b.type||'text'),d=b.data||{},g=d.board||{};
+ if(t==='callout'){const bg=HEX.test(String(g.color||''))?g.color:'#2A2636';return '<div class="bi-note" style="background:'+bg+'">'+(textOf(b)||'<span class="bi-muted">Nota vazia</span>')+'</div>';}
+ if(t==='todo'){const items=Array.isArray(d.items)?d.items:[{text:b.text,done:!!b.checked}];
+  return '<div class="bi-card bi-list">'+items.map(i=>'<p class="todo">'+(i&&i.done?'<span class="box on">✓</span>':'<span class="box"></span>')+'<span'+(i&&i.done?' class="done"':'')+'>'+plainWithLinks(String(i&&i.text||''))+'</span></p>').join('')+'</div>';}
+ if(t==='image'&&d.drawing){const dw=d.drawing,path=String(dw.d||'');if(!/^[ML0-9.\s-]*$/.test(path))return '';
+  return '<svg class="bi-draw" viewBox="0 0 '+num(dw.w,200,1,20000)+' '+num(dw.h,100,1,20000)+'" preserveAspectRatio="none" role="img" aria-label="Desenho"><path d="'+esc(path)+'" fill="none" stroke="'+(HEX.test(String(dw.color||''))?dw.color:'#B9A6FF')+'" stroke-width="'+num(dw.width,3,0.5,40)+'" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';}
+ if(t==='image')return d.attachment_id?'<img class="bi-img" src="'+esc(ctx.imgUrl(String(d.attachment_id)))+'" alt="'+esc(d.caption||'')+'" loading="lazy" draggable="false">':'';
+ if(t==='file'&&d.attachment_id){const id=String(d.attachment_id),k=fileKind(d.mime,d.name),name=String(d.name||'Arquivo'),office=k==='doc'||k==='sheet'||k==='slides';
+  const pv=(d.view||((k==='image'||k==='video'||k==='audio')?'preview':'attach'))==='preview',url=ctx.fileUrl(id),open=url+(office?'?as=pdf':''),dl=url+'?dl=1';
+  if(pv&&k==='image')return '<img class="bi-img" src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy" draggable="false">';
+  if(pv&&k==='video')return '<video class="bi-media" controls preload="metadata" src="'+esc(url)+'"></video>';
+  if(pv&&k==='audio')return '<div class="bi-card bi-audio"><audio controls preload="metadata" src="'+esc(url)+'"></audio></div>';
+  if(pv&&(k==='pdf'||office))return '<iframe class="bi-frame" src="'+esc(open)+'" title="'+esc(name)+'"></iframe>';
+  return '<a class="file-row bi-file" href="'+esc(k==='other'?dl:open)+'" target="_blank" rel="noopener"><span class="file-ico" style="background:'+FILE_COLOR[k]+'22;color:'+FILE_COLOR[k]+'">'+esc((name.split('.').pop()||'').slice(0,4).toUpperCase()||'ARQ')+'</span><span class="file-txt"><b>'+esc(name)+'</b><small>'+esc([FILE_LABEL[k],sizeText(d.size)].filter(Boolean).join(' · '))+'</small></span></a>';}
+ if(t==='page_link'&&d.page_id){const l=ctx.linkable(String(d.page_id));if(!l)return '';
+  const lines=(ctx.pageLines&&ctx.pageLines(String(d.page_id)))||[];
+  return '<a class="bi-card bi-page" href="'+esc(l.href)+'"><span class="bi-page-head">'+esc(l.icon)+' <b>'+esc(l.title)+'</b></span>'+(lines.length?lines.map(x=>'<span class="bi-line">'+esc(x)+'</span>').join(''):'<span class="bi-muted">Página vazia</span>')+'</a>';}
+ if(t==='code')return '<pre class="bi-text"><code>'+esc(b.text)+'</code></pre>';
+ return '<div class="'+(/^heading/.test(t)?'bi-text bi-h':'bi-text')+'">'+textOf(b)+'</div>';}
+function boardHtml(blocks,ctx){
+ const shown=blocks.filter(b=>b&&typeof b==='object'&&onBoardShared(b));let col=0;const geo=new Map();
+ for(const b of shown){const g=(b.data&&b.data.board)||null,s=sizeShared(b);
+  if(g&&Number.isFinite(Number(g.x))&&Number.isFinite(Number(g.y)))geo.set(b.id,{x:num(g.x,0,-1e6,1e6),y:num(g.y,0,-1e6,1e6),w:num(g.w,s.w,8,20000),h:num(g.h,s.h,8,20000),z:num(g.z,0,-1e6,1e6),links:Array.isArray(g.links)?g.links.map(String):[]});
+  else{geo.set(b.id,{x:-360,y:col,w:s.w,h:s.h,z:0,links:[]});col+=s.h+24;}}
+ const lines=[];for(const b of shown){const a=geo.get(b.id);for(const to of a.links){const c=geo.get(to);if(c)lines.push('<line x1="'+(a.x+a.w/2)+'" y1="'+(a.y+a.h/2)+'" x2="'+(c.x+c.w/2)+'" y2="'+(c.y+c.h/2)+'"/>');}}
+ const items=shown.map(b=>{const g=geo.get(b.id),inner=boardItemHtml(b,ctx);if(!inner)return '';
+  return '<div class="bi" data-type="'+esc(String(b.type||'text'))+'" style="left:'+g.x+'px;top:'+g.y+'px;width:'+g.w+'px;height:'+g.h+'px;z-index:'+Math.round(g.z)+'">'+inner+'</div>';}).filter(Boolean);
+ return '<div id="board" class="board" tabindex="0" aria-label="Quadro (somente leitura). Rodinha: zoom; arrastar: mover"><div id="layer" class="layer"><svg class="links" width="1" height="1" aria-hidden="true">'+lines.join('')+'</svg>'+items.join('')+'</div>'+
+  (items.length?'':'<div class="bi-empty">Quadro vazio</div>')+
+  '<div class="zoombar" role="toolbar" aria-label="Zoom do quadro"><button type="button" id="zout" aria-label="Afastar">−</button><button type="button" id="zpct" aria-label="Voltar para 100%">100%</button><button type="button" id="zin" aria-label="Aproximar">+</button><button type="button" id="zfit">Ver tudo</button></div></div>';
+}
+const BOARD_CSS=`html,body{height:100%;overflow:hidden}.board{position:fixed;left:0;right:0;top:var(--top,45px);bottom:0;overflow:hidden;outline:none;cursor:grab;touch-action:none;background-color:var(--bg);background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:24px 24px}.board.drag{cursor:grabbing}
+.layer{position:absolute;left:0;top:0;transform-origin:0 0}.links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}.links line{stroke:var(--muted);stroke-width:2}
+.bi{position:absolute;box-sizing:border-box}.bi>*{width:100%;height:100%;box-sizing:border-box}.bi-note{padding:14px;border-radius:12px;border:1px solid var(--line);font-size:14px;line-height:1.45;overflow:auto;color:#F2EEFA}.bi-text{padding:6px;font-size:18px;line-height:1.45;overflow:auto;margin:0;white-space:pre-wrap}.bi-h{font-size:28px;font-weight:700}
+.bi-card{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:12px;background:var(--soft);border:1px solid var(--line);overflow:hidden;color:inherit;text-decoration:none}.bi-list .todo{margin:0}.bi-audio{justify-content:center}.bi-audio audio{width:100%}
+.bi-img{display:block;object-fit:cover;border-radius:6px;user-select:none;-webkit-user-drag:none}.bi-media{display:block;background:#000;border-radius:8px}.bi-frame{border:0;border-radius:8px;background:#fff}.bi-draw{overflow:visible}.bi-file{margin:0}
+.bi-page-head{display:flex;gap:6px;align-items:center;padding-bottom:6px;border-bottom:1px solid var(--line)}.bi-line{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bi-muted{color:var(--muted);font-size:12px}.bi-empty{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);color:var(--muted)}
+.zoombar{position:absolute;left:16px;bottom:20px;display:flex;gap:2px;padding:4px 6px;border-radius:12px;background:var(--soft);border:1px solid var(--line);box-shadow:0 10px 24px rgba(0,0,0,.25)}.zoombar button{min-width:34px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text);font:600 14px SofiaSans,system-ui,sans-serif;cursor:pointer}.zoombar button:hover{background:var(--line)}#zpct{min-width:56px;font-size:13px}#zfit{font-size:12px;color:var(--muted)}`;
+const BOARD_JS=`(function(){var b=document.getElementById('board'),L=document.getElementById('layer'),P=document.getElementById('zpct'),nav=document.querySelector('.top');if(!b)return;
+if(nav)b.style.setProperty('--top',nav.offsetHeight+'px');var v={x:80,y:60,z:1};
+function ap(){L.style.transform='translate('+v.x+'px,'+v.y+'px) scale('+v.z+')';b.style.backgroundSize=(24*v.z)+'px '+(24*v.z)+'px';b.style.backgroundPosition=v.x+'px '+v.y+'px';P.textContent=Math.round(v.z*100)+'%';}
+function zoomAt(k,mx,my){var z=Math.min(4,Math.max(0.1,v.z*k));v.x=mx-(mx-v.x)*(z/v.z);v.y=my-(my-v.y)*(z/v.z);v.z=z;ap();}
+function fit(){var it=L.querySelectorAll('.bi');if(!it.length){ap();return;}var x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;for(var i=0;i<it.length;i++){var s=it[i].style,x=parseFloat(s.left),y=parseFloat(s.top),w=parseFloat(s.width),h=parseFloat(s.height);x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x+w);y2=Math.max(y2,y+h);}
+var W=b.clientWidth,H=b.clientHeight,z=Math.min(1,Math.max(0.1,Math.min((W-80)/Math.max(1,x2-x1),(H-120)/Math.max(1,y2-y1))));v.z=z;v.x=(W-(x2-x1)*z)/2-x1*z;v.y=(H-60-(y2-y1)*z)/2-y1*z;ap();}
+b.addEventListener('wheel',function(e){if(e.target.closest&&e.target.closest('iframe,video,audio'))return;e.preventDefault();var r=b.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*(e.ctrlKey?0.01:0.0015)),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+b.addEventListener('pointerdown',function(e){if(e.button!==0&&e.button!==1)return;if(e.target.closest('a,button,video,audio,iframe,.zoombar'))return;var sx=e.clientX,sy=e.clientY,x0=v.x,y0=v.y;b.classList.add('drag');
+function mv(ev){v.x=x0+ev.clientX-sx;v.y=y0+ev.clientY-sy;ap();}function up(){b.classList.remove('drag');removeEventListener('pointermove',mv);removeEventListener('pointerup',up);}addEventListener('pointermove',mv);addEventListener('pointerup',up);});
+var pts={};b.addEventListener('touchstart',function(e){if(e.touches.length===2){pts.d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}},{passive:true});
+b.addEventListener('touchmove',function(e){if(e.touches.length===2&&pts.d){e.preventDefault();var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY),r=b.getBoundingClientRect();zoomAt(d/pts.d,(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,(e.touches[0].clientY+e.touches[1].clientY)/2-r.top);pts.d=d;}},{passive:false});
+document.getElementById('zin').onclick=function(){zoomAt(1.25,b.clientWidth/2,b.clientHeight/2);};document.getElementById('zout').onclick=function(){zoomAt(0.8,b.clientWidth/2,b.clientHeight/2);};
+P.onclick=function(){zoomAt(1/v.z,b.clientWidth/2,b.clientHeight/2);};document.getElementById('zfit').onclick=fit;fit();})();`;
 const PALETTE={bg:'#131218',text:'#F2EEFA',muted:'#9A95A8',line:'#2A2833',soft:'#1D1B24',accent:'#B9A6FF'};
 const LIGHT={bg:'#FFFFFF',text:'#1F1D24',muted:'#6E6A78',line:'#E7E4EC',soft:'#F6F4F9',accent:'#6B4FD8'};
 /** 'dark' | 'light' | null (null = segue o sistema de quem abre). Por horario: conta no horario de Brasilia. */
@@ -130,13 +192,14 @@ function shareTheme(a,now=new Date()){
  const hm=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now),cur=min(hm);
  return light<dark?(cur>=light&&cur<dark?'light':'dark'):(cur>=light||cur<dark?'light':'dark');
 }
-function renderSharedPage({root,current,shares,token}){
+function renderSharedPage({root,current,shares,token,nonce}){
  const base='/p/'+encodeURIComponent(token);
  const href=id=>id===root.id?base:base+'/'+encodeURIComponent(id);
  const imgUrl=att=>base+'/img/'+encodeURIComponent(att),fileUrl=att=>base+'/file/'+encodeURIComponent(att);
  const isEmoji=v=>v&&!/^[a-z0-9_-]+$/i.test(String(v));
  const pageIcon=e=>isEmoji(e.data&&e.data.icon)?String(e.data.icon):'📄';
  const linkable=id=>{const r=shares.resolve(token,id===root.id?undefined:id);if(!r||!r.current)return null;return {href:href(id),title:r.current.title||'Sem título',icon:pageIcon(r.current)};};
+ const pageLines=id=>{const r=shares.resolve(token,id===root.id?undefined:id);if(!r||!r.current)return [];let bs=[];try{bs=JSON.parse(String(r.current.data&&r.current.data.blocks_json||'[]'));}catch{bs=[];}return (Array.isArray(bs)?bs:[]).map(x=>String((x&&(x.text||(x.data&&x.data.name)))||'').trim()).filter(Boolean).slice(0,8);};
  let blocks=[];try{blocks=JSON.parse(String(current.data&&current.data.blocks_json||'[]'));}catch{blocks=[];}if(!Array.isArray(blocks))blocks=[];
  const linked=new Set(blocks.filter(b=>b&&b.type==='page_link').map(b=>String(b.data&&b.data.page_id||'')));
  const kids=shares.children(current.id).filter(k=>!linked.has(k.id));
@@ -146,6 +209,7 @@ function renderSharedPage({root,current,shares,token}){
  const rawPos=d.cover_position,pos=rawPos!==''&&rawPos!=null&&Number.isFinite(Number(rawPos))?Math.max(0,Math.min(100,Number(rawPos))):50;
  const icon=isEmoji(d.icon)?String(d.icon):'';
  const title=current.title||'Sem título';
+ const isBoard=d.layout==='board'&&!!nonce; // Pagina Quadro: so leitura com zoom e mover (precisa do nonce do script)
  // sem a escolha ainda registrada (o app manda ao abrir), vale o padrao da Sofia: por horario, em Brasilia - nunca o tema de quem abre
  const theme=shareTheme((shares.getAppearance&&shares.getAppearance())||{appearance:'schedule'});
  const css=(p)=>`--bg:${p.bg};--text:${p.text};--muted:${p.muted};--line:${p.line};--soft:${p.soft};--accent:${p.accent};`;
@@ -177,13 +241,14 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid 
 details{margin:6px 0}summary{cursor:pointer;font-weight:600}summary small{color:var(--muted);font-weight:400}details.note{margin:4px 0 4px 18px;padding:6px 10px;border-radius:8px;background:var(--soft)}details.note summary{font-weight:500}.note-body{padding:6px 2px 2px}
 footer{max-width:960px;margin:0 auto;padding:24px 48px;color:var(--muted);font-size:12px}
 @media (max-width:600px){main{padding:0 16px 72px}footer{padding:24px 16px}h1.title{font-size:30px}.icon{font-size:48px}}
+${isBoard?BOARD_CSS:''}
 </style></head><body>
 <nav class="top">${trail.map((t,i)=>(i?'<span class="sep">/</span>':'')+(t.id===current.id?'<span>'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</span>':'<a href="'+esc(href(t.id))+'">'+esc(pageIcon(t))+' '+esc(t.title||'Sem título')+'</a>')).join(' ')}</nav>
-${cover?'<div class="cover"><img src="'+esc(cover)+'" alt=""></div>':''}
+${isBoard?boardHtml(blocks,{token,linkable,imgUrl,fileUrl,pageLines})+'<script nonce="'+esc(nonce)+'">'+BOARD_JS+'</script></body></html>':`${cover?'<div class="cover"><img src="'+esc(cover)+'" alt=""></div>':''}
 <main>${icon?'<div class="icon">'+esc(icon)+'</div>':''}<h1 class="title">${esc(title)}</h1>
 ${blocksHtml(blocks,{token,linkable,imgUrl,fileUrl})}
 ${kids.length?'<div class="subs"><div class="label">Subpáginas</div>'+kids.map(k=>'<a class="page-link" href="'+esc(href(k.id))+'">'+esc(pageIcon(k))+' <span>'+esc(k.title||'Sem título')+'</span></a>').join('')+'</div>':''}
-</main><footer>Publicado com Sofia OS · somente leitura</footer></body></html>`;
+</main><footer>Publicado com Sofia OS · somente leitura</footer></body></html>`}`;
 }
 const NOT_FOUND_PAGE=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Página indisponível</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#131218;color:#F2EEFA;font:16px/1.6 system-ui,sans-serif;text-align:center;padding:24px}p{color:#9A95A8}</style></head><body><div><h1>Página indisponível</h1><p>Este link não existe ou o compartilhamento foi desligado.</p></div></body></html>`;
 
@@ -200,10 +265,11 @@ async function servePublicPage(req,res,p,m,{shares,workspace,google}){
   res.setHeader('Content-Type',mime);res.setHeader('Content-Disposition','inline');res.setHeader('Cache-Control','private, max-age=300');res.setHeader('Content-Length',String(bytes.length));res.end(m==='HEAD'?undefined:bytes);return true;
  }
  const r=shares.resolve(token,subId);
- res.setHeader('Cache-Control','no-store');res.setHeader('Content-Security-Policy',"default-src 'none'; img-src 'self'; media-src 'self'; frame-src 'self'; font-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+ const nonce=crypto.randomBytes(16).toString('base64');
+ res.setHeader('Cache-Control','no-store');res.setHeader('Content-Security-Policy',"default-src 'none'; img-src 'self'; media-src 'self'; frame-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'nonce-"+nonce+"'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
  res.setHeader('Content-Type','text/html; charset=utf-8');
  if(!r||!r.current){res.statusCode=404;res.end(NOT_FOUND_PAGE);return true;}
- res.statusCode=200;res.end(m==='HEAD'?undefined:renderSharedPage({root:r.root,current:r.current,shares,token}));return true;
+ res.statusCode=200;res.end(m==='HEAD'?undefined:renderSharedPage({root:r.root,current:r.current,shares,token,nonce}));return true;
 }
 /** 07/11/2026: arquivo de pagina compartilhada (video/audio com avanço, PDF e Office em quadro, download). So os da pagina. */
 async function serveSharedFile(req,res,m,token,attId,{shares,workspace,google}){
@@ -221,4 +287,4 @@ async function serveSharedFile(req,res,m,token,attId,{shares,workspace,google}){
   res.statusCode=206;res.setHeader('Content-Range','bytes '+start+'-'+end+'/'+total);}else res.statusCode=200;
  res.setHeader('Content-Length',String(total?end-start+1:0));res.end(m==='HEAD'?undefined:bytes.subarray(start,end+1));return true;
 }
-module.exports={makePageShares,servePublicPage,renderSharedPage,richHtml,shareTheme};
+module.exports={makePageShares,servePublicPage,renderSharedPage,richHtml,shareTheme,boardHtml};

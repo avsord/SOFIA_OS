@@ -322,7 +322,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function pageAsText(){const blocks=currentBlocks();return blocksText(blocks.map((_,i)=>i)).slice(0,4000);}
  async function askSofia(prompt:string,atId:string,quote=''){
   const q=prompt.trim();if(!q||!entry)return;const title=entry.draft.title||'Sem título';setAi({id:atId,busy:true,error:'',quote});
-  try{const chat=await api.ensureChat();const id=chat.conversation?.id||'';
+  try{const chat=await api.ensureChat();const id=chat.conversation?.id||(await api.newConversation('Páginas')).conversation.id;
    const message='Estou escrevendo na página "'+title+'" do Sofia OS. '+q+(quote?'\n\nTrecho selecionado:\n'+quote:'')+'\n\nConteúdo atual da página:\n'+(pageAsText()||'(vazia)')+'\n\nResponda só com o texto para colocar na página, em markdown simples (# títulos, - listas), sem comentários antes ou depois.';
    const r=await api.chat({conversation_id:id,message,client_message_id:'pagina-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)});
    const made=blocksFromMarkdown(String(r.reply||''));if(!made.length)throw new Error('A Sofia não devolveu texto.');

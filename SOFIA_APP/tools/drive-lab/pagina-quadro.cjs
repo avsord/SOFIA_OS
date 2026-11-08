@@ -56,6 +56,21 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  // Word novo
  await page.getByTestId('board-add-doc').click(); await page.waitForTimeout(5000); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
  const wd=page.locator('[data-testid=board-item][data-type=file]').filter({hasText:'.docx'}); ok(await wd.count()===1,'Word criado no quadro');
+ // 08/11 entrega 2/3: cartao vivo de tarefa (marca feito no app), busca no quadro, pedir a Sofia
+ const tok=await page.evaluate(()=>{for(const k of Object.keys(localStorage)){const v=localStorage.getItem(k)||'';const m=/"token":"([A-Za-z0-9_-]{43})"/.exec(v);if(m)return m[1];}return '';});
+ if(tok){await page.evaluate(async([B,t])=>{await fetch(B+'/api/mobile/tasks',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({title:'Alugar luz flash'})});},[B,tok]);}
+ await page.getByTestId('board-add-live').click(); await page.waitForTimeout(800); await page.getByTestId('live-src-task').click(); await page.waitForTimeout(1500);
+ const li=page.getByTestId('live-item').filter({hasText:'Alugar luz flash'}); ok(await li.count()===1,'Do app: tarefa aparece na lista'+(tok?'':' (sem token)'));
+ if(await li.count()){await li.click(); await page.waitForTimeout(1500);
+  const lc=page.locator('[data-testid=board-item][data-type=bookmark]'); ok(await lc.count()===1 && /Alugar luz flash/.test(await lc.innerText()),'cartão vivo da tarefa no quadro');
+  await lc.locator('input[type=checkbox]').click(); await page.waitForTimeout(2000);
+  const st=await page.evaluate(async([B,t])=>{const r=await fetch(B+'/api/mobile/tasks',{headers:{Authorization:'Bearer '+t}});const j=await r.json();return (j.items||[]).find(x=>x.title==='Alugar luz flash')?.state;},[B,tok]);
+  ok(st==='done','marcar no cartão marca a tarefa no app (estado: '+st+')');}
+ await page.getByTestId('board-find-open').click(); await page.getByTestId('board-find-input').fill('ideia'); await page.keyboard.press('Enter'); await page.waitForTimeout(600);
+ ok(/1 de/.test(await page.getByTestId('board-find').innerText()),'busca no quadro acha a nota'); await page.keyboard.press('Escape');
+ const nt=items().first(); await nt.click({position:{x:12,y:12}}); await page.getByTestId('board-ask').click(); await page.getByLabel('Pedido para a Sofia').fill('resume'); await page.getByTestId('board-ask-go').click(); await page.waitForTimeout(4000);
+ ok(/Pedindo|pensando|nota ao lado|[A-Za-z]/.test(await page.getByTestId('board-ask-box').innerText().catch(()=>'fechou')),'pedir à Sofia envia (no laboratório não há a Sofia: mostra o aviso)');
+ await page.keyboard.press('Escape');
  await page.screenshot({path:O+'q1.png'});
  // recarregar: tudo no lugar
  const before=await items().count(); await page.waitForTimeout(2500); await page.reload(); await page.waitForTimeout(4500);
