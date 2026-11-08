@@ -173,6 +173,10 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   const h1=h0?await hd.boundingBox():null; ok(!!h0&&Math.abs(h1.x-h0.x-70)<8,'Word editando: arrasta pela barra de cima (janela do quadro)');
   {const e=await page.evaluate(([x0,y0,w,h])=>{for(let y=y0+120;y<y0+h-120;y+=37)for(let x=x0+40;x<x0+w-40;x+=41){const el=document.elementFromPoint(x,y);if(el&&el.getAttribute('data-testid')==='page-board')return {x,y};}return null;},[bb.x,bb.y,bb.width,bb.height]); if(e) await page.mouse.click(e.x,e.y);} await page.waitForTimeout(800);
   ok(await wd2.getByTestId('board-file-head').count()===1,'clicar fora: a janela do Word continua aberta (não vira linha vazia)');
+  {const sc=()=>wd2.evaluate(e=>[...e.querySelectorAll('*')].reduce((t,x)=>t+x.scrollTop+x.scrollLeft,0)); const b0=await wd2.boundingBox(), s0=await sc(), z0=await page.getByTestId('board-zoom').innerText();
+   await page.mouse.move(b0.x+b0.width/2,b0.y+b0.height/2); await page.keyboard.down('Control'); await page.mouse.wheel(0,200); await page.keyboard.up('Control'); await page.waitForTimeout(700);
+   const s1=await sc(), z1=await page.getByTestId('board-zoom').innerText(); ok(s1===s0 && z1!==z0,'Ctrl+rodinha em cima da janela do Word só dá zoom no quadro (não rola a janela) ('+z0+' -> '+z1+')');
+   await page.keyboard.down('Control'); await page.mouse.wheel(0,-200); await page.keyboard.up('Control'); await page.waitForTimeout(700);}
   await wd2.getByTestId('board-file-done').click(); await page.waitForTimeout(600); ok((await wd2.boundingBox()).height<100,'Pronto fecha a janela e o Word fica como anexo');}
  await page.keyboard.press('Escape');
  // ver como pagina

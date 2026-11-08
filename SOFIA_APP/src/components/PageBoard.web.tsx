@@ -162,14 +162,14 @@ export function PageBoard(p: Props) {
   useEffect(() => {const el = host.current; if (!el) return;
     const on = (e: WheelEvent) => {const t = e.target as HTMLElement; if (t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
-      if (e.ctrlKey || e.metaKey) {wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;}
+      if (e.ctrlKey || e.metaKey) {e.stopPropagation(); wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;} // 08/11 (Pedro): Ctrl+rodinha SO da zoom no quadro (nada rola, nem a janela por baixo)
       const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
     const noAuto = (e: MouseEvent) => {if (e.button === 1) e.preventDefault();}; // sem o "auto-rolar" do navegador
     const mid = (e: PointerEvent) => {if (e.button !== 1) return; e.preventDefault(); e.stopPropagation(); dragOn(); const go = panFrom(e.screenX, e.screenY);
       const mv = (ev: PointerEvent) => go(ev.screenX, ev.screenY), up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff();};
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);};
-    el.addEventListener('wheel', on, {passive: false}); el.addEventListener('mousedown', noAuto, true); el.addEventListener('pointerdown', mid, true);
-    return () => {el.removeEventListener('wheel', on); el.removeEventListener('mousedown', noAuto, true); el.removeEventListener('pointerdown', mid, true);};}, []);
+    el.addEventListener('wheel', on, {passive: false, capture: true}); el.addEventListener('mousedown', noAuto, true); el.addEventListener('pointerdown', mid, true);
+    return () => {el.removeEventListener('wheel', on, true); el.removeEventListener('mousedown', noAuto, true); el.removeEventListener('pointerdown', mid, true);};}, []);
   // a pagina aberta no cartao (iframe) manda: segurar a rodinha e arrastar / Ctrl+rodinha (o navegador entrega o mouse a ela)
   useEffect(() => {let go: ((x: number, y: number) => void) | null = null;
     const on = (e: MessageEvent) => {const d = e.data; if (e.origin !== location.origin || !d || d.sofia !== 'board-nav') return;
