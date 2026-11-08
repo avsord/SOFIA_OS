@@ -205,6 +205,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(!page){if(fetchedOpen.current!==openPageKey){fetchedOpen.current=openPageKey;void api.entity(openPageId).then((e:any)=>{if(e&&e.id===openPageId&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old:[...old,e]);}).catch(()=>{});}return;}
   handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
  const fetchedOpen=useRef(0);
+ // 08/11/2026 (Pedro: "quando apago e volto aparece essa tela das paginas... se eu apaguei e voltei tem que ser a tela original"):
+ // dentro de um cartao do Quadro (?embed=1) nunca existe a lista de Paginas: se a pagina fechar (voltar, desfazer, lista
+ // recarregada sem ela por um instante), ela reabre sozinha; removida de verdade mostra um aviso, nunca a lista.
+ const EMBED_ID=EMBED&&typeof location!=='undefined'?decodeURIComponent(location.pathname.split('/')[2]||''):'';
+ const [embedGone,setEmbedGone]=useState(false),embedFetch=useRef(false);
+ useEffect(()=>{if(!EMBED_ID||!ready||selectedId)return;const pg=byId.get(EMBED_ID);if(pg){if(pg.state!=='archived'){setEmbedGone(false);history.current=[];open(pg,false);}else setEmbedGone(true);return;}
+  if(embedFetch.current)return;embedFetch.current=true;void api.entity(EMBED_ID).then((e:any)=>{embedFetch.current=false;if(e&&e.id===EMBED_ID&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old.map(x=>x.id===e.id?e:x):[...old,e]);else setEmbedGone(true);}).catch(()=>{embedFetch.current=false;setEmbedGone(true);});},[ready,selectedId,byId]); // eslint-disable-line react-hooks/exhaustive-deps
  const handledCreate=useRef(0);
  useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}if(desktop)void create();else setCreateParent(null);},[createPageKey,ready]);
  useEffect(()=>{if(Platform.OS!=='web')return;const trail:{id:string;title:string}[]=[];let cur=selectedId?byId.get(selectedId):undefined;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&trail.length<40){seen.add(cur.id);trail.unshift({id:cur.id,title:cur.title||'Sem título'});cur=byId.get(String(cur.data?.parent_id||''));}const prev=pagePath.get();if(prev.length!==trail.length||prev.some((x,i)=>x.id!==trail[i].id||x.title!==trail[i].title))pagePath.set(trail);},[selectedId,byId]);
@@ -742,6 +749,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   // pagina" (e o Modelos de "Comece a usar") aplica na propria pagina; o resto cria uma subpagina com o template
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)applyTemplate(template);else void create(createParent||undefined,template);}}
   onBoard={Platform.OS==='web'&&desktop&&BOARD_SUPPORTED?()=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)setLayoutRef.current('board');else void create(createParent||undefined,undefined,'board');}:undefined}/>;
+ if(!entry&&EMBED_ID)return <View testID="embed-page-wait" style={{flex:1,alignItems:'center',justifyContent:'center',padding:24}}>{embedGone?<Text style={{color:c.muted,fontSize:14,textAlign:'center'}}>Esta página foi removida. Use Ctrl+Z no quadro para trazer de volta.</Text>:<LoadingLines rows={4}/>}</View>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada

@@ -121,6 +121,17 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
    await page.mouse.click(c2.x+60,c2.y+20); await page.waitForTimeout(400);}
   await page.getByTestId('board-page-done').click(); await page.waitForTimeout(800);}
  await page.waitForTimeout(3000); ok(await page.getByTestId('board-title').inputValue()==='Hacker','editar a página do cartão não mexe no quadro (título continua)');
+ // 08/11 (Pedro: "quando apago e volto aparece a tela das paginas" + "os anexos flutuantes saem juntos"): apagar o cartao leva a janela do anexo; Ctrl+Z traz os dois e a pagina (nunca a lista)
+ {const wins=()=>page.locator('[data-testid=board-item][data-type=file]').count(), w0=await wins();
+  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.keyboard.press('Delete'); await page.waitForTimeout(800); const w1=await wins(), c1=await pc.count();
+  ok(c1===0 && w1<w0,'apagar o cartão leva junto as janelas dos anexos abertos dele ('+w0+' -> '+w1+')');
+  await page.keyboard.press('Control+z'); await page.waitForTimeout(4000); const w2=await wins();
+  const ft=await (async()=>{const h=await pc.locator('iframe').elementHandle().catch(()=>null); if(!h) return ''; const fr=await h.contentFrame(); await page.waitForTimeout(1500); return fr.evaluate(()=>document.body.innerText);})();
+  ok(await pc.count()===1 && w2===w0 && /linha da original/.test(ft) && !/Todas as páginas/.test(ft),'Ctrl+Z traz o cartão e as janelas de volta, com a página (não a lista de Páginas)');}
+ // dentro do cartao a lista de Paginas nunca aparece (mesmo se a pagina fechar)
+ {const h=await pc.locator('iframe').elementHandle(); const fr=await h.contentFrame(); const url=fr.url(); const cx=await br.newContext({viewport:{width:900,height:700},storageState:await page.context().storageState()}); const t=await cx.newPage(); await t.goto(url); await t.waitForTimeout(4000);
+  await t.keyboard.press('Escape'); await t.keyboard.press('Alt+ArrowLeft'); await t.waitForTimeout(2500); const tx=await t.evaluate(()=>document.body.innerText); await cx.close();
+  ok(/linha da original/.test(tx) && !/Todas as páginas/.test(tx),'página do cartão sozinha: voltar não mostra a lista de Páginas');}
  // 08/11 (Pedro): sincronizar leva o que mudou na copia para a pagina original
  {const tok0=await page.evaluate(()=>{for(const k of Object.keys(localStorage)){const v=localStorage.getItem(k)||'';const m=/"token":"([A-Za-z0-9_-]{43})"/.exec(v);if(m)return m[1];}return '';});
   const orig=()=>page.evaluate(async([B,t])=>{const r=await fetch(B+'/api/mobile/workspace/entities?limit=100&kind=user_page&q=&offset=0',{headers:{Authorization:'Bearer '+t}});const j=await r.json();const o=(j.items||[]).find(x=>/linha da original/.test(String(x.data?.blocks_json||''))&&!(x.tags||[]).includes('board-copy'));return o?String(o.data.blocks_json):'';},[B,tok0]);
@@ -128,6 +139,10 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(500);
   await page.getByRole('button',{name:'Sincronizar',exact:true}).click(); await page.waitForTimeout(2500); const after=await orig();
   ok(tok0 && !/editado no quadro/.test(before) && /editado no quadro/.test(after) && /Cópia/.test(await pc.innerText()),'sincronizar leva as mudanças da cópia para a página original (a cópia continua escondida no quadro)');}
+ // 08/11 (Pedro: "botao pra tornar essa copia o conteudo original... e deixa de ser copia")
+ {await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-make-original').click(); await page.waitForTimeout(400);
+  await page.getByRole('button',{name:'Tornar a original',exact:true}).click(); await page.waitForTimeout(2500);
+  const tx=await pc.innerText(); ok(/Sincronizada/.test(tx) && !/Cópia/.test(tx),'tornar a original: o cartão vira a própria original (sincronizada, deixa de ser cópia)');}
  // desenho
  await page.getByTestId('board-draw').click(); await page.mouse.move(bb.x+200,bb.y+600); await page.mouse.down(); await page.mouse.move(bb.x+260,bb.y+640,{steps:5}); await page.mouse.move(bb.x+330,bb.y+600,{steps:5}); await page.mouse.up(); await page.getByTestId('board-draw').click(); await page.waitForTimeout(400);
  ok(await page.locator('[data-testid=board-item][data-type=image] svg path').count()===1,'desenho feito');
