@@ -369,11 +369,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-08 | (delivery) | Página Quadro (entrega 1: zoom, mover, cantos, notas, lista, desenho, áudio, arquivos, Word no lugar, página como cópia + sincronizar) e Versões das páginas | robô do quadro 17/17, versões ok (voltou para a 1ª e manteve após recarregar), trancada ok, portão 14/14; APK 0.3.266 verde (run 42428422862) |
 | 2026-11-08 | (delivery) | Quadro: cartões vivos (Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca), Pedir à Sofia, busca Ctrl+F, quadro só leitura no compartilhado | robô do quadro 22/22 (tarefa marcada pelo cartão ficou done no app), compartilhado 2/2 + zoom no navegador, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro fechado: linhas-guia, legenda, mencionar, ligação com seta/texto, link vira prévia, pinça no celular, anexo de e-mail vira cartão (Gmail/IMAP sob pedido) | robô do quadro 30/30, teste de anexos (Gmail simulado) ok, portão 14/14 |
 | 2026-11-08 | (delivery) | Quadro com o método do Drive: robôs no portão (etapa 5), registro [quadro] do site e teste de produção [quadro-teste] a cada versão | teste de produção no laboratório 8/8 (apaga tudo no fim), portão 18/18 |
 | 2026-11-08 | (delivery) | Quadro: página de verdade no cartão (iframe da própria Sofia, dois cliques usa), 0 no centro + botão recentralizar, janela de páginas igual à barra lateral, rodinha na janela não dá zoom, arrastar não seleciona texto, Quadro em Templates, template cria subpágina, cópias fora das listas, excluir cópia sem trava | robô do quadro 39/39, teste de exclusão ok, portão 18/18 |
+| 2026-11-08 | (delivery) | Quadro abre afastado mostrando tudo (até 60%), fundo de grade de quadrados discreta (site e compartilhado), centro só com + e 0, título sem caixa | robô 39/39, portão 18/18 |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

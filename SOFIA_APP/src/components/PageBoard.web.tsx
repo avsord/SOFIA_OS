@@ -32,6 +32,16 @@ const linkObj = (l: Link): {to: string; label?: string; arrow?: boolean} => type
 function edgePoint(a: {x: number; y: number}, r: Geo) {const cx = r.x + r.w / 2, cy = r.y + r.h / 2, dx = a.x - cx, dy = a.y - cy; if (!dx && !dy) return {x: cx, y: cy}; const k = Math.min(Math.abs((r.w / 2 + 6) / (dx || 1e-9)), Math.abs((r.h / 2 + 6) / (dy || 1e-9))); return {x: cx + dx * Math.min(1, k), y: cy + dy * Math.min(1, k)};}
 type View = {x: number; y: number; z: number};
 const MIN_Z = 0.1, MAX_Z = 4;
+// 08/11/2026 (Pedro: "imita o quadrado deles, o nosso ficou muito sujo, poluido"): grade de quadrados bem discreta - linha fina a
+// cada 24 px e uma um pouco mais marcada a cada 5 quadrados; afastado, so as linhas grandes (sem chuvisco).
+function gridBg(v: View, bg: string): any {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(bg || '')), n = m ? parseInt(m[1], 16) : 0, dark = !m || ((n >> 16) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) < 128;
+  const minor = dark ? 'rgba(255,255,255,0.028)' : 'rgba(0,0,0,0.04)', major = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)';
+  const S = 24 * v.z, B = S * 5, pos = v.x + 'px ' + v.y + 'px', showMinor = S >= 9;
+  const layers = ['linear-gradient(to right, ' + major + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + major + ' 1px, transparent 1px)'], sizes = [B + 'px ' + B + 'px', B + 'px ' + B + 'px'];
+  if (showMinor) {layers.push('linear-gradient(to right, ' + minor + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + minor + ' 1px, transparent 1px)'); sizes.push(S + 'px ' + S + 'px', S + 'px ' + S + 'px');}
+  return {backgroundImage: layers.join(','), backgroundSize: sizes.join(','), backgroundPosition: layers.map(() => pos).join(',')};
+}
 const NOTE_COLORS = ['#2A2636', '#3A2C1A', '#1D3329', '#1E2A44', '#3B2330'];
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -67,9 +77,10 @@ type Props = {
 
 export function PageBoard(p: Props) {
   const c = useTheme(), host = useRef<HTMLDivElement | null>(null), viewKey = 'sofia.board.view.' + p.pageId;
-  const [view, setView] = useState<View>(() => {try {const v = JSON.parse(localStorage.getItem(viewKey) || 'null'); if (v && v.z > 0) return v;} catch {} return {x: 80, y: 60, z: 0.8};});
+  // 08/11/2026 (Pedro: "a pagina sempre comeca nesse tamanho mais longe"): abre afastado mostrando tudo (ate 60%), nao no ultimo zoom
+  const [view, setView] = useState<View>({x: 400, y: 300, z: 0.6}), opening = useRef(true);
   const viewRef = useRef(view); viewRef.current = view;
-  useEffect(() => {const t = setTimeout(() => {try {localStorage.setItem(viewKey, JSON.stringify(view));} catch {}}, 400); return () => clearTimeout(t);}, [view, viewKey]);
+  void viewKey;
   const [sel, setSel] = useState<string[]>([]), [editing, setEditing] = useState<string | null>(null), [live, setLive] = useState<Record<string, Geo>>({});
   const liveRef = useRef(live); liveRef.current = live;
   const [box, setBox] = useState<{x: number; y: number; w: number; h: number} | null>(null), [mode, setMode] = useState<'' | 'draw' | 'link'>(''), [ink, setInk] = useState<{x: number; y: number}[] | null>(null);
@@ -94,6 +105,12 @@ export function PageBoard(p: Props) {
   const byId = useMemo(() => new Map(p.blocks.map(b => [b.id, b])), [p.blocks]);
   const geo = (b: PageBlock): Geo => live[b.id] || geoOf(b) || {x: 0, y: 0, ...size(b)};
   useLayoutEffect(() => {const el = host.current; if (!el) return; const ro = new ResizeObserver(() => setSize2({w: el.clientWidth, h: el.clientHeight})); ro.observe(el); return () => ro.disconnect();}, []);
+  useLayoutEffect(() => {const el = host.current; if (!el || !opening.current) return; const w = el.clientWidth || 1200, hh = el.clientHeight || 800; opening.current = false;
+    const gs = p.blocks.filter(onBoard).map(b => geoOf(b)).filter(Boolean) as Geo[];
+    if (!gs.length) {setView({z: 0.6, x: w / 2, y: hh / 2}); return;}
+    const x1 = Math.min(...gs.map(g => g.x)), y1 = Math.min(...gs.map(g => g.y)), x2 = Math.max(...gs.map(g => g.x + g.w)), y2 = Math.max(...gs.map(g => g.y + g.h));
+    const z = Math.max(MIN_Z, Math.min(0.6, (w - 160) / Math.max(1, x2 - x1), (hh - 200) / Math.max(1, y2 - y1)));
+    setView({z, x: (w - (x2 - x1) * z) / 2 - x1 * z, y: (hh - 70 - (y2 - y1) * z) / 2 - y1 * z});}, []); // eslint-disable-line react-hooks/exhaustive-deps
   const toBoard = useCallback((cx: number, cy: number) => {const r = host.current!.getBoundingClientRect(), v = viewRef.current; return {x: (cx - r.left - v.x) / v.z, y: (cy - r.top - v.y) / v.z};}, []);
   const center = () => {const v = viewRef.current; return {x: (size2.w / 2 - v.x) / v.z, y: (size2.h / 2 - v.y) / v.z};};
 
@@ -298,7 +315,7 @@ export function PageBoard(p: Props) {
 
   return h('div', {ref: host, 'data-testid': 'page-board', tabIndex: 0, onKeyDown: onKey, onPointerDown: onBgDown, onDoubleClick: onBgDouble,
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default', backgroundColor: c.bg,
-      backgroundImage: 'radial-gradient(' + c.line + ' ' + Math.max(0.8, 1.2 * Math.min(1.4, view.z)) + 'px, transparent ' + Math.max(0.8, 1.2 * Math.min(1.4, view.z)) + 'px)', backgroundSize: 24 * view.z + 'px ' + 24 * view.z + 'px', backgroundPosition: view.x + 'px ' + view.y + 'px'}},
+      ...gridBg(view, c.bg)}},
     h('div', {style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'}},
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
         h('defs', null, h('marker', {id: 'board-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'}, h('path', {d: 'M0 0 L10 5 L0 10 z', fill: c.muted}))),
@@ -309,9 +326,9 @@ export function PageBoard(p: Props) {
             l.label ? h('text', {x: (ca.x + end.x) / 2, y: (ca.y + end.y) / 2 - 6 / view.z, fill: c.text, fontSize: 13 / Math.max(0.6, view.z), textAnchor: 'middle', style: {paintOrder: 'stroke', stroke: c.bg, strokeWidth: 4 / Math.max(0.6, view.z)}}, l.label) : null);}),
         ink ? h('path', {d: ink.map((q, i) => (i ? 'L' : 'M') + q.x + ' ' + q.y).join(' '), fill: 'none', stroke: c.accent, strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round'}) : null),
       // 08/11/2026 (Pedro: "o ponto central da pagina pra nao se perder no infinito"): eixos discretos e o 0 no centro
-      h('div', {key: 'ox', 'aria-hidden': true, style: {position: 'absolute', left: 0, top: -100000, width: 1 / view.z, height: 200000, background: c.line, opacity: 0.9, pointerEvents: 'none'}}),
-      h('div', {key: 'oy', 'aria-hidden': true, style: {position: 'absolute', top: 0, left: -100000, height: 1 / view.z, width: 200000, background: c.line, opacity: 0.9, pointerEvents: 'none'}}),
-      h('div', {key: 'o0', 'data-testid': 'board-origin', 'aria-hidden': true, style: {position: 'absolute', left: 8 / view.z, top: 6 / view.z, color: c.muted, fontSize: 18 / view.z, fontWeight: 600, pointerEvents: 'none', userSelect: 'none'}}, '0'),
+      h('div', {key: 'ox', 'aria-hidden': true, style: {position: 'absolute', left: -6 / view.z, top: 0, width: 12 / view.z, height: 1 / view.z, background: c.muted, opacity: 0.5, pointerEvents: 'none'}}),
+      h('div', {key: 'oy', 'aria-hidden': true, style: {position: 'absolute', top: -6 / view.z, left: 0, height: 12 / view.z, width: 1 / view.z, background: c.muted, opacity: 0.5, pointerEvents: 'none'}}),
+      h('div', {key: 'o0', 'data-testid': 'board-origin', 'aria-hidden': true, style: {position: 'absolute', left: 10 / view.z, top: 8 / view.z, color: c.muted, opacity: 0.7, fontSize: 14 / view.z, fontWeight: 500, pointerEvents: 'none', userSelect: 'none'}}, '0'),
       guides.x != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', left: guides.x, top: -100000, width: 1 / view.z, height: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
@@ -323,8 +340,8 @@ export function PageBoard(p: Props) {
     selBar,
     h('input', {'data-board-ui': '1', 'data-testid': 'board-title', value: p.title, placeholder: 'Sem título', 'aria-label': 'Título do quadro', onPointerDown: (e: any) => e.stopPropagation(), onChange: (e: any) => p.onTitle(e.target.value),
       onKeyDown: (e: any) => {if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();},
-      style: {userSelect: 'text', WebkitUserSelect: 'text', position: 'absolute', left: 16, top: 12, zIndex: 30, width: 'min(420px, 50%)', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: c.bg + 'cc', color: c.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit'},
-      onFocus: (e: any) => {e.target.style.borderColor = c.accent;}, onBlur: (e: any) => {e.target.style.borderColor = 'transparent'; p.flush();}}),
+      style: {userSelect: 'text', WebkitUserSelect: 'text', position: 'absolute', left: 16, top: 12, zIndex: 30, width: 'min(420px, 50%)', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: c.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit'},
+      onFocus: (e: any) => {e.target.style.borderColor = c.accent; e.target.style.background = c.surface;}, onBlur: (e: any) => {e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; p.flush();}}),
     bar([btn('T', 'Texto', () => {const nb = addBlock({id: uid(), type: 'text', text: '', data: {}}); setEditing(nb.id);}, false, false, 'board-add-text'),
       btn('edit', mode === 'draw' ? 'Parar de desenhar' : 'Desenhar', () => setMode(mode === 'draw' ? '' : 'draw'), mode === 'draw', false, 'board-draw'),
       btn('clip', 'Arquivo (foto, vídeo, PDF, qualquer um)', () => {anchor.current = center(); p.pickFiles();}, false, false, 'board-add-file'),
