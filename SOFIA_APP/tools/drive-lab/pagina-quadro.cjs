@@ -85,9 +85,12 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
    const p1=await pc.boundingBox(); await page.mouse.move(p0.x+300,p0.y+300,{steps:6}); await page.waitForTimeout(400); const p2=await pc.boundingBox();
    ok(Math.abs(p1.y-p0.y)>40 && Math.abs(p2.x-p1.x)<2 && Math.abs(p2.y-p1.y)<2,'arrastar o cartão de página e soltar: não fica grudado no mouse');
    await page.mouse.move(p2.x+60,p2.y+20); await page.mouse.down(); await page.mouse.move(p2.x+60+(p0.x-p2.x),p2.y+20+(p0.y-p2.y),{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);}
-  // qualidade: a pagina e desenhada no tamanho do cartao (nada de 35% da resolucao)
-  {const z=parseInt(await page.getByTestId('board-zoom').innerText())/100, q=await f.evaluate(()=>({dpr:devicePixelRatio,w:innerWidth})), cw=(await pc.boundingBox()).width;
-   ok(Math.abs(q.dpr-z)<0.05 && Math.abs(q.w*z-cw)<40,'página do cartão desenhada no tamanho real (resolução '+q.dpr.toFixed(2)+' com zoom '+z+')');}
+  // 08/11 (Pedro: "quando fico dando zoom tudo fica distorcendo ou mudando de forma"): o zoom so amplia; a pagina do cartao
+  // continua com a mesma largura/resolucao por dentro em qualquer zoom (nada redesenha com outro formato)
+  {const q=()=>f.evaluate(()=>({dpr:devicePixelRatio,w:innerWidth,h:innerHeight})), z0=parseInt(await page.getByTestId('board-zoom').innerText())/100, q0=await q(), cw0=(await pc.boundingBox()).width;
+   await page.getByLabel('Aproximar').click(); await page.waitForTimeout(900); const z1=parseInt(await page.getByTestId('board-zoom').innerText())/100, q1=await q(), cw1=(await pc.boundingBox()).width;
+   ok(z1>z0 && q1.w===q0.w && q1.h===q0.h && q1.dpr===q0.dpr && Math.abs(q0.w*z0-cw0)<40 && Math.abs(q1.w*z1-cw1)<40,'zoom não muda o formato da página do cartão ('+q0.w+'x'+q0.h+' em '+z0+' e '+q1.w+'x'+q1.h+' em '+z1+')');
+   await page.getByLabel('Afastar').click(); await page.waitForTimeout(900);}
   await pc.click({position:{x:60,y:20}}); await page.waitForTimeout(500); ok(await pc.locator('iframe').evaluate(e=>getComputedStyle(e).pointerEvents)==='auto','(página do cartão ativa para o teste da rodinha)');
   {const o0=await page.getByTestId('board-origin').boundingBox(), r=await pc.boundingBox(); await page.mouse.move(r.x+r.width/2,r.y+r.height/2); await page.mouse.down({button:'middle'}); await page.mouse.move(r.x+r.width/2+70,r.y+r.height/2+40,{steps:6}); await page.mouse.up({button:'middle'}); await page.waitForTimeout(400);
    const o1=await page.getByTestId('board-origin').boundingBox(); ok(Math.abs(o1.x-o0.x-70)<4 && Math.abs(o1.y-o0.y-40)<4,'segurar a rodinha em cima da página aberta no cartão anda pelo quadro');
@@ -183,7 +186,7 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
    await page.keyboard.down('Control'); await page.mouse.wheel(0,-150); const frames=[]; for(let i=0;i<6;i++){frames.push(await samp()); await page.waitForTimeout(25);} await page.keyboard.up('Control'); await page.waitForTimeout(600); const fin=await samp();
    let dev=0,who=-1; for(const f of frames) f.forEach((v,i)=>{const g=frames[0][i]; if(g) for(let k=0;k<3;k++) if(Math.abs(v[k]-g[k])>dev){dev=Math.abs(v[k]-g[k]);who=i;}}); if(dev>=0.004) console.log('DEV', who, JSON.stringify(frames.map(f=>f[who])), await wd2.evaluate((w,i)=>{const t=[...w.querySelectorAll('*')].filter(x=>x.children.length===0&&/\S/.test(x.textContent||'')&&x.tagName!=='OPTION'&&x.getBoundingClientRect().width>0)[i]; return t.tagName+' '+t.textContent.slice(0,40)+' '+t.className;},who));
    ok(frames[0].length>0 && dev<0.004,'zoom suave: o conteúdo da janela não pula durante a animação (desvio '+dev.toFixed(4)+')');
-   {let d2=0; const last=frames[frames.length-1]; fin.forEach((v,i)=>{const g=last[i]; if(g) for(let k=0;k<2;k++) d2=Math.max(d2,Math.abs(v[k]-g[k]));}); ok(d2<0.02,'ao parar o zoom, o redesenho nítido não dá pulo visível (desvio '+d2.toFixed(4)+')');}
+   {let d2=0; const first=frames[0]; fin.forEach((v,i)=>{const g=first[i]; if(g) for(let k=0;k<3;k++) d2=Math.max(d2,Math.abs(v[k]-g[k]));}); ok(d2<0.004,'depois de parar o zoom o conteúdo da janela tem a mesma forma de antes (desvio '+d2.toFixed(4)+')');}
    await page.keyboard.down('Control'); await page.mouse.wheel(0,150); await page.keyboard.up('Control'); await page.waitForTimeout(700);}
   await wd2.getByTestId('board-file-done').click(); await page.waitForTimeout(600); ok((await wd2.boundingBox()).height<100,'Pronto fecha a janela e o Word fica como anexo');}
  await page.keyboard.press('Escape');

@@ -86,10 +86,10 @@ export function PageBoard(p: Props) {
   // 08/11/2026 (Pedro: "a pagina sempre comeca nesse tamanho mais longe"): abre afastado mostrando tudo (ate 60%), nao no ultimo zoom
   const [view, setView] = useState<View>({x: 400, y: 300, z: 0.6}), opening = useRef(true);
   const viewRef = useRef(view); viewRef.current = view;
-  // 08/11/2026 (Pedro: "quando dou zoom o conteudo da janela fica pulando"): o zoom nitido (CSS zoom) redesenha tudo e o texto
-  // quebra diferente a cada passo. Durante o zoom so a imagem cresce (scale, sem redesenhar); parado ~180 ms, redesenha nitido.
-  const [zs, setZs] = useState(view.z);
-  useEffect(() => {if (view.z === zs) return; const t = setTimeout(() => setZs(viewRef.current.z), 180); return () => clearTimeout(t);}, [view.z, zs]);
+  // 08/11/2026 (Pedro: "quando fico dando zoom tudo fica distorcendo ou mudando de forma"): o zoom e SO escala (transform scale),
+  // nunca CSS zoom. O CSS zoom redesenhava tudo em cada nivel (texto quebrava diferente, a pagina/Word dentro das janelas mudava de
+  // largura e de resolucao) e a troca scale->zoom ao parar dava outro pulo. Com scale a forma e sempre a mesma; o Chrome redesenha
+  // nitido sozinho no tamanho novo (sem will-change, que congelaria a resolucao).
   void viewKey;
   const [sel, setSel] = useState<string[]>([]), [editing, setEditing] = useState<string | null>(null), [live, setLive] = useState<Record<string, Geo>>({});
   const liveRef = useRef(live); liveRef.current = live;
@@ -343,7 +343,9 @@ export function PageBoard(p: Props) {
   const vis = useMemo(() => {const v = view, mx = size2.w / v.z / 2, my = size2.h / v.z / 2, x1 = -v.x / v.z - mx, y1 = -v.y / v.z - my, x2 = (size2.w - v.x) / v.z + mx, y2 = (size2.h - v.y) / v.z + my;
     return shown.filter(b => {if (sel.includes(b.id) || editing === b.id) return true; const g = geo(b); return g.x < x2 && g.x + g.w > x1 && g.y < y2 && g.y + g.h > y1;}).sort((a, b) => (geo(a).z || 0) - (geo(b).z || 0));
   }, [shown, view, size2, live, sel, editing]); // eslint-disable-line react-hooks/exhaustive-deps
-  const light = view.z < 0.45;
+  // 08/11/2026 (Pedro: "mudando de forma" no zoom): so muito afastado (< 15%) o conteudo vira resumo; antes, abaixo de 45%, a janela
+  // do Word virava linha de arquivo e as imagens viravam caixa vazia no meio do zoom
+  const light = view.z < 0.15;
   const links = useMemo(() => {const out: {id: string; from: string; to: string; a: Geo; b: Geo; label: string; arrow: boolean}[] = []; for (const b of shown) {const g = geo(b); for (const raw of g.links || []) {const l = linkObj(raw), t = byId.get(l.to); if (t && onBoard(t)) out.push({id: b.id + '>' + l.to, from: b.id, to: l.to, a: g, b: geo(t), label: String(l.label || ''), arrow: !!l.arrow});}} return out;}, [shown, live]); // eslint-disable-line react-hooks/exhaustive-deps
   const one = sel.length === 1 ? byId.get(sel[0]) : undefined;
 
@@ -381,9 +383,8 @@ export function PageBoard(p: Props) {
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
     h('style', null, '[data-board-drag] iframe{pointer-events:none!important}'),
-    // 08/11/2026 (Pedro: "o conteudo ta com a qualidade ruim"): zoom do navegador (CSS zoom) em vez de esticar a imagem (scale):
-    // o texto e redesenhado no tamanho certo e fica nitido em qualquer zoom; a camada anda com translate (sem escala)
-    h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x / zs + 'px,' + view.y / zs + 'px)' + (view.z !== zs ? ' scale(' + view.z / zs + ')' : ''), zoom: zs, willChange: view.z !== zs ? 'transform' : undefined} as any}, // o translate tambem passa pelo zoom: divide
+    // camada do quadro: anda (translate) e cresce (scale) sem nunca mudar o desenho por dentro (ver comentario do zoom no topo)
+    h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'} as any},
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
         h('defs', null, h('marker', {id: 'board-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'}, h('path', {d: 'M0 0 L10 5 L0 10 z', fill: c.muted}))),
         ...links.map(l => {const ca = {x: l.a.x + l.a.w / 2, y: l.a.y + l.a.h / 2}, end = l.arrow ? edgePoint(ca, l.b) : {x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h / 2}, on = selLink?.from === l.from && selLink?.to === l.to, sw = 2 / Math.max(0.5, view.z);
