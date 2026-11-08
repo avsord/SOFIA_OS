@@ -177,6 +177,14 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
    await page.mouse.move(b0.x+b0.width/2,b0.y+b0.height/2); await page.keyboard.down('Control'); await page.mouse.wheel(0,200); await page.keyboard.up('Control'); await page.waitForTimeout(700);
    const s1=await sc(), z1=await page.getByTestId('board-zoom').innerText(); ok(s1===s0 && z1!==z0,'Ctrl+rodinha em cima da janela do Word só dá zoom no quadro (não rola a janela) ('+z0+' -> '+z1+')');
    await page.keyboard.down('Control'); await page.mouse.wheel(0,-200); await page.keyboard.up('Control'); await page.waitForTimeout(700);}
+  // 08/11 (Pedro: "o conteudo da janela fica pulando no zoom"): durante o zoom o conteudo so cresce junto (nao redesenha)
+  {const b0=await wd2.boundingBox(); await page.mouse.move(b0.x+b0.width/2,b0.y+b0.height/2);
+   const samp=()=>wd2.evaluate(w=>{const r=w.getBoundingClientRect(); const ts=[...w.querySelectorAll('*')].filter(x=>x.children.length===0&&/\S/.test(x.textContent||'')&&x.tagName!=='OPTION'&&x.getBoundingClientRect().width>0).slice(0,40); return ts.map(t=>{const q=t.getBoundingClientRect(); return [(q.left-r.left)/r.width,(q.top-r.top)/r.height,q.width/r.width];});});
+   await page.keyboard.down('Control'); await page.mouse.wheel(0,-150); const frames=[]; for(let i=0;i<6;i++){frames.push(await samp()); await page.waitForTimeout(25);} await page.keyboard.up('Control'); await page.waitForTimeout(600); const fin=await samp();
+   let dev=0,who=-1; for(const f of frames) f.forEach((v,i)=>{const g=frames[0][i]; if(g) for(let k=0;k<3;k++) if(Math.abs(v[k]-g[k])>dev){dev=Math.abs(v[k]-g[k]);who=i;}}); if(dev>=0.004) console.log('DEV', who, JSON.stringify(frames.map(f=>f[who])), await wd2.evaluate((w,i)=>{const t=[...w.querySelectorAll('*')].filter(x=>x.children.length===0&&/\S/.test(x.textContent||'')&&x.tagName!=='OPTION'&&x.getBoundingClientRect().width>0)[i]; return t.tagName+' '+t.textContent.slice(0,40)+' '+t.className;},who));
+   ok(frames[0].length>0 && dev<0.004,'zoom suave: o conteúdo da janela não pula durante a animação (desvio '+dev.toFixed(4)+')');
+   {let d2=0; const last=frames[frames.length-1]; fin.forEach((v,i)=>{const g=last[i]; if(g) for(let k=0;k<2;k++) d2=Math.max(d2,Math.abs(v[k]-g[k]));}); ok(d2<0.02,'ao parar o zoom, o redesenho nítido não dá pulo visível (desvio '+d2.toFixed(4)+')');}
+   await page.keyboard.down('Control'); await page.mouse.wheel(0,150); await page.keyboard.up('Control'); await page.waitForTimeout(700);}
   await wd2.getByTestId('board-file-done').click(); await page.waitForTimeout(600); ok((await wd2.boundingBox()).height<100,'Pronto fecha a janela e o Word fica como anexo');}
  await page.keyboard.press('Escape');
  // ver como pagina
