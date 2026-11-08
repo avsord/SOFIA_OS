@@ -22,6 +22,14 @@ import {SlideEditor, PPTX_MIME} from './SlideEditor';
 import {mountInWindow} from '../lib/popup-root';
 import type {SaveTarget} from '../lib/office-save';
 import {setSofiaClip} from '../lib/sofia-clipboard';
+import {EMBED} from '../lib/embed';
+/** 08/11/2026 (Pedro: "essa janela fica dentro do template, posso mover, e se mover o espaco ela fica fixa igual as outras"):
+ * na pagina aberta dentro de um cartao do Quadro (?embed=1), abrir um arquivo (janela flutuante ou janela separada) nao abre
+ * janela aqui dentro nem do navegador: pede ao Quadro, que poe o arquivo como uma janela do proprio quadro ao lado do cartao. */
+function askBoard(f: {id: string; name: string; mime: string; pageId?: string}): boolean {
+  if (!EMBED || typeof window === 'undefined' || window.parent === window) return false;
+  try {window.parent.postMessage({sofia: 'board-open-file', id: f.id, name: f.name, mime: f.mime, pageId: f.pageId || ''}, location.origin); return true;} catch {return false;}
+}
 
 const WEB = Platform.OS === 'web';
 const h = React.createElement as any;
@@ -92,6 +100,7 @@ function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '', d
  * arquivo numa JANELA SEPARADA do navegador (pode ir para outro monitor). A janela e aberta na hora do clique (senao o
  * navegador bloqueia) e preenchida quando o link assinado chega. So imagem, video, audio, PDF, Office (em PDF) e texto. */
 export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void}) {
+  if (askBoard(f)) return true;
   const k = fileKind(f.mime, f.name), sw = window.screen?.availWidth || 1440, sh = window.screen?.availHeight || 900;
   const ed = !!editKind(f.mime, f.name) && !!f.pageId, g = readGeo('popup', ed);
   const w = g ? g.w : Math.round(Math.min(960, sw * 0.5)), hh = g ? g.h : Math.round(Math.min(1040, sh * 0.88)), left = g ? g.x : Math.max(0, sw - w - 40), top = g ? g.y : 40;
@@ -134,6 +143,7 @@ const setWins = (next: Win[]) => {wins = next; emit();};
 /** `drive`: arquivo do Google Drive do usuario (07/11/2026, Pedro: "posso alterar os itens dentro do drive tambem"): Word, Excel
  * e PowerPoint abrem no editor da Sofia e salvar grava no proprio arquivo do Drive. */
 export function openFileWindow(api: SofiaApi, f: {id: string; name: string; mime: string; pageId?: string; onSaved?: (a: SavedFile) => void; drive?: boolean}, at?: Partial<Pick<Win, 'x' | 'y' | 'w' | 'hgt' | 'drag'>>): string {
+  if (!f.drive && askBoard(f)) return '';
   const found = wins.find(w => w.id === f.id); if (found) {setWins(wins.map(w => w === found ? {...w, ...(at || {}), z: ++topZ} : w)); return found.key;}
   const ed = canEdit(f), W = window.innerWidth, H = window.innerHeight, g = readGeo('win', ed), n = wins.length, key = f.id + ':' + Date.now();
   const w = g ? Math.min(g.w, W - 8) : ed ? Math.min(960, W - 48) : Math.min(560, Math.max(360, Math.round(W * 0.38))), hgt = g ? Math.min(g.h, H - 8) : ed ? H - 90 : Math.min(H - 110, 720);

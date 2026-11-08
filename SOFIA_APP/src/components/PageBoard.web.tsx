@@ -192,6 +192,23 @@ export function PageBoard(p: Props) {
   const usePageHere = (b: PageBlock) => {const t = p.pages.find(x => x.id === String(b.data?.page_id || '')); if (!t) return; if (t.data?.lock_json || p.locked) {p.onOpenPage(t); return;}
     const g = geo(b), s2 = size({...b, data: {...(b.data || {}), view: 'page'}}), g2 = {...g, w: Math.max(g.w, s2.w), h: Math.max(g.h, s2.h)};
     if (pageView(b) !== 'page') setPageView(b, 'page'); setSel([b.id]); focusOn(g2); setEditing(b.id);};
+  // 08/11/2026 (Pedro: "a janela fica dentro do template, posso mover, e se mover o espaco ela fica fixa"): arquivo aberto na
+  // pagina de um cartao vira uma janela DO QUADRO ao lado do cartao (Word/Excel/PowerPoint ja editando; salvar grava tambem na
+  // pagina). Se ja estiver no quadro, so leva ate ela.
+  const openFromPage = (cardId: string, d: {id: string; name: string; mime: string; pageId: string}) => {
+    const card = byId.get(cardId); if (!card) return;
+    const ed = !!editKind(d.mime, d.name) && !p.locked, exist = shown.find(x => x.type === 'file' && String(x.data?.attachment_id || '') === d.id);
+    if (exist) {setSel([exist.id]); focusOn(geo(exist)); if (ed) setEditing(exist.id); return;}
+    let fromBlock = ''; try {const bs = JSON.parse(String(p.pages.find(x => x.id === d.pageId)?.data?.blocks_json || '[]')); fromBlock = String((Array.isArray(bs) ? bs : []).find((x: any) => String(x?.data?.attachment_id || '') === d.id)?.id || '');} catch {}
+    const data: any = {attachment_id: d.id, name: d.name, mime: d.mime, from_page: d.pageId, from_block: fromBlock};
+    const cg = geo(card), s2 = ed ? {w: 680, h: 860} : size({id: '', type: 'file', text: '', data} as PageBlock), g2 = {x: cg.x + cg.w + 40, y: cg.y, w: s2.w, h: s2.h, z: topZ()};
+    const nb: PageBlock = {id: uid(), type: 'file', text: '', data: {...data, board: g2}};
+    p.edit(bs => [...bs, nb], 'board-file-open'); setSel([nb.id]); if (ed) setEditing(nb.id); focusOn({...cg, w: g2.x + g2.w - cg.x, h: Math.max(cg.h, g2.h)});};
+  const openFromPageRef = useRef(openFromPage); openFromPageRef.current = openFromPage;
+  useEffect(() => {const on = (e: MessageEvent) => {const d = e.data; if (e.origin !== location.origin || !d || d.sofia !== 'board-open-file' || !d.id) return;
+      const fr = Array.from(host.current?.querySelectorAll('iframe[data-testid=board-page-frame]') || []).find(x => (x as HTMLIFrameElement).contentWindow === e.source);
+      const cardId = fr?.closest('[data-board-item]')?.getAttribute('data-id'); if (cardId) openFromPageRef.current(cardId, {id: String(d.id), name: String(d.name || 'arquivo'), mime: String(d.mime || ''), pageId: String(d.pageId || '')});};
+    window.addEventListener('message', on); return () => window.removeEventListener('message', on);}, []);
   // item: clique seleciona, arrastar move (todos os selecionados), no modo ligar liga
   const onItemDown = (b: PageBlock) => (e: any) => {
     if (e.button !== 0) return; if (editing === b.id && !(e.target as HTMLElement).closest?.('[data-board-handle]')) return; e.stopPropagation(); host.current?.focus({preventScroll: true});
@@ -436,10 +453,11 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
   else if (b.type === 'image') body = b.data?.attachment_id ? (light ? h('div', {style: {width: '100%', height: '100%', background: c.input}}) : h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 6}}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind="image" name={String(b.data?.caption || 'imagem')} />)) : <Loading c={c} label="Enviando…" />;
   else if (b.type === 'file') {
     if (b.data?.uploading || !b.data?.attachment_id) body = <Loading c={c} label={'Enviando ' + (b.data?.name || 'arquivo') + '…'} />;
-    else if (editing && editKind(b.data?.mime, b.data?.name) && !locked) body = h('div', {'data-board-editing': '1', style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: c.surface, borderRadius: 8, overflow: 'hidden'}, onPointerDown: (e: any) => e.stopPropagation()},
-      h('div', {style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted}}, h('span', {style: {flex: 1}}, 'Editando ' + (b.data?.name || '')), h('button', {type: 'button', onClick: onDone, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
+    else if (editing && editKind(b.data?.mime, b.data?.name) && !locked) body = h('div', {'data-board-editing': '1', style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: c.surface, borderRadius: 8, overflow: 'hidden'}, onPointerDown: (e: any) => {if (!(e.target as HTMLElement).closest?.('[data-board-handle]')) e.stopPropagation();}},
+      h('div', {'data-board-handle': '1', 'data-testid': 'board-file-head', title: 'Arraste por aqui para mover', style: {display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid ' + c.line, fontSize: 12, color: c.muted, cursor: 'grab'}}, h('span', {style: {flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Editando ' + (b.data?.name || '') + (b.data?.from_page ? ' · da página ' + (pages.find((x: Entity) => x.id === String(b.data.from_page))?.title || '') : '')), h('button', {type: 'button', 'data-testid': 'board-file-done', onPointerDown: (e: any) => e.stopPropagation(), onClick: onDone, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
       h('div', {style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column'}}, <FileBody api={api} id={String(b.data.attachment_id)} firstId={String(b.data.attachment_id)} name={String(b.data?.name || '')} mime={String(b.data?.mime || '')} zoom={0} onZoom={() => {}} pageId={pageId}
-        onSaved={(a: any) => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}))} />));
+        onSaved={(a: any) => {onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));
+          if (b.data?.from_page && b.data?.from_block) void patchPageBlock?.(String(b.data.from_page), String(b.data.from_block), (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}));}} />)); // aberto da pagina de um cartao: salvar grava tambem na pagina
     else if (preview && !light) body = h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: k === 'audio' ? c.surface : '#000', display: 'flex', alignItems: 'center'}},
       h('div', {style: {width: '100%', height: k === 'audio' ? 'auto' : '100%', pointerEvents: selected ? 'auto' : 'none'}, className: 'board-media'}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind={k} name={String(b.data?.name || '')} />));
     else {const meta = (KIND as any)[k] || KIND.other; body = h('div', {style: {width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', boxSizing: 'border-box', background: c.surface, border: '1px solid ' + c.line, borderRadius: 12, overflow: 'hidden'}},
@@ -456,7 +474,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
   else body = h('div', {style: {padding: 12, background: c.surface, border: '1px solid ' + c.line, borderRadius: 12, color: c.muted, fontSize: 12, width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden'}}, String(b.text || b.type));
   const handle = (corner: string, css: any) => h('div', {key: corner, onPointerDown: onResize(corner), 'aria-label': 'Mudar o tamanho', style: {position: 'absolute', width: 14 / zoom, height: 14 / zoom, borderRadius: 4 / zoom, background: c.surface, border: (2 / zoom) + 'px solid ' + c.accent, cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize', zIndex: 3, ...css}});
   const o = -7 / zoom;
-  return h('div', {'data-board-item': '1', 'data-testid': 'board-item', 'data-type': b.type, 'aria-label': String(b.data?.name || b.text || b.type).slice(0, 80), onPointerDown: onDown, onDoubleClick: (e: any) => {e.stopPropagation(); onOpen();},
+  return h('div', {'data-board-item': '1', 'data-id': b.id, 'data-testid': 'board-item', 'data-type': b.type, 'aria-label': String(b.data?.name || b.text || b.type).slice(0, 80), onPointerDown: onDown, onDoubleClick: (e: any) => {e.stopPropagation(); onOpen();},
     style: {position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, zIndex: selected || editing ? 1000000 : g.z || 0, outline: selected ? (2 / zoom) + 'px solid ' + c.accent : 'none', outlineOffset: 3 / zoom, borderRadius: 10, cursor: editing ? 'auto' : 'grab', userSelect: editing ? 'text' : 'none'}},
     body,
     g.caption || (g.mentions || []).length ? h('div', {style: {position: 'absolute', left: 0, top: '100%', marginTop: 6, width: '100%', display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', pointerEvents: 'auto'}},

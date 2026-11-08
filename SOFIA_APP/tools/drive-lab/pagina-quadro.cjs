@@ -87,6 +87,18 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   ok((await pc.boundingBox()).height<90 && await pc.locator('iframe').count()===0,'Anexo: a página vira uma linha');
   await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(2500);
   ok(await pc.locator('iframe[data-testid=board-page-frame]').count()===1 && await pc.locator('iframe[data-testid=board-page-frame]').evaluate(e=>getComputedStyle(e).pointerEvents)==='auto' && page.url().includes('/paginas/'),'dois cliques no anexo: a página abre no cartão com edição (sem aba nova)');
+  // 08/11 (Pedro: "a janela fica dentro do template e posso mover"): arquivo aberto na pagina do cartao vira janela do quadro
+  {const f2=await (await pc.locator('iframe[data-testid=board-page-frame]').elementHandle()).contentFrame(); await f2.waitForSelector('[data-testid=page-file-row],[data-testid=page-file-preview]',{timeout:15000}).catch(()=>null);
+   const n0=await page.locator('[data-testid=board-item][data-type=file]').count(), pg0=page.context().pages().length;
+   const row=f2.locator('[data-testid=page-file-row]').first(); if(await row.count()) await row.click(); else await f2.locator('[data-testid=page-file-preview] img').first().dblclick(); await page.waitForTimeout(2500);
+   const n1=await page.locator('[data-testid=board-item][data-type=file]').count();
+   ok(n1===n0+1 && page.context().pages().length===pg0 && await f2.locator('[data-testid=file-window]').count()===0,'arquivo aberto na página do cartão vira janela do quadro (sem janela do navegador) ('+n0+' -> '+n1+')');
+   const w=page.locator('[data-testid=board-item][data-type=file]').last(), w0=await w.boundingBox(); await page.mouse.move(w0.x+w0.width/2,w0.y+w0.height/2); await page.mouse.down(); await page.mouse.move(w0.x+w0.width/2+80,w0.y+w0.height/2+40,{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);
+   const w1=await w.boundingBox(); ok(Math.abs(w1.x-w0.x-80)<6,'a janela do arquivo se move no quadro');
+   const bg=await page.evaluate(([x0,y0,ww,hh])=>{for(let y=y0+120;y<y0+hh-120;y+=37)for(let x=x0+40;x<x0+ww-40;x+=41){const el=document.elementFromPoint(x,y);if(el&&el.getAttribute('data-testid')==='page-board')return {x,y};}return null;},[bb.x,bb.y,bb.width,bb.height]);
+   if(bg){await page.mouse.move(bg.x,bg.y); await page.mouse.down(); await page.mouse.move(bg.x+100,bg.y+50,{steps:5}); await page.mouse.up(); await page.waitForTimeout(300);} const w2=await w.boundingBox(), c2=await pc.boundingBox();
+   ok(!!bg && Math.abs((w2.x-w1.x)-100)<4 && Math.abs((w2.y-w1.y)-50)<4,'andar pelo quadro leva a janela junto (fica fixa no lugar dela)');
+   await page.mouse.click(c2.x+60,c2.y+20); await page.waitForTimeout(400);}
   await page.getByTestId('board-page-done').click(); await page.waitForTimeout(800);}
  await page.waitForTimeout(3000); ok(await page.getByTestId('board-title').inputValue()==='Hacker','editar a página do cartão não mexe no quadro (título continua)');
  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(600); ok(/Sincronizada/.test(await pc.innerText()),'sincronizar liga a original');
@@ -146,6 +158,8 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  const wd2=page.locator('[data-testid=board-item][data-type=file]').filter({hasText:'.docx'}); await wd2.dblclick(); await page.waitForTimeout(6000);
  ok(await page.locator('[data-board-editing] [contenteditable="true"], [data-board-editing] iframe').count()>=1 || /Editando/.test(await wd2.innerText()),'duplo clique edita o Word no quadro');
  await page.screenshot({path:O+'q2.png'});
+ {const hd=wd2.getByTestId('board-file-head'); const h0=await hd.count()?await hd.boundingBox():null; if(h0){await page.mouse.move(h0.x+40,h0.y+h0.height/2); await page.mouse.down(); await page.mouse.move(h0.x+40+70,h0.y+h0.height/2+30,{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);}
+  const h1=h0?await hd.boundingBox():null; ok(!!h0&&Math.abs(h1.x-h0.x-70)<8,'Word editando: arrasta pela barra de cima (janela do quadro)');}
  await page.keyboard.press('Escape');
  // ver como pagina
  await page.getByLabel('Opções da página').click(); await page.waitForTimeout(400); await page.getByText('Ver como página').last().click(); await page.waitForTimeout(1500);
