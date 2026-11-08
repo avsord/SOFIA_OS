@@ -159,7 +159,10 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  ok(await page.locator('[data-board-editing] [contenteditable="true"], [data-board-editing] iframe').count()>=1 || /Editando/.test(await wd2.innerText()),'duplo clique edita o Word no quadro');
  await page.screenshot({path:O+'q2.png'});
  {const hd=wd2.getByTestId('board-file-head'); const h0=await hd.count()?await hd.boundingBox():null; if(h0){await page.mouse.move(h0.x+40,h0.y+h0.height/2); await page.mouse.down(); await page.mouse.move(h0.x+40+70,h0.y+h0.height/2+30,{steps:6}); await page.mouse.up(); await page.waitForTimeout(400);}
-  const h1=h0?await hd.boundingBox():null; ok(!!h0&&Math.abs(h1.x-h0.x-70)<8,'Word editando: arrasta pela barra de cima (janela do quadro)');}
+  const h1=h0?await hd.boundingBox():null; ok(!!h0&&Math.abs(h1.x-h0.x-70)<8,'Word editando: arrasta pela barra de cima (janela do quadro)');
+  {const e=await page.evaluate(([x0,y0,w,h])=>{for(let y=y0+120;y<y0+h-120;y+=37)for(let x=x0+40;x<x0+w-40;x+=41){const el=document.elementFromPoint(x,y);if(el&&el.getAttribute('data-testid')==='page-board')return {x,y};}return null;},[bb.x,bb.y,bb.width,bb.height]); if(e) await page.mouse.click(e.x,e.y);} await page.waitForTimeout(800);
+  ok(await wd2.getByTestId('board-file-head').count()===1,'clicar fora: a janela do Word continua aberta (não vira linha vazia)');
+  await wd2.getByTestId('board-file-done').click(); await page.waitForTimeout(600); ok((await wd2.boundingBox()).height<100,'Pronto fecha a janela e o Word fica como anexo');}
  await page.keyboard.press('Escape');
  // ver como pagina
  await page.getByLabel('Opções da página').click(); await page.waitForTimeout(400); await page.getByText('Ver como página').last().click(); await page.waitForTimeout(1500);
