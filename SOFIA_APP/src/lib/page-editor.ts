@@ -2,7 +2,7 @@ import type {Entity} from './types';
 
 export type PageBlock={id:string;type:string;text?:string;html?:string;checked?:boolean;data?:Record<string,any>;[key:string]:any};
 export type PageDraft={title:string;blocks:PageBlock[];appearance:Record<string,any>};
-export const APPEARANCE_KEYS=['icon','icon_mode','cover_type','cover_value','cover_attachment_id','cover_position'] as const;
+export const APPEARANCE_KEYS=['icon','icon_mode','cover_type','cover_value','cover_attachment_id','cover_position','layout'] as const; // layout: 'board' = Pagina Quadro (08/11/2026)
 export const newBlock=(type='text'):PageBlock=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,9),type,text:''});
 const clone=<T>(v:T):T=>JSON.parse(JSON.stringify(v));
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);

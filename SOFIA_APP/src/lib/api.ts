@@ -448,6 +448,8 @@ export class SofiaApi {
   attachmentThumb(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?thumb=1',headers:{Authorization:'Bearer '+this.token}}; }
   /** 07/11/2026: link assinado (2 h) para abrir o arquivo da pagina num quadro/player (que nao mandam login). */
   /** 07/11/2026: arquivos (e versoes antigas) guardados numa pagina. */
+  // 08/11/2026 (Pedro: "as paginas tambem guardam versoes"): cada salvamento vira uma versao no servidor
+  async entityVersions(id:string) { return (await this.request<{items:{id:string;revision:number;created_at:string;snapshot:Entity}[]}>('/workspace/entities/'+encodeURIComponent(id)+'/versions',undefined,'GET',30000)).items||[]; }
   async entityAttachments(id:string) { return (await this.request<{items:{id:string;name:string;mime:string;bytes:number;created_at:string}[]}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments')).items||[]; }
   /** 07/11/2026: documento do editor de Word da Sofia (HTML) -> .docx anexado a pagina. */
   saveDocx(pageId:string,input:{html:string;name:string}) { return this.request<{id:string;name:string;mime:string;bytes:number}>('/workspace/entities/'+encodeURIComponent(pageId)+'/docx',input,'POST',90000); }

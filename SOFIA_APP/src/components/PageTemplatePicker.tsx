@@ -5,7 +5,7 @@ import {useTheme} from '../lib/theme';
 import {PAGE_TEMPLATES,PageTemplate} from '../lib/page-templates';
 import {IconButton} from './UI';
 
-export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate}:{visible:boolean;parentTitle?:string;onClose:()=>void;onBlank:()=>void;onTemplate:(template:PageTemplate)=>void}){
+export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate,onBoard}:{visible:boolean;parentTitle?:string;onClose:()=>void;onBlank:()=>void;onTemplate:(template:PageTemplate)=>void;onBoard?:()=>void}){
  const c=useTheme(),[mode,setMode]=useState<'create'|'templates'>('create');
  const close=()=>{setMode('create');onClose();};
  return <Sheet visible={visible} onClose={close}>
@@ -20,6 +20,11 @@ export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate}:
        <Text style={{fontSize:18,fontWeight:'600',color:c.text}}>＋ Página em branco</Text>
        <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Começar com título e área de escrita vazios.</Text>
       </Pressable>
+      {/* 08/11/2026 (Pedro: Pagina Quadro): quadro livre com zoom, tudo solto (so no site) */}
+      {onBoard?<Pressable accessibilityRole="button" accessibilityLabel="Criar Quadro" testID="create-board" onPress={()=>{close();onBoard();}} style={{padding:16,borderRadius:14,backgroundColor:c.input,borderWidth:1,borderColor:c.line}}>
+       <Text style={{fontSize:18,fontWeight:'600',color:c.text}}>◫ Quadro</Text>
+       <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Livre, com zoom: fotos, arquivos, notas, Word e páginas soltos onde você quiser.</Text>
+      </Pressable>:null}
       <Pressable accessibilityRole="button" accessibilityLabel="Usar template de conteúdo" onPress={()=>setMode('templates')} style={{padding:16,borderRadius:14,backgroundColor:c.accentSoft,borderWidth:1,borderColor:c.accent}}>
        <Text style={{fontSize:18,fontWeight:'600',color:c.accent}}>▦ Usar template</Text>
        <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Kanban, Notas ou Formulário.</Text>

@@ -217,7 +217,7 @@ function FileWindow({win}: {win: Win}) {
       mode === 'se' ? h('div', {style: {position: 'absolute', right: 10, bottom: 10, width: 8, height: 8, borderRight: '2px solid ' + c.muted, borderBottom: '2px solid ' + c.muted, opacity: 0.6}}) : null)));
 }
 
-function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, drive, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; drive?: boolean; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
+export function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, drive, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; drive?: boolean; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
   const ek = editKind(mime, name), editable = canEdit({mime, name, pageId, drive}); /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
   const c = useTheme(), k = fileKind(mime, name), {url, error, base} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : '', !!drive), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
@@ -307,7 +307,7 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
   </View>);
 }
 
-function InlineMedia({api, id, kind, name}: {api: SofiaApi; id: string; kind: Kind; name: string}) {
+export function InlineMedia({api, id, kind, name}: {api: SofiaApi; id: string; kind: Kind; name: string}) {
   const c = useTheme(), {url, error} = useSigned(api, id, OFFICE(kind) ? 'pdf' : '');
   if (!WEB) return <View style={{height: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12}}>{name}</Text></View>;
   if (error) return <View style={{minHeight: 80, padding: 14, gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{error}</Text></View>;

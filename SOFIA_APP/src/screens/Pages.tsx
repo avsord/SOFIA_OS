@@ -1,3 +1,4 @@
+import Svg,{Path} from 'react-native-svg';
 import {PagesLoadingBody} from '../components/ScreenSkeleton';
 import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime,openFileWindow,DOCX_MIME,XLSX_MIME,PPTX_MIME} from '../components/PageFiles';
 import {blankXlsx} from '../components/SheetEditor';
@@ -29,7 +30,9 @@ import {blocksFromMarkdown,TEXT_BLOCKS,splitBlock,backspaceAtStart,deleteAtEnd,m
 import type {Caret} from '../lib/page-block-keys';
 import {flushNow} from '../lib/flush-sync';
 import {useHoverHold,useHoverKey} from '../lib/hover-hold';
+import {PageVersions} from '../components/PageVersions';
 import {PageRichInput,textToHtml,htmlLines} from '../components/PageRichInput';
+import {PageBoard,BOARD_SUPPORTED} from '../components/PageBoard';
 import {PageShareButton,shareUrl} from '../components/PageSharePanel';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {Sheet} from '../components/Sheet';
@@ -174,7 +177,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const entry=selectedId?store.get(selectedId):undefined;
  // 06/11/2026 (pagina com senha): Maxima tranca ao sair da pagina (subpagina da mesma chave nao conta como sair); Media
  // conta 5 min. Com a chave aberta, o texto e decifrado em segundo plano e entra no editor.
- const [lockDialog,setLockDialog]=useState<null|'lock'|'change'>(null),[lockTick,setLockTick]=useState(0);
+ const [versionsOpen,setVersionsOpen]=useState(false);const [lockDialog,setLockDialog]=useState<null|'lock'|'change'>(null),[lockTick,setLockTick]=useState(0);
  useEffect(()=>onLockChange(()=>setLockTick(t=>t+1)),[]);
  const selRaw=selectedId?pages.find(x=>x.id===selectedId):undefined,selKid=selRaw&&isLocked(selRaw)?(lockHeader(selRaw)?.kid||''):'';
  useEffect(()=>{if(!selKid)return;entered(selKid);return()=>left(selKid);},[selKid]);
@@ -517,11 +520,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
  function startCoverMove(){if(!selectedId)return;coverLive.current=coverPosition(store.get(selectedId)?.draft.appearance||{});setCoverMove(true);}
  function saveCoverMove(){const id=selectedId;setCoverMove(false);if(!id)return;const value=Math.round(coverLive.current*10)/10;store.edit(id,d=>({...d,appearance:{...d.appearance,cover_position:value}}));void store.flush(id);}
- async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
+ async function create(parent?:Entity,template?:PageTemplate,layout:'notes'|'board'='notes'){mutationEpoch.current++;try{
   const preset=template?freshTemplate(template):null;
   const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
    icon:'',icon_mode:'default',cover_type:desktop?'':'preset',cover_value:desktop?'':PAGE_COVERS[0][1],cover_attachment_id:'',
-   purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
+   purpose:'',layout,suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
   }});
   if(!mounted.current)return;mutationEpoch.current++;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
@@ -586,6 +589,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     </View>:null}
    </View>;}
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{paddingVertical:14,borderRadius:6,backgroundColor:focus===b.id?c.accentSoft:'transparent'}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
+  if(b.type==='image'&&b.data?.drawing){const dw=b.data.drawing;/* 08/11/2026: desenho feito no quadro, visto como pagina */return <View key={b.id} style={{marginVertical:8,alignSelf:'flex-start',width:Math.min(600,Math.max(40,dw.w||200)),aspectRatio:Math.max(0.1,(dw.w||200)/Math.max(1,dw.h||100))}}><Svg width="100%" height="100%" viewBox={'0 0 '+(dw.w||200)+' '+(dw.h||100)} preserveAspectRatio="none"><Path d={String(dw.d||'')} fill="none" stroke={dw.color||c.accent} strokeWidth={dw.width||3} strokeLinecap="round" strokeLinejoin="round"/></Svg></View>;}
   if(b.type==='image'&&b.data?.uploading)return <View key={b.id} style={{marginVertical:8,height:120,borderRadius:8,backgroundColor:c.input,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Enviando imagem…</Text></View>;
   if(b.type==='image'&&b.data?.attachment_id&&desktop)return <Pressable key={b.id} accessible={false} onPress={()=>{setFocus(b.id);/* 06/11/2026 (Pedro: "tentando apagar isso e nao ta indo"): clicar na imagem a seleciona como no Notion; Delete/Backspace apaga, Esc solta */if(desktop){try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id||picked.has(b.id)?c.accent:'transparent',alignSelf:'flex-start',maxWidth:'100%'}}><PageAttachmentImage api={api} id={String(b.data.attachment_id)} caption={b.data.caption?String(b.data.caption):''}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
@@ -725,7 +729,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Um lugar para ideias, roteiros e anotações. Toque em + para começar.")}/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
-  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
+  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}
+  onBoard={Platform.OS==='web'&&desktop&&BOARD_SUPPORTED?()=>void create(createParent||undefined,undefined,'board'):undefined}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada
@@ -749,6 +754,23 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     putSaved(await api.saveEntity({id:x.id,revision:x.revision,tags:[...(x.tags||[]).filter(t=>t!==LOCK_TAG&&t!==SECRET_OK_TAG),SECRET_OK_TAG],data:{...(x.data||{}),blocks_json:blocks,lock_json:''}} as any));}
    if(level==='medium')await api.pageLockKey(kid,null);forget(kid);}catch(err){setError(errorText(err));}})()}]);};
  const lockItems=lk?(lockedNow?[]:[{label:'Trancar agora',icon:'lock' as const,run:()=>forget(lk.kid)},{label:'Trocar senha…',icon:'lock' as const,run:()=>setLockDialog('change')},{label:'Tirar senha…',icon:'lock' as const,run:removeLock}]):[{label:'Trancar com senha…',icon:'lock' as const,run:()=>setLockDialog('lock')}];
+ // 08/11/2026 (Pedro: paginas guardam versoes): Versoes anteriores no menu da pagina (computador e celular)
+ // 08/11/2026 (Pedro: Pagina Quadro): a mesma pagina, com os blocos soltos num quadro com zoom (so no site, no computador)
+ const isBoard=Platform.OS==='web'&&desktop&&BOARD_SUPPORTED&&draft.appearance.layout==='board';
+ const setLayout=(v:'board'|'notes')=>{edit(d=>({...d,appearance:{...d.appearance,layout:v}}),'layout');void store.flush(selected.id);};
+ // toda duplicacao e independente (Pedro, 08/11): pagina trazida para o quadro vira uma copia nova, filha do quadro
+ const copyPage=async(src:Entity)=>{if(isLocked(src))throw Error('Página trancada não pode ser copiada para o quadro. Tire a senha dela antes.');
+  const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
+  const saved=await api.saveEntity({kind:'user_page',title:(src.title||'Sem título')+' (cópia)',content:'',area:selected.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
+   icon:src.data?.icon||'',icon_mode:src.data?.icon_mode||'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:selected.id,node_type:'page',blocks_json:blocks}});
+  mutationEpoch.current++;setPages(old=>[...old,saved]);return saved;};
+ const copyInto=async(copy:Entity,src:Entity)=>{if(isLocked(src))throw Error('A original está trancada.');const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
+  const cur=store.get(copy.id)?.base||copy;putSaved(await api.saveEntity({id:copy.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:blocks}} as any));setFlash('Cópia atualizada com a original');setTimeout(()=>setFlash(''),2500);};
+ const boardView=isBoard?<PageBoard api={api} pageId={selected.id} blocks={draft.blocks} locked={!!lk} pages={pages} title={draft.title} onTitle={(v:string)=>edit(d=>({...d,title:v}),'title')}
+  edit={(fn:(b:PageBlock[])=>PageBlock[],group='')=>edit(d=>({...d,blocks:fn(d.blocks)}),group)} flush={()=>void store.flush(selected.id)}
+  onOpenPage={(pg:Entity)=>open(pg)} copyPage={copyPage} copyInto={copyInto} pickFiles={()=>pickFiles(null)} createDoc={()=>void createDoc(null,'docx')}
+  dropFiles={(files:File[])=>void dropFiles(null,files)} pasteClip={(clip:any)=>void pasteClipBlocks(null,clip)} onError={(m:string)=>setError(m)}/>:null;
+ const pageItems:{label:string;icon:any;run:()=>void;danger?:boolean}[]=[...(BOARD_SUPPORTED&&Platform.OS==='web'&&desktop?[isBoard?{label:'Ver como página',icon:'listView',run:()=>setLayout('notes')}:{label:'Ver como quadro',icon:'gridView',run:()=>setLayout('board')}]:[]),...lockItems,{label:'Versões anteriores…',icon:'history',run:()=>setVersionsOpen(true)}];
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
@@ -773,7 +795,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      // 0.3.267 (computador): menu pequeno junto do ⋯, como no Notion (antes: painel de baixo na largura toda)
      const vw=typeof window!=='undefined'?window.innerWidth:1200,imageCoverNow=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id,blk=focus?draft.blocks.find(x=>x.id===focus):undefined;
      openContextMenu(vw-236,92,[{label:'Nova subpágina',icon:'plus',run:()=>void create(selected)},{label:'Usar um modelo nesta página',icon:'grid',run:()=>setCreateParent(selected)},{label:draft.appearance.icon?'Alterar ícone':'Adicionar ícone',icon:'sparkle',run:()=>{appearanceAnchor.current={x:vw-460,y:92};setAppearance('icon');}},{label:hasCover?'Alterar capa':'Adicionar capa',icon:'image',run:()=>{appearanceAnchor.current={x:vw-480,y:92};setAppearance('cover');}},
-      ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),...lockItems,{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
+      ...(imageCoverNow?[{label:'Reposicionar capa',icon:'move' as const,run:startCoverMove}]:[]),...(blk?[{label:'Remover bloco selecionado',icon:'trash' as const,run:()=>confirmRemoveBlock(blk)}]:[]),...pageItems,{label:'Excluir página',icon:'trash',danger:true,run:removePage}]);}}/>
    </View>
   </View>
   {/* 0.3.230: opcoes da pagina no ⋯ do topo, como no Notion (antes: icones soltos e "segure para excluir" nos blocos) */}
@@ -784,22 +806,23 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <Button title={hasCover?'Alterar capa':'Adicionar capa'} secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('cover'),120);}}/>
    {draft.appearance.cover_type==='attachment'&&draft.appearance.cover_attachment_id?<><View style={{height:8}}/><Button title="Reposicionar capa" secondary onPress={()=>{setPageMenu(false);setTimeout(startCoverMove,120);}}/></>:null}
    {focus&&draft.blocks.some(x=>x.id===focus)?<><View style={{height:8}}/><Button title="Remover bloco selecionado" secondary onPress={()=>{const blk=draft.blocks.find(x=>x.id===focus);setPageMenu(false);if(blk)setTimeout(()=>confirmRemoveBlock(blk),120);}}/></>:null}
-   {lockItems.map(it=><React.Fragment key={it.label}><View style={{height:8}}/><Button title={it.label} secondary onPress={()=>{setPageMenu(false);setTimeout(it.run,120);}}/></React.Fragment>)}
+   {pageItems.map(it=><React.Fragment key={it.label}><View style={{height:8}}/><Button title={it.label} secondary onPress={()=>{setPageMenu(false);setTimeout(it.run,120);}}/></React.Fragment>)}
    <Pressable accessibilityRole="button" onPress={()=>{setPageMenu(false);setTimeout(removePage,120);}} style={{paddingVertical:18}}><Text style={{color:c.danger,fontWeight:'600'}}>Excluir página</Text></Pressable>
   </Sheet>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
   {/* a pergunta fica ate a pessoa responder (o clique tira o foco do texto e dispara outro salvar; antes ela sumia sob o clique) */}
   {entry.secretAsk&&!lk?<SecretAsk onLock={()=>setLockDialog('lock')} onKeep={()=>store.allowSecret(selected.id)}/>:null}
-  {lockedNow&&lk?<PageLockScreen title={selected.title} level={lk.level} onUnlock={unlockPage} onRecover={recoverPage}/>:decrypting?<View style={{flex:1,alignItems:'center',paddingTop:80}}><ActivityIndicator color={c.accent}/></View>:documentContent(selected,draft)}
+  {lockedNow&&lk?<PageLockScreen title={selected.title} level={lk.level} onUnlock={unlockPage} onRecover={recoverPage}/>:decrypting?<View style={{flex:1,alignItems:'center',paddingTop:80}}><ActivityIndicator color={c.accent}/></View>:isBoard?boardView:documentContent(selected,draft)}
+  {versionsOpen?<PageVersions api={api} page={selRaw||selected} visible onClose={()=>setVersionsOpen(false)} onRestore={d=>edit(()=>({title:d.title,blocks:d.blocks,appearance:{...d.appearance}}),'restore-version')}/>:null}
   {lockDialog?<PageLockDialog title={selected.title} change={lockDialog==='change'?lk?.level:undefined} onCancel={()=>setLockDialog(null)} onLock={lockDialog==='change'?pw=>changePassword(pw):lockPage}/>:null}
   {/* 05/11/2026 (Pedro: o + abria "um trambolho"): como no Notion, a página nova abre direto e embaixo fica "Comece a usar" */}
-  {desktop&&!lk&&pageBodyIsEmpty(draft.blocks)&&!(children.get(selected.id)||[]).length?<View pointerEvents="box-none" testID="page-start-bar" style={{position:'absolute',left:0,right:0,bottom:36,alignItems:'center',zIndex:25}}>
+  {desktop&&!lk&&!isBoard&&pageBodyIsEmpty(draft.blocks)&&!(children.get(selected.id)||[]).length?<View pointerEvents="box-none" testID="page-start-bar" style={{position:'absolute',left:0,right:0,bottom:36,alignItems:'center',zIndex:25}}>
    <View style={{gap:8,alignItems:'flex-start'}}>
     <Text style={{color:c.muted,fontSize:12}}>Comece a usar</Text>
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
      {[{label:'Pedir à Sofia',icon:'sofia' as const,run:()=>{const first=draft.blocks[0];if(first){setFocus(first.id);placeCaret(first.id,0);setAiText('');setAi({id:first.id,busy:false,error:''});}}},
        ...PAGE_TEMPLATES.map(t=>({label:t.title,icon:undefined,glyph:t.icon,run:()=>applyTemplate(t)})),
-       {label:'Modelos',icon:'grid' as const,run:()=>setCreateParent(selected)}].map((x:any)=><Pressable key={x.label} accessibilityRole="button" accessibilityLabel={x.label} onPress={x.run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:34,paddingHorizontal:14,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
+       ...(BOARD_SUPPORTED&&Platform.OS==='web'?[{label:'Quadro',icon:'gridView' as const,run:()=>setLayout('board')}]:[]),{label:'Modelos',icon:'grid' as const,run:()=>setCreateParent(selected)}].map((x:any)=><Pressable key={x.label} accessibilityRole="button" accessibilityLabel={x.label} onPress={x.run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:34,paddingHorizontal:14,borderRadius:999,borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.input:c.surface})}>
       {x.icon?<Icon name={x.icon} size={15} color={x.icon==='sofia'?c.accent:c.muted}/>:<Text style={{fontSize:13}}>{x.glyph}</Text>}<Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>{x.label}</Text></Pressable>)}
     </View>
    </View>

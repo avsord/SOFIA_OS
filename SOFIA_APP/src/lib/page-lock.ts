@@ -105,6 +105,11 @@ export async function seal(id: string, kid: string, blocks: string): Promise<str
   keep(id, kid, blocks, ct);
   return JSON.stringify({...h, iv: b64(iv), ct});
 }
+/** 08/11/2026 (versoes da pagina): decifra uma versao antiga sem mexer no texto aberto da pagina. */
+export async function peekBlocks(h: LockHeader): Promise<string> {
+  const o = OPEN.get(h.kid); if (!o) throw Error('Página trancada: abra com a senha para ver as versões.');
+  return dec.decode(await subtle().decrypt({name: 'AES-GCM', iv: unb64(h.iv)}, o.key, unb64(h.ct)));
+}
 /** Decifra os blocos de uma pagina (precisa da chave aberta). */
 export async function openBlocks(id: string, h: LockHeader): Promise<string> {
   const o = OPEN.get(h.kid); if (!o) throw Error('Página trancada.');

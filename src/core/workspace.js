@@ -254,7 +254,7 @@ class Workspace {
    return this.s.tx(()=>{
      if(old)this.db.prepare('UPDATE entities SET title=?,content=?,area=?,tags=?,privacy=?,state=?,data=?,revision=?,updated_at=? WHERE id=?').run(v.title,v.content,v.area,JSON.stringify(v.tags),v.privacy,v.state,JSON.stringify(v.data),revision,stamp,key);
      else this.db.prepare('INSERT INTO entities VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(key,OWNER,v.kind,v.title,v.content,v.area,JSON.stringify(v.tags),v.privacy,v.state,JSON.stringify(v.data),input.source_id?this.s.source(input.source_id):null,revision,stamp,stamp);
-     const saved=this.get(key);this.db.prepare('INSERT INTO entity_versions VALUES(?,?,?,?,?)').run(id(),key,revision,JSON.stringify(saved),stamp);
+     const saved=this.get(key);this.db.prepare('INSERT INTO entity_versions VALUES(?,?,?,?,?)').run(id(),key,revision,JSON.stringify(saved),stamp);this.pruneVersions(key);
      this.event('entity',key,old?'updated':'created',v.area,v.title);this.s.audit('workspace.'+(old?'updated':'created'),key);
      if(v.kind==='monitor'||v.kind==='routine')this.syncJob(saved);
      return saved;
@@ -297,6 +297,14 @@ class Workspace {
      this.s.audit('workspace.deleted',entityId);return {ok:true,id:entityId,title:e.title,kind:e.kind,deleted_ids:[entityId],deleted_total:1};
    });
   }
+ /** 08/11/2026 (Pedro: "as paginas guardam versoes"): o historico nao cresce sem fim. Fica: as 200 mais recentes e, das
+  * mais antigas, a ultima de cada dia dos ultimos 90 dias. O resto sai. */
+ pruneVersions(entityId,keep=200,days=90){
+  const rows=this.db.prepare('SELECT id,created_at FROM entity_versions WHERE entity_id=? ORDER BY revision DESC').all(entityId);if(rows.length<=keep)return 0;
+  const limit=Date.now()-days*86400000,seenDay=new Set(),drop=[];
+  for(const r of rows.slice(keep)){const t=Date.parse(r.created_at),day=String(r.created_at||'').slice(0,10);if(Number.isFinite(t)&&t>=limit&&!seenDay.has(day)){seenDay.add(day);continue;}drop.push(r.id);}
+  const del=this.db.prepare('DELETE FROM entity_versions WHERE id=?');for(const x of drop)del.run(x);return drop.length;
+ }
  versions(entityId){this.get(entityId);return this.db.prepare('SELECT * FROM entity_versions WHERE entity_id=? ORDER BY revision DESC').all(entityId).map(r=>({...r,snapshot:JSON.parse(r.snapshot)}));}
  reference(type,key){if(type==='entity')return this.get(key);if(type==='note')return this.s.note(key);if(type==='task')return this.s.task(key);if(type==='message')return this.s.message(key);throw new AppError('BAD_REFERENCE','Tipo de vínculo inválido.');}
  link(b){const a=this.reference(b.from_type,b.from_id),z=this.reference(b.to_type,b.to_id);if(b.from_type===b.to_type&&b.from_id===b.to_id)throw new AppError('SELF_LINK','Não vincule o registro a ele mesmo.');const kind=cleanText(b.kind||'related','Relação',80);rejectSecrets(kind);this.db.prepare('INSERT OR IGNORE INTO relations VALUES(?,?,?,?,?,?,?)').run(id(),b.from_type,a.id,b.to_type,z.id,kind,now());return this.links(b.from_type,a.id);}
