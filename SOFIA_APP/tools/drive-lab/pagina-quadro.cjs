@@ -63,6 +63,9 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
  // 08/11 (Pedro: "ele considera essa pagina existente como copia e fica de fundo, mas nao aparece como subpagina"): a copia nao aparece no seletor de paginas nem em Recentes
  {await page.getByTestId('board-add-page').click(); await page.waitForTimeout(500); const t=await page.getByTestId('board-page-picker').innerText(); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   ok(!/\(cópia\)/.test(t),'cópia escondida: não aparece como subpágina do quadro no seletor de páginas');}
+ // 08/11 (Pedro: "tem uma subpagina na pagina que eu criei... porque eu adicionei uma pagina existente"): abrindo a setinha do quadro na barra lateral
+ {for(const b of await page.locator('[data-testid=sidebar-page-tree] [aria-label^="Abrir "],[data-testid=sidebar-page-tree] [aria-label*="xpandir"]').all()){await b.click().catch(()=>{}); await page.waitForTimeout(200);}
+  const t=await page.getByTestId('sidebar-page-tree').innerText().catch(()=>''); ok(/Hacker/.test(t) && !/\(cópia\)/.test(t),'barra lateral com o quadro aberto: a cópia não aparece como subpágina');}
  // 08/11 (Pedro: "versao adaptada"): resumo da pagina - arquivo em linha, abrir/fechar o anexo, clicar abre a janela flutuante
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(500);
  await pc.click({position:{x:60,y:20}}); await page.getByTestId('board-page-view').click(); await page.waitForTimeout(800);
