@@ -60,6 +60,9 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   ok(await page.getByTestId('board-zoom').innerText()===z0,'rodinha em cima da janela não mexe no zoom do quadro'); await page.screenshot({path:O+'picker.png'});} await page.getByTestId('board-page-picker').getByRole('button',{name:'Sem título',exact:true}).first().click(); await page.waitForTimeout(2500);
  const pc=page.locator('[data-testid=board-item][data-type=page_link]'); ok(await pc.count()===1 && /Cópia/.test(await pc.innerText()),'página entra como cópia');
  ok(!/\(cópia\)/.test(await page.getByTestId('sidebar-page-tree').innerText().catch(()=>'')),'cópia do quadro não aparece duplicada na lista de Páginas');
+ // 08/11 (Pedro: "ele considera essa pagina existente como copia e fica de fundo, mas nao aparece como subpagina"): a copia nao aparece no seletor de paginas nem em Recentes
+ {await page.getByTestId('board-add-page').click(); await page.waitForTimeout(500); const t=await page.getByTestId('board-page-picker').innerText(); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+  ok(!/\(cópia\)/.test(t),'cópia escondida: não aparece como subpágina do quadro no seletor de páginas');}
  // 08/11 (Pedro: "versao adaptada"): resumo da pagina - arquivo em linha, abrir/fechar o anexo, clicar abre a janela flutuante
  await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(300); await pc.dblclick({position:{x:60,y:20}}); await page.waitForTimeout(500);
  await pc.click({position:{x:60,y:20}}); await page.getByTestId('board-page-view').click(); await page.waitForTimeout(800);
@@ -115,7 +118,13 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
    await page.mouse.click(c2.x+60,c2.y+20); await page.waitForTimeout(400);}
   await page.getByTestId('board-page-done').click(); await page.waitForTimeout(800);}
  await page.waitForTimeout(3000); ok(await page.getByTestId('board-title').inputValue()==='Hacker','editar a página do cartão não mexe no quadro (título continua)');
- await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(600); ok(/Sincronizada/.test(await pc.innerText()),'sincronizar liga a original');
+ // 08/11 (Pedro): sincronizar leva o que mudou na copia para a pagina original
+ {const tok0=await page.evaluate(()=>{for(const k of Object.keys(localStorage)){const v=localStorage.getItem(k)||'';const m=/"token":"([A-Za-z0-9_-]{43})"/.exec(v);if(m)return m[1];}return '';});
+  const orig=()=>page.evaluate(async([B,t])=>{const r=await fetch(B+'/api/mobile/workspace/entities?limit=100&kind=user_page&q=&offset=0',{headers:{Authorization:'Bearer '+t}});const j=await r.json();const o=(j.items||[]).find(x=>/linha da original/.test(String(x.data?.blocks_json||''))&&!(x.tags||[]).includes('board-copy'));return o?String(o.data.blocks_json):'';},[B,tok0]);
+  const before=await orig();
+  await pc.click({position:{x:12,y:12}}); await page.waitForTimeout(300); await page.getByTestId('board-sync').click(); await page.waitForTimeout(500);
+  await page.getByRole('button',{name:'Sincronizar',exact:true}).click(); await page.waitForTimeout(2500); const after=await orig();
+  ok(tok0 && !/editado no quadro/.test(before) && /editado no quadro/.test(after) && /Cópia/.test(await pc.innerText()),'sincronizar leva as mudanças da cópia para a página original (a cópia continua escondida no quadro)');}
  // desenho
  await page.getByTestId('board-draw').click(); await page.mouse.move(bb.x+200,bb.y+600); await page.mouse.down(); await page.mouse.move(bb.x+260,bb.y+640,{steps:5}); await page.mouse.move(bb.x+330,bb.y+600,{steps:5}); await page.mouse.up(); await page.getByTestId('board-draw').click(); await page.waitForTimeout(400);
  ok(await page.locator('[data-testid=board-item][data-type=image] svg path').count()===1,'desenho feito');

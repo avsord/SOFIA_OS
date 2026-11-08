@@ -704,7 +704,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   // 05/11/2026: capas das paginas recentes ja baixadas antes de abrir (trocar de pagina sem esperar a capa)
   useEffect(()=>{if(Platform.OS!=='web'||!desktop)return;const list=[...displayPages].filter(p=>p.data?.cover_type==='attachment'&&p.data?.cover_attachment_id).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,12);
    const timers=list.map((p,i)=>setTimeout(()=>prefetchPageCover(api,p.data),600+i*350));return()=>timers.forEach(clearTimeout);},[displayPages,desktop,api]);
-  const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
+  const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived'&&!(p.tags||[]).includes('board-copy')).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
  const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
@@ -777,6 +777,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   mutationEpoch.current++;setPages(old=>[...old,saved]);return saved;};
  const copyInto=async(copy:Entity,src:Entity)=>{if(isLocked(src))throw Error('A original está trancada.');const live=store.get(src.id),blocks=live?JSON.stringify(live.draft.blocks):String(src.data?.blocks_json||'[]');
   const cur=store.get(copy.id)?.base||copy;putSaved(await api.saveEntity({id:copy.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:blocks}} as any));setFlash('Cópia atualizada com a original');setTimeout(()=>setFlash(''),2500);};
+ // 08/11/2026 (Pedro): sincronizar = o conteudo da copia escondida do quadro vai para a pagina original (titulo, capa e lugar da original ficam)
+ const pushToOriginal=async(copy:Entity,src:Entity)=>{const orig=pages.find(x=>x.id===src.id)||src;if(isLocked(orig))throw Error('A original está trancada. Abra com a senha antes de sincronizar.');
+  const live=store.get(copy.id);if(live)await store.flush(copy.id).catch(()=>undefined);/* a copia e editada dentro do cartao (outra janela): le a versao do servidor */const fresh=live?null:await api.entity(copy.id),blocks=live?JSON.stringify(live.draft.blocks):String(fresh?.data?.blocks_json||copy.data?.blocks_json||'[]');await store.flush(src.id).catch(()=>undefined);
+  const cur=store.get(src.id)?.base||await api.entity(src.id);putSaved(await api.saveEntity({id:cur.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:blocks}} as any));mutationEpoch.current++;setFlash('Página original sincronizada com a cópia');setTimeout(()=>setFlash(''),2500);};
  // 08/11/2026 (Quadro, cartao de pagina adaptado): abrir/fechar o anexo e salvar o arquivo editado vao para o bloco da PROPRIA pagina
  const patchPageBlock=async(pageId:string,blockId:string,f:(b:PageBlock)=>PageBlock)=>{
   const e=store.get(pageId);if(e&&!isLocked(e.base)){store.edit(pageId,d=>({...d,blocks:d.blocks.map(b=>b.id===blockId?f(b):b)}),'board-card');await store.flush(pageId);const now=store.get(pageId);if(now)setPages(old=>old.map(x=>x.id===pageId?{...x,revision:now.base.revision,data:{...x.data,blocks_json:JSON.stringify(now.draft.blocks)}}:x));return;}
@@ -784,7 +788,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const saved=await api.saveEntity({id:cur.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:JSON.stringify(bs.map(b=>b.id===blockId?f(b):b))}} as any);mutationEpoch.current++;setPages(old=>old.map(x=>x.id===saved.id?saved:x));};
  const boardView=isBoard?<PageBoard api={api} pageId={selected.id} blocks={draft.blocks} locked={!!lk} pages={pages} title={draft.title} onTitle={(v:string)=>edit(d=>({...d,title:v}),'title')}
   edit={(fn:(b:PageBlock[])=>PageBlock[],group='')=>edit(d=>({...d,blocks:fn(d.blocks)}),group)} flush={()=>void store.flush(selected.id)}
-  onOpenPage={(pg:Entity)=>open(pg)} copyPage={copyPage} copyInto={copyInto} pickFiles={()=>pickFiles(null)} createDoc={()=>void createDoc(null,'docx')}
+  onOpenPage={(pg:Entity)=>open(pg)} copyPage={copyPage} copyInto={copyInto} pushToOriginal={pushToOriginal} pickFiles={()=>pickFiles(null)} createDoc={()=>void createDoc(null,'docx')}
   dropFiles={(files:File[])=>void dropFiles(null,files)} pasteClip={(clip:any)=>void pasteClipBlocks(null,clip)} onError={(m:string)=>setError(m)}
   onPageChanged={(id:string)=>void api.entity(id).then(e=>{mutationEpoch.current++;setPages(old=>old.map(x=>x.id===e.id?e:x));}).catch(()=>undefined)}
   patchPageBlock={patchPageBlock}/>:null;

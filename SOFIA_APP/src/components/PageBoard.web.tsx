@@ -13,6 +13,7 @@ import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import type {PageBlock} from '../lib/page-editor';
 import {useTheme} from '../lib/theme';
+import {appAlert} from '../lib/app-alert';
 import {Icon, type IconName} from './Icon';
 import {FileBody, InlineMedia, fileKind, editKind, openFileWindow, downloadPageFile, sizeLabel, defaultView} from './PageFiles';
 import {KIND} from './DrivePreview';
@@ -75,7 +76,7 @@ function plainOf(html: string) {const d = document.createElement('div'); d.inner
 type Props = {
   api: SofiaApi; pageId: string; blocks: PageBlock[]; locked: boolean;
   edit: (fn: (blocks: PageBlock[]) => PageBlock[], group?: string) => void; flush: () => void;
-  pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>;
+  pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>; pushToOriginal?: (copy: Entity, src: Entity) => Promise<void>;
   title: string; onTitle: (v: string) => void; onPageChanged?: (id: string) => void;
   patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>;
   pickFiles: () => void; createDoc: () => void; dropFiles: (files: File[]) => void; pasteClip: (clip: SofiaClip) => void; onError: (m: string) => void;
@@ -360,8 +361,13 @@ export function PageBoard(p: Props) {
     const items: any[] = [];
     if (one?.type === 'file') {const k = fileKind(one.data?.mime, one.data?.name), pv = (one.data?.view || defaultView(k)) === 'preview'; items.push(btn(pv ? 'file' : 'eye', pv ? 'Mostrar como anexo' : 'Abrir no quadro (visualização)', () => {const s = size({...one, data: {...one.data, view: pv ? 'attach' : 'preview'}}); patchBlock(one.id, b => ({...b, data: {...b.data, view: pv ? 'attach' : 'preview', board: {...geo(b), w: s.w, h: s.h}}}), 'board-view');}));}
     if (one?.type === 'page_link') {const synced = !!one.data?.synced, src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null;
-      if (src) items.push(btn('refresh', synced ? 'Parar de sincronizar com a original' : 'Sincronizar com a página original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: !synced, page_id: !synced ? b.data?.source_id : b.data?.copy_id}}), 'board-sync'), synced, false, 'board-sync'));
-      if (src && !synced) items.push(btn('download', 'Atualizar a cópia com o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
+      // 08/11/2026 (Pedro: "se ele alterou coisas e quer sincronizar essa copia pode fazer a pagina original sincronizar essas
+      // informacoes"): a copia continua escondida (nao e subpagina); Sincronizar leva o que mudou na copia PARA a original.
+      // Cartoes antigos ligados direto na original (synced) so ganham o "parar".
+      if (src && synced) items.push(btn('refresh', 'Parar de sincronizar com a original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: false, page_id: b.data?.copy_id}}), 'board-sync'), true, false, 'board-sync'));
+      if (src && !synced && p.pushToOriginal) items.push(btn('refresh', 'Sincronizar: levar as mudanças desta cópia para a página original', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (!cp) return;
+        appAlert('Sincronizar com a original?', 'O conteúdo desta cópia vai substituir o conteúdo de "' + (src.title || 'Sem título') + '". A versão anterior da original fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sincronizar', onPress: () => void track('sincronizar-original', () => p.pushToOriginal!(cp, src)).catch(e => fail(String(e?.message || e)))}]);}, false, false, 'board-sync'));
+      if (src && !synced) items.push(btn('download', 'Trazer para a cópia o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
       items.push(btn(one.data?.view === 'list' ? 'book' : 'listView', one.data?.view === 'list' ? 'Mostrar a página de verdade (editar aqui)' : 'Mostrar só o resumo (arquivos em lista)', () => setPageView(one, one.data?.view === 'list' ? 'page' : 'list'), one.data?.view === 'list', false, 'board-page-view'));
       items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
     if (one?.type === 'callout') items.push(btn('circle', 'Cor da nota', () => {const i = NOTE_COLORS.indexOf(geo(one).color || NOTE_COLORS[0]); patchGeo([one.id], g => ({...g, color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length]}), 'board-color');}));
@@ -648,7 +654,7 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
 const isEmojiIcon = (v: unknown) => typeof v === 'string' && v.length > 0 && v.length <= 8 && !/^[a-z0-9_-]+$/i.test(v);
 function PagePicker({pages, exclude, onPick, onClose, title = 'Trazer página para o quadro', hint = 'Entra como uma cópia independente (mexer nela não muda a original). Se quiser, depois é só clicar em sincronizar.', extra}: {pages: Entity[]; exclude: string; onPick: (p: Entity) => void; onClose: () => void; title?: string; hint?: string; extra?: {label: string; run: () => void}}) {
   const c = useTheme(), [q, setQ] = useState(''), [open, setOpen] = useState<Record<string, boolean>>({}), [hover, setHover] = useState('');
-  const live = useMemo(() => pages.filter(x => x.state !== 'archived'), [pages]);
+  const live = useMemo(() => pages.filter(x => x.state !== 'archived' && !(x.tags || []).includes('board-copy')), [pages]); // copias de quadro ficam escondidas: nunca aparecem como subpagina
   const byParent = useMemo(() => {const m = new Map<string, Entity[]>(), ids = new Set(live.map(x => x.id)); for (const x of live) {const par = String(x.data?.parent_id || ''), key = ids.has(par) ? par : ''; if (!m.has(key)) m.set(key, []); m.get(key)!.push(x);}
     for (const l of m.values()) l.sort((a, b) => (Number(a.data?.sort_order) || 0) - (Number(b.data?.sort_order) || 0) || String(a.title || '').localeCompare(String(b.title || ''), 'pt-BR')); return m;}, [live]);
   const pathOf = (x: Entity) => {const out: string[] = []; let cur = live.find(y => y.id === String(x.data?.parent_id || '')), guard = 0; while (cur && guard++ < 20) {out.unshift(cur.title || 'Sem título'); cur = live.find(y => y.id === String(cur!.data?.parent_id || ''));} return out.join(' / ');};
