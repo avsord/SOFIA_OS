@@ -20,9 +20,10 @@ test('e-mails: grupos e selecao pelo titulo; Conta Google nao aparece como "falt
 test('retomada: erro de demora so do chat fala em "mensagem"; leitura interrompida repete; teclado e abas na volta',()=>{
   const a=read('src/lib/api.ts');
   assert.ok(a.includes("isChatSend(path, method) ? 'A conexão demorou. Recarregue antes de reenviar: sua mensagem pode ter chegado.' : 'A Sofia demorou para responder. Tente de novo.'"));
-  // 09/11/2026: leitura que perde a conexao (interrompida ou nao, inclusive no meio da resposta) repete antes do erro
-  assert.ok(a.includes("e.code==='TIMEOUT'||e.code==='NETWORK')){"));
-  assert.ok(a.includes("if (controller.signal.aborted || (bodyError as any)?.name === 'AbortError' || bodyError instanceof TypeError) throw bodyError;"));
+  assert.ok(a.includes("(e.code==='NETWORK'&&interrupted)"));
+  // 09/11/2026: resposta cortada no meio repete (BODY_CUT); sem internet continua falhando na hora (modo offline)
+  assert.ok(a.includes("e.code==='BODY_CUT'||(e.code==='NETWORK'&&interrupted)"));
+  assert.ok(a.includes("if (bodyError instanceof TypeError) throw new ApiError('A resposta da Sofia chegou incompleta. Tente de novo.', 'BODY_CUT', response.status);"));
   assert.ok(read('App.tsx').includes('TextInput.State.blurTextInput(f)'));
   assert.ok(read('src/components/TabPager.tsx').includes("if(state==='active'){selection.current.cancelDrag();aligned.current=null;align();clearPreview();}"));
 });
