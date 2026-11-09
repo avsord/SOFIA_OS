@@ -105,7 +105,8 @@ test('068 bell actions share one horizontal row and capsule reads remain server-
  const bell=fs.readFileSync(path.join(root,'src/components/NotificationCenter.tsx'),'utf8');
  const code=bell.slice(bell.indexOf('    {n.items.length?<View style='),bell.indexOf('    <Button title="Ver todas as notificações"'));
  assert.ok(code.includes("flexDirection:'row'"));
- assert.ok(code.includes('Marcar tudo como lido')&&code.includes('Limpar todas'));
+ // 09/11/2026 (Pedro): sem "Marcar tudo como lido"; fica so limpar
+ assert.ok(!code.includes('Marcar tudo como lido')&&code.includes('Limpar todas'));
  const api=fs.readFileSync(path.join(root,'src/lib/api.ts'),'utf8');
  assert.ok(api.includes("'/md/capsules/doses"));
  const server=fs.readFileSync(path.join(root,'../src/channels/mobile.js'),'utf8');
@@ -118,10 +119,10 @@ test('069 unread bell actions use identical neutral color, one no-wrap row',()=>
  const section=bell.slice(bell.indexOf('    {n.items.length?<View style='),bell.indexOf('    <Button title="Ver todas as notificações"'));
  assert.ok(section.includes("flexDirection:'row'"));
  assert.ok(!section.includes("flexWrap:'wrap'"));
- const mark=section.slice(section.indexOf('Marcar todas as notificações como lidas'),section.indexOf('Limpar todas as notificações'));
+ // 09/11/2026 (Pedro: "tirar o marcar tudo como lido e deixar limpar notificacoes"): so o Limpar
+ assert.ok(!section.includes('Marcar todas as notificações como lidas'));
  const clean=section.slice(section.indexOf('Limpar todas as notificações'));
- assert.ok(mark.includes('color:c.muted')&&clean.includes('color:c.muted'));
- assert.ok(mark.includes('numberOfLines={1}')&&clean.includes('numberOfLines={1}'));
+ assert.ok(clean.includes('color:c.muted')&&clean.includes('numberOfLines={1}'));
 });
 test('069 startup restores photo and cached Home together; menus mount only when visited',()=>{
  const launch=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
