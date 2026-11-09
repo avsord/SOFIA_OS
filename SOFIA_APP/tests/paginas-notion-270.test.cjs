@@ -325,3 +325,18 @@ test('criar rapido na linha do tempo: entende variacoes (tipo, prioridade, horar
  assert.equal(f('o que tenho amanhã?'),null);assert.equal(f('quais tarefas hoje'),null);
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/const quick = !f \? parseQuickCreate\(t, when\) : null;/);
 });
+test('09/11: GIF parado com play, uma volta ou repetir salvo no bloco; leitura do blob pelo cache (CSP)',()=>{
+ const g=fs.readFileSync(path.join(__dirname,'..','src/components/GifPlayer.tsx'),'utf8');
+ assert.match(g,/export function gifInfo/);assert.match(g,/'Tocar o GIF'/);assert.match(g,/if \(!loopRef\.current\) timer\.current = setTimeout\(stop, gif\.ms\)/);assert.match(g,/coverBlob\(src\)/);
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/loop=\{!!b\.data\.gif_loop\} onLoop=\{v=>updateBlock\(b,\{data:\{\.\.\.b\.data,gif_loop:v\}\}\)\}/);
+ const f=fs.readFileSync(path.join(__dirname,'..','src/components/PageFiles.tsx'),'utf8');assert.match(f,/h\(GifPlayer, \{src: url/);assert.match(f,/onLoop=\{v => onChange\(\{\.\.\.data, gif_loop: v\}\)\}/);
+});
+test('09/11: colar de documento claro tira o fundo branco e a letra preta/branca (grifo colorido fica)',()=>{
+ const r=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');
+ assert.match(r,/colorTone\(st\.backgroundColor\)>0\.92\)st\.backgroundColor=''/);assert.match(r,/if\(st\.color&&neutralInk\(st\.color\)\)st\.color=''/);
+});
+test('09/11: Quadro - janela de anexo vira a original (salvar vai direto para a pagina) e o cartao leva as janelas dele',()=>{
+ const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');
+ assert.match(b,/board-file-make-original/);assert.match(b,/board-file-live/);assert.match(b,/if \(b\.data\?\.live && fp && fb && patchPageBlock\)/);
+ assert.match(b,/String\(b\.data\?\.from_page\) === String\(one\.data\?\.copy_id \|\| ''\) \? \{\.\.\.b, data: \{\.\.\.b\.data, from_page: one\.data\?\.source_id, live: true\}\}/);
+});

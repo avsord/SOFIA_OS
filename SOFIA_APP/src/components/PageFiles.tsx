@@ -7,6 +7,7 @@
 //   enquanto voce escreve. PDF e Office (convertido em PDF pelo Google no servidor) num quadro; imagem com zoom; video e audio
 //   com o player do navegador; texto em letra fixa.
 // Os arquivos abrem por LINK ASSINADO do proprio site (a protecao da pagina bloqueia quadros com blob:).
+import {GifPlayer} from './GifPlayer';
 import React, {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {Platform, Pressable, Text, View} from 'react-native';
 import type {SofiaApi} from '../lib/api';
@@ -34,7 +35,7 @@ function askBoard(f: {id: string; name: string; mime: string; pageId?: string}):
 const WEB = Platform.OS === 'web';
 const h = React.createElement as any;
 export const FILE_MAX = 25 * 1024 * 1024;
-export type PageFileData = {attachment_id?: string; name?: string; mime?: string; size?: number; view?: 'attach' | 'preview'; scale?: number; uploading?: boolean; progress?: string};
+export type PageFileData = {attachment_id?: string; name?: string; mime?: string; size?: number; view?: 'attach' | 'preview'; scale?: number; uploading?: boolean; progress?: string; gif_loop?: boolean};
 
 export const fileKind = (mime?: string, name?: string): Kind => driveKind({mime: String(mime || ''), name: String(name || ''), folder: false} as any);
 const OFFICE = (k: Kind) => k === 'doc' || k === 'sheet' || k === 'slides';
@@ -307,7 +308,7 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
     <Icon name={meta.icon} size={16} color={meta.color} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 13}}>{data.name}</Text><Text style={{color: c.muted, fontSize: 12}}>Em janela flutuante · </Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '600'}}>Trazer de volta</Text></Pressable>);
   return hoverDiv(<View style={{marginVertical: 6, position: 'relative'}}>
     <View ref={wrap} testID="page-file-preview" style={{width: (scale + '%') as any, maxWidth: '100%', position: 'relative', borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: selected ? c.accent : 'transparent'}}>
-      {h('div', {onClick: onSelect, onDoubleClick: open}, <InlineMedia api={api} id={id} kind={k} name={data.name || ''} />)}
+      {h('div', {onClick: onSelect, onDoubleClick: open}, <InlineMedia api={api} id={id} kind={k} name={data.name || ''} loop={!!data.gif_loop} onLoop={v => onChange({...data, gif_loop: v})} />)}
       {h('div', {onPointerDown: (e: any) => popOut(api, file, e, wrap.current), title: 'Arraste para soltar na tela (janela flutuante)', 'aria-label': 'Arraste para soltar na tela', style: {position: 'absolute', left: '50%', top: 0, marginLeft: -40, width: 80, height: 18, cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover || selected ? 1 : 0, zIndex: 6}},
         h('div', {style: {width: 42, height: 5, borderRadius: 3, background: 'rgba(255,255,255,.95)', boxShadow: '0 0 0 1px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.3)'}}))}
       {k !== 'audio' ? h('div', {onPointerDown: resize, 'aria-label': 'Arraste para mudar o tamanho', style: {position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover || selected ? 1 : 0}}, h('div', {style: {width: 4, height: 38, borderRadius: 2, background: 'rgba(255,255,255,.9)', boxShadow: '0 0 0 1px rgba(0,0,0,.25)'}})) : null}
@@ -317,12 +318,12 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
   </View>);
 }
 
-export function InlineMedia({api, id, kind, name}: {api: SofiaApi; id: string; kind: Kind; name: string}) {
+export function InlineMedia({api, id, kind, name, loop, onLoop}: {api: SofiaApi; id: string; kind: Kind; name: string; loop?: boolean; onLoop?: (v: boolean) => void}) {
   const c = useTheme(), {url, error} = useSigned(api, id, OFFICE(kind) ? 'pdf' : '');
   if (!WEB) return <View style={{height: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12}}>{name}</Text></View>;
   if (error) return <View style={{minHeight: 80, padding: 14, gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{error}</Text></View>;
   if (!url) return <View style={{height: kind === 'audio' ? 54 : 200, alignItems: 'center', justifyContent: 'center', backgroundColor: c.input}}><Spinner size={16} /></View>;
-  if (kind === 'image') return h('img', {src: url, alt: name, draggable: false, style: {display: 'block', width: '100%', height: 'auto'}});
+  if (kind === 'image') return h(GifPlayer, {src: url, alt: name, loop, onLoop, style: {display: 'block', width: '100%', height: 'auto'}});
   if (kind === 'video') return h('video', {src: url, controls: true, preload: 'metadata', style: {display: 'block', width: '100%', maxHeight: 520, background: '#000'}});
   if (kind === 'audio') return h('audio', {src: url, controls: true, preload: 'metadata', style: {display: 'block', width: '100%'}});
   return h('iframe', {src: url, title: name, style: {display: 'block', width: '100%', height: 560, border: 0, background: '#fff'}});

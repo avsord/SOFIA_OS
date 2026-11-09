@@ -8,3 +8,5 @@ export const PageRichInput=React.forwardRef<any,any>(function PageRichInput(){re
 export function pasteHtml(html: string, _ctx?: {bg?: string; color?: string}) { return sanitizeRich(html); }
 export function pasteContext(_el: any): {bg?: string; color?: string} { return {}; }
 export function htmlLines(html: string): string[] { return String(html || '').split(/<br\s*\/?>/i); }
+/** So no site (barra de formatacao); no app nativo nao ha cor colada para limpar. */
+export function neutralInk(_v: string) { return false; }

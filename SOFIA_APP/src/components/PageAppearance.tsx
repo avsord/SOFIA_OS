@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {GifPlayer} from './GifPlayer';
 import {PALETTE} from '../lib/palette';
 import {tap} from '../lib/desktop';
 import {View,Text,Pressable,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder,Platform} from 'react-native';
@@ -55,12 +56,12 @@ export async function uploadPageImage(api:SofiaApi,pageId:string,blob:Blob):Prom
 export function clipboardImage(e:any):Blob|null{const items=[...(e?.clipboardData?.items||[])] as any[];for(const it of items)if(it.kind==='file'&&/^image\//.test(it.type)){const f=it.getAsFile();if(f)return f;}return null;}
 async function readClipboardImage():Promise<Blob|null>{const nav=(globalThis as any).navigator;if(!nav?.clipboard?.read)return null;const list=await nav.clipboard.read();for(const item of list){const type=(item.types||[]).find((t:string)=>/^image\//.test(t));if(type)return await item.getType(type);}return null;}
 /** Imagem anexada a pagina (bloco de imagem no site): baixada com a sessao, como a capa. */
-export function PageAttachmentImage({api,id,caption}:{api:SofiaApi;id:string;caption?:string}){
+export function PageAttachmentImage({api,id,caption,loop,onLoop}:{api:SofiaApi;id:string;caption?:string;loop?:boolean;onLoop?:(v:boolean)=>void}){
  const c=useTheme(),[uri,setUri]=useState(()=>peekCover(id)),[failed,setFailed]=useState(false);
  useEffect(()=>{let live=true;if(peekCover(id)){setUri(peekCover(id));return;}cachedPageCover(api.attachmentSource(id),id,false,0).then(u=>{if(live)setUri(u);}).catch(()=>{if(live)setFailed(true);});return()=>{live=false;};},[id,api]);
  if(failed)return <Text style={{color:c.muted,fontSize:12,padding:12}}>Não foi possível abrir esta imagem.</Text>;
  if(!uri)return <View style={{height:160,alignItems:'center',justifyContent:'center',backgroundColor:c.input,borderRadius:6}}><Spinner size={18}/></View>;
- return <View>{React.createElement('img',{src:uri,alt:caption||'',draggable:false,style:{display:'block',maxWidth:'100%',maxHeight:520,borderRadius:6,objectFit:'contain'}})}{caption?<Text style={{color:c.muted,fontSize:12,marginTop:4}}>{caption}</Text>:null}</View>;
+ return <View>{React.createElement(GifPlayer,{src:uri,alt:caption||'',loop,onLoop,style:{display:'block',maxWidth:'100%',maxHeight:520,borderRadius:6,objectFit:'contain'}})}{caption?<Text style={{color:c.muted,fontSize:12,marginTop:4}}>{caption}</Text>:null}</View>;
 }
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 /** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */

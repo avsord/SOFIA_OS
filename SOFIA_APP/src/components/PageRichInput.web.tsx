@@ -17,6 +17,13 @@ const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent|[a-z]{3,24})$/i;
 // 09/11/2026 (Pedro: "editor mais completo, com cor de texto, tamanho"): tamanho do texto so nos 4 tamanhos da barra (em, relativo ao bloco)
 export const SAFE_SIZE=/^(0\.85|1\.25|1\.5|2)em$/;
+/** Brilho (0 a 1) de uma cor simples (nome basico, #hex ou rgb); -1 se nao der para saber. */
+export function colorTone(v:string):number{const t=String(v||'').trim().toLowerCase();if(!t||t==='transparent')return -1;if(t==='black'||t==='windowtext')return 0;if(t==='white'||t==='window')return 1;
+ let r=-1,g=0,b=0;const m=t.match(/^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)(?:[ ,/]+([\d.]+%?))?/),h=t.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+ if(m){if(m[4]!==undefined&&parseFloat(m[4])===0)return -1;r=+m[1];g=+m[2];b=+m[3];}else if(h){const x=h[1].length===3?h[1].split('').map(c=>c+c).join(''):h[1];r=parseInt(x.slice(0,2),16);g=parseInt(x.slice(2,4),16);b=parseInt(x.slice(4,6),16);}
+ return r<0?-1:(0.299*r+0.587*g+0.114*b)/255;}
+/** Letra "neutra" (quase preta ou quase branca): a cor padrao do documento de onde se copiou, nao uma cor escolhida. */
+export function neutralInk(v:string){const l=colorTone(v);return l>=0&&(l<0.2||l>0.85);}
 export function escapeHtml(v:string){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 export function textToHtml(v:string){return escapeHtml(v).replace(/\n/g,'<br>');}
 /** Só marcas de texto conhecidas; links http/https/mailto; cor/fundo como cor simples. Div/p viram quebra de linha. */
@@ -74,6 +81,9 @@ export function pasteHtml(html:string,ctx?:{bg?:string;color?:string}):string{
   // se cola: saem. Grifo de verdade (outra cor de fundo) continua.
   if(ctx){const same=(a:string,b?:string)=>!!b&&a.replace(/\s/g,'')===b.replace(/\s/g,'');
    t.content.querySelectorAll('[style]').forEach(n=>{const st=(n as HTMLElement).style;if(st.backgroundColor&&same(st.backgroundColor,ctx.bg))st.backgroundColor='';if(st.color&&same(st.color,ctx.color))st.color='';});}
+  // 09/11/2026 (print do Pedro: trechos colados com fundo branco e letra preta): o "papel" do documento de origem (fundo quase branco,
+  // letra quase preta/branca) tambem sai - virava um retangulo branco na pagina escura. Grifo colorido de verdade (amarelo etc.) fica
+  t.content.querySelectorAll('[style]').forEach(n=>{const st=(n as HTMLElement).style;if(st.backgroundColor&&colorTone(st.backgroundColor)>0.92)st.backgroundColor='';if(st.color&&neutralInk(st.color))st.color='';});
   body=t.innerHTML;}
  return sanitizeRich(body).replace(/^(<br>)+|(<br>)+$/g,'');
 }
