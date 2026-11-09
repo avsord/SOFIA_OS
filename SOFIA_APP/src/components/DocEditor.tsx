@@ -44,7 +44,7 @@ export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions, 
   const drive = target && target.kind === 'drive' ? target : null;
   const [empty, setEmpty] = useState(false);
   const [zoom, setZoom] = useEditorZoom('docx'), scroller = useRef<HTMLDivElement | null>(null);
-  const [c, toggleTheme] = useEditorColors(), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
+  const [c, toggleTheme] = useEditorColors(id), host = useRef<HTMLDivElement | null>(null), styles = useRef<HTMLDivElement | null>(null), sel = useRef<Range | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [status, setStatus] = useState(''), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false);
   const onSavedRef = useRef(onSaved); onSavedRef.current = onSaved; const initial = useRef(''), blocked = useRef(''), lib = useRef<any>(null);
   useEffect(() => {let live = true; setState('loading');

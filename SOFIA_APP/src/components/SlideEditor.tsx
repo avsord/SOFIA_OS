@@ -68,8 +68,8 @@ function bodyHtml(sp: Element, title: boolean, scale: number) {
   }).join('');
 }
 
-export function SlideEditor({api, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
-  const [c, toggleTheme] = useEditorColors(), [userZoom, setUserZoom] = useEditorZoom('pptx');
+export function SlideEditor({api, id, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
+  const [c, toggleTheme] = useEditorColors(id), [userZoom, setUserZoom] = useEditorZoom('pptx');
   const zip = useRef<any>(null), pres = useRef<{doc: Document; rels: Document; ct: Document; cx: number; cy: number} | null>(null), slides = useRef<Slide[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [cur, setCur] = useState(0), [ver, setVer] = useState(0), [status, setStatus] = useState(''), [selBox, setSelBox] = useState<string | null>(null);
   const stage = useRef<HTMLDivElement | null>(null), [stageW, setStageW] = useState(900), stageWRef = useRef(900), flushTextRef = useRef<() => void>(() => {}), dirty = useRef(false), timer = useRef<any>(null), saving = useRef(false), boxDirty = useRef(new Set<string>()), sel = useRef<Range | null>(null);

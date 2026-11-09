@@ -123,8 +123,8 @@ const HIGHLIGHTS: [string, string][] = [['Amarelo', '#fff176'], ['Verde', '#b9f6
 const COLORS: [string, string][] = [['Preto', '#000000'], ['Vermelho', '#d32f2f'], ['Azul', '#1565c0'], ['Verde', '#2e7d32'], ['Roxo', '#6a1b9a'], ['Cinza', '#616161']];
 type Sel = {r: number; c: number; r2: number; c2: number};
 
-export function SheetEditor({api, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
-  const [c, toggleTheme] = useEditorColors(), [zoom, setZoom] = useEditorZoom('xlsx');
+export function SheetEditor({api, id, name, url, pageId, onSaved, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: OfficeSaved) => void; target?: SaveTarget}) {
+  const [c, toggleTheme] = useEditorColors(id), [zoom, setZoom] = useEditorZoom('xlsx');
   const wb = useRef<any>(null), [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'), [err, setErr] = useState(''), [, setTick] = useState(0);
   const [sheet, setSheet] = useState(0), [sel, setSel] = useState<Sel>({r: 1, c: 1, r2: 1, c2: 1}), [editing, setEditing] = useState<{text: string; bar: boolean} | null>(null);
   const [scroll, setScroll] = useState({top: 0, left: 0, height: 600}), [renaming, setRenaming] = useState<number | null>(null), [status, setStatus] = useState('');
