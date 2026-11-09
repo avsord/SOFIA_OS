@@ -63,8 +63,25 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  function save(){
   if(!editing?.title?.trim()||busy)return;
   const others=editing.id&&groupOf(editing)?records.items.filter(x=>groupOf(x)===groupOf(editing)&&x.id!==editing.id):[];
+  // 09/11/2026 (Pedro: "quando eu alterar nome e data, opcao de mudar so este lembrete ou todos"): lembrete que se repete pergunta
+  const orig=editing.id?records.items.find(x=>x.id===editing.id):null;
+  const changed=!!orig&&(String(orig.title||'').trim()!==editing.title.trim()||Date.parse(String(orig.data?.remind_at||''))!==Date.parse(String(editing.data?.remind_at||'')));
+  if(!others.length&&orig&&changed&&readRepeat(orig).frequency!=='none'){appAlert('Mudar só este lembrete ou todos?','Este lembrete se repete.',[{text:'Cancelar',style:'cancel'},{text:'Só este',onPress:()=>void saveOnce(orig)},{text:'Todos',onPress:()=>void saveNow(false)}]);return;}
   if(!others.length){void saveNow(false);return;}
   appAlert('Alterar as outras datas também?','Este lembrete tem '+(others.length+1)+' datas.',[{text:'Cancelar',style:'cancel'},{text:'Só esta data',onPress:()=>void saveNow(true)},{text:'Todas as datas',onPress:()=>void saveNow(false)}]);
+ }
+ /** So este: a mudanca vira um lembrete avulso (sem repetir) e a serie segue para a proxima data, com o nome e o horario de antes. */
+ async function saveOnce(orig:Entity){
+  if(!editing?.title?.trim()||busy)return;setBusy(true);setError('');
+  try{
+   const d={...(editing.data||{})};d.remind_at=String(d.remind_at||'');d.message=String(d.message||'');d.location=String(d.location||'');
+   if(!Number.isFinite(Date.parse(d.remind_at)))throw Error('Escolha quando lembrar.');
+   if(!/(Z|[+-]\d\d:?\d\d)$/.test(d.remind_at))d.remind_at=new Date(Date.parse(d.remind_at)).toISOString();
+   const one=await api.saveEntity({kind:'reminder',title:editing.title.trim(),content:String(editing.content||''),area:editing.area||'Lembretes',privacy:'private',state:'active',tags:agendaTags(withGroup(editing.tags||[],''),'none'),data:d});records.merge(one);
+   const cur=Date.parse(String(orig.data?.remind_at||''));const next=occurrences(orig as any,new Date(cur+60000),new Date(cur+400*86400000)).map(o=>Date.parse(String((o as any).data?.remind_at||''))).filter(t=>Number.isFinite(t)&&t>cur).sort((a,b)=>a-b)[0];
+   records.merge(next?await api.saveEntity({...orig,revision:orig.revision,data:{...orig.data,remind_at:new Date(next).toISOString()}}):await api.saveEntity({...orig,state:'done',revision:orig.revision}));
+   setEditing(null);setExtras([]);
+  }catch(e){setError(errorText(e));}finally{setBusy(false);}
  }
  async function saveNow(onlyThis:boolean){
   if(!editing?.title?.trim()||busy)return;setBusy(true);setError('');

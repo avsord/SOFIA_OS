@@ -355,3 +355,7 @@ test('09/11: tornar a original tira o "(cópia)" do nome da cópia escondida',()
  const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/const pushToOriginal=async\(copy:Entity,src:Entity,final=false\)=>/);assert.match(s,/if\(final\)\{try\{const cp=/);
  const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');assert.match(b,/p\.pushToOriginal!\(cp, src, true\)/);
 });
+test('09/11: lembrete que se repete - mudar nome/data pergunta so este ou todos; so este vira avulso e a serie segue',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');
+ assert.match(s,/appAlert\('Mudar só este lembrete ou todos\?'/);assert.match(s,/async function saveOnce\(orig:Entity\)/);assert.match(s,/tags:agendaTags\(withGroup\(editing\.tags\|\|\[\],''\),'none'\)/);
+});
