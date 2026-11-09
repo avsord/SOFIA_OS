@@ -365,21 +365,25 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   const c = useTheme(), [w, setW] = useState(0), [wS, setWS] = useState(0), [start, setStartRaw] = useState(() => homeOf(0, SPAN_FULL, nowHours())), box = useRef<View>(null), lineBox = useRef<View>(null);
   // 0.3.333 (aprovado por foto): Ctrl + rodinha aproxima a linha (ate 4 h na tela) e afasta de volta ate o dia inteiro (16 h)
   const [SPAN, setSpanState] = useState(SPAN_FULL), spanRef = useRef(SPAN_FULL), recsRef = useRef<DayRecord[]>(items); recsRef.current = items;
+  // 09/11/2026 (Pedro: "a linha do tempo quando rola com scroll ta travando muito"): enquanto desliza, a camada das bolinhas e nomes
+  // (cada bolinha e um botao) nao e refeita a cada quadro: a ultima versao anda por CSS (translateX), desenhada com folga dos dois
+  // lados e recortada nas bordas; parou de deslizar, ela e refeita com cliques e passar do mouse. Medido com CPU 6x mais lenta.
+  const [moving, setMoving] = useState(false), frozen = useRef<{el: any; start: number} | null>(null);
   // 0.3.317 (Pedro): a linha do tempo desliza (roda do mouse, botao "agora", borda ao arrastar) em vez de pular de hora em hora
   const startRef = useRef(homeOf(0, SPAN_FULL, nowHours())), target = useRef(homeOf(0, SPAN_FULL, nowHours())), raf = useRef<any>(null), dayRef = useRef(0), manualAt = useRef(0);
   const clampStart = (v: number) => {const r = timelineRange(); return Math.max(-24 * r.back, Math.min(24 * (r.ahead + 1) - spanRef.current, v));}; // 0.3.338 (Pedro): rolar passa de um dia para o outro, liso
   // 0.3.319 (Pedro: "o agora da uma bugada quando para"): movimento por tempo (ease-out de 380 ms) em vez de ir chegando aos
   // poucos - termina exatamente no destino, sem os ultimos quadros se arrastando; cada novo pedido continua do ponto atual
   const tween = useRef({from: startRef.current, t0: 0, ms: 380, home: false});
-  const glide = (to: number, ms = 380, home = false) => {target.current = clampStart(to); tween.current = {from: startRef.current, t0: Date.now(), ms, home}; if (raf.current) return;
+  const glide = (to: number, ms = 380, home = false) => {target.current = clampStart(to); tween.current = {from: startRef.current, t0: Date.now(), ms, home}; if (raf.current) return; setMoving(true);
     const step = () => {const {from, t0, ms: dur} = tween.current, t = Math.min(1, (Date.now() - t0) / dur), e = 1 - Math.pow(1 - t, 3);
-      const nx = t >= 1 ? target.current : from + (target.current - from) * e; startRef.current = nx; setStartRaw(nx); raf.current = t >= 1 ? null : requestAnimationFrame(step);};
+      const nx = t >= 1 ? target.current : from + (target.current - from) * e; startRef.current = nx; setStartRaw(nx); raf.current = t >= 1 ? null : requestAnimationFrame(step); if (t >= 1) setMoving(false);};
     raf.current = requestAnimationFrame(step);};
   useEffect(() => () => {if (raf.current) cancelAnimationFrame(raf.current);}, []);
   // 03/11/2026 (Pedro: "quando volto para o site depois de muito tempo a linha do tempo percorre o caminho"): a linha tem
   // que estar sempre na hora certa, como se tivesse andado com o site fechado. Ao voltar para a aba (ou quando o atraso e
   // grande) ela ja aparece no lugar, sem deslizar; o deslize suave fica so para o passo normal de meio minuto.
-  const jump = (to: number) => {if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} const st = clampStart(to); startRef.current = st; target.current = st; setStartRaw(st);};
+  const jump = (to: number) => {if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null; setMoving(false);} const st = clampStart(to); startRef.current = st; target.current = st; setStartRaw(st);};
   // 03/11/2026: no celular a linha do tempo anda arrastando o dedo para os lados (antes so a roda do mouse mexia nas horas).
   // A area tem o nativeID que o guarda nativo usa para nao trocar de aba durante o gesto.
   const jumpRef = useRef(jump); jumpRef.current = jump; const wRef = useRef(0); wRef.current = w; const panFrom = useRef(0);
@@ -435,7 +439,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     const down = (e: MouseEvent) => {if (!(e.shiftKey || e.altKey) || e.button) return; const t = e.target as any; if (t?.closest?.('[data-tldot]')) return; if (marqStart.current(e)) e.stopPropagation();};
     el.addEventListener('mousedown', down, true); return () => el.removeEventListener('mousedown', down, true);}, []);
   const points: Point[] = [];
-  const inView = (x: number) => x >= -0.01 && x <= 1.01;
+  const inView = (x: number) => WEB && moving ? x >= -0.6 && x <= 1.6 : x >= -0.01 && x <= 1.01; // deslizando: com folga (a camada anda por CSS)
   // 06/11/2026 (Pedro: "juntei duas bolinhas e ficou so uma; mudei a prioridade e agrupou"): o item arrastado muda de horario mas
   // continuava no lugar antigo da lista; sem ordenar, os dois ficavam um em cima do outro sem virar grupo
   for (const r of [...withMoved(items)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
@@ -453,7 +457,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     const onWheel = (e: WheelEvent) => {e.preventDefault(); if (dragRef.current) return;
       if (e.ctrlKey || e.metaKey) {const r = (lineBox.current as any)?.getBoundingClientRect?.(); if (!r?.width) return; const fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), at = startRef.current + fx * spanRef.current;
         const ns = Math.max(SPAN_MIN, Math.min(SPAN_FULL, spanRef.current * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); if (Math.abs(ns - spanRef.current) < 0.01) return; manualAt.current = Date.now(); spanRef.current = ns; setSpanState(ns);
-        const st = clampStart(at - fx * ns); if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null;} startRef.current = st; target.current = st; setStartRaw(st); setPin(''); setHover(''); return;}
+        const st = clampStart(at - fx * ns); if (raf.current) {cancelAnimationFrame(raf.current); raf.current = null; setMoving(false);} startRef.current = st; target.current = st; setStartRaw(st); setPin(''); setHover(''); return;}
       const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; manualAt.current = Date.now(); setPin(''); setHover(''); glide(target.current + d / 40 * spanRef.current / SPAN_FULL);};
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
@@ -637,6 +641,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const col = colorOf(r, c.accent), x0 = Math.max(0, a), x1 = Math.min(1, b);
       return <View key={'d' + r.id + r.date} pointerEvents="none" style={{position: 'absolute', left: (x0 * 100 + '%') as any, width: ((x1 - x0) * 100 + '%') as any, top: 29 + OFF - 6, height: 12, borderRadius: 6, backgroundColor: tint(col, 0.18), boxShadow: 'inset 0 0 0 1px ' + tint(col, 0.5), opacity: op.rec(r)} as any} />;})}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
+    {(() => {const reuse = WEB && moving && !!frozen.current && Math.abs(start - frozen.current.start) < SPAN * 0.55;
+      const el = reuse ? frozen.current!.el : (
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
         const m = p.marks[0], r = p.recs[0], open = () => {if (justDragged.current) return; manualAt.current = Date.now(); /* 06/11/2026 (Pedro): clicar numa bolinha conta como mexer na linha - ela nao corre sozinha para o agora */ setPin(k => k === p.key ? '' : p.key);}, hov = {onHoverIn: () => {if (!dragRef.current && !marq) enter(p.key);}, ref: (el: any) => {if (el) dotEls.current[p.key] = el;}};
@@ -686,10 +692,16 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}{HITS}
       {marq && Math.abs(marq.b - marq.a) >= 4 ? <OverAll><View pointerEvents="none" testID="timeline-marquee" style={{position: 'absolute', left: Math.min(marq.a, marq.b), top: Math.min(marq.y0, marq.y1), width: Math.abs(marq.b - marq.a), height: Math.max(2, Math.abs(marq.y1 - marq.y0)), borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: tint(c.accent, 0.1), borderRadius: 3, zIndex: 50} as any} /></OverAll> : null}
-      {/* 04/11/2026: os nomes so aparecem depois de medir a largura da linha (antes nasciam numa altura e pulavam 24 px) */}{all.map(p => place[p.key] == null || !wS ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: clampX(lx, lw / 2, lw, w), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
+      {/* 04/11/2026: os nomes so aparecem depois de medir a largura da linha (antes nasciam numa altura e pulavam 24 px) */}{all.map(p => place[p.key] == null || !wS || (WEB && moving && (p.x < -0.01 || p.x > 1.01)) /* deslizando: nome so de quem ja esta na tela (os de fora seriam puxados para a borda) */ ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: clampX(lx, lw / 2, lw, w), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
         <View style={{flexDirection: 'row', maxWidth: '100%', alignItems: 'center', backgroundColor: t.bg || (p.marks[0] ? tint(t.color, 0.14) : 'transparent'), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2} as any}>{t.imp ? <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: IMPORTANT_RED, marginRight: 5}} /> : null}<Text numberOfLines={1} style={{flexShrink: 1, fontSize: 12, color: t.color, fontWeight: t.strong ? '600' : '400', overflow: 'hidden', fontVariant: ['tabular-nums']}}>{t.text}</Text>{t.more ? <Text numberOfLines={1} style={{flexShrink: 0, marginLeft: 4, fontSize: 11, fontWeight: '700', color: t.imp ? IMPORTANT_RED : t.color, fontVariant: ['tabular-nums'], opacity: 0.85}} /* 07/11/2026 (revisao): '+1' tinha um espaco so e colava no nome */> +{t.more}</Text> : null}{t.sub ? <Text numberOfLines={1} style={{flexShrink: 0, fontSize: 11, color: c.muted, marginLeft: 5, fontVariant: ['tabular-nums'], whiteSpace: 'nowrap'} as any}>{t.sub}</Text> : null}</View>
       </View>;})())}
     </View>
+      );
+      if (!reuse) frozen.current = {el, start};
+      if (!WEB) return el;
+      const dx = ((frozen.current!.start - start) / SPAN) * (wS || w);
+      return <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, ...(moving ? {clipPath: 'inset(-400px 0px -400px 0px)'} : {})} as any}>
+        <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, transform: [{translateX: dx}]}}>{el}</View></View>;})()}
     {/* 0.3.314 (Pedro): o "agora" em destaque - um farol que pulsa na linha, com o horario numa etiqueta; o trecho que ja
         passou fica preenchido. Se a pessoa rolar para longe, aparece um botao para voltar para agora. */}
     {nowX >= 0 && nowX <= 1 ? <NowBeacon x={nowX} top={29 + OFF} lw={w} /> : null}
@@ -1044,7 +1056,7 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       onSave={async at => {actions.onMove!([{t: {dose: m.dose!}, to: at}]); setQuickMark(null); onClose();}} />, col);}
   if (quick && actions.onQuickEdit) return shell(<QuickEditor r={quick} color={colOf(quick)} kind={kindOf(quick)} priority={String((quick.original as any)?.priority_level ?? (quick.original as any)?.data?.priority_level ?? '')} description={String(quick.isTask ? (quick.original as any)?.description || '' : (quick.original as any)?.content || (quick.original as any)?.data?.description || '')}
     onCancel={() => setQuick(null)} onMore={() => {const q = quick; setQuick(null); onClose(); actions.onEdit(q);}}
-    onSave={async ch => {await actions.onQuickEdit!(quick, ch); setQuick(null); onClose();}} />, colOf(quick));
+    onSave={async ch => {/* 09/11/2026 (Pedro: "alterei pra importante, demorou muito pra bolinha ficar vermelha"): fecha na hora; o Inicio ja mostra a mudanca e salva por tras (erro aparece no Inicio) */ const run = actions.onQuickEdit!(quick, ch); setQuick(null); onClose(); await Promise.resolve(run).catch(() => undefined);}} />, colOf(quick));
   // --- compromisso sozinho
   if (single) {const r = point.recs[0], col = colOf(r), o: any = r.original || {}, d = durOf(r), end = endOfRec(r) ? hhmm(new Date(endOfRec(r))) : '', loc = String(o.data?.location || '').trim(), text = desc(r);
     const mins = Math.round((new Date(r.date).getTime() - Date.now()) / 60000), rel = mins > 0 ? 'em ' + (mins >= 60 ? Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + String(mins % 60).padStart(2, '0') : '') : mins + ' min') : '';

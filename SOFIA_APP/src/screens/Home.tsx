@@ -132,7 +132,11 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{if(!launchVisible)return;let alive=true;async function load(){try{const monitors:Entity[]=[];for(let offset=0;;offset+=100){const r=await api.entities('monitor','',offset);monitors.push(...r.items);if(r.items.length<100)break;}const result=await productsFrom(api,monitors);/* One broken monitor must not turn the whole Home into an error. */if(alive){setSeriesFailed(false);const rows=widgetRows(result);api.rememberLocal(MONITOR_WIDGET_PATH,rows);startTransition(()=>setSeries(rows));}}catch{/* Monitoring is secondary; Home, Agenda and Tasks stay usable. */if(alive)setSeriesFailed(true);}}const cancel=soonOrIdle(()=>{void load();});const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});const stop=onCollector(()=>{if(!collectorState().running&&homeActive.current)void load();});return()=>{alive=false;cancel();clearInterval(timer);foreground.remove();stop();};},[api,refreshEpoch,launchVisible]);
  const [calendarDate,setCalendarDate]=useState(()=>new Date());
  const calendar=useAgendaMonth(api,calendarDate,active,launchVisible);
- const notGone=useCallback((list:AgendaItem[]|undefined)=>!gone.size||!list?list||[]:list.filter(e=>!gone.has(e.id)&&!gone.has(String((e.data as {task_id?:string}|undefined)?.task_id||''))),[gone]);
+ // 09/11/2026 (Pedro: "alterei um evento pra importante, demorou muito pra bolinha ficar vermelha"): a edicao rapida aparece na hora
+ // (patched) e o servidor confirma por tras; sai daqui quando a leitura nova ja traz o mesmo valor (ou em 20 s)
+ const [patched,setPatched]=useState<Record<string,{title?:string;content?:string;data?:Record<string,any>}>>({});
+ const notGone=useCallback((list:AgendaItem[]|undefined)=>{const l=!gone.size||!list?list||[]:list.filter(e=>!gone.has(e.id)&&!gone.has(String((e.data as {task_id?:string}|undefined)?.task_id||'')));
+  return Object.keys(patched).length?l.map(e=>{const pt=patched[e.id];return pt?{...e,...(pt.title!==undefined?{title:pt.title}:{}),...(pt.content!==undefined?{content:pt.content}:{}),data:{...(e.data||{}),...(pt.data||{})}} as AgendaItem:e;}):l;},[gone,patched]);
  // 05/11/2026: o que a Sofia acabou de criar entra na linha do tempo na hora (vem na resposta da conversa); some daqui
  // quando a Agenda/Tarefas recarregadas ja trazem o item, ou em 20 s
  const [freshAgenda,setFreshAgenda]=useState<AgendaItem[]>([]);
@@ -261,17 +265,25 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
   refreshAgenda();
  }catch(e){setError(errorText(e));refreshAgenda();}};
  // 05/11/2026 (Pedro: "alterar por ali, um mini editor"): editor pequeno do balao da linha do tempo (nome, horario, importante)
- const quickEdit=async(r:DayRecord,ch:QuickEdit)=>{const o:any=r.original;if(!o)return;const iso=ch.at.toISOString(),moved=Math.abs(ch.at.getTime()-new Date(r.date).getTime())>=60000;
+ const quickEdit=async(r:DayRecord,ch:QuickEdit)=>{try{await quickEditNow(r,ch);}catch(e){const m=errorText(e);if(m!=='Nada foi alterado.')setError(m);}};
+ const quickEditNow=async(r:DayRecord,ch:QuickEdit)=>{const o:any=r.original;if(!o)return;const iso=ch.at.toISOString(),moved=Math.abs(ch.at.getTime()-new Date(r.date).getTime())>=60000;
   if(r.isTask){const id=String(o.id||r.id.replace(/^task:/,'')),task=tasks.find(x=>x.id===id);if(!task)return;const shift=moved&&task.due_at&&task.end_at&&Date.parse(task.end_at)>Date.parse(task.due_at)?{end_at:new Date(ch.at.getTime()+Date.parse(task.end_at)-Date.parse(task.due_at)).toISOString()}:{};
-   const res=await api.saveTask({...task,title:ch.title,priority_level:ch.priority,...(ch.description!==(task.description||'')?{description:ch.description,...(task.description_document?{description_document:{version:1,text:ch.description,marks:[]}}:{})}:{}) /* texto mudou no mini editor: a formatacao antiga nao vale mais */,...(moved&&task.due_at?{due_at:iso,...shift,timeline_move:false}:{})} as any);setTasks(prev=>prev.map(x=>x.id===id?res.item:x));refreshAgenda();return;}
+   const undoTask=optimistic({...task,title:ch.title,priority_level:ch.priority} as Task,task.state);
+   const res=await api.saveTask({...task,title:ch.title,priority_level:ch.priority,...(ch.description!==(task.description||'')?{description:ch.description,...(task.description_document?{description_document:{version:1,text:ch.description,marks:[]}}:{})}:{}) /* texto mudou no mini editor: a formatacao antiga nao vale mais */,...(moved&&task.due_at?{due_at:iso,...shift,timeline_move:false}:{})} as any).catch(e=>{undoTask();throw e;});setTasks(prev=>prev.map(x=>x.id===id?res.item:x));refreshAgenda();return;}
   const raw:any=rawEvent(o),from=String(o.data?.sofia_moved_from||new Date(r.date).toISOString());
   // 05/11/2026 (Pedro): lembrete com outras datas (grupo) pergunta se a mudanca vale so para esta data ou para todas
   const grp=(raw.tags||[]).find((t:string)=>String(t).startsWith('sofia-rgroup-v1:')),textChanged=ch.title!==raw.title||ch.description!==String(raw.content||'')||ch.priority!==String(raw.data?.priority_level||'');
   const sibs=grp&&textChanged?[...events,...(calNext1.items||[]),...(calNext2.items||[])].filter((e:any)=>e.id!==raw.id&&(e.tags||[]).includes(grp)).filter((e:any,i:number,a:any[])=>a.findIndex((x:any)=>x.id===e.id)===i):[];
   const all=sibs.length?await new Promise<boolean|null>(res=>appAlert('Alterar as outras datas também?','Este lembrete tem '+(sibs.length+1)+' datas.',[{text:'Cancelar',style:'cancel',onPress:()=>res(null)},{text:'Só esta data',onPress:()=>res(false)},{text:'Todas as datas',onPress:()=>res(true)}])):false;
   if(all===null)throw Error('Nada foi alterado.');
+  const pat={title:ch.title,content:ch.description,data:{priority_level:ch.priority}},ids=[raw.id,...(all?(sibs as any[]).map(x=>x.id):[])];
+  setPatched(p=>{const n={...p};for(const id of ids)n[id]=pat;return n;});const unpatch=()=>setPatched(p=>{const n={...p};for(const id of ids)delete n[id];return n;});
+  setTimeout(unpatch,20000);
+  try{
   if(all)for(const sb of sibs as any[])await api.saveEntity({...sb,title:ch.title,content:ch.description,data:{...(sb.data||{}),priority_level:ch.priority},revision:sb.revision});
-  await api.saveEntity({...raw,title:ch.title,content:ch.description,data:{...(raw.data||{}),priority_level:ch.priority,...(raw.data?.description!==undefined?{description:ch.description}:{})},...(moved?{tags:withMove(raw.tags,from,iso)}:{}),revision:raw.revision});refreshAgenda();};
+  await api.saveEntity({...raw,title:ch.title,content:ch.description,data:{...(raw.data||{}),priority_level:ch.priority,...(raw.data?.description!==undefined?{description:ch.description}:{})},...(moved?{tags:withMove(raw.tags,from,iso)}:{}),revision:raw.revision});
+  }catch(e){unpatch();throw e;}
+  refreshAgenda();setTimeout(unpatch,4000);};
  // 05/11/2026 (Pedro: X na linha do tempo): tarefa sai so da linha (fica sem horario, em Tarefas) ou e excluida; compromisso/lembrete excluido
  const removeFromTimeline=async(r:DayRecord,mode:'timeline'|'all')=>{try{const o:any=r.original;if(!o)return;
   if(r.isTask){const id=String(o.id||r.id.replace(/^task:/,'')),task=tasks.find(x=>x.id===id);if(!task)return;
