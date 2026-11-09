@@ -364,3 +364,11 @@ test('09/11: cartao de pagina do Quadro so aparece quando a pagina avisa que est
  const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');assert.match(b,/e\.data\?\.sofia === 'board-embed-ready' && e\.source === frame\.current\?\.contentWindow/);
  assert.match(b,/live = !!t && !lockedPage && \(!light \|\| editing \|\| loaded\)/);assert.doesNotMatch(b,/'board-page-frame', onLoad: \(\) => setLoaded\(true\)/);
 });
+test('09/11: tique da tarefa no Inicio e instantaneo (muda na tela e salva por tras; erro desfaz)',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');
+ assert.match(s,/const optimistic=\(task:Task,state:string\)=>/);assert.match(s,/undo=optimistic\(cur,next\);\s*try\{await api\.taskState/);assert.match(s,/undo=optimistic\(fresh,fresh\.state==='done'\?'scheduled':'done'\);try\{const r=await api\.taskSetState/);
+});
+test('09/11: barra lateral - Abrir em nova guia no menu da pagina, Ctrl/Cmd+clique e botao do meio',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
+ assert.match(s,/\{label:'Abrir em nova guia',icon:'external',run:\(\)=>newTab\(p\)\}/);assert.match(s,/if\(ne\?\.ctrlKey\|\|ne\?\.metaKey\)\{newTab\(p\);return;\}/);assert.match(s,/onAuxOpen=\{\(\)=>newTab\(p\)\}/);
+});

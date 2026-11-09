@@ -146,13 +146,17 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{if(refreshEpoch)void calendar.refresh();},[refreshEpoch]);
  // 0.3.321: devolve se deu certo (o bloco Tarefas do Inicio confirma ou oferece tentar de novo)
  const tasksNow=useRef<Task[]>([]);tasksNow.current=tasks;
- async function toggle(task:Task):Promise<boolean>{if(saving)return false;setSaving(task.id);try{const fresh=tasksNow.current.find(x=>x.id===task.id);await api.taskState(fresh?{...task,revision:fresh.revision}:task,task.state==='done'?'todo':'done');setTasks((await api.tasks()).items);return true;}catch(e){setError(errorText(e));return false;}finally{setSaving('');}}
+ // 09/11/2026 (Pedro: "na linha do tempo, quando voce tica uma tarefa demora pra ser ticado, tem que ser instantaneo"): o tique aparece
+ // na hora (a tarefa muda na tela) e o servidor salva por tras; se recusar, desfaz e mostra o erro. Antes esperava salvar E recarregar a lista.
+ const optimistic=(task:Task,state:string)=>{const before=tasksNow.current;setTasks(prev=>prev.some(x=>x.id===task.id)?prev.map(x=>x.id===task.id?{...x,state}:x):[...prev,{...task,state} as Task]);return ()=>setTasks(before);};
+ async function toggle(task:Task):Promise<boolean>{if(toggling.current.has(task.id))return false;toggling.current.add(task.id);const fresh=tasksNow.current.find(x=>x.id===task.id),cur=fresh||task,next=cur.state==='done'?'todo':'done',undo=optimistic(cur,next);
+  try{await api.taskState({...task,...(fresh?{revision:fresh.revision}:{})},next as any);void api.tasks().then(r=>setTasks(r.items)).catch(()=>undefined);return true;}catch(e){undo();setError(errorText(e));return false;}finally{toggling.current.delete(task.id);}}
  const openAgenda=(day:string,id?:string)=>{if(onOpenAgenda)onOpenAgenda(day,id);else navigate('agenda');};
  // 0.3.255: tocar num compromisso do Inicio abre o proprio compromisso aqui (antes ia para a Agenda e de la para ele); voltar fecha e fica no Inicio
  const [valuesHidden,setValuesHidden]=useValuesHidden(api);
  // 0.3.255: check da tarefa na agenda do Inicio. Desmarcar devolve para a agenda (estado "scheduled").
  const toggling=useRef(new Set<string>());
- async function toggleAgendaTask(rec:DayRecord){const t=rec.original as Task;if(!t?.id||toggling.current.has(t.id))return;toggling.current.add(t.id);try{const fresh=tasks.find(x=>x.id===t.id)||t;const r=await api.taskSetState(fresh,fresh.state==='done'?'scheduled':'done');setTasks(prev=>prev.some(x=>x.id===r.item.id)?prev.map(x=>x.id===r.item.id?r.item:x):[...prev,r.item]);void calendar.refresh();}catch(e){setError(errorText(e));}finally{toggling.current.delete(t.id);}}
+ async function toggleAgendaTask(rec:DayRecord){const t=rec.original as Task;if(!t?.id||toggling.current.has(t.id))return;toggling.current.add(t.id);const fresh=tasksNow.current.find(x=>x.id===t.id)||t,undo=optimistic(fresh,fresh.state==='done'?'scheduled':'done');try{const r=await api.taskSetState(fresh,fresh.state==='done'?'scheduled':'done');setTasks(prev=>prev.some(x=>x.id===r.item.id)?prev.map(x=>x.id===r.item.id?r.item:x):[...prev,r.item]);void calendar.refresh();}catch(e){undo();setError(errorText(e));}finally{toggling.current.delete(t.id);}}
  // 0.3.255: tarefa da agenda que nao foi ticada passa para o dia seguinte a meia-noite (no mesmo horario)
  const [dayTick,setDayTick]=useState(()=>localDateKey(new Date()));
  useEffect(()=>{let timer:ReturnType<typeof setTimeout>;const arm=()=>{timer=setTimeout(()=>{setDayTick(localDateKey(new Date()));arm();},msToMidnight());};arm();const sub=AppState.addEventListener('change',st=>{if(st==='active')setDayTick(localDateKey(new Date()));});return()=>{clearTimeout(timer);sub.remove();};},[]);
