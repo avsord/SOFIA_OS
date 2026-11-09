@@ -13,7 +13,8 @@ type Props={value:string;html?:string;placeholder?:string;placeholderColor?:stri
  onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number,html?:string)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
-const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i;
+// 08/11/2026 (Pedro: grifo do Word sumia ao colar): o Word grifa com nome de cor (background:yellow) - nome de cor tambem vale
+const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent|[a-z]{3,24})$/i;
 export function escapeHtml(v:string){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 export function textToHtml(v:string){return escapeHtml(v).replace(/\n/g,'<br>');}
 /** Só marcas de texto conhecidas; links http/https/mailto; cor/fundo como cor simples. Div/p viram quebra de linha. */
@@ -50,9 +51,27 @@ export function sanitizeRich(html:string):string{
  return target.innerHTML;
 }
 /** HTML colado: so o trecho copiado (entre os marcadores do navegador), limpo pela mesma lista de marcas. */
-export function pasteHtml(html:string):string{
+/** Cor de fundo (a primeira nao transparente subindo pela tela) e cor do texto de onde se cola. */
+export function pasteContext(el:HTMLElement|null):{bg?:string;color?:string}{
+ if(typeof getComputedStyle==='undefined'||!el)return {};let bg='';for(let p:HTMLElement|null=el;p;p=p.parentElement){const b=getComputedStyle(p).backgroundColor;if(b&&b!=='transparent'&&!/rgba\(.*,\s*0\)$/.test(b)){bg=b;break;}}
+ if(!bg)bg=getComputedStyle(document.body).backgroundColor;return {bg,color:getComputedStyle(el).color};
+}
+export function pasteHtml(html:string,ctx?:{bg?:string;color?:string}):string{
  const m=/<!--StartFragment-->([\s\S]*?)<!--EndFragment-->/.exec(html);let body=m?m[1]:html.replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
  body=body.replace(/<(style|script|meta|title|head)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<meta[^>]*>/gi,'');
+ // 08/11/2026 (Pedro: "colei e os links e grifados sairam"): no HTML de outro programa (Word, sites) a quebra de linha DENTRO do
+ // codigo e so espaco (o Word quebra o codigo no meio da frase). Ela virava linha nova, a linha deixava de bater com o texto e
+ // perdia link e grifo. So texto com white-space:pre (ou <pre>) guarda a quebra.
+ if(typeof document!=='undefined'){const t=document.createElement('template');t.innerHTML=body;
+  const keep=(n:Node)=>{for(let p=n.parentElement;p;p=p.parentElement){if(p.tagName==='PRE'||/pre/.test(String(p.style?.whiteSpace||'')))return true;}return false;};
+  const walk=document.createTreeWalker(t.content,NodeFilter.SHOW_TEXT);const texts:Text[]=[];while(walk.nextNode())texts.push(walk.currentNode as Text);
+  for(const n of texts)if(/[\r\n]/.test(n.data)&&!keep(n))n.data=n.data.replace(/[ \t]*[\r\n]+[ \t]*/g,' ');
+  // 08/11/2026: copiando de dentro de uma pagina (da Sofia ou de outro site), o navegador grava em cada pedaco a cor de FUNDO da
+  // pagina e a cor do TEXTO. Colando, virava um grifo falso e letra de cor fixa (some ao trocar o tema). Iguais as da pagina onde
+  // se cola: saem. Grifo de verdade (outra cor de fundo) continua.
+  if(ctx){const same=(a:string,b?:string)=>!!b&&a.replace(/\s/g,'')===b.replace(/\s/g,'');
+   t.content.querySelectorAll('[style]').forEach(n=>{const st=(n as HTMLElement).style;if(st.backgroundColor&&same(st.backgroundColor,ctx.bg))st.backgroundColor='';if(st.color&&same(st.color,ctx.color))st.color='';});}
+  body=t.innerHTML;}
  return sanitizeRich(body).replace(/^(<br>)+|(<br>)+$/g,'');
 }
 /** Linhas do HTML limpo (separadas por <br>), para colar varias linhas mantendo a formatacao de cada uma. */
@@ -142,7 +161,7 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
    // 07/11/2026 (Pedro: colar qualquer tipo de item): arquivo copiado no computador (PDF, Word...) vira bloco de arquivo
    if(props.onDropFiles){const fl=[...(e.clipboardData?.files||[])] as File[];if(fl.length&&!e.clipboardData?.getData('text/plain')){e.preventDefault();props.onDropFiles(fl);return;}}
    const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
-   const rawHtml=e.clipboardData?.getData('text/html')||'',rich=rawHtml?pasteHtml(rawHtml):'';
+   const rawHtml=e.clipboardData?.getData('text/html')||'',rich=rawHtml?pasteHtml(rawHtml,pasteContext(node as any)):'';
    if(props.onPasteText?.(text,start,end,rich||undefined))return;
    // uma linha com formatacao (negrito, italico, cor, link): entra com a formatacao
    if(rich&&!text.includes('\n')&&/<(b|i|u|s|code|mark|a|span)\b/i.test(rich)){document.execCommand('insertHTML',false,rich);return;}

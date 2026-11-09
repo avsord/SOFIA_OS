@@ -129,7 +129,9 @@ test('fila ociosa com startQuiet: nada roda na primeira janela de silêncio; toq
  t=1600;await fire();assert.deepEqual(ran,[1600],'800 ms depois do último toque, roda');
 });
 test('o App mostra um esqueleto por aba não montada, e a Conversa só sincroniza quando o usuário está parado',()=>{
- const app=read('App.tsx');for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(app.includes(`<ScreenSkeleton tab='${tab}'/>`),tab);
+ const app=read('App.tsx');for(const tab of ['chat','agenda','apps','profile'])assert.ok(app.includes(`<ScreenSkeleton tab='${tab}'/>`),tab);
+ // 08/11/2026: Paginas recebe a pagina sendo aberta (abrindo uma pagina, nada do esqueleto da lista)
+ assert.ok(app.includes("<ScreenSkeleton tab='pages' pageId={pageTarget.id}/>"),'pages');
  assert.ok(!app.includes('<View style={{flex:1}}/>}'),'nenhum placeholder vazio sobrou');
  assert.ok(read('src/screens/Chat.tsx').includes("AppState.currentState==='active'&&userIsIdle())void refresh(true)"));
  assert.ok(read('src/lib/idle-work.ts').includes('startQuiet:true'));

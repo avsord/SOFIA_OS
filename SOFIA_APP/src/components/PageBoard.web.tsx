@@ -17,22 +17,25 @@ import {appAlert} from '../lib/app-alert';
 import {Icon, type IconName} from './Icon';
 import {FileBody, InlineMedia, fileKind, editKind, openFileWindow, downloadPageFile, sizeLabel, defaultView} from './PageFiles';
 import {KIND} from './DrivePreview';
-import {sanitizeRich} from './PageRichInput';
+import {sanitizeRich, pasteHtml, pasteContext, escapeHtml} from './PageRichInput';
+import {findLinks} from '../lib/leaf-document';
 import {parseSofiaClip, clipFromPaste, type SofiaClip} from '../lib/sofia-clipboard';
 import {boardDiagInit, note as diag, track} from '../lib/board-diag';
 import {LiveCard, LivePicker, askSofiaAbout, mdToHtml, liveText, liveTitleNow, bustLive, type LiveItem, type LiveKind} from './BoardLive.web';
 
 export const BOARD_SUPPORTED = true;
 const h = React.createElement as any;
-type Link = string | {to: string; label?: string; arrow?: boolean};
+type Link = string | {to: string; label?: string; arrow?: boolean; dash?: boolean};
 type Mention = {kind: string; id: string; title: string};
 type Geo = {x: number; y: number; w: number; h: number; z?: number; links?: Link[]; color?: string; caption?: string; mentions?: Mention[]};
 const linkTo = (l: Link) => typeof l === 'string' ? l : l.to;
-const linkObj = (l: Link): {to: string; label?: string; arrow?: boolean} => typeof l === 'string' ? {to: l} : l;
+const linkObj = (l: Link): {to: string; label?: string; arrow?: boolean; dash?: boolean} => typeof l === 'string' ? {to: l} : l;
 /** ponto onde a linha do centro de a ate o centro de b sai do retangulo b (a seta encosta na borda) */
 function edgePoint(a: {x: number; y: number}, r: Geo) {const cx = r.x + r.w / 2, cy = r.y + r.h / 2, dx = a.x - cx, dy = a.y - cy; if (!dx && !dy) return {x: cx, y: cy}; const k = Math.min(Math.abs((r.w / 2 + 6) / (dx || 1e-9)), Math.abs((r.h / 2 + 6) / (dy || 1e-9))); return {x: cx + dx * Math.min(1, k), y: cy + dy * Math.min(1, k)};}
 type View = {x: number; y: number; z: number};
-const MIN_Z = 0.1, MAX_Z = 4;
+type AlignKind = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'row' | 'col';
+// 08/11/2026 (referencia Weje: afasta ate ~1%): o quadro afasta ate 5% para ver mapas grandes inteiros
+const MIN_Z = 0.05, MAX_Z = 4;
 // 08/11/2026 (Pedro: "imita o quadrado deles, o nosso ficou muito sujo, poluido"): grade de quadrados bem discreta - linha fina a
 // cada 24 px e uma um pouco mais marcada a cada 5 quadrados; afastado, so as linhas grandes (sem chuvisco).
 function gridBg(v: View, bg: string): any {
@@ -40,7 +43,10 @@ function gridBg(v: View, bg: string): any {
   // fundo #252525, linha fina #2A2A2A a cada 22 px (no 100%) e linha marcada #363636 a cada 4 quadrados
   const m = /^#?([0-9a-f]{6})$/i.exec(String(bg || '')), n = m ? parseInt(m[1], 16) : 0, dark = !m || ((n >> 16) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) < 128;
   const minor = dark ? '#2a2a2a' : 'rgba(0,0,0,0.05)', major = dark ? '#363636' : 'rgba(0,0,0,0.09)';
-  const S = 22 * v.z, B = S * 4, pos = v.x + 'px ' + v.y + 'px', showMinor = S >= 8;
+  // 08/11/2026 (referencia Weje, grade em niveis): afastando, o quadrado cresce 4x quando ficaria menor que 8 px na tela - a grade
+  // nunca vira chuvisco e continua com a mesma cara em qualquer zoom (cores e espessuras da Sofia nao mudam)
+  let cell = 22; while (cell * v.z < 8) cell *= 4;
+  const S = cell * v.z, B = S * 4, pos = v.x + 'px ' + v.y + 'px', showMinor = S >= 8;
   const layers = ['linear-gradient(to right, ' + major + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + major + ' 1px, transparent 1px)'], sizes = [B + 'px ' + B + 'px', B + 'px ' + B + 'px'];
   if (showMinor) {layers.push('linear-gradient(to right, ' + minor + ' 1px, transparent 1px)', 'linear-gradient(to bottom, ' + minor + ' 1px, transparent 1px)'); sizes.push(S + 'px ' + S + 'px', S + 'px ' + S + 'px');}
   return {backgroundColor: dark ? '#252525' : bg, backgroundImage: layers.join(','), backgroundSize: sizes.join(','), backgroundPosition: layers.map(() => pos).join(',')};
@@ -148,7 +154,7 @@ export function PageBoard(p: Props) {
   // celular/tablet: dois dedos = pinca (zoom) e arrastar; um dedo no fundo anda, num item move
   useEffect(() => {const el = host.current; if (!el) return; const pts = new Map<number, {x: number; y: number}>(); let start: {d: number; cx: number; cy: number; v: View} | null = null;
     const geom = () => {const [a, b] = [...pts.values()]; return {d: Math.hypot(a.x - b.x, a.y - b.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2};};
-    const down = (e: PointerEvent) => {if (e.pointerType !== 'touch') return; pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); if (pts.size === 2) {pinching.current = true; setLive({}); setGuides({}); start = {...geom(), v: viewRef.current};}};
+    const down = (e: PointerEvent) => {if (e.pointerType !== 'touch') return; pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); if (pts.size === 2) {stopGlide(); pinching.current = true; setLive({}); setGuides({}); start = {...geom(), v: viewRef.current};}};
     const move = (e: PointerEvent) => {if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); if (pts.size < 2 || !start) return; const g = geom(), r = el.getBoundingClientRect(), v = start.v;
       const z = Math.min(MAX_Z, Math.max(MIN_Z, v.z * g.d / start.d)), mx = start.cx - r.left, my = start.cy - r.top; setView({z, x: (g.cx - r.left) - (mx - v.x) * (z / v.z), y: (g.cy - r.top) - (my - v.y) * (z / v.z)});};
     const up = (e: PointerEvent) => {if (!pts.delete(e.pointerId)) return; if (pts.size < 2) start = null; if (!pts.size) setTimeout(() => {pinching.current = false;}, 0);};
@@ -158,13 +164,31 @@ export function PageBoard(p: Props) {
   // e progressivo (~10% por dente, animado, no ponto do mouse); segurar a rodinha e arrastar anda pelo quadro em cima de
   // qualquer coisa - ate da pagina aberta num cartao (ela avisa o quadro, ver lib/embed.ts). Em cima de lista/janela, rola ela.
   const zoomAnim = useRef<{z: number; mx: number; my: number} | null>(null);
-  const zoomTo = (target: number, mx: number, my: number) => {const run = !zoomAnim.current; zoomAnim.current = {z: Math.min(MAX_Z, Math.max(MIN_Z, target)), mx, my}; if (!run) return;
+  const zoomTo = (target: number, mx: number, my: number) => {stopGlide(); const run = !zoomAnim.current; zoomAnim.current = {z: Math.min(MAX_Z, Math.max(MIN_Z, target)), mx, my}; if (!run) return;
     const step = () => {const a = zoomAnim.current; if (!a) return; const v = viewRef.current, near = Math.abs(a.z - v.z) < a.z * 0.003, z = near ? a.z : v.z + (a.z - v.z) * 0.3;
       const nv = {z, x: a.mx - (a.mx - v.x) * (z / v.z), y: a.my - (a.my - v.y) * (z / v.z)}; viewRef.current = nv; setView(nv); if (near) zoomAnim.current = null; else requestAnimationFrame(step);};
     requestAnimationFrame(step);};
+  // 08/11/2026 (Pedro: "o movimento deles acho bem melhor" - referencia Weje): a camera DESLIZA (0,3 s, desacelerando no fim) em
+  // tudo que move o quadro por botao ou atalho - Ver tudo, centro, zoom dos botoes, 100%, ir ate um item, ligacao, busca. O zoom
+  // anda em proporcao (cada passo parece igual) e o ponto do meio da tela segue em linha reta. Mexer o mouse/rodinha corta o
+  // deslize na hora. Com "reduzir movimento" no sistema, pula direto.
+  const glideRaf = useRef(0), glideTo = useRef<View | null>(null);
+  const stopGlide = () => {if (glideRaf.current) cancelAnimationFrame(glideRaf.current); glideRaf.current = 0; glideTo.current = null;};
+  const glide = (to: View, ms = 300) => {stopGlide(); zoomAnim.current = null; const from = viewRef.current, el = host.current, W = (el?.clientWidth || size2.w) / 2, H = (el?.clientHeight || size2.h) / 2;
+    const tz = Math.min(MAX_Z, Math.max(MIN_Z, to.z)), dest = {...to, z: tz};
+    let reduce = false; try {reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;} catch {}
+    if (reduce || (Math.abs(from.x - dest.x) < 0.5 && Math.abs(from.y - dest.y) < 0.5 && Math.abs(from.z - dest.z) < 1e-4)) {viewRef.current = dest; setView(dest); return;}
+    glideTo.current = dest; const c0 = {x: (W - from.x) / from.z, y: (H - from.y) / from.z}, c1 = {x: (W - dest.x) / dest.z, y: (H - dest.y) / dest.z}, t0 = performance.now();
+    const step = (now: number) => {const t = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - t, 3);
+      const nv = t >= 1 ? dest : (() => {const z = from.z * Math.pow(dest.z / from.z, e), cx = c0.x + (c1.x - c0.x) * e, cy = c0.y + (c1.y - c0.y) * e; return {z, x: W - cx * z, y: H - cy * z};})();
+      viewRef.current = nv; setView(nv); glideRaf.current = t < 1 ? requestAnimationFrame(step) : 0; if (t >= 1) glideTo.current = null;};
+    glideRaf.current = requestAnimationFrame(step);};
+  const zoomAround = (z: number, mx: number, my: number) => {const v = glideTo.current || viewRef.current, zz = Math.min(MAX_Z, Math.max(MIN_Z, z)); glide({z: zz, x: mx - (mx - v.x) * (zz / v.z), y: my - (my - v.y) * (zz / v.z)});};
+  // zoom em degraus de 20% (como o Weje: 100, 120, 144... / 83, 69, 58...), sempre caindo num degrau redondo
+  const zoomStep = (dir: 1 | -1) => {const L = Math.log((glideTo.current || viewRef.current).z) / Math.log(1.2), n = dir > 0 ? Math.floor(L + 1e-3) + 1 : Math.ceil(L - 1e-3) - 1; zoomAround(Math.pow(1.2, n), size2.w / 2, size2.h / 2);};
   const wheelZoom = (dy: number, cx: number, cy: number) => {const r = host.current?.getBoundingClientRect(); if (!r) return; const d = Math.max(-60, Math.min(60, dy)), base = zoomAnim.current?.z ?? viewRef.current.z; zoomTo(base * Math.exp(-d * 0.0018), cx - r.left, cy - r.top);};
   const lastBoardWheel = useRef(0);
-  const panFrom = (sx: number, sy: number) => {const v0 = viewRef.current; zoomAnim.current = null; return (x: number, y: number) => {const nv = {...viewRef.current, x: v0.x + x - sx, y: v0.y + y - sy}; viewRef.current = nv; setView(nv);};};
+  const panFrom = (sx: number, sy: number) => {stopGlide(); const v0 = viewRef.current; zoomAnim.current = null; return (x: number, y: number) => {const nv = {...viewRef.current, x: v0.x + x - sx, y: v0.y + y - sy}; viewRef.current = nv; setView(nv);};};
   useEffect(() => {const el = host.current; if (!el) return;
     // 08/11/2026 (Pedro: "quando eu tiver movendo ainda as vezes confunde o scroll movimentando o conteudo, tem que travar"):
     // arrastando (item, fundo ou rodinha segurada) ou no meio de um giro de rodinha que ja estava andando o quadro, a rodinha
@@ -173,7 +197,7 @@ export function PageBoard(p: Props) {
       if (!boardGesture && t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); lastBoardWheel.current = now;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
       if (e.ctrlKey || e.metaKey) {e.stopPropagation(); wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;} // 08/11 (Pedro): Ctrl+rodinha SO da zoom no quadro (nada rola, nem a janela por baixo)
-      const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
+      stopGlide(); const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
     const noAuto = (e: MouseEvent) => {if (e.button === 1) e.preventDefault();}; // sem o "auto-rolar" do navegador
     const mid = (e: PointerEvent) => {if (e.button !== 1) return; e.preventDefault(); e.stopPropagation(); dragOn(); const go = panFrom(e.screenX, e.screenY);
       const mv = (ev: PointerEvent) => go(ev.screenX, ev.screenY), up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff();};
@@ -187,9 +211,9 @@ export function PageBoard(p: Props) {
       if (d.kind === 'pan-start') go = panFrom(Number(d.sx), Number(d.sy)); else if (d.kind === 'pan-move') go?.(Number(d.sx), Number(d.sy)); else if (d.kind === 'pan-end') go = null;
       else if (d.kind === 'zoom') {const r = fr.getBoundingClientRect(), iw = fr.contentWindow?.innerWidth || r.width, ih = fr.contentWindow?.innerHeight || r.height; wheelZoom(Number(d.dy) || 0, r.left + Number(d.x) * r.width / iw, r.top + Number(d.y) * r.height / ih);}};
     window.addEventListener('message', on); return () => window.removeEventListener('message', on);}, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const zoomBy = (k: number) => zoomTo((zoomAnim.current?.z ?? viewRef.current.z) * k, size2.w / 2, size2.h / 2);
-  const fitAll = () => {if (!shown.length) {setView({x: 80, y: 60, z: 1}); return;} const gs = shown.map(geo), x1 = Math.min(...gs.map(g => g.x)), y1 = Math.min(...gs.map(g => g.y)), x2 = Math.max(...gs.map(g => g.x + g.w)), y2 = Math.max(...gs.map(g => g.y + g.h));
-    const z = Math.min(MAX_Z, Math.max(MIN_Z, Math.min((size2.w - 120) / Math.max(1, x2 - x1), (size2.h - 180) / Math.max(1, y2 - y1)))); setView({z, x: (size2.w - (x2 - x1) * z) / 2 - x1 * z, y: (size2.h - 60 - (y2 - y1) * z) / 2 - y1 * z});};
+  const zoomBy = (k: number) => zoomAround((glideTo.current || viewRef.current).z * k, size2.w / 2, size2.h / 2);
+  const fitAll = () => {if (!shown.length) {glide({x: 80, y: 60, z: 1}); return;} const gs = shown.map(geo), x1 = Math.min(...gs.map(g => g.x)), y1 = Math.min(...gs.map(g => g.y)), x2 = Math.max(...gs.map(g => g.x + g.w)), y2 = Math.max(...gs.map(g => g.y + g.h));
+    const z = Math.min(MAX_Z, Math.max(MIN_Z, Math.min((size2.w - 120) / Math.max(1, x2 - x1), (size2.h - 180) / Math.max(1, y2 - y1)))); glide({z, x: (size2.w - (x2 - x1) * z) / 2 - x1 * z, y: (size2.h - 60 - (y2 - y1) * z) / 2 - y1 * z});};
 
   // fundo: arrastar anda; Shift+arrastar seleciona; no modo desenho, desenha
   const onBgDown = (e: any) => {
@@ -212,7 +236,7 @@ export function PageBoard(p: Props) {
       const up = () => {setBox(null); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); return;}
     let moved = false;
-    const mv = (ev: PointerEvent) => {if (pinching.current) return; const dx = ev.clientX - sx, dy = ev.clientY - sy; if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return; if (!moved) dragOn(); moved = true; setView({...v0, x: v0.x + dx, y: v0.y + dy});};
+    const mv = (ev: PointerEvent) => {if (pinching.current) return; const dx = ev.clientX - sx, dy = ev.clientY - sy; if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return; if (!moved) {stopGlide(); dragOn();} moved = true; setView({...v0, x: v0.x + dx, y: v0.y + dy});};
     const up = () => {if (!moved) {setSel([]); setSelLink(null); if (mode === 'link') setMode('');} dragOff(); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
@@ -247,6 +271,8 @@ export function PageBoard(p: Props) {
   // item: clique seleciona, arrastar move (todos os selecionados), no modo ligar liga
   const onItemDown = (b: PageBlock) => (e: any) => {
     if (e.button !== 0) return; if (editing === b.id && !(e.target as HTMLElement).closest?.('[data-board-handle]')) return; e.stopPropagation(); host.current?.focus({preventScroll: true});
+    // 08/11/2026: clicar em OUTRO item encerra a edicao anterior (a lista ficava editando e a barra da selecao nao aparecia)
+    if (editing && editing !== b.id) {setEditing(null); p.flush();}
     if (mode === 'link') {const from = sel[0]; if (from && from !== b.id) {patchGeo([from], g => ({...g, links: [...(g.links || []).filter(l => linkTo(l) !== b.id), {to: b.id, arrow: true}]}), 'board-link');} setMode(''); setSel([b.id]); return;}
     // 08/11/2026 (Pedro: "clico nele e ele fica grudado no mouse"): soltar o botao em cima da pagina do cartao (iframe) nao chegava
     // ao quadro e o item seguia o mouse. Durante o arrasto nenhum iframe recebe o mouse, e a pagina so passa a aceitar cliques
@@ -276,7 +302,7 @@ export function PageBoard(p: Props) {
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);
   };
   // leva a camera ate o item (cabe na tela, no maximo 100%), como quem aproxima o documento para editar
-  const focusOn = (g: Geo) => {const z = Math.min(1, Math.max(MIN_Z, Math.min((size2.w - 80) / g.w, (size2.h - 150) / g.h))); setView({z, x: (size2.w - g.w * z) / 2 - g.x * z, y: Math.max(60, (size2.h - 90 - g.h * z) / 2) - g.y * z});};
+  const focusOn = (g: Geo) => {const z = Math.min(1, Math.max(MIN_Z, Math.min((size2.w - 80) / g.w, (size2.h - 150) / g.h))); glide({z, x: (size2.w - g.w * z) / 2 - g.x * z, y: Math.max(60, (size2.h - 90 - g.h * z) / 2) - g.y * z});};
   const openItem = (b: PageBlock) => {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
@@ -291,10 +317,31 @@ export function PageBoard(p: Props) {
   // teclado (com o foco no quadro, fora de edicao)
   // 08/11/2026 (Pedro: "a letra H vira a maozinha pra arrastar o mapa: com ela so arrasta, clicar em qualquer coisa fica bloqueado"):
   // H liga/desliga a maozinha (Esc ou V tambem desligam). Com ela, qualquer clique no quadro so arrasta; nada e clicado nem editado.
-  useEffect(() => {const on = (e: KeyboardEvent) => {if (e.ctrlKey || e.metaKey || e.altKey) return; const a = document.activeElement as HTMLElement | null;
-      if (a && (a.tagName === 'IFRAME' || a.closest('input,textarea,select,[contenteditable="true"],[data-board-editing]'))) return; if (!host.current?.isConnected) return;
-      const k = e.key.toLowerCase(); if (k === 'h') {e.preventDefault(); setMode(m => m === 'hand' ? '' : 'hand'); setEditing(null);} else if ((k === 'v' || k === 'escape') && modeRef.current === 'hand') setMode('');};
-    window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, []);
+  // 08/11/2026 (referencia Weje): Ctrl + / Ctrl - / Ctrl 0 dao zoom no quadro (nao no navegador); W A S D (e as setas, sem nada
+  // selecionado) andam pelo quadro enquanto seguradas, liso (Shift = mais rapido); C nota, L lista, T texto, U arquivo.
+  const keyNav = useRef<any>(null); keyNav.current = {zoomStep, zoomAround, size2, sel, add: (type: 'callout' | 'todo' | 'text') => {const at = mouseAt.current && Date.now() - mouseAt.current.t < 4000 ? toBoard(mouseAt.current.x, mouseAt.current.y) : undefined;
+    const nb = addBlock(type === 'todo' ? {id: uid(), type: 'todo', text: '', data: {items: [{id: uid(), text: '', done: false}]}} : {id: uid(), type, text: '', html: '', data: {}}, at); setEditing(nb.id);}, file: () => {anchor.current = center(); p.pickFiles();}, locked: p.locked};
+  const mouseAt = useRef<{x: number; y: number; t: number} | null>(null);
+  useEffect(() => {const held = new Set<string>(); let raf = 0, last = 0;
+    const loop = (now: number) => {if (!held.size) {raf = 0; return;} const dt = Math.min(50, now - (last || now)); last = now; const sp = (held.has('shift') ? 2200 : 1000) * dt / 1000;
+      let dx = 0, dy = 0; if (held.has('a') || held.has('arrowleft')) dx += sp; if (held.has('d') || held.has('arrowright')) dx -= sp; if (held.has('w') || held.has('arrowup')) dy += sp; if (held.has('s') || held.has('arrowdown')) dy -= sp;
+      if (dx || dy) {const v = viewRef.current, nv = {...v, x: v.x + dx, y: v.y + dy}; viewRef.current = nv; setView(nv);} raf = requestAnimationFrame(loop);};
+    const typing = () => {const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === 'IFRAME' || !!a.closest('input,textarea,select,[contenteditable="true"],[data-board-editing]'));};
+    const onBoardFocus = () => {const a = document.activeElement; return !a || a === document.body || !!host.current?.contains(a);};
+    const on = (e: KeyboardEvent) => {if (typing() || !host.current?.isConnected || !host.current.offsetParent) return; const k = e.key.toLowerCase(), n = keyNav.current;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {const W = n.size2.w / 2, H = n.size2.h / 2;
+        if (k === '=' || k === '+') n.zoomStep(1); else if (k === '-' || k === '_') n.zoomStep(-1); else if (k === '0') n.zoomAround(1, W, H); else return; e.preventDefault(); return;}
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (k === 'h') {e.preventDefault(); setMode(m => m === 'hand' ? '' : 'hand'); setEditing(null); return;} if ((k === 'v' || k === 'escape') && modeRef.current === 'hand') {setMode(''); return;}
+      if (!onBoardFocus()) return;
+      const arrow = k.startsWith('arrow'); if ('wasd'.includes(k) && k.length === 1 || (arrow && !n.sel.length)) {e.preventDefault(); held.add(k); if (e.shiftKey) held.add('shift'); stopGlide(); if (!raf) {last = 0; raf = requestAnimationFrame(loop);} return;}
+      if (e.repeat || n.locked) return;
+      if (k === 'c') {e.preventDefault(); n.add('callout');} else if (k === 'l') {e.preventDefault(); n.add('todo');} else if (k === 't') {e.preventDefault(); n.add('text');} else if (k === 'u') {e.preventDefault(); n.file();}};
+    const off = (e: KeyboardEvent) => {held.delete(e.key.toLowerCase()); if (e.key === 'Shift') held.delete('shift');};
+    const clear = () => held.clear();
+    const mm = (e: PointerEvent) => {const r = host.current?.getBoundingClientRect(); mouseAt.current = r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom ? {x: e.clientX, y: e.clientY, t: Date.now()} : null;};
+    window.addEventListener('keydown', on); window.addEventListener('keyup', off); window.addEventListener('blur', clear); window.addEventListener('pointermove', mm, {passive: true});
+    return () => {window.removeEventListener('keydown', on); window.removeEventListener('keyup', off); window.removeEventListener('blur', clear); window.removeEventListener('pointermove', mm); cancelAnimationFrame(raf);};}, []); // eslint-disable-line react-hooks/exhaustive-deps
   const modeRef = useRef(mode); modeRef.current = mode;
   const [grabbing, setGrabbing] = useState(false);
   const handDown = (e: any) => {if (e.button !== 0 && e.button !== 1) return; e.preventDefault(); e.stopPropagation(); try {window.getSelection()?.removeAllRanges();} catch {}
@@ -310,6 +357,8 @@ export function PageBoard(p: Props) {
     if (!sel.length) return;
     if (k === 'Delete' || k === 'Backspace') {e.preventDefault(); remove(sel); return;}
     if (mod && k.toLowerCase() === 'd') {e.preventDefault(); void duplicate(sel); return;}
+    // 08/11/2026 (referencia Weje): Ctrl+Enter cria uma nota nova ao lado do item selecionado, ja escrevendo
+    if (k === 'Enter' && mod && !p.locked) {const b = byId.get(sel[0]); if (b) {e.preventDefault(); const g = geo(b), nb = addBlock({id: uid(), type: 'callout', text: '', html: '', data: {}}, {x: g.x + g.w + 40 + 120, y: g.y + 75}); setEditing(nb.id);} return;}
     if (k === 'Enter') {const b = byId.get(sel[0]); if (b) {e.preventDefault(); openItem(b);} return;}
     const step = e.shiftKey ? 20 : 4, d = k === 'ArrowLeft' ? [-step, 0] : k === 'ArrowRight' ? [step, 0] : k === 'ArrowUp' ? [0, -step] : k === 'ArrowDown' ? [0, step] : null;
     if (d) {e.preventDefault(); patchGeo(sel, g => ({...g, x: g.x + d[0], y: g.y + d[1]}), 'board-nudge');}
@@ -320,7 +369,7 @@ export function PageBoard(p: Props) {
     if (b.type === 'todo' && Array.isArray(b.data?.items)) return b.data.items.map((i: any) => (i.done ? '[x] ' : '[ ] ') + i.text).join('\n');
     if (b.type === 'file' || b.type === 'image') return b.data?.drawing ? '' : 'Arquivo: ' + String(b.data?.name || b.data?.caption || 'imagem');
     return String(b.text || '');};
-  const patchLink = (from: string, to: string, f: ((l: {to: string; label?: string; arrow?: boolean}) => any) | null) => patchGeo([from], g => ({...g, links: (g.links || []).flatMap(l => linkTo(l) !== to ? [l] : f ? [f(linkObj(l))] : [])}), 'board-link');
+  const patchLink = (from: string, to: string, f: ((l: {to: string; label?: string; arrow?: boolean; dash?: boolean}) => any) | null) => patchGeo([from], g => ({...g, links: (g.links || []).flatMap(l => linkTo(l) !== to ? [l] : f ? [f(linkObj(l))] : [])}), 'board-link');
   const remove = (ids: string[]) => {const set0 = new Set(ids); p.edit(bs => {
       // 08/11 (Pedro: "os anexos flutuantes sao ligacao daquele anexo daquela pagina... se eu tiro eles saem juntos")
       const cards = bs.filter(b => set0.has(b.id) && b.type === 'page_link'), pgs = new Set(cards.flatMap(b => [String(b.data?.page_id || ''), String(b.data?.copy_id || '')]).filter(Boolean)),
@@ -368,8 +417,16 @@ export function PageBoard(p: Props) {
   // 08/11/2026 (Pedro: "mudando de forma" no zoom): so muito afastado (< 15%) o conteudo vira resumo; antes, abaixo de 45%, a janela
   // do Word virava linha de arquivo e as imagens viravam caixa vazia no meio do zoom
   const light = view.z < 0.15;
-  const links = useMemo(() => {const out: {id: string; from: string; to: string; a: Geo; b: Geo; label: string; arrow: boolean}[] = []; for (const b of shown) {const g = geo(b); for (const raw of g.links || []) {const l = linkObj(raw), t = byId.get(l.to); if (t && onBoard(t)) out.push({id: b.id + '>' + l.to, from: b.id, to: l.to, a: g, b: geo(t), label: String(l.label || ''), arrow: !!l.arrow});}} return out;}, [shown, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const links = useMemo(() => {const out: {id: string; from: string; to: string; a: Geo; b: Geo; label: string; arrow: boolean; dash: boolean}[] = []; for (const b of shown) {const g = geo(b); for (const raw of g.links || []) {const l = linkObj(raw), t = byId.get(l.to); if (t && onBoard(t)) out.push({id: b.id + '>' + l.to, from: b.id, to: l.to, a: g, b: geo(t), label: String(l.label || ''), arrow: !!l.arrow, dash: !!l.dash});}} return out;}, [shown, live]); // eslint-disable-line react-hooks/exhaustive-deps
   const one = sel.length === 1 ? byId.get(sel[0]) : undefined;
+  const [alignOpen, setAlignOpen] = useState(false);
+  useEffect(() => {if (sel.length < 2) setAlignOpen(false);}, [sel.length]);
+  const alignSel = (kind: AlignKind) => {const list = sel.map(id => byId.get(id)).filter(Boolean).map(b => ({id: b!.id, g: geo(b!)})); if (list.length < 2) return;
+    const x1 = Math.min(...list.map(o => o.g.x)), y1 = Math.min(...list.map(o => o.g.y)), x2 = Math.max(...list.map(o => o.g.x + o.g.w)), y2 = Math.max(...list.map(o => o.g.y + o.g.h)), out = new Map<string, {x: number; y: number}>();
+    if (kind === 'row') {let x = x1; for (const o of [...list].sort((a, b) => a.g.x - b.g.x)) {out.set(o.id, {x, y: y1}); x += o.g.w + 40;}}
+    else if (kind === 'col') {let y = y1; for (const o of [...list].sort((a, b) => a.g.y - b.g.y)) {out.set(o.id, {x: x1, y}); y += o.g.h + 40;}}
+    else for (const o of list) out.set(o.id, {x: kind === 'left' ? x1 : kind === 'right' ? x2 - o.g.w : kind === 'hcenter' ? (x1 + x2) / 2 - o.g.w / 2 : o.g.x, y: kind === 'top' ? y1 : kind === 'bottom' ? y2 - o.g.h : kind === 'vcenter' ? (y1 + y2) / 2 - o.g.h / 2 : o.g.y});
+    patchGeo([...out.keys()], (g, b) => {const q = out.get(b.id)!; return {...g, x: Math.round(q.x), y: Math.round(q.y)};}, 'board-align'); p.flush();};
 
   const btn = (icon: IconName | 'T', label: string, run: () => void, on = false, danger = false, testID?: string) => h('button', {key: label, type: 'button', title: label, 'aria-label': label, 'aria-pressed': on || undefined, 'data-testid': testID,
     onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); run();},
@@ -401,10 +458,15 @@ export function PageBoard(p: Props) {
     if (one) items.push(btn('rename', 'Legenda', () => setCapEdit(one.id), capEdit === one.id, false, 'board-caption'));
     if (one) items.push(btn('@' as any, 'Mencionar uma página ou item do app (@)', () => setMention({id: one.id, mode: 'page'}), !!mention, false, 'board-mention'));
     if (one) items.push(btn('link', 'Ligar a outro item (clique no outro item)', () => setMode(mode === 'link' ? '' : 'link'), mode === 'link'));
+    if (sel.length > 1 && !p.locked) items.push(btn('gridView', 'Alinhar e organizar', () => setAlignOpen(o => !o), alignOpen, false, 'board-align'));
     items.push(btn('moveTo', 'Trazer para a frente', bringFront));
     if (one && (one.type === 'file' || (one.type === 'image' && one.data?.attachment_id))) items.push(btn('download', 'Baixar', () => void downloadPageFile(p.api, String(one.data?.attachment_id))));
     items.push(btn('copy', 'Duplicar (Ctrl+D) — cópia independente', () => void duplicate(sel)));
     items.push(btn('trash', 'Excluir (Delete)', () => remove(sel), false, true));
+    // 08/11/2026 (referencia Weje): com varios itens, a barra troca para as opcoes de alinhar e organizar (enfileirar com 40 de espaco)
+    if (alignOpen && sel.length > 1) {const opts: [string, string, AlignKind][] = [['Esquerda', 'Alinhar pela esquerda', 'left'], ['Centro', 'Alinhar pelo centro', 'hcenter'], ['Direita', 'Alinhar pela direita', 'right'], ['Topo', 'Alinhar pelo topo', 'top'], ['Meio', 'Alinhar pelo meio', 'vcenter'], ['Base', 'Alinhar pela base', 'bottom'], ['Lado a lado', 'Enfileirar lado a lado, com o mesmo espaço', 'row'], ['Em coluna', 'Empilhar em coluna, com o mesmo espaço', 'col']];
+      return bar([btn('back', 'Voltar', () => setAlignOpen(false)), ...opts.map(([t, label, kind]) => h('button', {key: kind, type: 'button', title: label, 'aria-label': label, 'data-testid': 'board-align-' + kind, onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); alignSel(kind);},
+        style: {height: 34, padding: '0 9px', border: 0, borderRadius: 9, cursor: 'pointer', background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap'}}, t))], {left: Math.max(8, Math.min(size2.w - 620, left)), top, height: 48}, 'Alinhar e organizar');}
     return bar(items, {left, top, height: 48}, 'Item selecionado');})() : null;
 
   return h('div', {ref: host, 'data-testid': 'page-board', tabIndex: 0, onKeyDown: onKey, onPointerDown: onBgDown, onDoubleClick: onBgDouble,
@@ -419,9 +481,11 @@ export function PageBoard(p: Props) {
       h('svg', {style: {position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none'}, width: 1, height: 1, 'aria-hidden': true},
         h('defs', null, h('marker', {id: 'board-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'}, h('path', {d: 'M0 0 L10 5 L0 10 z', fill: c.muted}))),
         ...links.map(l => {const ca = {x: l.a.x + l.a.w / 2, y: l.a.y + l.a.h / 2}, end = l.arrow ? edgePoint(ca, l.b) : {x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h / 2}, on = selLink?.from === l.from && selLink?.to === l.to, sw = 2 / Math.max(0.5, view.z);
-          return h('g', {key: l.id}, h('line', {x1: ca.x, y1: ca.y, x2: end.x, y2: end.y, stroke: on ? c.accent : c.muted, strokeWidth: on ? sw * 1.5 : sw, markerEnd: l.arrow ? 'url(#board-arrow)' : undefined}),
+          return h('g', {key: l.id}, h('line', {x1: ca.x, y1: ca.y, x2: end.x, y2: end.y, stroke: on ? c.accent : c.muted, strokeWidth: on ? sw * 1.5 : sw, strokeDasharray: l.dash ? (sw * 4) + ' ' + (sw * 3) : undefined, strokeLinecap: l.dash ? 'round' : undefined, markerEnd: l.arrow ? 'url(#board-arrow)' : undefined}),
             h('line', {'data-board-link': l.id, 'data-testid': 'board-link', x1: ca.x, y1: ca.y, x2: end.x, y2: end.y, stroke: 'transparent', strokeWidth: 14 / Math.max(0.3, view.z), style: {pointerEvents: 'stroke', cursor: 'pointer'},
-              onPointerDown: (e: any) => {e.stopPropagation(); setSel([]); setSelLink({from: l.from, to: l.to});}}),
+              onPointerDown: (e: any) => {e.stopPropagation(); setSel([]); setSelLink({from: l.from, to: l.to});},
+              // 08/11/2026 (referencia Weje): dois cliques na ligacao levam a camera ate o item da outra ponta (o mais longe do meio da tela)
+              onDoubleClick: (e: any) => {e.stopPropagation(); const mid = center(), far = (g: Geo) => Math.hypot(g.x + g.w / 2 - mid.x, g.y + g.h / 2 - mid.y), t = far(l.b) >= far(l.a) ? l.b : l.a, id = t === l.b ? l.to : l.from; setSelLink(null); setSel([id]); focusOn(t);}}),
             l.label ? h('text', {x: (ca.x + end.x) / 2, y: (ca.y + end.y) / 2 - 6 / view.z, fill: c.text, fontSize: 13 / Math.max(0.6, view.z), textAnchor: 'middle', style: {paintOrder: 'stroke', stroke: c.bg, strokeWidth: 4 / Math.max(0.6, view.z)}}, l.label) : null);}),
         ink ? h('path', {d: ink.map((q, i) => (i ? 'L' : 'M') + q.x + ' ' + q.y).join(' '), fill: 'none', stroke: c.accent, strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round'}) : null),
       // 08/11/2026 (Pedro: "o ponto central da pagina pra nao se perder no infinito"): eixos discretos e o 0 no centro
@@ -450,8 +514,8 @@ export function PageBoard(p: Props) {
       btn('fileDoc', 'Documento Word', () => {anchor.current = center(); p.createDoc();}, false, false, 'board-add-doc'),
       btn('book', 'Página existente (entra como cópia)', () => setPicker(true), picker, false, 'board-add-page'),
       btn('grid', 'Do app: Agenda, Tarefas, Notas, Lembretes, Listas, Price Tracker, E-mails, Biblioteca', () => setLivePick(true), livePick, false, 'board-add-live')], {left: '50%', bottom: 20, transform: 'translateX(-50%)', height: 54}, 'Inserir no quadro'),
-    bar([btn('zoomOut', 'Afastar', () => zoomBy(1 / 1.25)), h('button', {key: 'pct', type: 'button', title: 'Voltar para 100%', onClick: () => zoomBy(1 / view.z), 'data-testid': 'board-zoom',
-      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar', () => zoomBy(1.25)), btn('home', 'Voltar ao centro (0)', () => setView(v => ({...v, x: size2.w / 2, y: size2.h / 2})), false, false, 'board-center'), btn('expand', 'Ver tudo', fitAll), btn('search', 'Buscar no quadro (Ctrl+F)', () => setFind(f => f ? null : {q: '', i: 0}), !!find, false, 'board-find-open')],
+    bar([btn('zoomOut', 'Afastar (Ctrl -)', () => zoomStep(-1)), h('button', {key: 'pct', type: 'button', title: 'Voltar para 100% (Ctrl 0)', onClick: () => zoomAround(1, size2.w / 2, size2.h / 2), 'data-testid': 'board-zoom',
+      style: {minWidth: 52, height: 34, border: 0, background: 'transparent', color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer'}}, Math.round(view.z * 100) + '%'), btn('zoomIn', 'Aproximar (Ctrl +)', () => zoomStep(1)), btn('home', 'Voltar ao centro (0)', () => glide({...viewRef.current, x: size2.w / 2, y: size2.h / 2}), false, false, 'board-center'), btn('expand', 'Ver tudo', fitAll), btn('search', 'Buscar no quadro (Ctrl+F)', () => setFind(f => f ? null : {q: '', i: 0}), !!find, false, 'board-find-open')],
       {left: 16, bottom: 20, height: 46}, 'Zoom do quadro'),
     rec ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', bottom: 84, transform: 'translateX(-50%)', padding: '6px 12px', borderRadius: 10, background: c.dangerBg, color: c.danger, fontSize: 12, fontWeight: 600}}, '● Gravando… clique no microfone para parar') : null,
     selLink ? (() => {const l = links.find(x => x.from === selLink.from && x.to === selLink.to); if (!l) return null; const mx = ((l.a.x + l.a.w / 2) + (l.b.x + l.b.w / 2)) / 2 * view.z + view.x, my = ((l.a.y + l.a.h / 2) + (l.b.y + l.b.h / 2)) / 2 * view.z + view.y;
@@ -459,6 +523,7 @@ export function PageBoard(p: Props) {
         h('input', {key: l.id, defaultValue: l.label, placeholder: 'Texto na ligação', 'aria-label': 'Texto na ligação', 'data-testid': 'board-link-label', onKeyDown: (e: any) => {if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setSelLink(null);},
           onBlur: (e: any) => {const v = String(e.target.value || '').slice(0, 120); if (v !== l.label) patchLink(l.from, l.to, o => ({...o, label: v || undefined}));}, style: {width: 170, height: 32, borderRadius: 8, border: '1px solid ' + c.line, background: c.input, color: c.text, padding: '0 8px', fontSize: 13, outline: 'none'}}),
         btn('arrowRight', l.arrow ? 'Tirar a seta' : 'Pôr seta', () => patchLink(l.from, l.to, o => ({...o, arrow: !o.arrow})), l.arrow, false, 'board-link-arrow'),
+        btn('more', l.dash ? 'Linha contínua' : 'Linha tracejada', () => patchLink(l.from, l.to, o => ({...o, dash: !o.dash || undefined})), l.dash, false, 'board-link-dash'),
         btn('trash', 'Apagar a ligação', () => {patchLink(l.from, l.to, null); setSelLink(null);}, false, true));})() : null,
     capEdit && byId.get(capEdit) ? (() => {const b = byId.get(capEdit)!, g = geo(b); return h('input', {'data-board-ui': '1', 'data-testid': 'board-caption-input', autoFocus: true, defaultValue: g.caption || '', placeholder: 'Legenda', 'aria-label': 'Legenda do item',
       onPointerDown: (e: any) => e.stopPropagation(), onKeyDown: (e: any) => {if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();},
@@ -563,7 +628,13 @@ function TextCard({b, g, editing, onChange, onDone}: any) {
   const save = () => {const el = ref.current; if (!el) return; const html = sanitizeRich(el.innerHTML), text = plainOf(html).slice(0, 12000); onChange((x: PageBlock) => ({...x, text, html: html.length < 24000 ? html : ''}));};
   const style: any = {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'auto', padding: note ? 14 : 6, borderRadius: note ? 12 : 6, background: note ? (g.color || NOTE_COLORS[0]) : 'transparent', border: note ? '1px solid ' + c.line : 0,
     color: c.text, fontSize: head ? 28 : note ? 14 : 18, fontWeight: head ? 700 : 400, lineHeight: 1.45, outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word'};
-  if (editing) return h('div', {key: 'edit', ref, 'data-board-editing': '1', contentEditable: true, suppressContentEditableWarning: true, role: 'textbox', 'aria-multiline': true, 'aria-label': note ? 'Nota' : 'Texto', onBlur: () => {save(); onDone();}, onInput: save, onPointerDown: (e: any) => e.stopPropagation(), style: {...style, userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text', boxShadow: '0 0 0 2px ' + c.accent}});
+  if (editing) return h('div', {key: 'edit', ref, 'data-board-editing': '1', contentEditable: true, suppressContentEditableWarning: true, role: 'textbox', 'aria-multiline': true, 'aria-label': note ? 'Nota' : 'Texto', onBlur: () => {save(); onDone();}, onInput: save,
+    // 08/11/2026 (Pedro: "colei e os links e grifados sairam"): colar na nota usa a mesma limpeza das paginas - mantem link,
+    // negrito e grifo; tira o fundo/cor da pagina de onde veio; URL sem link vira link
+    onPaste: (e: any) => {const dt = e.clipboardData; const text = String(dt?.getData('text/plain') || ''), raw = String(dt?.getData('text/html') || ''); if (!text && !raw) return;
+      e.preventDefault(); e.stopPropagation(); let html = raw ? pasteHtml(raw, pasteContext(ref.current)) : '';
+      if (!html) {let at = 0; for (const l of findLinks(text)) {html += escapeHtml(text.slice(at, l.start)) + '<a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(l.url) + '</a>'; at = l.end;} html = (html + escapeHtml(text.slice(at))).replace(/\r?\n/g, '<br>');}
+      document.execCommand('insertHTML', false, html); save();}, onPointerDown: (e: any) => e.stopPropagation(), style: {...style, userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text', boxShadow: '0 0 0 2px ' + c.accent}});
   const empty = !String(b.text || '').trim();
   return h('div', {key: 'view', style}, empty ? h('span', {style: {color: c.muted}}, note ? 'Nota vazia — dois cliques para escrever' : 'Texto — dois cliques para escrever') : b.html ? h('div', {dangerouslySetInnerHTML: {__html: sanitizeRich(b.html)}}) : String(b.text || ''));
 }

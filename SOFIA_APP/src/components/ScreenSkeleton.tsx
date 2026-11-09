@@ -19,8 +19,16 @@ const TITLES:Record<string,string>={home:'Início',chat:'Conversa',pages:'Págin
 const noop=()=>{};
 const APP_COUNT=11;
 
-export function ScreenSkeleton({tab}:{tab:string}){
+/** 08/11/2026 (Pedro: "o shimmer e esqueleto esta aparecendo de outra tela e nao dessa"): abrindo UMA pagina (barra lateral,
+ * link, /paginas/<id>), o esqueleto da LISTA de Paginas ("Recentes / Todas as paginas") e de outra tela. Nesse caso fica so
+ * o fundo, e a pagina (documento ou quadro) entra no lugar. */
+function openingOnePage(pageId?:string){
+ if(pageId)return true;
+ try{return typeof location!=='undefined'&&/^\/paginas\/[^/?#]+/.test(location.pathname);}catch{return false;}
+}
+export function ScreenSkeleton({tab,pageId}:{tab:string;pageId?:string}){
  const c=useTheme(),show=useSkeletonDelay();
+ if(tab==='pages'&&openingOnePage(pageId))return <View testID="screen-wait-page" style={{flex:1,backgroundColor:c.bg}}/>;
  if(!show||EMBED)return <View testID={'screen-wait-'+tab} style={{flex:1,backgroundColor:c.bg}}/>; // 08/11/2026 (Pedro): dentro do cartao do Quadro, nunca esqueleto com brilho
  const body=tab==='agenda'?<AgendaSkeleton/>:tab==='chat'?<ChatSkeleton/>:tab==='pages'?<PagesSkeleton/>:tab==='apps'?<AppsSkeleton/>:tab==='profile'?<ProfileSkeleton/>:null;
  if(body)return <View testID={'screen-skeleton-'+tab} pointerEvents="none" accessibilityLabel={'Abrindo '+(TITLES[tab]||'')} style={{flex:1,backgroundColor:c.bg}}><ShimmerGroup>{body}</ShimmerGroup></View>;

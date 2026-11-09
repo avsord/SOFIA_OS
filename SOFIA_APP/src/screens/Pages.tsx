@@ -33,6 +33,7 @@ import {flushNow} from '../lib/flush-sync';
 import {useHoverHold,useHoverKey} from '../lib/hover-hold';
 import {PageVersions} from '../components/PageVersions';
 import {PageRichInput,textToHtml,htmlLines} from '../components/PageRichInput';
+import {findLinks} from '../lib/leaf-document';
 import {PageBoard,BOARD_SUPPORTED} from '../components/PageBoard';
 import {note as boardNote} from '../lib/board-diag';
 import {PageShareButton,shareUrl} from '../components/PageSharePanel';
@@ -68,11 +69,26 @@ const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)
 /** 07/11/2026: varias linhas coladas com formatacao: cada bloco novo (e o atual, se estava vazio) recebe o HTML da linha
  * de mesmo texto. Linha que virou lista/titulo pelo "- " ou "# " fica sem a formatacao (texto mudou). */
 function richPasted(r:any,before:PageBlock[],id:string,html?:string){
- if(!r||!html||typeof document==='undefined')return r;
- const plain=(h:string)=>{const d=document.createElement('div');d.innerHTML=h;return String(d.textContent||'');};
- const lines=htmlLines(html).map(h=>({h,t:plain(h).trim()})),old=new Set(before.map(x=>x.id)),used=new Set<number>(),self=before.find(x=>x.id===id);
- return {...r,blocks:r.blocks.map((x:PageBlock)=>{if(old.has(x.id)&&!(x.id===id&&!String(self?.text||'').trim()))return x;const t=String(x.text||'').trim();if(!t)return x;
-  const k=lines.findIndex((l,n)=>!used.has(n)&&l.t===t&&/<(b|i|u|s|code|mark|a|span)\b/i.test(l.h));if(k<0)return x;used.add(k);return {...x,html:lines[k].h};})};
+ if(!r||typeof document==='undefined')return r;
+ // 08/11/2026 (Pedro: "colei aqui e os links e grifados sairam"): a linha casa com o HTML pelo texto com espacos normalizados
+ // (o &nbsp; e os espacos duplos do Word nao batiam); URL sem link (texto puro, site) vira link como ao colar uma linha so;
+ // e a primeira linha colada no fim/meio de um texto ja escrito tambem leva a formatacao.
+ const plain=(h:string)=>{const d=document.createElement('div');d.innerHTML=h;return String(d.textContent||'');},norm=(v:string)=>String(v||'').replace(/\s+/g,' ').trim();
+ const RICH=/<(b|i|u|s|code|mark|a|span)\b/i;
+ const lines=html?htmlLines(html).map(h=>({h,raw:plain(h).trim(),t:norm(plain(h))})).filter(l=>l.t):[],old=new Set(before.map(x=>x.id)),used=new Set<number>(),self=before.find(x=>x.id===id);
+ const linkify=(h:string)=>{const d=document.createElement('div');d.innerHTML=h;const w=document.createTreeWalker(d,NodeFilter.SHOW_TEXT),texts:any[]=[];while(w.nextNode())texts.push(w.currentNode);let changed=false;
+  for(const n of texts){if(n.parentElement?.closest('a'))continue;const ls=findLinks(n.data);if(!ls.length)continue;changed=true;const f=document.createDocumentFragment();let at=0;
+   for(const l of ls){if(l.start>at)f.append(document.createTextNode(n.data.slice(at,l.start)));const a=document.createElement('a');a.href=l.url;a.setAttribute('href',l.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=n.data.slice(l.start,l.end);f.append(a);at=l.end;}
+   if(at<n.data.length)f.append(document.createTextNode(n.data.slice(at)));n.replaceWith(f);}
+  return changed?d.innerHTML:h;};
+ const selfText=String(self?.text||'');
+ return {...r,blocks:r.blocks.map((x:PageBlock)=>{const isSelf=x.id===id;if(old.has(x.id)&&!isSelf)return x;const text=String(x.text||''),t=norm(text);if(!t)return x;
+  if(isSelf&&selfText.trim()){// colado depois (ou no meio) de um texto que ja existia: o que era antes fica, a linha colada entra com a formatacao
+   const k=lines.findIndex((l,n)=>!used.has(n)&&RICH.test(l.h)&&text.includes(l.raw));if(k<0){const lk=linkify(self?.html||textToHtml(text));return lk!==(self?.html||textToHtml(text))&&!self?.html?{...x,html:lk}:x;}
+   used.add(k);const at=text.indexOf(lines[k].raw),head=text.slice(0,at),tail=text.slice(at+lines[k].raw.length),base=self?.html&&selfText===head?self.html:textToHtml(head);
+   return {...x,html:linkify(base+lines[k].h+textToHtml(tail))};}
+  const k=lines.findIndex((l,n)=>!used.has(n)&&l.t===t&&RICH.test(l.h));if(k>=0){used.add(k);return {...x,html:linkify(lines[k].h)};}
+  const lk=linkify(textToHtml(text));return lk!==textToHtml(text)?{...x,html:lk}:x;})};
 }
 
 export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openPageId='',createPageKey=0}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void;openPageKey?:number;openPageId?:string;createPageKey?:number}){useRenderCost('pages');
@@ -197,12 +213,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 0.3.250 (computador): a barra lateral mostra a arvore destas paginas e abre uma pagina daqui; o caminho
  // da pagina aberta vai para a barra de cima. No celular nada disso roda.
  useEffect(()=>{if(Platform.OS==='web'&&loaded&&!samePages(pagesDirectory.get(),displayPages))pagesDirectory.set(displayPages);},[displayPages,loaded]);
- const handledOpen=useRef(0);
+ const handledOpen=useRef(0),[openMissed,setOpenMissed]=useState(0);
  useLayoutEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;let page=byId.get(openPageId);
   if(!page){const fresh=createdPage.get();if(fresh&&fresh.id===openPageId){page=fresh;setPages(old=>old.some(x=>x.id===fresh.id)?old:[...old,fresh]);createdPage.set(null);}}
   // 08/11/2026 (Pedro: no cartao do Quadro aparecia a lista de Paginas): pagina que nao veio na lista (copia do quadro, lista
   // ainda incompleta) e buscada direto no servidor e aberta
-  if(!page){if(fetchedOpen.current!==openPageKey){fetchedOpen.current=openPageKey;void api.entity(openPageId).then((e:any)=>{if(e&&e.id===openPageId&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old:[...old,e]);}).catch(()=>{});}return;}
+  if(!page){if(fetchedOpen.current!==openPageKey){fetchedOpen.current=openPageKey;const key=openPageKey;void api.entity(openPageId).then((e:any)=>{if(e&&e.id===openPageId&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old:[...old,e]);else setOpenMissed(key);}).catch(()=>setOpenMissed(key));}return;}
   handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
  const fetchedOpen=useRef(0);
  // 08/11/2026 (Pedro: "quando apago e volto aparece essa tela das paginas... se eu apaguei e voltei tem que ser a tela original"):
@@ -750,6 +766,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)applyTemplate(template);else void create(createParent||undefined,template);}}
   onBoard={Platform.OS==='web'&&desktop&&BOARD_SUPPORTED?()=>{const here=templateHere&&!!selectedId;setTemplateHere(false);if(here)setLayoutRef.current('board');else void create(createParent||undefined,undefined,'board');}:undefined}/>;
  if(!entry&&EMBED_ID)return <View testID="embed-page-wait" style={{flex:1,alignItems:'center',justifyContent:'center',padding:24}}>{embedGone?<Text style={{color:c.muted,fontSize:14,textAlign:'center'}}>Esta página foi removida. Use Ctrl+Z no quadro para trazer de volta.</Text>:null}</View>;
+ // 08/11/2026 (Pedro: "o esqueleto esta aparecendo de outra tela"): abrindo uma pagina (barra lateral, link, quadro), enquanto
+ // ela nao chega a tela fica no fundo - nunca a LISTA de Paginas com esqueleto. Se a pagina nao existir mais, mostra a lista.
+ if(!entry&&openPageKey&&openPageId&&handledOpen.current!==openPageKey&&openMissed!==openPageKey)return <View testID="page-open-wait" style={{flex:1,backgroundColor:c.bg}}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}<FileWindowHost/></View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  // 06/11/2026 (pagina com senha): acoes do ⋯ e da tela trancada

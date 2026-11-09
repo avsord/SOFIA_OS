@@ -9,7 +9,8 @@
  *   2. login e "Esqueceu a senha?" respondendo;
  *   3. a varredura de coerencia (tools/ux-sweep.cjs) nas telas principais.
  *   4. o Drive no laboratorio (tools/drive-lab: Google Drive fiel, sondas do servidor e robo na tela).
- *   5. as Paginas no laboratorio: robo do Quadro (30 verificacoes), versoes das paginas e pagina trancada (08/11/2026).
+ *   5. as Paginas no laboratorio: robo do Quadro (30 verificacoes), versoes das paginas e pagina trancada (08/11/2026),
+ *      colar com links/grifo e o movimento do Quadro (08/11/2026).
  * Uso (na pasta SOFIA_APP, depois de npm run build:web):  node tools/release-check.cjs [--sem-varredura] [--sem-drive]
  */
 const path = require('node:path'), fs = require('node:fs'), os = require('node:os'), {spawn, spawnSync} = require('node:child_process');
@@ -88,7 +89,7 @@ async function main() {
     // 08/11/2026 (Pedro: "faz o mesmo metodo pro quadro"): Paginas no laboratorio - quadro inteiro, versoes e pagina trancada
     if (!process.argv.includes('--sem-quadro')) {
       console.log('\n5) Paginas no laboratorio (servidor de verdade: Quadro, versoes, pagina trancada)');
-      for (const [file, okRe, label] of [['pagina-quadro.cjs', /QUADRO OK/, 'Quadro'], ['quadro-anexo-word.cjs', /QUADRO-WORD OK/, 'Quadro: anexo Word'], ['paginas-versoes.cjs', /VERSOES OK/, 'Versões das páginas'], ['pagina-trancada-shift-enter.cjs', /PAGINA TRANCADA OK/, 'Página trancada'], ['quadro-selftest-lab.cjs', /QUADRO-TESTE OK/, 'Teste de produção do Quadro (no laboratório)']]) {
+      for (const [file, okRe, label] of [['pagina-quadro.cjs', /QUADRO OK/, 'Quadro'], ['quadro-anexo-word.cjs', /QUADRO-WORD OK/, 'Quadro: anexo Word'], ['paginas-versoes.cjs', /VERSOES OK/, 'Versões das páginas'], ['pagina-trancada-shift-enter.cjs', /PAGINA TRANCADA OK/, 'Página trancada'], ['quadro-selftest-lab.cjs', /QUADRO-TESTE OK/, 'Teste de produção do Quadro (no laboratório)'], ['paginas-colar.cjs', /COLAR OK/, 'Colar com links e grifo (Docs, Word, Notion, texto, Sofia, nota do Quadro)'], ['quadro-movimento.cjs', /QUADRO-MOVIMENTO OK/, 'Movimento do Quadro (deslize, zoom, WASD, alinhar, ligação)']]) {
         const r = spawnSync(process.execPath, [path.join(APP, 'tools/drive-lab', file)], {encoding: 'utf8', timeout: 12 * 60000});
         const out = (r.stdout || '') + (r.stderr || ''), tail = (out.match(/\(\d+ verificacoes\)/) || [''])[0];
         okRe.test(out) ? pass(label + ' sem falhas ' + tail) : fail(label + ': ' + out.split('\n').filter(l => /^FALHA|✗/.test(l)).slice(0, 10).join('\n'));

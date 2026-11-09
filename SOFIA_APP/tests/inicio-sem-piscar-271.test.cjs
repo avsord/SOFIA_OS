@@ -109,7 +109,12 @@ test('Drive: Google Drive inteiro - listas, varios selecionados, envio grande po
 
 test('telas que baixam depois mostram o esqueleto enquanto o arquivo chega (nunca so o fundo)', () => {
   const s = require('fs').readFileSync(require('path').join(__dirname, '../src/lib/screen-loader.web.tsx'), 'utf8');
-  assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name}/>"), 'Suspense com esqueleto');
+  assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name} pageId={name==='pages'?String(props?.openPageId||''):undefined}/>"), 'Suspense com esqueleto');
+  // 08/11/2026 (Pedro: "esqueleto de outra tela"): abrindo UMA pagina, o esqueleto da lista de Paginas nao aparece (so o fundo)
+  const sk = require('fs').readFileSync(require('path').join(__dirname, '../src/components/ScreenSkeleton.tsx'), 'utf8');
+  assert.ok(sk.includes("if(tab==='pages'&&openingOnePage(pageId))return <View testID=\"screen-wait-page\""), 'pagina aberta sem esqueleto da lista');
+  const pg = require('fs').readFileSync(require('path').join(__dirname, '../src/screens/Pages.tsx'), 'utf8');
+  assert.ok(pg.includes('testID="page-open-wait"') && pg.indexOf('testID="page-open-wait"') < pg.indexOf(' if(!entry)return <View style={{flex:1}} onTouchEnd='), 'Paginas espera a pagina sem mostrar a lista');
   assert.ok(!s.includes('fallback={null}>'), 'sem fallback vazio');
 });
 
