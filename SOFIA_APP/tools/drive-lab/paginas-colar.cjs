@@ -17,7 +17,8 @@ const CASES = [
 ];
 (async () => {
   const lab = spawn(process.execPath, [P.join(__dirname, 'lab-server.cjs'), String(PORT), O + 'data'], {stdio: ['ignore', 'pipe', 'pipe']}); let log = ''; lab.stdout.on('data', d => log += d); lab.stderr.on('data', d => log += d);
-  for (let i = 0; i < 80 && !/pronto/.test(log); i++) await new Promise(r => setTimeout(r, 250));
+  for (let i = 0; i < 240 && !/pronto/.test(log); i++) await new Promise(r => setTimeout(r, 250)); // ate 60 s (maquina ocupada)
+  if (!/pronto/.test(log)) {console.log('FALHA laboratorio nao ligou em 60 s: ' + log.slice(-300)); lab.kill(); process.exit(1);}
   const br = await chromium.launch(); const ctx = await br.newContext({viewport: {width: 1500, height: 900}}); await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: B});
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)));
   const paste = (html, text) => page.evaluate(([html, text]) => {const t = document.activeElement; const dt = new DataTransfer(); if (html) dt.setData('text/html', html); dt.setData('text/plain', text); t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));}, [html, text]);
