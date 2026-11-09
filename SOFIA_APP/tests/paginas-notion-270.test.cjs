@@ -372,3 +372,7 @@ test('09/11: barra lateral - Abrir em nova guia no menu da pagina, Ctrl/Cmd+cliq
  const s=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');
  assert.match(s,/\{label:'Abrir em nova guia',icon:'external',run:\(\)=>newTab\(p\)\}/);assert.match(s,/if\(ne\?\.ctrlKey\|\|ne\?\.metaKey\)\{newTab\(p\);return;\}/);assert.match(s,/onAuxOpen=\{\(\)=>newTab\(p\)\}/);
 });
+test('09/11: compromisso criado sem fim fica sem fim (so o ponto na linha do tempo), sem 1 h automatica',()=>{
+ const h=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');assert.doesNotMatch(h,/x\.minutes\|\|60/);assert.match(h,/end_at:x\.end\?x\.end\.toISOString\(\):x\.minutes\?/);
+ const e=fs.readFileSync(path.join(__dirname,'..','src/components/HomeCommitmentEditor.tsx'),'utf8');assert.match(e,/\[end,setEnd\]=useState\(''\)/);
+});
