@@ -193,7 +193,11 @@ export function PageBoard(p: Props) {
     // 08/11/2026 (Pedro: "quando eu tiver movendo ainda as vezes confunde o scroll movimentando o conteudo, tem que travar"):
     // arrastando (item, fundo ou rodinha segurada) ou no meio de um giro de rodinha que ja estava andando o quadro, a rodinha
     // continua no quadro mesmo passando por cima de uma janela; o conteudo das janelas so rola num giro que comecou nele.
-    const on = (e: WheelEvent) => {const t = e.target as HTMLElement, now = performance.now(), boardGesture = el.hasAttribute('data-board-drag') || now - lastBoardWheel.current < 700;
+    // 09/11/2026 (Pedro: "to scrolando nas paginas e nao ta indo" - nas janelas do Word): a trava era 0,7 s depois de CADA dente
+    // da rodinha; rolando o quadro, a janela chega embaixo do mouse e a trava nunca soltava. Agora solta com 0,3 s sem girar (entre
+    // dentes de um mesmo giro e menos que isso) e, com o texto da janela em uso (clicou nela), a rodinha e sempre da janela.
+    const on = (e: WheelEvent) => {const t = e.target as HTMLElement, now = performance.now(), dragging = el.hasAttribute('data-board-drag'), win = t.closest?.('[data-board-editing],[data-board-scroll="on"]') as HTMLElement | null;
+      const using = !!win && !!document.activeElement && win.contains(document.activeElement), boardGesture = dragging || (!using && now - lastBoardWheel.current < 300);
       if (!boardGesture && t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); lastBoardWheel.current = now;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
       if (e.ctrlKey || e.metaKey) {e.stopPropagation(); wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;} // 08/11 (Pedro): Ctrl+rodinha SO da zoom no quadro (nada rola, nem a janela por baixo)

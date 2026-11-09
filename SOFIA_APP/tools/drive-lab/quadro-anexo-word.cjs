@@ -5,7 +5,7 @@ const PORT=6900+Math.floor(Math.random()*200)*2, B='http://127.0.0.1:'+PORT, O=f
 const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
 (async()=>{
  const lab=spawn(process.execPath,[P.join(__dirname,'lab-server.cjs'),String(PORT),O+'data'],{stdio:['ignore','pipe','pipe']}); let log=''; lab.stdout.on('data',d=>log+=d); lab.stderr.on('data',d=>log+=d);
- for(let i=0;i<80&&!/pronto/.test(log);i++) await new Promise(r=>setTimeout(r,250));
+ for(let i=0;i<240&&!/pronto/.test(log);i++) await new Promise(r=>setTimeout(r,250));
  const br=await chromium.launch(); const page=await br.newPage({viewport:{width:1500,height:900}}); const errs=[]; page.on('pageerror',e=>errs.push(String(e.message).slice(0,200)));
  try{
  await page.goto(B+'/paginas'); await page.waitForTimeout(1500);
@@ -53,6 +53,18 @@ const res=[]; const ok=(c,m)=>{res.push((c?'OK   ':'FALHA')+' '+m);};
   ok(s3===s2,'arrastando, a rodinha não rola o conteúdo da janela');}
  {const wb=await win.boundingBox(), s2=await sc(); const bg2=await page.evaluate(([x0,y0,w,h])=>{for(let x=x0+w+10;x<innerWidth-20;x+=20){const y=y0+h/2;const e=document.elementFromPoint(x,y);if(e&&e.closest('[data-testid=page-board]')&&!e.closest('[data-board-item],[data-board-ui]'))return [x,y];}return [x0+w+30,y0+h/2];},[wb.x,wb.y,wb.width,wb.height]); await page.mouse.move(bg2[0],bg2[1]); await page.mouse.wheel(0,120); await page.waitForTimeout(60); await page.mouse.move(wb.x+wb.width/2,wb.y+wb.height/2); await page.mouse.wheel(0,120); await page.waitForTimeout(60); await page.mouse.wheel(0,120); await page.waitForTimeout(400);
   ok(await sc()===s2,'giro da rodinha que começou andando o quadro continua no quadro ao passar por cima da janela');}
+  // 09/11/2026 (Pedro: "to scrolando nas paginas e nao ta indo", nas janelas do Word): parou de girar o quadro, a rodinha em cima
+  // da janela rola a janela; com o texto da janela em uso, rola a janela mesmo logo depois de andar o quadro
+  {const ed2=win.locator('[contenteditable="true"]').first(); await ed2.click(); await page.keyboard.press('Control+End'); for(let i=0;i<50;i++){await page.keyboard.press('Enter'); await page.keyboard.type('linha extra '+i);} await page.waitForTimeout(600);
+   await page.keyboard.press('Control+Home'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(700);
+   const wb=await win.boundingBox(), o0=await page.getByTestId('board-origin').boundingBox(); await page.mouse.move(wb.x-40,wb.y+wb.height/2); for(let i=0;i<3;i++){await page.mouse.wheel(0,25); await page.waitForTimeout(60);}
+   await page.waitForTimeout(500); const wb2=await win.boundingBox(); await page.mouse.move(wb2.x+wb2.width/2,wb2.y+wb2.height/2); const a=await sc(), o1=await page.getByTestId('board-origin').boundingBox();
+   for(let i=0;i<4;i++){await page.mouse.wheel(0,150); await page.waitForTimeout(60);} await page.waitForTimeout(400); const b=await sc(), o2=await page.getByTestId('board-origin').boundingBox();
+   ok(b>a && Math.abs(o2.y-o1.y)<1,'parou de girar o quadro: a rodinha em cima da janela rola a janela ('+a+' -> '+b+')'); void o0;
+   await ed2.click(); await page.waitForTimeout(200); const wb3=await win.boundingBox(); await page.mouse.move(wb3.x-40,wb3.y+wb3.height/2); await page.mouse.wheel(0,25); await page.waitForTimeout(40);
+   await page.mouse.move(wb3.x+wb3.width/2,wb3.y+wb3.height/2); const c0=await sc(), q0=await page.getByTestId('board-origin').boundingBox(); for(let i=0;i<3;i++){await page.mouse.wheel(0,150); await page.waitForTimeout(50);} await page.waitForTimeout(400);
+   const c1=await sc(), q1=await page.getByTestId('board-origin').boundingBox(); ok(c1>c0 && Math.abs(q1.y-q0.y)<1,'escrevendo na janela: a rodinha rola a janela mesmo logo depois de andar o quadro ('+c0+' -> '+c1+')');
+   await page.keyboard.press('Escape'); await page.getByLabel('Ver tudo').click(); await page.waitForTimeout(700);}
  // 08/11 (Pedro: "a letra H vira a maozinha: com ela so arrasta, clicar em qualquer coisa fica bloqueado")
  {await page.keyboard.press('Escape'); await page.getByTestId('board-origin').evaluate(()=>{(document.activeElement)?.blur?.();}); await page.keyboard.press('h'); await page.waitForTimeout(300);
   const hand=page.getByTestId('board-hand'); ok(await hand.count()===1,'H liga a mãozinha');
