@@ -110,6 +110,17 @@ export function PageBoard(p: Props) {
   const anchor = useRef<{x: number; y: number} | null>(null);
   // 08/11/2026: registro do Quadro ("[quadro]" no servidor): cada aviso de erro mostrado tambem entra no registro (sem textos do usuario)
   const fail = (m: string) => {diag('aviso', false, {msg: m}); p.onError(m);};
+  // 09/11/2026 (Pedro: "eles nao tem que ter opcao de sincronizar com o original, apenas a janela mae"): sincronizar/tornar a original/parar
+  // do cartao de pagina (a "mae"); as janelas de anexo abertas dele so seguem a mae. Usado na barra e no cabecalho do cartao.
+  const cardAction = (one: PageBlock, kind: 'sync' | 'original' | 'stop') => {
+    const src = one.data?.source_id ? p.pages.find(x => x.id === String(one.data!.source_id)) : null; if (!src) return;
+    if (kind === 'stop') {patchBlock(one.id, b => ({...b, data: {...b.data, synced: false, page_id: b.data?.copy_id}}), 'board-sync'); return;}
+    const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (!cp || !p.pushToOriginal) return;
+    if (kind === 'sync') {appAlert('Sincronizar com a original?', 'O conteúdo desta cópia (com os anexos abertos dela) vai substituir o conteúdo de "' + (src.title || 'Sem título') + '". A versão anterior da original fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sincronizar', onPress: () => void track('sincronizar-original', () => p.pushToOriginal!(cp, src)).catch(e => fail(String(e?.message || e)))}]); return;}
+    appAlert('Tornar a original?', 'O conteúdo desta cópia vai substituir o de "' + (src.title || 'Sem título') + '" e o cartão passa a mostrar a própria original: o que mudar aqui (e nas janelas dos anexos dele) muda lá. A versão anterior fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tornar a original', onPress: () => void track('tornar-original', () => p.pushToOriginal!(cp, src, true)).then(() => p.edit(bs => bs.map(b => b.id === one.id ? {...b, data: {...b.data, synced: true, page_id: b.data?.source_id}}
+      // as janelas de anexo abertas deste cartao passam a ser da original (os blocos e anexos da original sao os mesmos da copia)
+      : String(b.data?.from_page || '') && String(b.data?.from_page) === String(one.data?.copy_id || '') ? {...b, data: {...b.data, from_page: one.data?.source_id, live: true}} : b), 'board-sync')).catch(e => fail(String(e?.message || e)))}]);
+  };
   const opened = useRef(Date.now());
   useEffect(() => boardDiagInit(p.api), [p.api]);
   // copias antigas trazidas para o quadro (de antes da etiqueta) ganham a etiqueta 'board-copy': somem das listas de Paginas
@@ -446,15 +457,9 @@ export function PageBoard(p: Props) {
       // 08/11/2026 (Pedro: "se ele alterou coisas e quer sincronizar essa copia pode fazer a pagina original sincronizar essas
       // informacoes"): a copia continua escondida (nao e subpagina); Sincronizar leva o que mudou na copia PARA a original.
       // Cartoes antigos ligados direto na original (synced) so ganham o "parar".
-      if (src && synced) items.push(btn('refresh', 'Parar de sincronizar com a original', () => patchBlock(one.id, b => ({...b, data: {...b.data, synced: false, page_id: b.data?.copy_id}}), 'board-sync'), true, false, 'board-sync'));
-      if (src && !synced && p.pushToOriginal) items.push(btn('refresh', 'Sincronizar: levar as mudanças desta cópia para a página original', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (!cp) return;
-        appAlert('Sincronizar com a original?', 'O conteúdo desta cópia vai substituir o conteúdo de "' + (src.title || 'Sem título') + '". A versão anterior da original fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sincronizar', onPress: () => void track('sincronizar-original', () => p.pushToOriginal!(cp, src)).catch(e => fail(String(e?.message || e)))}]);}, false, false, 'board-sync'));
-      // 08/11 (Pedro: "um botao pra tornar essa copia o conteudo original e ai eles mudam sincronizando e deixa de ser copia")
-      if (src && !synced && p.pushToOriginal) items.push(btn('book', 'Tornar a original: o conteúdo desta cópia vira o da original e o cartão passa a ser a própria original (sempre sincronizado)', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (!cp) return;
-        appAlert('Tornar a original?', 'O conteúdo desta cópia vai substituir o de "' + (src.title || 'Sem título') + '" e o cartão passa a mostrar a própria original: o que mudar aqui muda lá. A versão anterior fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tornar a original', onPress: () => void track('tornar-original', () => p.pushToOriginal!(cp, src, true)).then(() => p.edit(bs => bs.map(b => b.id === one.id ? {...b, data: {...b.data, synced: true, page_id: b.data?.source_id}}
-          // 09/11/2026 (Pedro: "se eu clicar nelas para virar clone... todo o conteudo interno delas"): as janelas de anexo abertas deste cartao
-          // passam a ser da original e ficam sempre sincronizadas (os blocos e anexos da original sao os mesmos da copia)
-          : String(b.data?.from_page || '') && String(b.data?.from_page) === String(one.data?.copy_id || '') ? {...b, data: {...b.data, from_page: one.data?.source_id, live: true}} : b), 'board-sync')).catch(e => fail(String(e?.message || e)))}]);}, false, false, 'board-make-original'));
+      if (src && synced) items.push(btn('refresh', 'Parar de sincronizar com a original', () => cardAction(one, 'stop'), true, false, 'board-sync'));
+      if (src && !synced && p.pushToOriginal) items.push(btn('refresh', 'Sincronizar: levar as mudanças desta cópia para a página original', () => cardAction(one, 'sync'), false, false, 'board-sync'));
+      if (src && !synced && p.pushToOriginal) items.push(btn('book', 'Tornar a original: o conteúdo desta cópia vira o da original e o cartão passa a ser a própria original (sempre sincronizado)', () => cardAction(one, 'original'), false, false, 'board-make-original'));
       if (src && !synced) items.push(btn('download', 'Trazer para a cópia o que está na original agora', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (cp) void track('atualizar-copia', () => p.copyInto(cp, src)).catch(e => fail(String(e?.message || e)));}));
       items.push(btn(one.data?.view === 'list' ? 'book' : 'listView', one.data?.view === 'list' ? 'Mostrar a página de verdade (editar aqui)' : 'Mostrar só o resumo (arquivos em lista)', () => setPageView(one, one.data?.view === 'list' ? 'page' : 'list'), one.data?.view === 'list', false, 'board-page-view'));
       items.push(btn('external', 'Abrir a página inteira', () => {const t = p.pages.find(x => x.id === String(one.data?.page_id || '')); if (t) p.onOpenPage(t);}));}
@@ -502,7 +507,7 @@ export function PageBoard(p: Props) {
       guides.x != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', left: guides.x, top: -100000, width: 1 / view.z, height: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
-        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onPageView={(v: any) => setPageView(b, v)} onUseHere={() => usePageHere(b)} onDup={() => void duplicate([b.id])} onRemove={() => remove([b.id])} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
+        onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onPageView={(v: any) => setPageView(b, v)} onUseHere={() => usePageHere(b)} onDup={() => void duplicate([b.id])} onRemove={() => remove([b.id])} onCard={(k: 'sync' | 'original' | 'stop') => cardAction(b, k)} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
         onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush(); if (b.type === 'page_link' && b.data?.page_id) p.onPageChanged?.(String(b.data.page_id));}} />),
       box ? h('div', {style: {position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, border: '1px solid ' + c.accent, background: c.accent + '22', pointerEvents: 'none'}}) : null),
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
@@ -575,7 +580,7 @@ export function PageBoard(p: Props) {
     picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await track('copiar-pagina', () => p.copyPage(src)); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {fail(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
-function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove}: any) {
+function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove, onCard}: any) {
   // 08/11/2026 (Pedro: "eu digito, ele salva e da um pulo nos conteudos"): o salvamento automatico cria um anexo novo e antes o
   // editor recebia esse anexo e recarregava inteiro (pulo). O editor fica com o arquivo de quando abriu e so grava por tras.
   const editBase = useRef(''); if (b.type === 'file' && !editBase.current && b.data?.attachment_id) editBase.current = String(b.data.attachment_id);
@@ -595,24 +600,15 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
           // o original e o anexo que esta AGORA no bloco da pagina (serve tambem para janelas abertas antes desta versao)
           let orig = String(b.data?.orig_attachment || ''); try {const pg = pages.find((x: Entity) => x.id === fp), bs = JSON.parse(String(pg?.data?.blocks_json || '[]')); const blk = (Array.isArray(bs) ? bs : []).find((x: any) => String(x?.id) === fb); if (blk?.data?.attachment_id) orig = String(blk.data.attachment_id);} catch {}
           const same = !!orig && cur === orig;
-          // 09/11/2026 (Pedro: "um botao pra tornar essas janelas uma versao nao copia"): janela "original" = cada salvar vai direto para o anexo da pagina
-          const toPage = (id: string) => patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: id, name: b.data?.name, mime: b.data?.mime, size: b.data?.size}})).then(() => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), orig_attachment: id}})));
-          const pill = {borderRadius: 7, padding: '3px 9px', fontWeight: 700, whiteSpace: 'nowrap'} as any;
-          if (b.data?.live) return h('span', {style: {display: 'inline-flex', gap: 6, alignItems: 'center'}},
-            h('span', {'data-testid': 'board-file-live', title: 'Esta janela é o próprio anexo da página: cada salvamento já vai para lá', style: {...pill, border: '1px solid ' + c.accent, color: c.accent}}, 'Original · sempre sincronizado'),
-            h('button', {type: 'button', 'data-testid': 'board-file-unlive', title: 'Voltar a ser cópia: as mudanças só vão para a página quando você sincronizar', onPointerDown: (e: any) => e.stopPropagation(), onClick: () => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), live: false}})), style: {...pill, border: '1px solid ' + c.line, background: 'transparent', color: c.muted, cursor: 'pointer'}}, 'Parar'));
-          return h('span', {style: {display: 'inline-flex', gap: 6, alignItems: 'center'}},
-           h('button', {type: 'button', 'data-testid': 'board-file-make-original', title: 'Tornar a original: leva esta versão para o anexo da página e, daqui em diante, cada salvamento vai direto para lá', onPointerDown: (e: any) => e.stopPropagation(),
-            onClick: () => appAlert('Tornar a original?', 'Esta janela vira o próprio anexo da página: a versão daqui substitui a da página agora e cada salvamento passa a ir direto para lá.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tornar a original', onPress: () => void (same ? Promise.resolve() : toPage(cur)).then(() => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), live: true, orig_attachment: cur}}))).catch(() => undefined)}]),
-            style: {...pill, border: '1px solid ' + c.accent, background: c.accent, color: c.onAccent, cursor: 'pointer'}}, 'Tornar a original'),
-           h('button', {type: 'button', 'data-testid': 'board-file-sync', disabled: same, title: same ? 'O anexo da página já está igual a esta janela' : 'Levar estas mudanças para o anexo original da página', onPointerDown: (e: any) => e.stopPropagation(),
-            onClick: () => {if (same) return; void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: cur, name: b.data?.name, mime: b.data?.mime, size: b.data?.size}})).then(() => onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), orig_attachment: cur}}))).catch(() => undefined);},
-            style: {border: '1px solid ' + (same ? c.line : c.accent), background: 'transparent', color: same ? c.muted : c.accent, borderRadius: 7, padding: '3px 9px', fontWeight: 700, cursor: same ? 'default' : 'pointer', whiteSpace: 'nowrap'}}, same ? 'Sincronizado com o original' : 'Sincronizar com o original'));})(),
+          // 09/11/2026 (Pedro: "esses dois esta ligado a janela mae... nao tem que ter opcao de sincronizar com o original, apenas a janela mae"):
+          // a janela de anexo e filha do cartao da pagina: cada salvar vai direto para o anexo da pagina-mae; quem sincroniza com a original e a mae
+          void same; const mom = pages.find((x: Entity) => x.id === fp);
+          return h('span', {'data-testid': 'board-file-linked', title: 'Cada salvamento vai direto para a página "' + (mom?.title || '') + '". Para levar à original, use Sincronizar ou Tornar a original no cartão da página.', style: {border: '1px solid ' + c.line, color: c.muted, borderRadius: 7, padding: '3px 9px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis'}}, 'Ligada a: ' + (mom?.title || 'página'));})(),
         h('button', {type: 'button', 'data-testid': 'board-file-done', title: isWin(b) ? 'Fechar a janela (o arquivo fica no quadro como anexo; dois cliques abre de novo)' : undefined, onPointerDown: (e: any) => e.stopPropagation(), onClick: () => {if (isWin(b)) onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), window: false, board: {...(x.data?.board || {}), w: 280, h: 64}}})); onDone();}, style: {border: 0, background: c.accent, color: c.onAccent, borderRadius: 7, padding: '4px 10px', fontWeight: 700, cursor: 'pointer'}}, 'Pronto')),
       h('div', {style: {flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column'}}, <FileBody api={api} id={String(b.data.attachment_id)} firstId={editBase.current || String(b.data.attachment_id)} name={String(b.data?.name || '')} mime={String(b.data?.mime || '')} zoom={0} onZoom={() => {}} pageId={pageId}
-        onSaved={(a: any) => {onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes, ...(x.data?.live ? {orig_attachment: a.id} : {})}}));
+        onSaved={(a: any) => {onChange((x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes, ...(x.data?.from_page ? {orig_attachment: a.id} : {})}}));
           // janela "original": o salvamento ja vai para o anexo da pagina (sem precisar de Sincronizar)
-          const fp = String(b.data?.from_page || ''), fb = String(b.data?.from_block || '');if (b.data?.live && fp && fb && patchPageBlock) void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}})).catch(() => undefined);}} />)); // 08/11 (Pedro): salvar fica so na janela; o anexo da pagina so muda com Sincronizar
+          const fp = String(b.data?.from_page || ''), fb = String(b.data?.from_block || '');if (fp && fb && patchPageBlock) void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}})).catch(() => undefined);}} />)); // 08/11 (Pedro): salvar fica so na janela; o anexo da pagina so muda com Sincronizar
     else if (preview && !light) body = h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: k === 'audio' ? c.surface : '#000', display: 'flex', alignItems: 'center'}},
       h('div', {style: {width: '100%', height: k === 'audio' ? 'auto' : '100%', pointerEvents: selected ? 'auto' : 'none'}, className: 'board-media'}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind={k} name={String(b.data?.name || '')} />));
     else {const meta = (KIND as any)[k] || KIND.other; body = h('div', {style: {width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', boxSizing: 'border-box', background: c.surface, border: '1px solid ' + c.line, borderRadius: 12, overflow: 'hidden'}},
@@ -620,7 +616,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
         h('div', {style: {color: c.muted, fontSize: 11}}, [String(b.data?.name || '').split('.').pop()?.toUpperCase(), sizeLabel(b.data?.size), editKind(b.data?.mime, b.data?.name) ? 'editável' : ''].filter(Boolean).join(' · '))));}
   }
-  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} tools={{onView: onPageView, onUse: onUseHere, onDup, onRemove}} />;
+  else if (b.type === 'page_link') body = <PageCard b={b} g={g} pages={pages} editing={editing} light={zoom < 0.15} onDone={onDone} api={api} selected={selected} patchPageBlock={patchPageBlock} tools={{onView: onPageView, onUse: onUseHere, onDup, onRemove, onCard}} />;
   else if (b.type === 'bookmark' && b.data?.link) {const L = b.data.link; body = h('div', {style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.surface, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column'}},
     L.image && !light ? h('div', {style: {flex: 1, minHeight: 0, backgroundColor: c.input, backgroundImage: 'url("' + String(L.image).replace(/["\\)]/g, '') + '")', backgroundSize: 'cover', backgroundPosition: 'center'}}) : null,
     h('div', {style: {padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3}}, h('span', {style: {color: c.text, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, L.title || L.url),
@@ -677,13 +673,22 @@ function ListCard({b, editing, onChange}: any) {
 // Qualidade: a pagina e desenhada no tamanho real do cartao (antes era desenhada a 980 px e encolhida com zoom, e o navegador
 // passava a desenhar o conteudo - PDF, fotos - com 35% da resolucao). Muito afastado (zoom < 15%) ou trancada: so o resumo.
 export const pageView = (b: PageBlock): 'attach' | 'list' | 'page' => b.data?.view === 'attach' ? 'attach' : b.data?.view === 'list' ? 'list' : 'page';
-type PageTools = {onView: (v: 'attach' | 'page') => void; onUse: () => void; onDup: () => void; onRemove: () => void};
+type PageTools = {onView: (v: 'attach' | 'page') => void; onUse: () => void; onDup: () => void; onRemove: () => void; onCard?: (k: 'sync' | 'original' | 'stop') => void};
 type PageCardProps = {b: PageBlock; g: Geo; pages: Entity[]; editing: boolean; light: boolean; onDone: () => void; api: SofiaApi; selected: boolean; patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>; tools?: PageTools};
 function PageCard(props: PageCardProps) {
   const v = pageView(props.b);
   return v === 'attach' ? <PageAttachCard {...props} /> : v === 'list' ? <PageListCard {...props} /> : <PageFrameCard {...props} />;
 }
 // a mesma barra do arquivo na pagina: Anexo | Visualizacao, usar aqui (editar), duplicar, remover
+/** Botoes de sincronia no cabecalho do cartao-mae: copia -> Sincronizar | Tornar a original; sincronizada -> Parar. */
+function CardSyncButtons({synced, copy, tools}: {synced: boolean; copy: boolean; tools?: PageTools}) {
+  const c = useTheme(); if (!tools?.onCard || (!synced && !copy)) return null;
+  const b = (label: string, title: string, k: 'sync' | 'original' | 'stop', strong = false) => h('button', {key: k, type: 'button', title, 'aria-label': title, 'data-testid': 'page-card-' + k, 'data-board-ui': '1',
+    onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); tools.onCard!(k);},
+    style: {height: 24, padding: '0 8px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', border: '1px solid ' + c.accent, background: strong ? c.accent : 'transparent', color: strong ? c.onAccent : c.accent}}, label);
+  return h('span', {style: {display: 'inline-flex', gap: 4, flexShrink: 0}},
+    synced ? b('Parar', 'Parar de sincronizar: o cartão volta a ser uma cópia', 'stop') : [b('Sincronizar', 'Levar as mudanças desta cópia (e dos anexos abertos dela) para a página original', 'sync'), b('Tornar a original', 'O conteúdo desta cópia vira o da original e o cartão passa a ser a própria original (sempre sincronizado)', 'original', true)]);
+}
 function PageHeadTools({view, tools, editing}: {view: 'attach' | 'list' | 'page'; tools?: PageTools; editing: boolean}) {
   const c = useTheme(); if (!tools) return null;
   const stop = (e: any) => e.stopPropagation();
@@ -748,6 +753,7 @@ function PageListCard({b, pages, api, selected, editing, patchPageBlock, tools}:
     h('div', {style: {height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid ' + c.line}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
       synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,
+      <CardSyncButtons synced={synced} copy={copy} tools={tools} />,
       selected ? <PageHeadTools view="list" tools={tools} editing={editing} /> : null),
     h('div', {'data-board-scroll': selected ? 'on' : 'off', style: {flex: 1, minHeight: 0, overflowY: selected ? 'auto' : 'hidden', padding: 12, display: 'flex', flexDirection: 'column', gap: 8}},
       lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : !t ? null : blocks.map(row).filter(Boolean).length ? blocks.map(row) : h('span', {style: {color: c.muted, fontSize: 12}}, 'Página vazia')));
@@ -764,6 +770,7 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
     h('div', {'data-board-handle': '1', style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 12px', borderBottom: '1px solid ' + c.line, background: c.surface, cursor: 'grab'}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
       synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,
+      <CardSyncButtons synced={synced} copy={copy} tools={tools} />,
       selected || editing ? <PageHeadTools view="page" tools={tools} editing={editing} /> : null,
       editing ? h('button', {type: 'button', 'data-testid': 'board-page-done', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); onDone();}, style: {border: 0, borderRadius: 7, padding: '4px 10px', background: c.accent, color: c.onAccent, fontWeight: 700, fontSize: 12, cursor: 'pointer'}}, 'Pronto') : null),
     h('div', {style: {flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden'}},

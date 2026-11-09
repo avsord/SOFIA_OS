@@ -335,10 +335,15 @@ test('09/11: colar de documento claro tira o fundo branco e a letra preta/branca
  const r=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');
  assert.match(r,/colorTone\(st\.backgroundColor\)>0\.92\)st\.backgroundColor=''/);assert.match(r,/if\(st\.color&&neutralInk\(st\.color\)\)st\.color=''/);
 });
-test('09/11: Quadro - janela de anexo vira a original (salvar vai direto para a pagina) e o cartao leva as janelas dele',()=>{
+test('09/11: Quadro - janela de anexo e filha do cartao: salvar vai para a pagina-mae; sincronia so no cartao (cabecalho e barra)',()=>{
  const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');
- assert.match(b,/board-file-make-original/);assert.match(b,/board-file-live/);assert.match(b,/if \(b\.data\?\.live && fp && fb && patchPageBlock\)/);
+ assert.match(b,/board-file-linked/);assert.doesNotMatch(b,/'data-testid': 'board-file-sync'/);assert.doesNotMatch(b,/board-file-make-original/);
+ assert.match(b,/if \(fp && fb && patchPageBlock\) void patchPageBlock\(fp, fb/);
+ assert.match(b,/function CardSyncButtons/);assert.match(b,/<CardSyncButtons synced=\{synced\} copy=\{copy\} tools=\{tools\} \/>/);
  assert.match(b,/String\(b\.data\?\.from_page\) === String\(one\.data\?\.copy_id \|\| ''\) \? \{\.\.\.b, data: \{\.\.\.b\.data, from_page: one\.data\?\.source_id, live: true\}\}/);
+});
+test('09/11: negrito + italico - o arquivo italico vale so ate o peso 550 (no negrito o navegador engrossa)',()=>{
+ const h=fs.readFileSync(path.join(__dirname,'..','public/index.html'),'utf8');assert.doesNotMatch(h,/SofiaSans-Italic\.woff2'\) format\('woff2'\);font-weight:100 900/);assert.match(h,/SofiaSans-Italic\.woff2'\) format\('woff2'\);font-weight:100 550;font-style:italic/);
 });
 test('09/11: colar tabela vira bloco de tabela com as mesmas linhas e colunas (site edita, app mostra texto)',()=>{
  const t=fs.readFileSync(path.join(__dirname,'..','src/components/PageTable.web.tsx'),'utf8');assert.match(t,/export function tableFromHtml/);assert.match(t,/export function tableFromText/);assert.match(t,/'\+ Linha'/);
