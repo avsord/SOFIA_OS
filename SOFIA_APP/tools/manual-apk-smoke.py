@@ -86,6 +86,20 @@ def tap_label(tree,label):
 result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'previous_105_runs':[],'previous_106_runs':[],'candidate_runs':[]}
 try:
  for name in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',name,'1')
+ # 09/11/2026: depois das 19h o Inicio troca "Voce tem N compromissos hoje" por "Como foi o dia?" (HomeDeskCards.daySentence) e o
+ # teste "agenda salva aparece na abertura" falhava so pela hora em que o CI rodava (19:25 e 19:40 UTC). O fuso do emulador e fixado
+ # antes da semente para a hora local ficar perto do meio-dia; o teste continua medindo a agenda salva, nao o relogio.
+ import datetime
+ utc_h=datetime.datetime.now(datetime.timezone.utc).hour;off=12-utc_h
+ if off>14:off-=24
+ if off<-12:off+=24
+ tz='Etc/GMT' if off==0 else 'Etc/GMT'+('-' if off>0 else '+')+str(abs(off))
+ for cmd in (['shell','cmd','alarm','set-timezone',tz],['shell','service','call','alarm','3','s16',tz],['shell','setprop','persist.sys.timezone',tz]):
+  try:adb(*cmd)
+  except Exception:pass
+ try:local_h=adb('shell','date','+%H').decode().strip()
+ except Exception:local_h='?'
+ print('SOFIA_TZ '+json.dumps({'utc_hour':utc_h,'timezone':tz,'device_hour':local_h}),flush=True)
  # 07/11/2026: a semente antiga (seed-060, artefato de 30 dias) expirou. A semente agora e compilada a cada rodada a partir
  # do App de verdade com transporte sintetico, com versionCode abaixo da versao publicada: o caminho e o de quem atualiza
  # (semente -> versao publicada -> candidato), sempre subindo de versao.
