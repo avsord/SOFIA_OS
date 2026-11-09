@@ -227,6 +227,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // recarregada sem ela por um instante), ela reabre sozinha; removida de verdade mostra um aviso, nunca a lista.
  const EMBED_ID=EMBED&&typeof location!=='undefined'?decodeURIComponent(location.pathname.split('/')[2]||''):'';
  const [embedGone,setEmbedGone]=useState(false),embedFetch=useRef(false);
+ // 09/11/2026 (Pedro: "quando saio da pagina e entro de novo as janelas piscam duas vezes e aparece a janela de inicio dentro delas"):
+ // dentro do cartao do Quadro, avisa o quadro so quando ESTA pagina ja esta desenhada (antes o cartao aparecia no fim do download do
+ // site, ainda com o Inicio montando por baixo)
+ const embedReadySent=useRef(false),embedShown=!!EMBED_ID&&!!entry&&selectedId===EMBED_ID;
+ useEffect(()=>{if(!embedShown||embedReadySent.current||typeof window==='undefined'||window.parent===window)return;embedReadySent.current=true;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.parent.postMessage({sofia:'board-embed-ready',id:EMBED_ID},location.origin);}catch{/* fora do quadro */}}));},[embedShown]);
  useEffect(()=>{if(!EMBED_ID||!ready||selectedId)return;const pg=byId.get(EMBED_ID);if(pg){if(pg.state!=='archived'){setEmbedGone(false);history.current=[];open(pg,false);}else setEmbedGone(true);return;}
   if(embedFetch.current)return;embedFetch.current=true;void api.entity(EMBED_ID).then((e:any)=>{embedFetch.current=false;if(e&&e.id===EMBED_ID&&e.state!=='archived')setPages(old=>old.some(x=>x.id===e.id)?old.map(x=>x.id===e.id?e:x):[...old,e]);else setEmbedGone(true);}).catch(()=>{embedFetch.current=false;setEmbedGone(true);});},[ready,selectedId,byId]); // eslint-disable-line react-hooks/exhaustive-deps
  const handledCreate=useRef(0);

@@ -763,8 +763,12 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
   const c = useTheme(), id = String(b.data?.page_id || ''), t = pages.find(x => x.id === id), synced = !!b.data?.synced, copy = !!b.data?.source_id && !synced, [loaded, setLoaded] = useState(false);
   let lines: string[] = [];
   if (t) {try {const bs = JSON.parse(String(t.data?.blocks_json || '[]')); lines = (Array.isArray(bs) ? bs : []).map((x: any) => String(x.text || x.data?.name || '').trim()).filter(Boolean).slice(0, 10);} catch {}}
-  const lockedPage = !!t?.data?.lock_json, live = !!t && !lockedPage && (!light || editing), head = 40;
+  // 09/11/2026 (Pedro: "aquela janela da esquerda de longe fica apagada sem nada"): pagina ja aberta no cartao continua aberta ao afastar o zoom
+  const lockedPage = !!t?.data?.lock_json, live = !!t && !lockedPage && (!light || editing || loaded), head = 40, frame = useRef<HTMLIFrameElement | null>(null);
   useEffect(() => {if (!live) setLoaded(false);}, [live]);
+  // so mostra a pagina quando ELA avisa que esta desenhada (board-embed-ready); 8 s sem aviso: mostra assim mesmo
+  useEffect(() => {if (!live || loaded) return; const on = (e: MessageEvent) => {if (e.origin === location.origin && e.data?.sofia === 'board-embed-ready' && e.source === frame.current?.contentWindow) setLoaded(true);};
+    window.addEventListener('message', on); const t2 = setTimeout(() => setLoaded(true), 8000); return () => {window.removeEventListener('message', on); clearTimeout(t2);};}, [live, loaded, id]);
   useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onDone();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
   return h('div', {'data-board-editing': editing ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column', position: 'relative'}},
     h('div', {'data-board-handle': '1', style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 12px', borderBottom: '1px solid ' + c.line, background: c.surface, cursor: 'grab'}}, <Icon name="book" size={15} color={c.accent} />,
@@ -775,9 +779,9 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
       editing ? h('button', {type: 'button', 'data-testid': 'board-page-done', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); onDone();}, style: {border: 0, borderRadius: 7, padding: '4px 10px', background: c.accent, color: c.onAccent, fontWeight: 700, fontSize: 12, cursor: 'pointer'}}, 'Pronto') : null),
     h('div', {style: {flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden'}},
       !loaded || !live ? h('div', {style: {position: 'absolute', inset: 0, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, overflow: 'hidden'}},
-        lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, live ? 'Abrindo a página…' : 'Página vazia')) : null,
-      live ? h('iframe', {key: id, src: '/paginas/' + encodeURIComponent(id) + '?embed=1', title: 'Página ' + (t?.title || ''), 'data-testid': 'board-page-frame', onLoad: () => setLoaded(true),
-        style: {position: 'absolute', left: 0, top: 0, border: 0, width: '100%', height: '100%', opacity: loaded ? 1 : 0, pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
+        lockedPage ? h('span', {style: {color: c.muted, fontSize: 12}}, 'Página trancada — dois cliques abre com a senha') : t ? [h('div', {key: 'title', style: {color: c.text, fontSize: 28, fontWeight: 700, margin: '18px 0 6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t.title || 'Sem título'), ...lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l))] : lines.length ? lines.map((l, i) => h('span', {key: i, style: {color: c.text, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, l)) : h('span', {style: {color: c.muted, fontSize: 12}}, live ? 'Abrindo a página…' : 'Página vazia')) : null,
+      live ? h('iframe', {key: id, ref: frame, src: '/paginas/' + encodeURIComponent(id) + '?embed=1', title: 'Página ' + (t?.title || ''), 'data-testid': 'board-page-frame',
+        style: {position: 'absolute', left: 0, top: 0, border: 0, width: '100%', height: '100%', opacity: loaded ? 1 : 0, transition: 'opacity .18s ease-out', pointerEvents: editing ? 'auto' : 'none', background: c.bg}}) : null),
     !editing && live ? h('div', {style: {position: 'absolute', right: 10, bottom: 8, padding: '2px 8px', borderRadius: 6, background: c.surface + 'e6', color: c.muted, fontSize: 11, pointerEvents: 'none'}}, 'Um clique: usar a página aqui · arraste pelo título') : null);
 }
 

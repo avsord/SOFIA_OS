@@ -12,3 +12,4 @@
 | 2026-11-09 | (delivery) | Quadro: janelas de anexo seguem o cartão-mãe (sincronia só no cartão, botões no cabeçalho); negrito + itálico volta a funcionar | tsc/npm test ok, site recompilado; negrito-itálico conferido no navegador |
 | 2026-11-09 | (delivery) | Lembrete que se repete: mudar nome/data pergunta Só este / Todos | tsc/npm test ok, site recompilado |
 | 2026-11-09 | (delivery) | Agenda/leituras: conexão que cai no meio da resposta não mostra mais "não retornou dados válidos"; a leitura repete sozinha | tsc/npm test ok, site recompilado |
+| 2026-11-09 | (delivery) | Quadro: cartão de página só aparece com a página desenhada (sem piscar nem mostrar o Início); de longe continua aberto | tsc/npm test ok, site recompilado; aviso de pronta conferido no navegador |

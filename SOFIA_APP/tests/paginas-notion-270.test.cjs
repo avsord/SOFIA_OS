@@ -359,3 +359,8 @@ test('09/11: lembrete que se repete - mudar nome/data pergunta so este ou todos;
  const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');
  assert.match(s,/appAlert\('Mudar só este lembrete ou todos\?'/);assert.match(s,/async function saveOnce\(orig:Entity\)/);assert.match(s,/tags:agendaTags\(withGroup\(editing\.tags\|\|\[\],''\),'none'\)/);
 });
+test('09/11: cartao de pagina do Quadro so aparece quando a pagina avisa que esta desenhada; continua aberto ao afastar o zoom',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/sofia:'board-embed-ready',id:EMBED_ID/);
+ const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');assert.match(b,/e\.data\?\.sofia === 'board-embed-ready' && e\.source === frame\.current\?\.contentWindow/);
+ assert.match(b,/live = !!t && !lockedPage && \(!light \|\| editing \|\| loaded\)/);assert.doesNotMatch(b,/'board-page-frame', onLoad: \(\) => setLoaded\(true\)/);
+});
