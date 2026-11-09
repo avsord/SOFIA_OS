@@ -46,6 +46,22 @@ const EARLY_PATHS_KEY = 'sofia.early.paths.v1';
 let earlyPaths: Set<string> | null = typeof document !== 'undefined' ? new Set() : null;
 function noteEarlyPath(path: string) { if (earlyPaths && earlyPaths.size < 40 && !/[?&]q=[^&]/.test(path) && !path.startsWith('/auth')) earlyPaths.add(path); }
 export function saveEarlyPaths() { if (!earlyPaths) return; const list = [...earlyPaths]; earlyPaths = null; try { if (list.length) localStorage.setItem(EARLY_PATHS_KEY, JSON.stringify(list)); } catch { /* modo privado */ } }
+/** 09/11/2026 (Pedro: "depois do login ja entra tudo de uma vez"): logo depois do login no site, pede de uma vez as leituras que o
+ * Inicio fez da ultima vez (a mesma lista que public/assets/early.js usa numa abertura normal). Antes saiam em ondas, uma esperando a outra.
+ * Resposta nao usada em 20 s e descartada (nunca entrega um dado velho mais tarde). */
+export function primeEarlyAfterLogin(token: string) {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !token) return;
+  const w = window as any; w.__sofiaLoginAt = Date.now();
+  if (window.innerWidth < 900 || typeof fetch !== 'function') return;
+  const paths = ['/workspace/entities?limit=100&kind=user_page&q=&offset=0', '/md/capabilities', '/profile/photo'];
+  try { const saved = JSON.parse(localStorage.getItem(EARLY_PATHS_KEY) || '[]'); if (Array.isArray(saved)) saved.slice(0, 40).forEach((x: unknown) => { if (typeof x === 'string' && x.charAt(0) === '/' && !paths.includes(x)) paths.push(x); }); } catch { /* modo privado */ }
+  const early: Record<string, Promise<unknown> | undefined> = w.__sofiaEarly = w.__sofiaEarly || {};
+  for (const path of paths) {
+    if (early[path]) continue;
+    const req = early[path] = fetch(SITE + '/api/mobile' + path, {headers: {Accept: 'application/json', Authorization: 'Bearer ' + token}, redirect: 'error'}).then(r => r.ok ? r.json() : null).catch(() => null);
+    setTimeout(() => { if (early[path] === req) delete early[path]; }, 20000);
+  }
+}
 // sem importar react-native aqui (os testes carregam este arquivo sozinho): no site existe document
 const isWebRuntime = () => typeof document !== 'undefined';
 export const SITE = rawBase;

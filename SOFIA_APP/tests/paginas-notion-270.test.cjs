@@ -280,7 +280,13 @@ test('proximos eventos na lateral usam a cor da importancia (como a Agenda)',()=
  const s=fs.readFileSync(path.join(__dirname,'..','src/desktop/DesktopShell.tsx'),'utf8');assert.match(s,/color:agendaPriority\(it as any\)\.color\|\|''/);assert.match(s,/backgroundColor:\(it as any\)\.color\|\|c\.accent/);
 });
 test('pagina: marca-texto como no Kindle (4 cores e tirar) na barra de formatacao',()=>{
- const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/page-highlight-row/);assert.match(s,/Marcar em /);assert.match(s,/fmt\('hiliteColor','transparent'\)/);
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/page-highlight-row/);assert.match(s,/Marcar em /);assert.match(s,/fmt\('unmark'\)/);assert.match(s,/execCommand\('hiliteColor',false,'transparent'\)/);
+ // 09/11/2026: tirar a marcacao tambem limpa a cor neutra colada (preto/branco) - senao a letra preta some no tema escuro
+ assert.match(s,/neutralInk\(el\.style\.color\)/);
+});
+test('pagina: barra com cor e tamanho do texto a um clique, tamanho guardado so nos 4 tamanhos',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/page-color-row/);assert.match(s,/page-size-row/);assert.match(s,/fmt\('fontSize',v\)/);
+ const r=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');assert.match(r,/SAFE_SIZE=\/\^\(0\\\.85\|1\\\.25\|1\\\.5\|2\)em\$\//);assert.match(r,/if\(tag==='SPAN'\)\{const fs=/);
 });
 test('tablet Android: app mostra o proprio site, entrega a sessao do app e mantem os avisos',()=>{
  const T=load('src/components/TabletSite.tsx',{react:{useEffect(){},useRef:()=>({current:null}),useState:v=>[v,()=>{}]},'react-native':{},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib/theme':{useTheme:()=>({})}},{process:{env:{}}});

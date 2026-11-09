@@ -390,8 +390,21 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function restoreBarRange(){const d=(globalThis as any).document,r=barRange.current;if(!d||!r)return;const sel=d.getSelection();sel.removeAllRanges();sel.addRange(r);}
  function fmt(cmd:string,value?:string){const d=(globalThis as any).document;if(!d)return;restoreBarRange();if(cmd==='foreColor'||cmd==='hiliteColor')d.execCommand('styleWithCSS',false,true);
   if(cmd==='code'){const t=d.getSelection()?.toString()||'';if(t)d.execCommand('insertHTML',false,'<code>'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</code>');}
-  else if(cmd==='clear'){d.execCommand('removeFormat');d.execCommand('unlink');}else d.execCommand(cmd,false,value);
+  else if(cmd==='clear'){d.execCommand('removeFormat');d.execCommand('unlink');}
+  // 09/11/2026 (Pedro: "editor mais completo, com cor de texto, tamanho"): o navegador so sabe por <font size>; troca por <span style="font-size"> (a unica forma que a pagina guarda)
+  else if(cmd==='fontSize'){const node:any=d.getSelection()?.anchorNode,root:any=(node?.nodeType===1?node:node?.parentElement)?.closest?.('[contenteditable="true"]');if(!root)return;d.execCommand('styleWithCSS',false,false);d.execCommand('fontSize',false,'7');
+   const made:any[]=[];root.querySelectorAll('font[size="7"]').forEach((f:any)=>{const sp=d.createElement('span');while(f.firstChild)sp.appendChild(f.firstChild);sp.querySelectorAll('span').forEach((x:any)=>{x.style.fontSize='';});if(value)sp.style.fontSize=value;f.replaceWith(sp);made.push(sp);});
+   if(made.length){const r=d.createRange();r.setStartBefore(made[0]);r.setEndAfter(made[made.length-1]);const sel=d.getSelection();sel?.removeAllRanges();sel?.addRange(r);root.dispatchEvent(new Event('input',{bubbles:true}));}}
+  // 09/11/2026 (Pedro: "tirei o grifo e sair a cor do texto"): texto colado de documento branco vem com letra preta + fundo branco; tirar so o
+  // fundo deixava a letra preta invisivel no tema escuro. Tirar marcacao limpa o fundo e a cor neutra colada (preto/branco); cor escolhida fica
+  else if(cmd==='unmark'){const sel0=d.getSelection(),node:any=sel0?.anchorNode,root:any=(node?.nodeType===1?node:node?.parentElement)?.closest?.('[contenteditable="true"]');if(!root||!sel0?.rangeCount)return;d.execCommand('styleWithCSS',false,true);d.execCommand('hiliteColor',false,'transparent');
+   const range=d.getSelection()?.rangeCount?d.getSelection().getRangeAt(0):sel0.getRangeAt(0);
+   root.querySelectorAll('[style]').forEach((el:any)=>{if(!range.intersectsNode(el))return;if(el.style.backgroundColor)el.style.backgroundColor='';if(neutralInk(el.style.color))el.style.color='';if(!el.getAttribute('style'))el.removeAttribute('style');});
+   root.dispatchEvent(new Event('input',{bubbles:true}));}
+  else d.execCommand(cmd,false,value);
   const sel=d.getSelection();if(sel?.rangeCount)barRange.current=sel.getRangeAt(0).cloneRange();setBarMenu(null);}
+ /** Cor de letra "neutra" (quase preta ou quase branca), a que vem colada de outro documento. */
+ const neutralInk=(v:string)=>{const t=String(v||'').trim().toLowerCase();if(!t)return false;if(t==='black'||t==='white'||t==='windowtext')return true;let r=-1,g=0,b=0;const m=t.match(/^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/),h=t.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);if(m){r=+m[1];g=+m[2];b=+m[3];}else if(h){const x=h[1].length===3?h[1].split('').map(c=>c+c).join(''):h[1];r=parseInt(x.slice(0,2),16);g=parseInt(x.slice(2,4),16);b=parseInt(x.slice(4,6),16);}if(r<0)return false;const l=(0.299*r+0.587*g+0.114*b)/255;return l<0.2||l>0.85;};
  const COLORS:[string,string,string][]=[['Padrão','',''],['Cinza','#9B9A97','rgba(155,154,151,.22)'],['Marrom','#BA856F','rgba(186,133,111,.22)'],['Laranja','#E5873A','rgba(229,135,58,.22)'],['Amarelo','#DFAB01','rgba(223,171,1,.22)'],['Verde','#4DAB9A','rgba(77,171,154,.22)'],['Azul','#529CCA','rgba(82,156,202,.22)'],['Roxo','#9A6DD7','rgba(154,109,215,.22)'],['Rosa','#E255A1','rgba(226,85,161,.22)'],['Vermelho','#FF7369','rgba(255,115,105,.22)']];
  const SKILLS:[string,string][]=[['Melhorar escrita','Reescreva o trecho selecionado melhorando a escrita, no mesmo tom.'],['Revisão','Revise ortografia e gramática do trecho selecionado e devolva o texto corrigido.'],['Explicar','Explique o trecho selecionado de forma simples e curta.'],['Reformatar','Reorganize o trecho selecionado em tópicos claros.']];
  function richBar(){
@@ -416,11 +429,20 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {tool('Link (Ctrl+K)',()=>{setLinkUrl('');setBarMenu(m=>m==='link'?null:'link');},<Icon name="link" size={16} color={c.text}/>,barMenu==='link')}
     {tool('Limpar formatação',()=>fmt('clear'),<Text style={{color:c.text,fontSize:12}}>T<Text style={{fontSize:10}}>x</Text></Text>)}
    </View>
+   {/* 09/11/2026 (Pedro: "editor mais completo, com cor de texto, tamanho"): cor e tamanho a um clique, sem abrir menu */}
+   <View testID="page-color-row" style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:4,paddingHorizontal:6,paddingVertical:4,borderTopWidth:1,borderColor:c.line}}>
+    <Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginRight:2,width:60}}>Cor</Text>
+    {COLORS.map(([name,fg])=><Pressable key={'q'+name} accessibilityRole="button" accessibilityLabel={'Cor do texto: '+name.toLowerCase()} onPress={()=>fmt('foreColor',fg||c.text)} style={({hovered}:any)=>({width:20,height:20,borderRadius:10,backgroundColor:fg||c.text,borderWidth:hovered?2:1,borderColor:hovered?c.text:c.line})}/>)}
+   </View>
+   <View testID="page-size-row" style={{flexDirection:'row',alignItems:'center',gap:4,paddingHorizontal:6,paddingVertical:4,borderTopWidth:1,borderColor:c.line}}>
+    <Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginRight:2,width:60}}>Tamanho</Text>
+    {([['Pequeno','0.85em',12],['Normal','',14],['Grande','1.25em',17],['Maior','1.5em',20],['Enorme','2em',24]] as const).map(([name,v,px])=><Pressable key={name} accessibilityRole="button" accessibilityLabel={'Tamanho do texto: '+name.toLowerCase()} onPress={()=>fmt('fontSize',v)} style={({hovered}:any)=>({minWidth:30,height:28,paddingHorizontal:4,borderRadius:6,alignItems:'center',justifyContent:'center',backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:px,fontWeight:'600',lineHeight:px+4}}>A</Text></Pressable>)}
+   </View>
    {/* 06/11/2026 (Pedro: "marcar igual no Kindle"): marca-texto com um clique - 4 cores e tirar a marca */}
    <View testID="page-highlight-row" style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,paddingVertical:4,borderTopWidth:1,borderColor:c.line}}>
-    <Text style={{color:c.muted,fontSize:11,marginRight:2}}>Marcar</Text>
+    <Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginRight:2,width:60}}>Marcar</Text>
     {([['Amarelo','rgba(250,204,21,.38)'],['Azul','rgba(96,165,250,.38)'],['Rosa','rgba(244,114,182,.38)'],['Laranja','rgba(251,146,60,.38)']] as const).map(([name,bg])=><Pressable key={name} accessibilityRole="button" accessibilityLabel={'Marcar em '+name.toLowerCase()} onPress={()=>fmt('hiliteColor',bg)} style={({hovered}:any)=>({width:22,height:22,borderRadius:11,backgroundColor:bg,borderWidth:hovered?2:1,borderColor:hovered?c.text:c.line})}/>)}
-    <Pressable accessibilityRole="button" accessibilityLabel="Tirar marcação" onPress={()=>fmt('hiliteColor','transparent')} style={({hovered}:any)=>({width:22,height:22,borderRadius:11,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.line:'transparent'})}><Text style={{color:c.muted,fontSize:11}}>✕</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Tirar marcação" onPress={()=>fmt('unmark')} style={({hovered}:any)=>({width:22,height:22,borderRadius:11,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.line,backgroundColor:hovered?c.line:'transparent'})}><Text style={{color:c.muted,fontSize:11}}>✕</Text></Pressable>
    </View>
    {barMenu==='color'?<View style={{borderTopWidth:1,borderColor:c.line,paddingTop:6,gap:4}}>
     <Text style={{color:c.muted,fontSize:11,paddingHorizontal:6}}>Cor do texto</Text>

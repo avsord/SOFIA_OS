@@ -15,6 +15,8 @@ type Props={value:string;html?:string;placeholder?:string;placeholderColor?:stri
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 // 08/11/2026 (Pedro: grifo do Word sumia ao colar): o Word grifa com nome de cor (background:yellow) - nome de cor tambem vale
 const SAFE_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent|[a-z]{3,24})$/i;
+// 09/11/2026 (Pedro: "editor mais completo, com cor de texto, tamanho"): tamanho do texto so nos 4 tamanhos da barra (em, relativo ao bloco)
+export const SAFE_SIZE=/^(0\.85|1\.25|1\.5|2)em$/;
 export function escapeHtml(v:string){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 export function textToHtml(v:string){return escapeHtml(v).replace(/\n/g,'<br>');}
 /** Só marcas de texto conhecidas; links http/https/mailto; cor/fundo como cor simples. Div/p viram quebra de linha. */
@@ -43,6 +45,7 @@ export function sanitizeRich(html:string):string{
   const out=document.createElement(tag==='STRONG'?'b':tag==='EM'?'i':tag==='STRIKE'||tag==='DEL'?'s':tag.toLowerCase());
   if(tag==='A'){const href=String(el.getAttribute('href')||'');if(/^(https?:|mailto:)/i.test(href)){out.setAttribute('href',href);out.setAttribute('target','_blank');out.setAttribute('rel','noopener noreferrer');}}
   if(tag!=='BR'){const color=el.style.color,bg=el.style.backgroundColor;if(color&&SAFE_COLOR.test(color.trim()))(out as HTMLElement).style.color=color;if(bg&&SAFE_COLOR.test(bg.trim()))(out as HTMLElement).style.backgroundColor=bg;}
+  if(tag==='SPAN'){const fs=String(el.style.fontSize||'').trim();if(SAFE_SIZE.test(fs))(out as HTMLElement).style.fontSize=fs;}
   el.childNodes.forEach(c=>out.append(build(c,false)));return out;
  };
  const target=document.createElement('div');src.content.childNodes.forEach((c,i)=>target.append(build(c,i===0)));

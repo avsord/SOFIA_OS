@@ -68,5 +68,5 @@ export async function wipeEncryptedStorage() {
   try {const d = await db(); d?.close();} catch { /* ignore */ }
   dbp = null; keyp = null;
   await new Promise<void>(resolve => {try {const r = indexedDB.deleteDatabase(DB); r.onsuccess = r.onerror = r.onblocked = () => resolve();} catch {resolve();}});
-  try {localStorage.removeItem('sofia.early.paths.v1');} catch { /* ignore */ }
+  // 09/11/2026: a lista de ENDERECOS do Inicio (sem nenhum dado) fica: e ela que faz o 1o Inicio depois do login entrar de uma vez
 }

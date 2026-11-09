@@ -18,7 +18,7 @@ import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState}
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet,Platform,useWindowDimensions} from 'react-native';
 import {isDesktopWidth} from './src/lib/desktop';
 import {SafeAreaProvider,SafeAreaView,initialWindowMetrics} from 'react-native-safe-area-context';
-import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
+import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor,primeEarlyAfterLogin} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile,Notice} from './src/lib/types';
 import {fastBootstrap,authWithBootstrap} from './src/lib/fast-bootstrap';
 import {themeAppearance} from './src/lib/theme-schedule';
@@ -244,7 +244,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  // Android back gestures never traverse the main-menu visit history.
  // Inner page/workspace handlers still own their explicit hierarchy.
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:!!auth);return()=>s.remove();},[tab,workspaceDepth,pagesDepth,auth]);
- const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
+ const login=useCallback(async(a:Auth)=>{primeEarlyAfterLogin(a.token);await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
  // 07/11/2026 (Pedro: pagina compartilhada branca no notebook): a aparencia escolhida vai para o servidor, que desenha a pagina
  // compartilhada com a mesma cara. Ao abrir (ja logado) e a cada mudanca; falha silenciosa (so aparencia).

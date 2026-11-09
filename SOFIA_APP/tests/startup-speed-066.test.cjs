@@ -71,9 +71,12 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
  const widgets=home.indexOf('void api.dashboardWidgets().then(r=>');
  const monitors=home.indexOf("api.entities('monitor'");
  assert.ok(catalog>=0&&widgets>=0&&monitors>=0);
- assert.ok(home.slice(catalog-100,catalog).includes('scheduleIdleTask('),'catalog startup deferred');
- assert.ok(home.slice(widgets-100,widgets).includes('scheduleIdleTask('),'widget refresh deferred');
- assert.ok(home.slice(monitors,monitors+1400).includes('scheduleIdleTask(()=>{void load();})'),'monitors startup deferred');
+ // 09/11/2026: soonOrIdle = scheduleIdleTask com cache; sem cache (logo depois do login) sai na hora, ate o Inicio aparecer
+ assert.ok(/const firstReveal=useRef\(!api\.cached\('\/home'\)&&!api\.cached\('\/tasks'\)\);const soonOrIdle=\(run:\(\)=>void\)=>\{if\(!firstReveal\.current\|\|Platform\.OS!=='web'\)return scheduleIdleTask\(run\);/.test(home),'cached Home keeps idle deferral');
+ assert.ok(home.includes('firstReveal.current=false'),'after the first reveal everything goes back to idle');
+ assert.ok(home.slice(catalog-100,catalog).includes('soonOrIdle('),'catalog startup deferred');
+ assert.ok(home.slice(widgets-100,widgets).includes('soonOrIdle('),'widget refresh deferred');
+ assert.ok(home.slice(monitors,monitors+1400).includes('soonOrIdle(()=>{void load();})'),'monitors startup deferred');
  assert.ok(home.includes('if(!active||!launchVisible||agendaCatalog)return'),'catalog waits for real Home');
  assert.ok(home.includes('if(!launchVisible||!active)return'),'widgets wait for real Home');
 });
