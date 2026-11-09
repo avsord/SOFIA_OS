@@ -376,3 +376,19 @@ test('09/11: compromisso criado sem fim fica sem fim (so o ponto na linha do tem
  const h=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');assert.doesNotMatch(h,/x\.minutes\|\|60/);assert.match(h,/end_at:x\.end\?x\.end\.toISOString\(\):x\.minutes\?/);
  const e=fs.readFileSync(path.join(__dirname,'..','src/components/HomeCommitmentEditor.tsx'),'utf8');assert.match(e,/\[end,setEnd\]=useState\(''\)/);
 });
+test('09/11: linha do tempo desliza sem refazer as bolinhas; edicao rapida aparece na hora',()=>{
+ const b=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');
+ assert.match(b,/const \[moving, setMoving\] = useState\(false\), frozen = useRef/);assert.match(b,/const reuse = WEB && moving && !!frozen\.current/);assert.match(b,/transform: \[\{translateX: dx\}\]/);
+ assert.match(b,/const run = actions\.onQuickEdit!\(quick, ch\); setQuick\(null\); onClose\(\);/);
+ const h=fs.readFileSync(path.join(__dirname,'..','src/screens/Home.tsx'),'utf8');assert.match(h,/const \[patched,setPatched\]=useState/);assert.match(h,/catch\(e\)\{unpatch\(\);throw e;\}/);
+});
+test('09/11: esqueleto da aba Apps nao desenha a grade quando abre um app (Financas etc.)',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/components/ScreenSkeleton.tsx'),'utf8');assert.match(s,/if\(tab==='apps'&&openingOneApp\(module\)\)return <View testID="screen-wait-app"/);assert.match(s,/const BOOT_PATH=/);
+ const a=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8');assert.match(a,/<ScreenSkeleton tab='apps' module=\{moduleTarget\.id\|\|/);
+});
+test('09/11: lembrete com outras datas (sem repetir) - feito encerra todas; Quadro - rodinha rola a pagina do cartao; icone de farmacia',()=>{
+ const r=fs.readFileSync(path.join(__dirname,'..','src/screens/Reminders.tsx'),'utf8');assert.match(r,/if\(readRepeat\(item\)\.frequency==='none'\)\{void setState\(item,'done'\);return;\}/);
+ const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');assert.match(b,/sofia: 'board-scroll'/);assert.match(b,/'data-board-pageframe': live && loaded/);
+ const e=fs.readFileSync(path.join(__dirname,'..','src/lib/embed.ts'),'utf8');assert.match(e,/d\.sofia !== 'board-scroll'/);
+ const k=fs.readFileSync(path.join(__dirname,'..','src/components/AppKit.tsx'),'utf8');assert.match(k,/'heartbeat', 'pharmacy', 'capsule'/);
+});

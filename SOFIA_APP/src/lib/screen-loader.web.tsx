@@ -20,7 +20,7 @@ const webLazy=new Map<string,Screen>();
 function lazyScreen(name:string,load:()=>Promise<Screen>):Screen{
  const existing=webLazy.get(name);if(existing)return existing;
  const Lazy=React.lazy(()=>load().then(component=>({default:component})));
- const Wrapped=(props:any)=><ScreenBoundary name={name}><React.Suspense fallback={SKELETON_TABS.has(name)?<ScreenSkeleton tab={name} pageId={name==='pages'?String(props?.openPageId||''):undefined}/>:null}><Lazy {...props}/></React.Suspense></ScreenBoundary>;
+ const Wrapped=(props:any)=><ScreenBoundary name={name}><React.Suspense fallback={SKELETON_TABS.has(name)?<ScreenSkeleton tab={name} pageId={name==='pages'?String(props?.openPageId||''):undefined} module={name==='apps'?String(props?.openModuleId||'')||(props?.openFinanceKey||props?.openTasksKey||props?.openCapsulesKey||props?.openMailKey||props?.openMonitoringKey?'app':''):undefined}/>:null}><Lazy {...props}/></React.Suspense></ScreenBoundary>;
  const component=React.memo(Wrapped) as unknown as Screen;webLazy.set(name,component);return component;
 }
 /** Literal requires stay inside loaders so Metro/Hermes does not execute the

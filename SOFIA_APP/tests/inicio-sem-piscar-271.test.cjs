@@ -109,7 +109,7 @@ test('Drive: Google Drive inteiro - listas, varios selecionados, envio grande po
 
 test('telas que baixam depois mostram o esqueleto enquanto o arquivo chega (nunca so o fundo)', () => {
   const s = require('fs').readFileSync(require('path').join(__dirname, '../src/lib/screen-loader.web.tsx'), 'utf8');
-  assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name} pageId={name==='pages'?String(props?.openPageId||''):undefined}/>"), 'Suspense com esqueleto');
+  assert.ok(s.includes("SKELETON_TABS.has(name)?<ScreenSkeleton tab={name} pageId={name==='pages'?String(props?.openPageId||''):undefined} module={name==='apps'?"), 'Suspense com esqueleto (09/11: Apps sabe o app que esta abrindo)');
   // 08/11/2026 (Pedro: "esqueleto de outra tela"): abrindo UMA pagina, o esqueleto da lista de Paginas nao aparece (so o fundo)
   const sk = require('fs').readFileSync(require('path').join(__dirname, '../src/components/ScreenSkeleton.tsx'), 'utf8');
   assert.ok(sk.includes("if(tab==='pages'&&openingOnePage(pageId))return <View testID=\"screen-wait-page\""), 'pagina aberta sem esqueleto da lista');

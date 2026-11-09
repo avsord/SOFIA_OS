@@ -177,7 +177,7 @@ export async function shareText(title: string, text: string): Promise<'shared' |
   }
   await Share.share({title, message: text}); return 'shared';
 }
-export const ICON_CHOICES: IconName[] = ['cart', 'list', 'checklist', 'box', 'gift', 'heart', 'star', 'home', 'briefcase', 'tshirt', 'coffee', 'forkKnife', 'heartbeat', 'car', 'airplane', 'book', 'music', 'film', 'paw', 'wrench', 'graduation', 'barbell', 'storefront', 'tag'];
+export const ICON_CHOICES: IconName[] = ['cart', 'list', 'checklist', 'box', 'gift', 'heart', 'star', 'home', 'briefcase', 'tshirt', 'coffee', 'forkKnife', 'heartbeat', 'pharmacy', 'capsule', 'car', 'airplane', 'book', 'music', 'film', 'paw', 'wrench', 'graduation', 'barbell', 'storefront', 'tag'];
 export function IconPicker({value, onChange}: {value: string; onChange: (v: IconName) => void}) {
   const c = useTheme();
   return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{ICON_CHOICES.map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={'Ícone ' + n} accessibilityState={{selected: value === n}} onPress={() => onChange(n)} style={{width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: value === n ? c.accent : c.line, backgroundColor: value === n ? c.accentSoft : c.surface}}><Icon name={n} size={18} color={value === n ? c.accent : c.text} /></Pressable>)}</View>;

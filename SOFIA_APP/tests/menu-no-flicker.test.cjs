@@ -17,7 +17,7 @@ test('FadeSwap: fica no esqueleto até o conteúdo existir, e esmaece ao trocar 
 test('as cinco telas de menu (Conversa, Páginas, Agenda, Apps, Perfil) trocam com FadeSwap',()=>{
  const app=read('App.tsx');
  for(const tab of ['chat','pages','agenda','apps','profile']){
-  assert.ok(app.includes("<FadeSwap ready={mountedTabs.has('"+tab+"')} fallback={<ScreenSkeleton tab='"+tab+"'"+(tab==='pages'?" pageId={pageTarget.id}":"")+"/>}>"),tab); // 08/11/2026: Paginas sabe a pagina que esta abrindo
+  assert.ok(app.includes("<FadeSwap ready={mountedTabs.has('"+tab+"')} fallback={<ScreenSkeleton tab='"+tab+"'"+(tab==='pages'?" pageId={pageTarget.id}/>}>":tab==='apps'?" module={":"/>}>")),tab); // 08/11/2026: Paginas sabe a pagina que esta abrindo; 09/11: Apps sabe o app
  }
  assert.ok(!/\{mountedTabs\.has\('(chat|pages|agenda|apps|profile)'\)\?<DeferredScreen/.test(app),'nenhuma troca em corte seco restante');
 });

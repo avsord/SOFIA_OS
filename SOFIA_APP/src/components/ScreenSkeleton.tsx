@@ -26,9 +26,19 @@ function openingOnePage(pageId?:string){
  if(pageId)return true;
  try{return typeof location!=='undefined'&&/^\/paginas\/[^/?#]+/.test(location.pathname);}catch{return false;}
 }
-export function ScreenSkeleton({tab,pageId}:{tab:string;pageId?:string}){
+/** 09/11/2026 (Pedro: "Financas esta com o esqueleto shimmer errado, nao e da pagina dela... rastreie e conserte pela raiz"):
+ * a aba Apps tambem abre cada app direto (Financas, Tarefas, Price Tracker, E-mails...). Desde 07/11 o esqueleto da aba e a GRADE
+ * de apps, entao abrir um app mostrava a grade (a mesma raiz do caso das Paginas de 08/11). Abrindo um app, fica so o fundo. */
+// o endereco de quando o site abriu (/apps/financas, F5): o site troca para /apps antes de a tela do app montar
+const BOOT_PATH=(()=>{try{return typeof location!=='undefined'?location.pathname:'';}catch{return '';}})();
+function openingOneApp(module?:string){
+ if(module)return true;
+ try{return /^\/apps\/[^/?#]+/.test(BOOT_PATH)||(typeof location!=='undefined'&&/^\/apps\/[^/?#]+/.test(location.pathname));}catch{return false;}
+}
+export function ScreenSkeleton({tab,pageId,module}:{tab:string;pageId?:string;module?:string}){
  const c=useTheme(),show=useSkeletonDelay();
  if(tab==='pages'&&openingOnePage(pageId))return <View testID="screen-wait-page" style={{flex:1,backgroundColor:c.bg}}/>;
+ if(tab==='apps'&&openingOneApp(module))return <View testID="screen-wait-app" style={{flex:1,backgroundColor:c.bg}}/>;
  if(!show||EMBED)return <View testID={'screen-wait-'+tab} style={{flex:1,backgroundColor:c.bg}}/>; // 08/11/2026 (Pedro): dentro do cartao do Quadro, nunca esqueleto com brilho
  const body=tab==='agenda'?<AgendaSkeleton/>:tab==='chat'?<ChatSkeleton/>:tab==='pages'?<PagesSkeleton/>:tab==='apps'?<AppsSkeleton/>:tab==='profile'?<ProfileSkeleton/>:null;
  if(body)return <View testID={'screen-skeleton-'+tab} pointerEvents="none" accessibilityLabel={'Abrindo '+(TITLES[tab]||'')} style={{flex:1,backgroundColor:c.bg}}><ShimmerGroup>{body}</ShimmerGroup></View>;

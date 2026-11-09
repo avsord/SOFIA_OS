@@ -209,7 +209,12 @@ export function PageBoard(p: Props) {
     // dentes de um mesmo giro e menos que isso) e, com o texto da janela em uso (clicou nela), a rodinha e sempre da janela.
     const on = (e: WheelEvent) => {const t = e.target as HTMLElement, now = performance.now(), dragging = el.hasAttribute('data-board-drag'), win = t.closest?.('[data-board-editing],[data-board-scroll="on"]') as HTMLElement | null;
       const using = !!win && !!document.activeElement && win.contains(document.activeElement), boardGesture = dragging || (!using && now - lastBoardWheel.current < 300);
-      if (!boardGesture && t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); lastBoardWheel.current = now;
+      if (!boardGesture && t.closest?.('[data-board-editing],[data-board-ui],[data-board-scroll="on"]') && !(e.ctrlKey || e.metaKey)) return;
+      // 09/11/2026 (Pedro: "tentando escrolar essa tela e nao ta indo" - cartao de pagina): a rodinha em cima do cartao rola a PAGINA dele
+      // (a pagina dentro do cartao so recebe o mouse depois de clicar); Ctrl+rodinha e giro que ja andava o quadro continuam no quadro
+      {const card = !boardGesture && !(e.ctrlKey || e.metaKey) ? t.closest?.('[data-board-pageframe]') as HTMLElement | null : null, fr = card?.querySelector('iframe') as HTMLIFrameElement | null;
+        if (fr?.contentWindow) {e.preventDefault(); const u = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? fr.clientHeight : 1; try {fr.contentWindow.postMessage({sofia: 'board-scroll', dx: e.deltaX * u, dy: e.deltaY * u, x: e.clientX - fr.getBoundingClientRect().left, y: e.clientY - fr.getBoundingClientRect().top}, location.origin);} catch {} return;}}
+      e.preventDefault(); lastBoardWheel.current = now;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
       if (e.ctrlKey || e.metaKey) {e.stopPropagation(); wheelZoom(e.deltaY * unit, e.clientX, e.clientY); return;} // 08/11 (Pedro): Ctrl+rodinha SO da zoom no quadro (nada rola, nem a janela por baixo)
       stopGlide(); const v = viewRef.current, dx = e.shiftKey ? (e.deltaX || e.deltaY) * unit : e.deltaX * unit, dy = e.shiftKey ? 0 : e.deltaY * unit, nv = {...v, x: v.x - dx, y: v.y - dy}; viewRef.current = nv; setView(nv);};
@@ -770,7 +775,7 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
   useEffect(() => {if (!live || loaded) return; const on = (e: MessageEvent) => {if (e.origin === location.origin && e.data?.sofia === 'board-embed-ready' && e.source === frame.current?.contentWindow) setLoaded(true);};
     window.addEventListener('message', on); const t2 = setTimeout(() => setLoaded(true), 8000); return () => {window.removeEventListener('message', on); clearTimeout(t2);};}, [live, loaded, id]);
   useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onDone();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
-  return h('div', {'data-board-editing': editing ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column', position: 'relative'}},
+  return h('div', {'data-board-editing': editing ? '1' : undefined, 'data-board-pageframe': live && loaded ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column', position: 'relative'}},
     h('div', {'data-board-handle': '1', style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 12px', borderBottom: '1px solid ' + c.line, background: c.surface, cursor: 'grab'}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
       synced ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.good}}, 'Sincronizada') : copy ? h('span', {style: {fontSize: 11, fontWeight: 700, color: c.muted}}, 'Cópia') : null,

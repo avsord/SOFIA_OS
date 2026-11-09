@@ -74,6 +74,7 @@ import * as PPencilSimple from 'phosphor-react-native/src/icons/PencilSimple';
 import * as PPhone from 'phosphor-react-native/src/icons/Phone';
 import * as PPiggyBank from 'phosphor-react-native/src/icons/PiggyBank';
 import * as PPill from 'phosphor-react-native/src/icons/Pill';
+import * as PFirstAidKit from 'phosphor-react-native/src/icons/FirstAidKit';
 import * as PPlay from 'phosphor-react-native/src/icons/Play';
 import * as PPlus from 'phosphor-react-native/src/icons/Plus';
 import * as PPushPin from 'phosphor-react-native/src/icons/PushPin';
@@ -140,6 +141,7 @@ import * as PSquaresFour_ from 'phosphor-react-native/src/icons/SquaresFour';
  * premium. Os nomes antigos continuam valendo; os novos substituem os emojis que faziam papel de icone. */
 const ICONS = {
  capsule: PPill.PillIcon,
+ pharmacy: PFirstAidKit.FirstAidKitIcon, // 09/11/2026 (Pedro: "falta icone de farmacia") - listas
  sofia: PSparkle.SparkleIcon,
  guardado: PPiggyBank.PiggyBankIcon,
  filter: PFunnelSimple.FunnelSimpleIcon,

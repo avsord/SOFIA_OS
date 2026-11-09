@@ -116,6 +116,9 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  }catch(e){setError(errorText(e));}finally{setBusy(false);}}
  function askDone(item:Entity,e?:any){
   if(!hasMore(item)){void setState(item,'done');return;}
+  // 09/11/2026 (Pedro: "se tiver outros horarios e dias e voce ticar que fez eles param de aparecer, porque ja foi feito"): lembrete com
+  // outras datas/horarios (sem repeticao) encerra todos de uma vez, sem perguntar. O que se repete (ex.: todo mes) continua perguntando.
+  if(readRepeat(item).frequency==='none'){void setState(item,'done');return;}
   const r=e?.currentTarget?.getBoundingClientRect?.();
   const items=[{label:'Feito — parar de lembrar',icon:'check' as const,run:()=>{void setState(item,'done');}},{label:'Feito só desta vez (continua avisando)',icon:'repeat' as const,run:()=>{void doneOnce(item);}}];
   if(desk&&r){openContextMenu(r.left,r.bottom+4,items);return;}
