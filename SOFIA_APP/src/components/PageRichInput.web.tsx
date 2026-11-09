@@ -2,6 +2,7 @@
 // código, link e cor dentro do texto. É um contentEditable que se apresenta para o Pages.tsx como se fosse o <textarea>
 // de antes (value, selectionStart/End, setSelectionRange, focus), para o teclado (Enter, Backspace, setas, "/")
 // continuar igual. O HTML guardado passa sempre por uma lista fechada de marcas permitidas.
+import {tableFromHtml,tableFromText} from './PageTable.web';
 import {findLinks} from '../lib/leaf-document';
 import {LinkHoverCard,openUrl} from './LinkHover';
 import type {LinkPop} from './LinkHover';
@@ -10,7 +11,7 @@ import {StyleSheet} from 'react-native';
 import {scaleStyle} from '../web/desktop-scale';
 
 type Props={value:string;html?:string;placeholder?:string;placeholderColor?:string;style?:any;editable?:boolean;accessibilityLabel?:string;testID?:string;
- onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number,html?:string)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void};
+ onChange:(text:string,html:string)=>void;onKeyPress?:(e:any)=>void;onFocus?:()=>void;onBlur?:()=>void;onPasteText?:(text:string,start:number,end:number,html?:string)=>boolean;onDropFiles?:(files:File[])=>void;onPasteImage?:(image:Blob)=>void;onUndo?:(redo:boolean)=>void;onPasteTable?:(rows:string[][])=>boolean};
 
 const ALLOWED=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','A','SPAN','MARK','BR']);
 // 08/11/2026 (Pedro: grifo do Word sumia ao colar): o Word grifa com nome de cor (background:yellow) - nome de cor tambem vale
@@ -174,7 +175,10 @@ export const PageRichInput=React.forwardRef<any,Props>(function PageRichInput(pr
    // 07/11/2026 (Pedro: colar qualquer tipo de item): arquivo copiado no computador (PDF, Word...) vira bloco de arquivo
    if(props.onDropFiles){const fl=[...(e.clipboardData?.files||[])] as File[];if(fl.length&&!e.clipboardData?.getData('text/plain')){e.preventDefault();props.onDropFiles(fl);return;}}
    const text=e.clipboardData?.getData('text/plain');if(!text){e.preventDefault();return;}e.preventDefault();const node=el.current!;const start=(node as any).selectionStart,end=(node as any).selectionEnd;
-   const rawHtml=e.clipboardData?.getData('text/html')||'',rich=rawHtml?pasteHtml(rawHtml,pasteContext(node as any)):'';
+   const rawHtml=e.clipboardData?.getData('text/html')||'';
+   // 09/11/2026 (Pedro): tabela copiada (ChatGPT, Word, Excel, Docs, sites) vira bloco de tabela com as mesmas linhas e colunas
+   if(props.onPasteTable){const rows=tableFromHtml(rawHtml,pasteContext(node as any))||tableFromText(text);if(rows&&props.onPasteTable(rows))return;}
+   const rich=rawHtml?pasteHtml(rawHtml,pasteContext(node as any)):'';
    if(props.onPasteText?.(text,start,end,rich||undefined))return;
    // uma linha com formatacao (negrito, italico, cor, link): entra com a formatacao
    if(rich&&!text.includes('\n')&&/<(b|i|u|s|code|mark|a|span)\b/i.test(rich)){document.execCommand('insertHTML',false,rich);return;}

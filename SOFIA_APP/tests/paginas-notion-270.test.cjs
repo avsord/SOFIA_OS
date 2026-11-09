@@ -340,3 +340,13 @@ test('09/11: Quadro - janela de anexo vira a original (salvar vai direto para a 
  assert.match(b,/board-file-make-original/);assert.match(b,/board-file-live/);assert.match(b,/if \(b\.data\?\.live && fp && fb && patchPageBlock\)/);
  assert.match(b,/String\(b\.data\?\.from_page\) === String\(one\.data\?\.copy_id \|\| ''\) \? \{\.\.\.b, data: \{\.\.\.b\.data, from_page: one\.data\?\.source_id, live: true\}\}/);
 });
+test('09/11: colar tabela vira bloco de tabela com as mesmas linhas e colunas (site edita, app mostra texto)',()=>{
+ const t=fs.readFileSync(path.join(__dirname,'..','src/components/PageTable.web.tsx'),'utf8');assert.match(t,/export function tableFromHtml/);assert.match(t,/export function tableFromText/);assert.match(t,/'\+ Linha'/);
+ const r=fs.readFileSync(path.join(__dirname,'..','src/components/PageRichInput.web.tsx'),'utf8');assert.match(r,/const rows=tableFromHtml\(rawHtml,pasteContext\(node as any\)\)\|\|tableFromText\(text\);if\(rows&&props\.onPasteTable\(rows\)\)return;/);
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/onPasteTable=\{\(rows:string\[\]\[\]\)=>\{pasteTableBlock\(b,rows\);return true;\}\}/);assert.match(s,/b\.type==='table'&&Array\.isArray\(b\.data\?\.rows\)/);
+ assert.ok(fs.existsSync(path.join(__dirname,'..','src/components/PageTable.tsx')),'versao do app nativo');
+});
+test('09/11: tornar a original tira o "(cópia)" do nome da cópia escondida',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/const pushToOriginal=async\(copy:Entity,src:Entity,final=false\)=>/);assert.match(s,/if\(final\)\{try\{const cp=/);
+ const b=fs.readFileSync(path.join(__dirname,'..','src/components/PageBoard.web.tsx'),'utf8');assert.match(b,/p\.pushToOriginal!\(cp, src, true\)/);
+});

@@ -82,7 +82,7 @@ function plainOf(html: string) {const d = document.createElement('div'); d.inner
 type Props = {
   api: SofiaApi; pageId: string; blocks: PageBlock[]; locked: boolean;
   edit: (fn: (blocks: PageBlock[]) => PageBlock[], group?: string) => void; flush: () => void;
-  pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>; pushToOriginal?: (copy: Entity, src: Entity) => Promise<void>;
+  pages: Entity[]; onOpenPage: (p: Entity) => void; copyPage: (src: Entity) => Promise<Entity>; copyInto: (copy: Entity, src: Entity) => Promise<void>; pushToOriginal?: (copy: Entity, src: Entity, final?: boolean) => Promise<void>;
   title: string; onTitle: (v: string) => void; onPageChanged?: (id: string) => void;
   patchPageBlock?: (pageId: string, blockId: string, f: (b: PageBlock) => PageBlock) => Promise<void>;
   pickFiles: () => void; createDoc: () => void; dropFiles: (files: File[]) => void; pasteClip: (clip: SofiaClip) => void; onError: (m: string) => void;
@@ -451,7 +451,7 @@ export function PageBoard(p: Props) {
         appAlert('Sincronizar com a original?', 'O conteúdo desta cópia vai substituir o conteúdo de "' + (src.title || 'Sem título') + '". A versão anterior da original fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sincronizar', onPress: () => void track('sincronizar-original', () => p.pushToOriginal!(cp, src)).catch(e => fail(String(e?.message || e)))}]);}, false, false, 'board-sync'));
       // 08/11 (Pedro: "um botao pra tornar essa copia o conteudo original e ai eles mudam sincronizando e deixa de ser copia")
       if (src && !synced && p.pushToOriginal) items.push(btn('book', 'Tornar a original: o conteúdo desta cópia vira o da original e o cartão passa a ser a própria original (sempre sincronizado)', () => {const cp = p.pages.find(x => x.id === String(one.data?.copy_id || '')); if (!cp) return;
-        appAlert('Tornar a original?', 'O conteúdo desta cópia vai substituir o de "' + (src.title || 'Sem título') + '" e o cartão passa a mostrar a própria original: o que mudar aqui muda lá. A versão anterior fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tornar a original', onPress: () => void track('tornar-original', () => p.pushToOriginal!(cp, src)).then(() => p.edit(bs => bs.map(b => b.id === one.id ? {...b, data: {...b.data, synced: true, page_id: b.data?.source_id}}
+        appAlert('Tornar a original?', 'O conteúdo desta cópia vai substituir o de "' + (src.title || 'Sem título') + '" e o cartão passa a mostrar a própria original: o que mudar aqui muda lá. A versão anterior fica em Versões da página.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Tornar a original', onPress: () => void track('tornar-original', () => p.pushToOriginal!(cp, src, true)).then(() => p.edit(bs => bs.map(b => b.id === one.id ? {...b, data: {...b.data, synced: true, page_id: b.data?.source_id}}
           // 09/11/2026 (Pedro: "se eu clicar nelas para virar clone... todo o conteudo interno delas"): as janelas de anexo abertas deste cartao
           // passam a ser da original e ficam sempre sincronizadas (os blocos e anexos da original sao os mesmos da copia)
           : String(b.data?.from_page || '') && String(b.data?.from_page) === String(one.data?.copy_id || '') ? {...b, data: {...b.data, from_page: one.data?.source_id, live: true}} : b), 'board-sync')).catch(e => fail(String(e?.message || e)))}]);}, false, false, 'board-make-original'));
