@@ -9,3 +9,10 @@ test('a persisted acknowledgement replaces its optimistic client ID',()=>{const 
 test('unchanged snapshots keep their array identity to avoid periodic re-renders',()=>{const old=[m(1)];assert.equal(reconcileMessages(old,{messages:[m(1)],has_more:false}),old);});
 test('selection is opt-in, multiple, toggleable and capped at the batch limit',()=>{let selection=new Set();selection=toggleMessageSelection(selection,'m1');selection=toggleMessageSelection(selection,'m2');assert.equal(selection.size,2);selection=toggleMessageSelection(selection,'m1');assert.equal(selection.has('m1'),false);for(let i=0;i<120;i++)selection=toggleMessageSelection(selection,'x'+i);assert.equal(selection.size,100);});
 test('remote deletion also removes a selected row',()=>{assert.deepEqual([...retainMessageSelection(new Set(['m1','m2']),[m(2)])],['m2']);});
+test('09/11: mensagem ainda saindo fica no fim, mesmo escrita antes de mensagens ja respondidas',()=>{
+ const m=(id,role,at,extra={})=>({id,role,content:id,created_at:at,...extra});
+ const out=model.mergeMessages([m('a','user','2026-11-09T20:21:00Z'),m('b','assistant','2026-11-09T20:21:05Z')],[m('c','user','2026-11-09T20:18:00Z',{client_id:'x',status:'sending'})]);
+ assert.equal(out.map(x=>x.id).join(','),'a,b,c');
+ const done=model.mergeMessages(out,[m('srv','user','2026-11-09T20:21:10Z',{client_id:'x',status:'sent'})]);
+ assert.equal(done.map(x=>x.id).join(','),'a,b,srv');
+});
