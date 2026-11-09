@@ -392,3 +392,6 @@ test('09/11: lembrete com outras datas (sem repetir) - feito encerra todas; Quad
  const e=fs.readFileSync(path.join(__dirname,'..','src/lib/embed.ts'),'utf8');assert.match(e,/d\.sofia !== 'board-scroll'/);
  const k=fs.readFileSync(path.join(__dirname,'..','src/components/AppKit.tsx'),'utf8');assert.match(k,/'heartbeat', 'pharmacy', 'capsule'/);
 });
+test('09/11: capa da pagina no computador tem a altura certa desde o 1o desenho (proporcao, sem esperar medir a largura)',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Pages.tsx'),'utf8');assert.match(s,/hasCover&&desktop\?\{width:'100%',aspectRatio:6,minHeight:200,maxHeight:460\}/);assert.doesNotMatch(s,/height:hasCover\?\(desktop\?coverH:190\):28/);
+});

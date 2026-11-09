@@ -17,3 +17,4 @@
 | 2026-11-09 | (delivery) | Compromisso criado sem fim não ganha mais 1 h de duração (só o ponto na linha do tempo) | tsc/npm test ok, site recompilado |
 | 2026-11-09 | (delivery) | Linha do tempo sem travar na rodinha; edição rápida e Conversa na ordem certa; esqueleto das Finanças/apps (raiz 07/11); lembrete feito encerra as outras datas; rodinha rola o cartão do Quadro; ícone de farmácia | tsc/npm test ok, site recompilado; rolagem, esqueleto e cartão conferidos no navegador |
 | 2026-11-09 | (delivery) | Notificações: Limpar notificações no lugar de Marcar tudo como lido | tsc/npm test ok, site recompilado |
+| 2026-11-09 | (delivery) | Página com capa não pula mais na 1ª entrada (altura por proporção) | 8 px → 0 medido no navegador; tsc/npm test ok |
