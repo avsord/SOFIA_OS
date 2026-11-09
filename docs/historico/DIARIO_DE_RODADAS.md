@@ -11,3 +11,4 @@
 | 2026-11-09 | (delivery) | GIF com play/repetir; colar sem fundo branco; tabela colada vira bloco de tabela; Quadro: janela de anexo vira a original e o cartão leva as janelas; tornar a original tira o "(cópia)" | tsc/npm test ok, site recompilado; GIF/tabela/colagem conferidos no navegador local |
 | 2026-11-09 | (delivery) | Quadro: janelas de anexo seguem o cartão-mãe (sincronia só no cartão, botões no cabeçalho); negrito + itálico volta a funcionar | tsc/npm test ok, site recompilado; negrito-itálico conferido no navegador |
 | 2026-11-09 | (delivery) | Lembrete que se repete: mudar nome/data pergunta Só este / Todos | tsc/npm test ok, site recompilado |
+| 2026-11-09 | (delivery) | Agenda/leituras: conexão que cai no meio da resposta não mostra mais "não retornou dados válidos"; a leitura repete sozinha | tsc/npm test ok, site recompilado |

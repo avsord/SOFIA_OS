@@ -191,7 +191,8 @@ export class SofiaApi {
       if(interrupted&&method!=='GET'&&(e.code==='TIMEOUT'||e.code==='NETWORK')&&!isChatSend(path,method)){noteApiFailure(path,method,e,Date.now()-started);throw new ApiError('A operação foi interrompida quando o app saiu da tela. Confira se ela foi concluída antes de repetir.','INTERRUPTED',0);}
       // Leitura que caiu porque o servidor estava reiniciando, ocupado, demorou ou o app saiu da tela: tenta de novo uma vez, em silêncio.
       // (Antes a nova tentativa so valia se o erro viesse antes do prazo - um TIMEOUT nunca repetia.)
-      if(method==='GET'&&!signal?.aborted&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT'||(e.code==='NETWORK'&&interrupted))){
+      // 09/11/2026: leitura cuja conexao caiu (inclusive no meio da resposta) tambem tenta de novo antes de mostrar erro
+      if(method==='GET'&&!signal?.aborted&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT'||e.code==='NETWORK')){
         await waitForActive();
         await new Promise(r=>setTimeout(r,interrupted?300:1200));
         // 06/11/2026 (checkup: 635 respostas 502 na semana, todas no minuto de uma publicacao - o servidor fica fora enquanto a
@@ -219,7 +220,9 @@ export class SofiaApi {
         headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(this.token ? { Authorization: 'Bearer ' + this.token } : {}) },
         body: body === undefined ? undefined : JSON.stringify(body), redirect: 'error' });
       let data: Record<string, any>;
-      try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
+      // 09/11/2026 (print do Pedro na Agenda: "O servidor nao retornou dados validos" com o servidor respondendo 200): a conexao que cai ou o
+      // tempo que acaba NO MEIO da resposta virava esse aviso e nao tentava de novo. Agora conta como conexao/tempo (tenta de novo sozinho).
+      try { data = await response.json(); } catch (bodyError) { if (controller.signal.aborted || (bodyError as any)?.name === 'AbortError' || bodyError instanceof TypeError) throw bodyError; throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {this.onExpired();} throw new ApiError(data.error || (response.status>=502&&response.status<=504?'O servidor da Sofia está reiniciando ou ocupado ('+response.status+'). Tente de novo em alguns segundos.':'Não foi possível concluir ('+response.status+').'), data.code || (response.status>=502&&response.status<=504?'SERVER_UNAVAILABLE':'HTTP_ERROR'), response.status, data); }
       this.noteSeen(data);

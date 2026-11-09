@@ -20,7 +20,9 @@ test('e-mails: grupos e selecao pelo titulo; Conta Google nao aparece como "falt
 test('retomada: erro de demora so do chat fala em "mensagem"; leitura interrompida repete; teclado e abas na volta',()=>{
   const a=read('src/lib/api.ts');
   assert.ok(a.includes("isChatSend(path, method) ? 'A conexão demorou. Recarregue antes de reenviar: sua mensagem pode ter chegado.' : 'A Sofia demorou para responder. Tente de novo.'"));
-  assert.ok(a.includes("(e.code==='NETWORK'&&interrupted)"));
+  // 09/11/2026: leitura que perde a conexao (interrompida ou nao, inclusive no meio da resposta) repete antes do erro
+  assert.ok(a.includes("e.code==='TIMEOUT'||e.code==='NETWORK')){"));
+  assert.ok(a.includes("if (controller.signal.aborted || (bodyError as any)?.name === 'AbortError' || bodyError instanceof TypeError) throw bodyError;"));
   assert.ok(read('App.tsx').includes('TextInput.State.blurTextInput(f)'));
   assert.ok(read('src/components/TabPager.tsx').includes("if(state==='active'){selection.current.cancelDrag();aligned.current=null;align();clearPreview();}"));
 });
