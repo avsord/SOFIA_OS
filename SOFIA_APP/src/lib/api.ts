@@ -62,6 +62,22 @@ export function primeEarlyAfterLogin(token: string) {
     setTimeout(() => { if (early[path] === req) delete early[path]; }, 20000);
   }
 }
+/** 10/11/2026 (print do Pedro: "Boa noite, Pedro" e o Inicio vazio ao ligar o PC): as leituras esperam o primeiro quadro
+ * (requestAnimationFrame). Com o navegador abrindo as abas escondido/minimizado (inicio do Windows), esse quadro nao vinha e
+ * NENHUMA leitura saia (o servidor nao recebeu nada por minutos). No site, a trava agora abre sozinha em ate 1,5 s (o relogio
+ * anda mesmo com a aba escondida) e tambem quando a janela volta para a frente. No Android nada muda (o aviso nativo continua). */
+function armNetworkFallback(api: {releaseNetwork(): void}) {
+  if (typeof document === 'undefined' || typeof window === 'undefined' || typeof setTimeout !== 'function') return;
+  let done = false;
+  const open = (why: string) => { if (done) return; done = true; try { clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onFocus); } catch { /* sem DOM completo */ }
+    if (why !== 'quadro') { try { (window as any).__sofiaNetFallback = why; } catch { /* so diagnostico */ } } api.releaseNetwork(); };
+  const onVis = () => { if (document.visibilityState === 'visible') open('voltou'); }, onFocus = () => open('voltou');
+  const timer = setTimeout(() => open('relogio'), 1500);
+  try { document.addEventListener('visibilitychange', onVis); window.addEventListener('focus', onFocus); } catch { /* sem DOM completo */ }
+  // o caminho normal (primeiro quadro) limpa o relogio pelo releaseNetwork original
+  const original = api.releaseNetwork.bind(api);
+  api.releaseNetwork = () => { if (!done) { done = true; try { clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onFocus); } catch { /* sem DOM completo */ } } original(); };
+}
 // sem importar react-native aqui (os testes carregam este arquivo sozinho): no site existe document
 const isWebRuntime = () => typeof document !== 'undefined';
 export const SITE = rawBase;
@@ -113,8 +129,10 @@ export class SofiaApi {
   private networkGate:Promise<void>=Promise.resolve();
   private releaseGate:(()=>void)|null=null;
   /** Cached reads stay available; live I/O cannot contend with first layout. */
-  deferNetworkUntilPaint(){if(!this.releaseGate)this.networkGate=new Promise<void>(resolve=>{this.releaseGate=resolve;});return this;}
+  deferNetworkUntilPaint(){if(!this.releaseGate){this.networkGate=new Promise<void>(resolve=>{this.releaseGate=resolve;});armNetworkFallback(this);}return this;}
   releaseNetwork(){this.releaseGate?.();this.releaseGate=null;}
+  /** true enquanto as leituras ainda esperam o primeiro quadro (o medidor do Inicio manda isso junto) */
+  networkHeld(){return !!this.releaseGate;}
 
   private rememberChatResult(result:ChatResult,input:object){
     const id=result.conversation_id||(input as {conversation_id?:string}).conversation_id;if(!id)return;

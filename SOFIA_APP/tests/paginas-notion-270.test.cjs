@@ -300,7 +300,7 @@ test('editar na linha do tempo: rascunho guardado ate salvar/cancelar, descricao
  const ch=fs.readFileSync(path.join(__dirname,'..','src/screens/Chat.tsx'),'utf8');assert.match(ch,/<Text selectable style=\{\{fontSize:16/);assert.match(ch,/onLongPress=\{Platform\.OS==='web'\?undefined/);
 });
 test('linha do tempo: area de pegar de 36px nos pontos (site), nao volta sozinha criando/com item aberto, previa das bolinhas enquanto cria',()=>{
- const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/if \(WEB\) HITS\.push\(<Pressable key=\{p\.key \+ '-hit'\}/);assert.match(hb,/addingRef\.current \|\| pinRef\.current/);assert.match(hb,/\(!adding \|\| \(hover === shown\.key && pin !== shown\.key\)\)/);
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/if \(WEB && !lite\) HITS\.push\(<Pressable key=\{p\.key \+ '-hit'\}/); /* 10/11/2026: deslizando a linha a area de pegar nao e criada (volta ao parar) */assert.match(hb,/addingRef\.current \|\| pinRef\.current/);assert.match(hb,/\(!adding \|\| \(hover === shown\.key && pin !== shown\.key\)\)/);
 });
 test('linha do tempo nao salta para o agora por causa de um clique (focus da janela) nem com janela aberta',()=>{
  const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.doesNotMatch(hb,/window\.addEventListener\('focus', back\)/);assert.match(hb,/!holdRef\.current && !addingRef\.current && !pinRef\.current\) \{const h = homeOf/);assert.match(hb,/manualAt\.current = Date\.now\(\); \/\* 06\/11\/2026 \(Pedro\): clicar numa bolinha/);
@@ -310,7 +310,7 @@ test('Price Tracker no site: preco lido pelo servidor (sem navegador invisivel) 
  const bg=fs.readFileSync(path.join(__dirname,'..','src/components/BackgroundServices.tsx'),'utf8');assert.match(bg,/setWebPriceSource\(url=>api\.linkPreview\(url\)\.then\(previewToReader\)\)/);
 });
 test('linha do tempo agrupa pelo horario mesmo logo depois de arrastar (lista ordenada antes de agrupar)',()=>{
- const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/for \(const r of \[\.\.\.withMoved\(items\)\]\.sort\(/);
+ const hb=fs.readFileSync(path.join(__dirname,'..','src/desktop/HomeBrief.tsx'),'utf8');assert.match(hb,/const sortedItems = useMemo\(\(\) => \[\.\.\.withMoved\(items\)\]\.sort\(/);assert.match(hb,/for \(const r of sortedItems\)/); /* 10/11/2026: a lista ordenada fica guardada (nao e refeita a cada quadro) */
 });
 test('criar rapido na linha do tempo: entende variacoes (tipo, prioridade, horario, fim, descricao) e manda pergunta para a Sofia',()=>{
  const Q=load('src/lib/quick-create.ts',{});const at=new Date(2026,10,6,9,5);const f=(t)=>Q.parseQuickCreate(t,at);const hm=d=>d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');

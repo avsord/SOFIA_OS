@@ -13,7 +13,9 @@ export function useLaunchVisible(enabled:boolean){
   const native=NativeModules.SofiaLaunch;
   if(native?.whenRevealed)void native.whenRevealed().then((ok:boolean)=>{if(ok)done();}).catch(fallback);
   else fallback();
-  return()=>{live=false;cancelAnimationFrame(first);cancelAnimationFrame(second);};
+  // 10/11/2026: no site, aba aberta escondida (navegador iniciando com o Windows) nao desenha quadros; o relogio garante a abertura
+  const clock=typeof document!=='undefined'&&typeof setTimeout==='function'?setTimeout(done,1500):null;
+  return()=>{live=false;cancelAnimationFrame(first);cancelAnimationFrame(second);if(clock)clearTimeout(clock);};
  },[enabled]);
  return enabled&&visible;
 }

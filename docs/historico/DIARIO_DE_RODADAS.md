@@ -18,3 +18,4 @@
 | 2026-11-09 | (delivery) | Linha do tempo sem travar na rodinha; edição rápida e Conversa na ordem certa; esqueleto das Finanças/apps (raiz 07/11); lembrete feito encerra as outras datas; rodinha rola o cartão do Quadro; ícone de farmácia | tsc/npm test ok, site recompilado; rolagem, esqueleto e cartão conferidos no navegador |
 | 2026-11-09 | (delivery) | Notificações: Limpar notificações no lugar de Marcar tudo como lido | tsc/npm test ok, site recompilado |
 | 2026-11-09 | (delivery) | Página com capa não pula mais na 1ª entrada (altura por proporção) | 8 px → 0 medido no navegador; tsc/npm test ok |
+| 2026-11-10 | (delivery) | Início vazio ao abrir o site com o PC ligando (trava das leituras abre sozinha; Início pede de novo); linha do tempo sem travar na rodinha (bolinha leve deslizando, blocos não refeitos) | tsc/npm test ok (exceto os que precisam de Java/Python, ausentes neste PC e já falhando antes); 100%→5% do processador medido |

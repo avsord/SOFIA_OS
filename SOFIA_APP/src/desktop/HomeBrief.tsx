@@ -257,6 +257,21 @@ export function HomeBrief(p: HomeBriefProps) {
   const card = {backgroundColor: c.surface, borderRadius: 18, padding: 18, boxShadow: '0 0 0 1px rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18)'} as any;
   // 03/11/2026: quando o pronto entra no lugar do esqueleto, entra apagando-se para aceso (sem estalo)
   // 04/11/2026: sem fade proprio aqui (comecava em 35% e piscava); a passagem suave e o esqueleto apagando por cima (Home.tsx)
+  // 10/11/2026 (Pedro: "linha do tempo com muito lag quando rola o scroll"): rolando a linha, o dia do cabecalho troca a cada 24 h
+  // e isso redesenhava todos os blocos (Agenda, Tarefas, Financas...). Os blocos so mudam quando os dados deles mudam.
+  const deskRows = useMemo(() => p.compact ? null : <>
+    <RowIn i={1} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
+      <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={fromTomorrow} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
+      <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
+      <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
+    </View></RowIn>
+    <RowIn i={2} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
+      <FinanceTile style={{flex: 2, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
+      <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
+      <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
+      <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
+    </View></RowIn>
+    </>, [p, rowH, open, fromTomorrow, c]);
   return <View ref={root} style={{gap: 12}}>
     <RowIn i={0} at={p.revealAt} style={{zIndex: 10, position: 'relative'}} /* 04/11/2026 (print do Pedro): a conversa rapida e as previas da linha do tempo ficavam por baixo das fileiras de baixo */><View testID="home-brief" onLayout={e => {const h = Math.round(e.nativeEvent.layout.height); if (h > 0) {lastBrief = h; setBriefH(h);}}} style={{...card, borderRadius: 22, padding: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: c.surface, position: 'relative', zIndex: 5}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
@@ -296,17 +311,7 @@ export function HomeBrief(p: HomeBriefProps) {
       </View>
       <FinanceTile style={{height: 204}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
     </CompactCtx.Provider> : <>
-    <RowIn i={1} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
-      <AgendaTile style={{flex: 2, height: rowH}} card={card} upcoming={fromTomorrow} onOpen={p.onOpenItem} onOpenAgenda={p.onOpenAgenda} />
-      <TasksTile style={{flex: 1, height: rowH}} card={card} open={open} onOpen={p.onOpenTasks} onDone={p.onToggleTask} />
-      <RotinaTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('capsules')} />
-    </View></RowIn>
-    <RowIn i={2} at={p.revealAt}>    <View style={{flexDirection: 'row', gap: 12}}>
-      <FinanceTile style={{flex: 2, height: rowH}} card={card} data={p.data} goal={p.data.goal || p.goal} masked={p.masked} onToggleMask={p.onToggleMask} onOpen={() => p.onOpenModule('finance')} />
-      <PriceTile style={{flex: 1, height: rowH}} card={card} rows={p.series} onOpen={p.onOpenMonitoring} />
-      <PackagesTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('packages')} />
-      <MailTile style={{flex: 1, height: rowH}} card={card} data={p.data} onOpen={() => p.onOpenModule('mail')} />
-    </View></RowIn>
+    {deskRows}
     </>}
   </View>;
 }
@@ -314,6 +319,9 @@ export function HomeBrief(p: HomeBriefProps) {
 /** Linha do tempo: 16 horas por vez, comecando nas 7h de hoje. A rodinha do mouse em cima dela anda pelas horas e
  * pelos dias seguintes (0.3.299). Pontos na cor de cada item, juntando os que ficam colados; passar o mouse mostra a
  * previa; clicar abre o cartao com titulo, descricao e o lapis para editar. */
+/** 10/11/2026: desenho da bolinha enquanto a linha desliza - o mesmo estilo do Pressable, sem eventos (refazer centenas de botoes
+ * a cada trecho era o que travava a rodinha do mouse). */
+const LiteDot = ({style, children}: any) => <View pointerEvents="none" style={typeof style === 'function' ? style({hovered: false, pressed: false}) : style}>{children}</View>;
 /** 05/11/2026 (Pedro: "preciso de todas as datas na linha do tempo, quando ando no scroll fica limitado"): antes so
  * hoje, amanha e depois; agora vai do dia 1 deste mes ao fim do mes seguinte ao proximo (os meses que o Inicio ja carrega). */
 // 06/11/2026 (Pedro: "coloca pra 1 mes, tanto pra passado quanto pra futuro"): a linha vai de hoje - 1 mes ate hoje + 1 mes
@@ -438,11 +446,13 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   useEffect(() => {const el: any = box.current; if (!WEB || !el?.addEventListener) return;
     const down = (e: MouseEvent) => {if (!(e.shiftKey || e.altKey) || e.button) return; const t = e.target as any; if (t?.closest?.('[data-tldot]')) return; if (marqStart.current(e)) e.stopPropagation();};
     el.addEventListener('mousedown', down, true); return () => el.removeEventListener('mousedown', down, true);}, []);
+  // 10/11/2026 (Pedro: "linha do tempo com muito lag quando rola o scroll"): a ordem dos itens so muda quando os itens mudam; antes era refeita a cada quadro do deslize
+  const sortedItems = useMemo(() => [...withMoved(items)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()), [items, moved]);
   const points: Point[] = [];
-  const inView = (x: number) => WEB && moving ? x >= -0.6 && x <= 1.6 : x >= -0.01 && x <= 1.01; // deslizando: com folga (a camada anda por CSS)
+  const inView = (x: number) => WEB && moving ? x >= -1.2 && x <= 2.2 : x >= -0.01 && x <= 1.01; // deslizando: com folga (a camada anda por CSS); 10/11/2026: folga maior, refeita menos vezes
   // 06/11/2026 (Pedro: "juntei duas bolinhas e ficou so uma; mudei a prioridade e agrupou"): o item arrastado muda de horario mas
   // continuava no lugar antigo da lista; sem ordenar, os dois ficavam um em cima do outro sem virar grupo
-  for (const r of [...withMoved(items)].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
+  for (const r of sortedItems) {const x = pos(new Date(r.date)); if (!inView(x)) continue; const p = points[points.length - 1]; if (p && p.recs.length && wS && (x - p.x) * wS < 22) p.recs.push(r); else points.push({key: 'r' + r.id + r.date, x, recs: [r], marks: []});}
   const mpoints: Point[] = [];
   for (const m0 of marks) {const mv = moved[markKey(m0)], m = mv ? {...m0, at: new Date(mv)} : m0; /* 06/11/2026 (Pedro: "arrasto as duas e uma vai, a outra fica e depois vai junto"): dose/marca arrastada fica no lugar novo ate a gravacao voltar, como os compromissos */ const x = m.late ? 0.025 : pos(m.at); if (!inView(x)) continue; const p = mpoints[mpoints.length - 1]; if (m.kind === 'routine' && p && p.marks[0]?.kind === 'routine' && wS && (x - p.x) * wS < 22) p.marks.push(m); else mpoints.push({key: 'm' + m.id, x, recs: [], marks: [m]});}
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
@@ -641,7 +651,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const col = colorOf(r, c.accent), x0 = Math.max(0, a), x1 = Math.min(1, b);
       return <View key={'d' + r.id + r.date} pointerEvents="none" style={{position: 'absolute', left: (x0 * 100 + '%') as any, width: ((x1 - x0) * 100 + '%') as any, top: 29 + OFF - 6, height: 12, borderRadius: 6, backgroundColor: tint(col, 0.18), boxShadow: 'inset 0 0 0 1px ' + tint(col, 0.5), opacity: op.rec(r)} as any} />;})}
     {/* marcas e pontos (com a opacidade escolhida na engrenagem) */}
-    {(() => {const reuse = WEB && moving && !!frozen.current && Math.abs(start - frozen.current.start) < SPAN * 0.55;
+    {(() => {const reuse = WEB && moving && !!frozen.current && Math.abs(start - frozen.current.start) < SPAN * 1.1;
+      const lite = WEB && moving, Dot: any = lite ? LiteDot : Pressable; // 10/11/2026: deslizando, a bolinha e so o desenho (sem botao); parou, volta a ser botao
       const el = reuse ? frozen.current!.el : (
     <View pointerEvents="box-none" style={{position: 'absolute', left: 0, right: 0, top: 0, bottom: 0}}>
       {all.map(p => {
@@ -661,34 +672,34 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
         if (picked) HITS.push(<View key={p.key + '-sel'} pointerEvents="none" testID="timeline-selected" style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, borderWidth: 2, borderColor: c.accent, backgroundColor: tint(c.accent, 0.12), zIndex: 3, opacity: drag?.live ? 0.3 : 1} as any} />);
         // 06/11/2026 (Pedro: "tem que ter a mira muito afiada pra arrastar"): no navegador o hitSlop nao vale; uma area invisivel
         // de 36 px por cima de cada ponto pega o clique, o passar do mouse e o arrastar mesmo com o mouse um pouco fora
-        if (WEB) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1', tldot: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
+        if (WEB && !lite) HITS.push(<Pressable key={p.key + '-hit'} accessible={false} onPress={open} onHoverIn={hov.onHoverIn} {...drg} dataSet={{noveil: '1', tldot: '1'}} style={{position: 'absolute', left: (xo * 100 + '%') as any, top: 29 + OFF - 15, width: 30, height: 30, marginLeft: -15, borderRadius: 15, zIndex: 4, cursor: 'pointer', backgroundColor: 'transparent'} as any} />);
         const itemOp = m ? op.mark(m) : op.rec(r), extra: any = {opacity: ghost ? 0.3 * itemOp : itemOp, cursor: 'pointer', /* 0.3.343 (Pedro): passar o mouse mostra o que tem na bolinha (mãozinha de clicar, não a de pegar); arrastar continua funcionando e, ao arrastar, a prévia some */ ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})};
         if (m) {
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
           const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
           const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
-          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
+          return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
             {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName)} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
-          </Pressable>;
+          </Dot>;
         }
         const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1, past = !isNext && p.recs.every(x => new Date(x.date).getTime() < Date.now()); // 0.3.332: o que ja passou fica mais apagado
-        if (!many && r.kind === 'reminder') return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
-          style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Pressable>;
+        if (!many && r.kind === 'reminder') return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+          style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Dot>;
         // 0.3.332 (aprovado por foto): bolinha solta menor; agrupada do mesmo tamanho de antes, com o miolo na cor do mais
         // urgente e um anel inteiro mostrando a mistura (um pedaco por item, na cor de cada um)
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
           const ring = 'conic-gradient(from -90deg, ' + cols.map((col, k) => col + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg').join(', ') + ')';
-          return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+          return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
             style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, ...(WEB ? {backgroundImage: ring} : {backgroundColor: tint(cols[0], 0.45)}), boxShadow: '0 0 0 2px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
             <View style={{width: 15, height: 15, borderRadius: 8, backgroundColor: cols[0], borderWidth: 1.5, borderColor: c.surface, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 10, fontWeight: '700', color: urgOf(r) ? '#fff' : c.onAccent, fontVariant: ['tabular-nums']}}>{openRecs(p.recs).length}</Text></View>
-          </Pressable>;}
+          </Dot>;}
         // 06/11/2026 (Pedro: "tarefa concluida precisa virar uma bolinha verde ticado")
-        if (isDoneRec(r)) return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + ' (concluída)').join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+        if (isDoneRec(r)) return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + ' (concluída)').join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 8, width: 16, height: 16, marginLeft: -8, borderRadius: 8, backgroundColor: c.success, boxShadow: '0 0 0 2.5px ' + c.surface, alignItems: 'center', justifyContent: 'center', outlineStyle: 'none'} as any}>
           <Icon name="check" size={11} color="#fff" />
-        </Pressable>;
+        </Dot>;
         const size = isNext ? 11 : 9;
-        return <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+        return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
           style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
       })}{HITS}
       {marq && Math.abs(marq.b - marq.a) >= 4 ? <OverAll><View pointerEvents="none" testID="timeline-marquee" style={{position: 'absolute', left: Math.min(marq.a, marq.b), top: Math.min(marq.y0, marq.y1), width: Math.abs(marq.b - marq.a), height: Math.max(2, Math.abs(marq.y1 - marq.y0)), borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: tint(c.accent, 0.1), borderRadius: 3, zIndex: 50} as any} /></OverAll> : null}
