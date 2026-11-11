@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Camadas do dia</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.env{width:1440px;height:900px;position:relative;overflow:hidden;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(120% 70% at 50% 108%,#3B2C5C 0%,rgba(59,44,92,0) 60%),radial-gradient(80% 60% at 50% -10%,#1B1830 0%,rgba(27,24,48,0) 70%),linear-gradient(180deg,#0C0B14 0%,#121022 55%,#1A1530 100%)}
+.topbar{position:absolute;left:0;right:0;top:0;height:120px;display:flex;justify-content:space-between;align-items:center;padding:0 64px;box-sizing:border-box}
+.topbar h1{margin:0;font-size:38px;font-weight:700;letter-spacing:-1.1px;line-height:1}
+.topbar p{margin:7px 0 0;font-size:15px;color:rgba(255,255,255,.55);font-weight:500}
+.tr{display:flex;align-items:center;gap:12px}
+.ft{font-size:13px;color:rgba(255,255,255,.55);line-height:1.25}.ft b{color:#fff;font-size:16px}
+.round{width:44px;height:44px;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;margin-left:8px}
+.glass{background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.045));backdrop-filter:blur(36px) saturate(160%);-webkit-backdrop-filter:blur(36px) saturate(160%);border:1px solid rgba(255,255,255,.14);box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 -1px 0 rgba(0,0,0,.25) inset,0 40px 90px rgba(0,0,0,.45)}
+.mk{position:absolute}
+.dot{width:10px;height:10px;border-radius:5px}
+.grp{width:24px;height:24px;border-radius:12px;font-size:12px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
+.cap{width:28px;height:14px;border-radius:7px;background:#30D158}
+.bell{width:30px;height:30px;border-radius:15px;background:#64D2FF;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 5px rgba(100,210,255,.18)}
+.now{position:absolute;width:12px;height:12px;border-radius:6px;background:#FF453A;box-shadow:0 0 0 3px rgba(255,69,58,.25);transform:translate(-50%,-50%)}
+.nowp{position:absolute;transform:translateX(-50%);background:#FF453A;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:3px 8px;white-space:nowrap}
+.st{position:absolute;width:1px;background:rgba(255,255,255,.2)}
+.tk{position:absolute;transform:translateX(-50%);font-size:12px;color:rgba(255,255,255,.38);font-weight:500;white-space:nowrap}
+.plab{position:absolute;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.5);white-space:nowrap}
+.c{position:absolute;white-space:nowrap;padding:10px 14px 11px 11px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 14px 30px rgba(0,0,0,.30);display:flex;gap:10px;align-items:flex-start;box-sizing:border-box}
+.c .ic{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px}
+.c .t{font-size:11.5px;font-weight:600;letter-spacing:.2px;color:rgba(255,255,255,.55)}
+.c .t b{font-weight:700}
+.c .n{font-size:15px;font-weight:600;letter-spacing:-.2px;margin-top:1px}
+.c .m{font-size:11.5px;color:rgba(255,255,255,.5);margin-top:3px;display:flex;gap:6px;align-items:center}
+.chip{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.12);color:#fff}
+.c.next{padding:13px 18px 14px 12px;border-color:rgba(100,210,255,.45);background:linear-gradient(180deg,rgba(100,210,255,.20),rgba(100,210,255,.08));box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 18px 40px rgba(0,0,0,.35),0 0 30px rgba(100,210,255,.15)}
+.c.next .ic{width:34px;height:34px;border-radius:17px;background:#64D2FF}
+.c.next .t{color:#9BE3FF;font-weight:700;letter-spacing:.8px}
+.c.next .n{font-size:19px;font-weight:700;letter-spacing:-.4px}
+.c.next .bar{margin-top:9px;height:3px;border-radius:2px;background:rgba(100,210,255,.18);overflow:hidden}
+.c.next .bar i{display:block;height:100%;width:38%;background:#64D2FF}
+.orn{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;align-items:center;gap:10px}
+.tabs{display:flex;gap:4px;padding:5px;border-radius:30px;background:rgba(255,255,255,.10);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 40px rgba(0,0,0,.35)}
+.tabs span{height:40px;padding:0 20px;border-radius:20px;display:flex;align-items:center;font-size:15px;font-weight:600;color:rgba(255,255,255,.7)}
+.tabs .on{background:rgba(255,255,255,.92);color:#111}
+.ob{width:50px;height:50px;border-radius:25px;background:rgba(255,255,255,.10);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 40px rgba(0,0,0,.35)}
+.cap-note{position:absolute;left:64px;bottom:44px;font-size:12.5px;color:rgba(255,255,255,.4);max-width:330px;line-height:1.5}
+
+
+</style>
+</helmet>
+<div class="env">
+<div class="topbar"><div class="tl"><h1>Hoje</h1><p>Quinta-feira, 5 de novembro</p></div>
+<div class="tr"><svg width="40" height="40" viewBox="0 0 44 44"><circle cx="22" cy="22" r="17" stroke="rgba(255,255,255,.14)" stroke-width="5" fill="none"/><circle cx="22" cy="22" r="17" stroke="#30D158" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="11.9 107" transform="rotate(-90 22 22)"/></svg><div class="ft"><b>1 de 9</b><br>feitos</div><div class="round"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></div></div></div>
+<div style="position:absolute;left:0;top:150px;width:1440px;height:620px;perspective:1400px;perspective-origin:45% 35%">
+<div class="glass" style="position:absolute;left:180px;top:40px;width:420px;height:500px;border-radius:36px;transform:translate3d(1180px,-60px,-560px) rotateY(-14deg);opacity:0.7"><div class="plab" style="left:20px;top:20px;color:#B9A8FF"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B9A8FF" stroke-width="2" stroke-linecap="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Noite<span style="color:rgba(255,255,255,.35);letter-spacing:.3px;text-transform:none;font-weight:500">· 1 item</span></div>
+<div style="position:absolute;left:0;right:0;top:430px;height:2px;background:rgba(255,255,255,.22)"></div>
+<div style="position:absolute;left:22px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:22px;top:446px">18:00</div>
+<div style="position:absolute;left:85px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:147px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:210px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:210px;top:446px">21:00</div>
+<div style="position:absolute;left:273px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:335px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:398px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="st" style="left:179px;top:408px;height:16px"></div>
+<div class="mk dot" style="left:179px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#BF9BFF"></div>
+<div class="c" style="left:167px;top:404px;transform:translate(0,-100%) scale(1.00);transform-origin:0 100%;"><div class="ic" style="background:#BF9BFF22"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BF9BFF" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></div><div><div class="t"><b style="color:#BF9BFF">20:30</b></div><div class="n">Emitir time sheet</div></div></div></div>
+<div class="glass" style="position:absolute;left:180px;top:40px;width:520px;height:500px;border-radius:36px;transform:translate3d(740px,-30px,-260px) rotateY(-10deg);opacity:0.9"><div class="plab" style="left:20px;top:20px;color:#F4D98B"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F4D98B" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/></svg>Tarde<span style="color:rgba(255,255,255,.35);letter-spacing:.3px;text-transform:none;font-weight:500">· 4 itens</span></div>
+<div style="position:absolute;left:0;right:0;top:430px;height:2px;background:rgba(255,255,255,.22)"></div>
+<div style="position:absolute;left:22px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:22px;top:446px">12:00</div>
+<div style="position:absolute;left:101px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:181px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:260px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:260px;top:446px">15:00</div>
+<div style="position:absolute;left:339px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:419px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:498px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:498px;top:446px">18:00</div>
+<div class="st" style="left:108px;top:174px;height:250px"></div>
+<div class="mk grp" style="left:108px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#FF453A">2</div>
+<div class="c" style="left:96px;top:170px;transform:translate(0,-100%) scale(1.00);transform-origin:0 100%;"><div class="ic" style="background:#FF696122"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF6961" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></div><div><div class="t"><b style="color:#FF6961">13:05</b> · 2 itens</div><div class="n">Devolver oficial farma</div><div class="m"><span class="chip">+1</span>Ligar contador</div></div></div>
+<div class="st" style="left:286px;top:408px;height:16px"></div>
+<div class="mk grp" style="left:286px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#BF9BFF;color:#1B1035">2</div>
+<div class="c" style="left:298px;top:404px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic" style="background:#BF9BFF22"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BF9BFF" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></div><div><div class="t"><b style="color:#BF9BFF">15:20</b> · 2 itens</div><div class="n">Fazer esquema de estudo</div><div class="m"><span class="chip">+1</span>Revisar petição</div></div></div>
+<div class="st" style="left:326px;top:252px;height:172px"></div>
+<div class="mk cap" style="left:326px;top:431px;transform:translate(-50%,-50%) scale(1.00)"></div>
+<div class="c" style="left:338px;top:248px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic" style="background:#4CD96422"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4CD964" stroke-width="2" stroke-linecap="round"><path d="M10.5 13.5l3-3M8 16a3.5 3.5 0 0 1 0-5l3-3a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0z"/></svg></div><div><div class="t"><b style="color:#4CD964">15:50</b> · rotina</div><div class="n">Ômega 3 · 4 cápsulas</div></div></div>
+<div class="st" style="left:458px;top:18px;height:406px"></div>
+<div class="mk dot" style="left:458px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#FF453A"></div>
+<div class="c" style="left:470px;top:14px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic" style="background:#FF696122"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF6961" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg></div><div><div class="t"><b style="color:#FF6961">17:30 – 19:00</b> · importante</div><div class="n">Processo júri especial</div><div class="m">Tarefa · 3 passos</div></div></div></div>
+<div class="glass" style="position:absolute;left:180px;top:40px;width:300px;height:500px;border-radius:36px;transform:translate3d(-330px,10px,-380px) rotateY(20deg);opacity:0.45"><div class="plab" style="left:20px;top:20px;color:#A79BFF"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A79BFF" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>Madrugada<span style="color:rgba(255,255,255,.35);letter-spacing:.3px;text-transform:none;font-weight:500">· livre</span></div>
+<div style="position:absolute;left:0;right:0;top:430px;height:2px;background:rgba(255,255,255,.22)"></div>
+<div style="position:absolute;left:22px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div style="position:absolute;left:69px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:115px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:162px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:162px;top:446px">03:00</div>
+<div style="position:absolute;left:208px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:255px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:22px;top:430px;height:2px;width:130px;background:rgba(255,255,255,.6)"></div>
+<div style="position:absolute;left:151px;top:60px;width:2px;height:370px;background:linear-gradient(180deg,rgba(255,69,58,0),#FF453A)"></div>
+<div class="now" style="left:152px;top:431px"></div><div class="nowp" style="left:152px;top:444px">agora 02:48</div></div>
+<div class="glass" style="position:absolute;left:180px;top:40px;width:620px;height:500px;border-radius:36px;transform:translate3d(-40px,0,40px);opacity:1"><div class="plab" style="left:20px;top:20px;color:#F2C38F"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F2C38F" stroke-width="2" stroke-linecap="round"><path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 7v3"/></svg>Manhã<span style="color:rgba(255,255,255,.35);letter-spacing:.3px;text-transform:none;font-weight:500">· 3 itens</span></div>
+<div style="position:absolute;left:0;right:0;top:430px;height:2px;background:rgba(255,255,255,.22)"></div>
+<div style="position:absolute;left:66px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:66px;top:446px">06:00</div>
+<div style="position:absolute;left:155px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:244px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:332px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:332px;top:446px">09:00</div>
+<div style="position:absolute;left:421px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:509px;top:427px;width:1px;height:6px;background:rgba(255,255,255,0.2)"></div>
+<div style="position:absolute;left:598px;top:425px;width:1px;height:10px;background:rgba(255,255,255,0.45)"></div>
+<div class="tk" style="left:598px;top:446px">12:00</div>
+<div class="st" style="left:362px;top:408px;height:16px"></div>
+<div class="mk bell" style="left:362px;top:431px;transform:translate(-50%,-50%) scale(1.00)"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0B2733" stroke="none" stroke-width="2" stroke-linecap="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></div>
+<div class="c next" style="left:374px;top:404px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="#0B2733" stroke="none" stroke-width="2" stroke-linecap="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></div><div><div class="t">O PRÓXIMO · 09:20</div><div class="n">Emitir nota</div><div class="m" style="color:#9BCFE0">Lembrete · faltam 6 h 32</div><div class="bar"><i></i></div></div></div>
+<div class="st" style="left:450px;top:252px;height:172px"></div>
+<div class="mk dot" style="left:450px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#FF453A"></div>
+<div class="c" style="left:462px;top:248px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic" style="background:#FF696122"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF6961" stroke-width="2" stroke-linecap="round"><path d="M5 12l4 4 10-10"/></svg></div><div><div class="t"><b style="color:#FF6961">10:20</b> · importante</div><div class="n">Pagar boleto Cemig</div></div></div>
+<div class="st" style="left:517px;top:174px;height:250px"></div>
+<div class="mk dot" style="left:517px;top:431px;transform:translate(-50%,-50%) scale(1.00);background:#BF9BFF"></div>
+<div class="c" style="left:529px;top:170px;transform:translate(-100%,-100%) scale(1.00);transform-origin:100% 100%;"><div class="ic" style="background:#BF9BFF22"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BF9BFF" stroke-width="2" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="16" r="2"/></svg></div><div><div class="t"><b style="color:#BF9BFF">11:05</b></div><div class="n">Procurar música</div></div></div></div>
+</div>
+<div style="position:absolute;left:250px;top:715px;width:800px;height:40px;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.45),rgba(0,0,0,0))"></div>
+<div class="orn"><div class="ob"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></div><div class="tabs"><span class="">Hora</span><span class="on">Dia</span><span class="">Semana</span><span class="">Mês</span></div><div class="ob"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></div></div>
+<div class="cap-note">Camadas: o período em que você está fica na frente; os próximos esperam atrás, em fila. Rolar traz o próximo para frente e o que passou sai pela esquerda.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -313,6 +313,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **(11/11)** Linha do tempo expansiva: só desenho, nada no código. Quadro https://claude.ai/artifact/5gf55bWJ48CmdQU4321Ksk ; cópia em `docs/design/2026-11-linha-expansiva/`. Pedro gostou do acabamento Apple (★★★, janela de vidro + balões); falta ele escolher entre Panorama, Camadas, Órbita e Mostrador (ou o Túnel). Depois: desenho do Drive da Sofia e histórico de dias passados na linha.
 - **(11/11)** Duplicar página (Clonar idêntica / Só a estrutura): Pedro confere na tela; APK candidato (run 42986775539) não conferido, a pedido dele; no app do celular a barra lateral não tem esse menu.
 - **(10/11)** Início vazio ao ligar o PC: corrigido pelo plano B da trava, mas não reproduzido com o Windows iniciando de verdade. Se voltar, o `[fluidez] inicio-incompleto` diz `held` e `netFallback`.
 - **Word (07/11):** o documento "Reel_GWM_Lista_de_Download.docx" do Pedro perdeu as linhas da tabela num salvamento (conversão HTML→docx). Não reproduzido com tabela simples; agora há trava (não troca se perder linha/texto) e botão Versões para ele voltar. Depois a versão atual dele ficou EM BRANCO (salvo antes de abrir, antes da trava): Pedro deve voltar pela Versões (relógio na janela). Agora o editor nunca salva antes de abrir nem vazio. Se repetir, pedir o arquivo original para reproduzir; considerar editar o .docx no próprio XML (como o PowerPoint).
@@ -405,17 +406,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-11 | (sem APK) | Linha do tempo expansiva: desenhos (Apple, Panorama, Camadas, Órbita, Mostrador) no quadro e em docs/design/2026-11-linha-expansiva | só desenho; nenhum código mudou |
 | 2026-11-11 | (sem APK) | Quadro: print/imagem colada fica na proporção dela, sem faixa preta (inclusive as já coladas) | robô quadro-print-colado 5/5; quadro-pdf-pulo ok; tsc ok; npm test só a falha antiga do Java; site no ar conferido |
 | 2026-11-11 | (sem APK) | Quadro: quadrados dos cantos da janela não aparecem mais ao mover nem ao passar o mouse, só esticando | robô quadro-pdf-pulo 11/11; tsc ok; npm test só a falha antiga do Java local; site recompilado |
 | 2026-11-11 | (delivery) | Repositório do GitHub renomeado de `sofiaos` para `SOFIA_OS` (pedido do Pedro: padrão NOME_NOME); endereço atualizado no atualizador, entrega e docs | tsc ok; npm test sem falhas novas (java/CRLF são do PC); endereço antigo redireciona (301) e o APK baixa por ele; site recompilado |
 | 2026-11-11 | (delivery) | Duplicar página: escolha Clonar idêntica (com subpáginas e conteúdo) ou Só a estrutura | tsc ok; clonar 5/5; npm test só a falha antiga do Java local; site recompilado |
-| 2026-11-11 | (delivery) | Janela do PDF/Word no Quadro estica pelos 4 cantos | robô quadro-pdf-pulo OK; tsc ok; npm test sem falhas novas; site recompilado |
-| 2026-11-11 | (delivery) | Quadro não dá mais pulo (zoom) ao abrir arquivo do cartão da página como janela | robô quadro-pdf-pulo OK; tsc ok; npm test sem falhas novas; site recompilado |
-| 2026-11-10 | (delivery) | PDF da página abre e edita no mesmo editor do Word (converte pelo Google e volta a PDF ao salvar) | tsc ok; servidor 460 (3 falhas antigas); app sem falhas novas; site recompilado |
-| 2026-11-10 | (delivery) | Nome da página aberta na aba do navegador | tsc ok; npm test sem falhas novas; site recompilado |
-| 2026-11-10 | (delivery) | Mover página na barra lateral não volta mais ao lugar (revisão lida do servidor, não da cópia da abertura) | tsc ok; legacy-md/editor 24/24; npm test sem falhas novas; site recompilado |
-| 2026-11-10 | (delivery) | Página não trava mais em Conflito quando a resposta do salvar se perde (junta sozinho); arquivo com envio interrompido sai de "Enviando…" | tsc ok; editor 16/16; npm test sem falhas novas; site recompilado |
-| 2026-11-09 | (delivery) | Compromisso criado sem fim não ganha mais 1 h de duração (só o ponto na linha do tempo) | tsc/npm test ok, site recompilado |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
