@@ -417,6 +417,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 | 2026-11-09 | (delivery) | Linha do tempo sem travar na rodinha; edição rápida e Conversa na ordem certa; esqueleto das Finanças/apps (raiz 07/11); lembrete feito encerra as outras datas; rodinha rola o cartão do Quadro; ícone de farmácia | tsc/npm test ok, site recompilado; rolagem, esqueleto e cartão conferidos no navegador |
 
 ## 11. Lições de erro (para calibrar quem chegar)
+- **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
 - **09/11: esqueleto por aba vale para TODAS as telas que a aba abre.** Aba Apps abre cada app direto e Páginas abre uma página; o esqueleto da tela-mãe (grade/lista) não serve para elas. Antes de mudar o esqueleto de uma aba, listar o que essa aba abre.
 
 - **09/11: esqueleto "de outra tela" só aparece no caminho real.** Abrir a página direto pela URL não mostrava nada; o defeito só aparecia saindo do Início e clicando na página da barra lateral (fallback da aba = esqueleto da LISTA). Filmar quadro a quadro o caminho que o Pedro faz, com CPU 4x mais lenta.
