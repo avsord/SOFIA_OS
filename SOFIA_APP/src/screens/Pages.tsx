@@ -58,7 +58,7 @@ import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
 import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,sharedPages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
-import {pageUrlPath} from '../lib/web-route';
+import {pageUrlPath,pageTabTitle,setOpenPageTitle} from '../lib/web-route';
 import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
 import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,hasPlain,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
 import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
@@ -253,6 +253,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const coverHoverOff=()=>{if(coverHoverTimer.current)clearTimeout(coverHoverTimer.current);coverHoverTimer.current=setTimeout(()=>setCoverHoverRaw(false),160);};
  // 0.3.267 (computador): topo da página como no Notion (Editada…, copiar link, favorito) e "↑ Topo" no centro em páginas longas
  const favorites=useStore(favoritePages),[showTop,setShowTop]=useState(false),showTopRef=useRef(false),docScroll=useRef<ScrollView>(null),[flash,setFlash]=useState('');
+ // 10/11/2026: nome da pagina aberta na aba do navegador ("(3) Mapa · Sofia"); sem pagina aberta volta para "Páginas · Sofia"
+ const tabName=entry?(String(entry.draft.title||'').trim()||'Sem título'):'';
+ useEffect(()=>{if(Platform.OS!=='web')return;setOpenPageTitle(active?tabName:'');if(!active||EMBED)return;try{const d=(globalThis as any).document;if(!d)return;const pre=/^\(\d+\) /.exec(d.title)?.[0]||'',next=pre+(tabName?pageTabTitle(tabName):'Páginas · Sofia');if(d.title!==next)d.title=next;}catch{/* sem titulo */}},[active,tabName]);
  useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path!==next)w.history?.replaceState?.(w.history.state,'',next);}catch{/* sem endereço */}},[selectedId,active]);
  useEffect(()=>{showTopRef.current=false;setShowTop(false);},[selectedId]);
  function editedLabel(at:string){const d=new Date(at);if(Number.isNaN(d.getTime()))return '';const now=new Date(),same=d.toDateString()===now.toDateString();return 'Editada '+(same?'hoje às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})}));}
