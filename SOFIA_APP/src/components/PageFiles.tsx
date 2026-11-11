@@ -43,12 +43,15 @@ export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordproc
 /** .docx abre no editor da Sofia (o resto do Office continua em PDF). */
 export const isDocx = (mime?: string, name?: string) => String(mime || '') === DOCX_MIME || /\.docx$/i.test(String(name || ''));
 /** 07/11/2026: Word, Excel e PowerPoint abrem nos editores da Sofia. */
-export const editKind = (mime?: string, name?: string): 'docx' | 'xlsx' | 'pptx' | null => isDocx(mime, name) ? 'docx' : String(mime || '') === XLSX_MIME || /\.xlsx$/i.test(String(name || '')) ? 'xlsx' : String(mime || '') === PPTX_MIME || /\.pptx$/i.test(String(name || '')) ? 'pptx' : null;
+// 10/11/2026 (Pedro: "quero o mesmo sistema do word no pdf"): PDF de pagina abre no editor do Word (o Google o converte em
+// documento) e, ao salvar, volta a ser PDF. Arquivo do Drive em PDF continua so para ver.
+export const isPdfFile = (mime?: string, name?: string) => String(mime || '') === 'application/pdf' || /\.pdf$/i.test(String(name || ''));
+export const editKind = (mime?: string, name?: string): 'docx' | 'xlsx' | 'pptx' | 'pdf' | null => isPdfFile(mime, name) ? 'pdf' : isDocx(mime, name) ? 'docx' : String(mime || '') === XLSX_MIME || /\.xlsx$/i.test(String(name || '')) ? 'xlsx' : String(mime || '') === PPTX_MIME || /\.pptx$/i.test(String(name || '')) ? 'pptx' : null;
 export {XLSX_MIME, PPTX_MIME};
-function officeEditor(kind: 'docx' | 'xlsx' | 'pptx', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void; target?: SaveTarget}) {return kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
+function officeEditor(kind: 'docx' | 'xlsx' | 'pptx' | 'pdf', p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void; onShowVersions?: () => void; target?: SaveTarget}) {return kind === 'pdf' ? <DocEditor {...p} format="pdf" /> : kind === 'docx' ? <DocEditor {...p} /> : kind === 'xlsx' ? <SheetEditor {...p} /> : <SlideEditor {...p} />;}
 type SavedFile = {id: string; name: string; mime: string; bytes: number};
 /** Abre no editor: arquivo de pagina, ou do Drive que nao seja do Google Docs (esse so abre para ver). */
-const canEdit = (f: {mime: string; name: string; pageId?: string; drive?: boolean}) => !!editKind(f.mime, f.name) && (!!f.pageId || (!!f.drive && !String(f.mime || '').startsWith('application/vnd.google-apps.')));
+const canEdit = (f: {mime: string; name: string; pageId?: string; drive?: boolean}) => !!editKind(f.mime, f.name) && (!!f.pageId || (!!f.drive && !isPdfFile(f.mime, f.name) && !String(f.mime || '').startsWith('application/vnd.google-apps.')));
 /** O alvo fica o mesmo enquanto o editor estiver aberto (guarda a data de modificacao do ultimo salvamento). */
 function DriveEdit({kind, p, base}: {kind: 'docx' | 'xlsx' | 'pptx'; p: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: SavedFile) => void}; base: string}) {
   const target = useRef<SaveTarget>({kind: 'drive', fileId: p.id, base}).current; return officeEditor(kind, {...p, target});
@@ -81,12 +84,12 @@ const geoKey = (where: 'win' | 'popup', ed: boolean) => 'sofia.janela.' + where 
 function readGeo(where: 'win' | 'popup', ed: boolean): Geo | null {try {const g = JSON.parse(localStorage.getItem(geoKey(where, ed)) || 'null'); return g && [g.x, g.y, g.w, g.h].every(Number.isFinite) && g.w > 200 && g.h > 150 ? g : null;} catch {return null;}}
 function saveGeo(where: 'win' | 'popup', ed: boolean, g: Geo) {try {localStorage.setItem(geoKey(where, ed), JSON.stringify({x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h)}));} catch {}}
 const links = new Map<string, {url: string; until: number}>();
-async function signedUrl(api: SofiaApi, id: string, as: '' | 'pdf' | 'download' = '') {
+async function signedUrl(api: SofiaApi, id: string, as: '' | 'pdf' | 'docx' | 'download' = '') {
   const hit = links.get(id); let url = hit && hit.until > Date.now() ? hit.url : '';
   if (!url) {url = (await api.attachmentLink(id)).url; links.set(id, {url, until: Date.now() + 90 * 60000});}
   return url + (as ? '&as=' + as : '');
 }
-function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' = '', drive = false) {
+function useSigned(api: SofiaApi, id: string | undefined, as: '' | 'pdf' | 'docx' = '', drive = false) {
   const [state, setState] = useState<{url: string; error: string; base?: string}>({url: '', error: ''});
   useEffect(() => {let live = true; setState({url: '', error: ''}); if (!id) return;
     // 07/11/2026: arquivo do Drive (editar no proprio Drive): link assinado do Drive e a data de modificacao de agora
@@ -118,7 +121,7 @@ export function detachFile(api: SofiaApi, f: {id: string; name: string; mime: st
   doc.body.textContent = 'Abrindo ' + f.name + '…';
   const ek = editKind(f.mime, f.name), editable = !!ek && !!f.pageId;
   // 07/11/2026 (Pedro: "nesse tipo de aba tambem tem que dar pra editar e salvar no proprio docx"): .docx abre no editor
-  if (editable) {void signedUrl(api, f.id, '').then(url => {doc.body.textContent = ''; doc.body.style.cssText = 'margin:0;height:100vh;background:#e9e9ee;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif';
+  if (editable) {void signedUrl(api, f.id, ek === 'pdf' ? 'docx' : '').then(url => {doc.body.textContent = ''; doc.body.style.cssText = 'margin:0;height:100vh;background:#e9e9ee;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif';
     mountInWindow(win, officeEditor(ek!, {api, id: f.id, name: f.name, url, pageId: f.pageId!, onSaved: a => {doc.title = a.name; f.onSaved?.(a);}}));}).catch(e => {doc.body.textContent = errorText(e);}); return true;}
   void signedUrl(api, f.id, OFFICE(k) ? 'pdf' : '').then(async url => {
     doc.body.textContent = ''; doc.title = f.name;
@@ -230,14 +233,14 @@ function FileWindow({win}: {win: Win}) {
 
 export function FileBody({api, id, firstId, name, mime, zoom, onZoom, pageId, drive, onSaved, onShowVersions}: {api: SofiaApi; id: string; firstId: string; name: string; mime: string; zoom: number; onZoom: (z: number) => void; pageId?: string; drive?: boolean; onSaved: (a: SavedFile) => void; onShowVersions?: () => void}) {
   const ek = editKind(mime, name), editable = canEdit({mime, name, pageId, drive}); /* o editor fica com o arquivo de quando abriu: salvar cria um anexo novo e nao recarrega */
-  const c = useTheme(), k = fileKind(mime, name), {url, error, base} = useSigned(api, editable ? firstId : id, editable ? '' : OFFICE(k) ? 'pdf' : '', !!drive), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
+  const c = useTheme(), k = fileKind(mime, name), {url, error, base} = useSigned(api, editable ? firstId : id, editable ? (ek === 'pdf' ? 'docx' : '') : OFFICE(k) ? 'pdf' : '', !!drive), [text, setText] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   useEffect(() => {if (!url) return; const t = setTimeout(() => setLoaded(true), 3500); return () => clearTimeout(t);}, [url]); // o leitor de PDF nem sempre avisa que terminou
   const textual = !inlineCapable(k) && windowCapable(k, name);
   useEffect(() => {if (!textual || !url) return; let live = true; fetch(url).then(r => r.text()).then(t => {if (live) setText(t.slice(0, 400000));}).catch(() => {if (live) setText('');}); return () => {live = false;};}, [url, textual]);
   if (error) return <Center><Icon name="warning" size={22} color={c.muted} /><Text style={{color: c.text, fontSize: 13, textAlign: 'center', maxWidth: 320}}>{error}</Text><DownloadButton api={api} id={id} /></Center>;
   if (!windowCapable(k, name)) return <Center><Icon name={KIND[k].icon} size={30} color={KIND[k].color} /><Text style={{color: c.text, fontSize: 13}}>Este tipo de arquivo não tem visualização.</Text><DownloadButton api={api} id={id} /></Center>;
-  if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
-  if (editable && drive && ek) return <DriveEdit kind={ek} p={{api, id: firstId, name, url, pageId: '', onSaved}} base={base || ''} />;
+  if (!url) return <Center><Spinner size={18} /><Text style={{color: c.muted, fontSize: 12}}>{editable && ek === 'pdf' ? 'Preparando o PDF para editar…' : OFFICE(k) ? 'Preparando a visualização…' : 'Abrindo…'}</Text></Center>;
+  if (editable && drive && ek && ek !== 'pdf') return <DriveEdit kind={ek} p={{api, id: firstId, name, url, pageId: '', onSaved}} base={base || ''} />;
   if (editable && pageId && ek) return officeEditor(ek, {api, id: firstId, name, url, pageId, onSaved, onShowVersions});
   if (k === 'image') return h('div', {style: {width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: zoom ? 'flex-start' : 'center', justifyContent: zoom ? 'flex-start' : 'center'},
     onWheel: (e: any) => {if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); onZoom(Math.max(25, Math.min(400, (zoom || 100) + (e.deltaY < 0 ? 15 : -15))));}},

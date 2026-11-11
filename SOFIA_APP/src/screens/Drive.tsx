@@ -183,7 +183,7 @@ function DriveInner({api: rawApi, active, onBack, frame}: {api: SofiaApi; active
   const pasteMenu = (): MenuItem[] => !WEB ? [] : [{label: peekSofiaClip()?.sofia === 'page-files' ? 'Colar arquivos da página' : 'Colar', icon: 'copy', run: () => {
     void (async () => { let clip = peekSofiaClip(); try { const t = await (navigator as any).clipboard?.readText?.(); clip = parseSofiaClip(t) || (t ? null : clip); } catch { /* sem permissao: vale o desta aba */ } pasteClip(clip); })(); }}];
   // Word/Excel/PowerPoint do Drive abrem no editor da Sofia; salvar grava no proprio arquivo (nova revisao no Google)
-  const editKindOf = (it: SdItem) => !it.folder && !String(it.mime || '').startsWith('application/vnd.google-apps.') ? editKind(it.mime, it.name) : null;
+  const editKindOf = (it: SdItem) => !it.folder && !String(it.mime || '').startsWith('application/vnd.google-apps.') && editKind(it.mime, it.name) !== 'pdf' ? editKind(it.mime, it.name) : null; // PDF do Drive: so ver (10/11/2026)
   const editItem = (it: SdItem) => { setSel([it.id]); openFileWindow(api, {id: it.id, name: it.name, mime: it.mime, drive: true, onSaved: () => { void refresh(); }}); };
   useEffect(() => {
     if (!WEB || !active) return;

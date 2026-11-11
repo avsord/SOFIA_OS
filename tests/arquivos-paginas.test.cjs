@@ -97,3 +97,20 @@ test('zoom proprio dos editores (sem mudar o do navegador)',()=>{
  assert.ok(ch.includes('export function useEditorZoom(')&&ch.includes("node.addEventListener('wheel', on, {passive: false})"));
  for(const f of ['DocEditor','SheetEditor','SlideEditor'])assert.ok(read('SOFIA_APP/src/components/'+f+'.tsx').includes('h(ZoomControl'),f);
 });
+// 10/11/2026 (Pedro: "quero o mesmo sistema do word no pdf"): PDF abre no editor do Word e, ao salvar, volta a ser PDF.
+test('PDF vira documento para editar e o documento salvo volta a PDF (copia temporaria no Google sempre apagada)',async()=>{
+ const {GoogleService}=require('../src/services/google.js'),P=GoogleService.prototype,calls=[];
+ const fake={driveOn:()=>true,token:async()=>'t',sdPreviewSweep:async()=>{},attachmentBytes:async()=>Buffer.from('%PDF-1.4'),
+  call:async(m,u,body,h)=>{calls.push([m,u,String(body).includes('application/vnd.google-apps.document')]);return {id:'tmp1'};},
+  fetch:async u=>{calls.push(['GET',u]);return {ok:true,arrayBuffer:async()=>new TextEncoder().encode(u.includes('pdf')?'PDF':'DOCX').buffer};}};
+ fake.convertBytes=P.convertBytes;
+ const docx=await P.attachmentDocx.call(fake,{id:'a1',name:'DECUPAGEM.pdf',mime:'application/pdf'});
+ assert.equal(docx.toString(),'DOCX');assert.ok(calls.some(c=>c[0]==='POST'&&c[2]),'enviado como documento do Google');
+ assert.ok(calls.some(c=>c[0]==='GET'&&c[1].includes('wordprocessingml')));
+ assert.ok(calls.some(c=>c[0]==='DELETE'&&c[1].includes('tmp1')),'copia temporaria apagada');
+ const pdf=await P.docxToPdf.call(fake,Buffer.from('PK'),'DECUPAGEM.pdf');assert.equal(pdf.toString(),'PDF');
+ await assert.rejects(P.attachmentDocx.call({...fake,attDocxMemo:undefined},{id:'a2',name:'x.docx',mime:'application/msword'}),/Só PDF/);
+ await assert.rejects(P.convertBytes.call({...fake,driveOn:()=>false},Buffer.from('x'),'application/pdf','x','a.pdf'),/conecte o Google/);
+ const m=read('src/channels/mobile.js');assert.ok(m.includes("['download', 'pdf', 'docx'].includes(url.searchParams.get('as'))"));assert.ok(m.includes("const asPdf = b.format === 'pdf';")&&m.includes("await runtime.google.docxToPdf(buf, name)"));
+ const f=read('SOFIA_APP/src/components/PageFiles.tsx');assert.ok(f.includes("kind === 'pdf' ? <DocEditor {...p} format=\"pdf\" />"));
+});

@@ -498,7 +498,7 @@ export class SofiaApi {
   async entityVersions(id:string) { return (await this.request<{items:{id:string;revision:number;created_at:string;snapshot:Entity}[]}>('/workspace/entities/'+encodeURIComponent(id)+'/versions',undefined,'GET',30000)).items||[]; }
   async entityAttachments(id:string) { return (await this.request<{items:{id:string;name:string;mime:string;bytes:number;created_at:string}[]}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments')).items||[]; }
   /** 07/11/2026: documento do editor de Word da Sofia (HTML) -> .docx anexado a pagina. */
-  saveDocx(pageId:string,input:{html:string;name:string}) { return this.request<{id:string;name:string;mime:string;bytes:number}>('/workspace/entities/'+encodeURIComponent(pageId)+'/docx',input,'POST',90000); }
+  saveDocx(pageId:string,input:{html:string;name:string;format?:'pdf'}) { return this.request<{id:string;name:string;mime:string;bytes:number}>('/workspace/entities/'+encodeURIComponent(pageId)+'/docx',input,'POST',90000); }
   async attachmentLink(id:string) { const r=await this.request<{url:string;name:string;mime:string;bytes:number}>('/workspace/attachments/'+encodeURIComponent(id)+'/link');return {...r,url:SITE+r.url}; }
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }

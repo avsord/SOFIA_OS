@@ -91,9 +91,9 @@ function makeMobileApi(runtime, deps) {
   const fileLink = id => { const exp = Date.now() + 2 * 3600000; return '/api/mobile/file-stream/' + id + '?exp=' + exp + '&sig=' + fileSig(id, exp); };
   const fileLinkValid = (id, exp, sig) => { const e = Number(exp); if (!e || e < Date.now() || typeof sig !== 'string') return false; const want = Buffer.from(fileSig(id, e)), got = Buffer.from(sig); return want.length === got.length && crypto.timingSafeEqual(want, got); };
   async function sendAttachment(req, res, id, as) {
-    const a0 = workspace.attachment(validId(id)), pdf = as === 'pdf';
-    const bytes = pdf ? await runtime.google.attachmentPdf(a0) : runtime.google && runtime.google.attachmentBytes ? await runtime.google.attachmentBytes(a0) : Buffer.from(a0.blob || []);
-    const a = pdf ? {...a0, mime: 'application/pdf', name: String(a0.name || 'arquivo').replace(/\.[^.]+$/, '') + '.pdf'} : a0;
+    const a0 = workspace.attachment(validId(id)), pdf = as === 'pdf', docx = as === 'docx'; /* 10/11/2026: docx = PDF aberto no editor do Word */
+    const bytes = pdf ? await runtime.google.attachmentPdf(a0) : docx ? await runtime.google.attachmentDocx(a0) : runtime.google && runtime.google.attachmentBytes ? await runtime.google.attachmentBytes(a0) : Buffer.from(a0.blob || []);
+    const a = pdf ? {...a0, mime: 'application/pdf', name: String(a0.name || 'arquivo').replace(/\.[^.]+$/, '') + '.pdf'} : docx ? {...a0, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', name: String(a0.name || 'arquivo').replace(/\.[^.]+$/, '') + '.docx'} : a0;
     const inline = as !== 'download' && require('../core/workspace').inlineSafe(a.mime), total = bytes.length;
     res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; object-src 'self'"); res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     let start = 0, end = total - 1; const r = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
@@ -207,7 +207,7 @@ function makeMobileApi(runtime, deps) {
     // 07/11/2026 (Pedro: arquivos nas Paginas): PDF/video/audio da pagina abre na janela flutuante. O quadro e o player nao
     // mandam login: link assinado (chave sorteada a cada partida do servidor), vale 2 h. Video pula para frente (Range).
     { const am = p.match(/^\/api\/mobile\/file-stream\/([A-Za-z0-9_-]{6,80})$/);
-      if (am && (m === 'GET' || m === 'HEAD')) { if (!fileLinkValid(am[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await sendAttachment(req, res, am[1], ['download', 'pdf'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''); return true; } }
+      if (am && (m === 'GET' || m === 'HEAD')) { if (!fileLinkValid(am[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await sendAttachment(req, res, am[1], ['download', 'pdf', 'docx'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''); return true; } }
     // 07/11/2026: player de video/audio do Drive - a tag <video> nao manda login; o link e assinado e vale 2 h
     { const sm = p.match(/^\/api\/mobile\/md\/sofiadrive\/stream\/([A-Za-z0-9_-]{6,200})$/);
       if (sm && (m === 'GET' || m === 'HEAD')) { if (!runtime.google.sdStreamValid(sm[1], url.searchParams.get('exp'), url.searchParams.get('sig'))) fail('LINK_EXPIRED', 'Link do arquivo expirou. Abra de novo.', 403); await runtime.google.sdStream(req, res, sm[1], {as: ['preview', 'download'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : ''}); return true; } }
@@ -545,11 +545,13 @@ function makeMobileApi(runtime, deps) {
     // o editor do site manda o HTML do documento; aqui vira .docx de verdade e entra como anexo novo da pagina.
     { const dm = p.match(/^\/api\/mobile\/workspace\/entities\/([A-Za-z0-9_-]{6,80})\/docx$/);
       if (dm && m === 'POST') { rate(session, 'docx-save', 240); const b = await bodyJson(req, 30 * 1024 * 1024);
-        let name = String(b.name || 'Documento.docx').replace(/[\\/]/g, '_').trim().slice(0, 150) || 'Documento.docx'; if (!/\.docx$/i.test(name)) name += '.docx';
+        const asPdf = b.format === 'pdf'; /* 10/11/2026: PDF editado no editor do Word volta a ser PDF */
+        let name = String(b.name || 'Documento.docx').replace(/[\\/]/g, '_').trim().slice(0, 150) || 'Documento.docx'; if (asPdf) name = name.replace(/\.(docx|pdf)$/i, '') + '.pdf'; else if (!/\.docx$/i.test(name)) name += '.docx';
         const H = require('@turbodocx/html-to-docx'), html = String(b.html || '').trim() || '<p></p>';
         const out = await (H.default || H)(html, null, {title: name.replace(/\.docx$/i, ''), font: 'Calibri', fontSize: 22, margins: {top: 1440, right: 1440, bottom: 1440, left: 1440}});
         const buf = Buffer.isBuffer(out) ? out : Buffer.from(out instanceof ArrayBuffer ? new Uint8Array(out) : await out.arrayBuffer());
-        const a = workspace.attach(validId(dm[1]), {name, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base64: buf.toString('base64')});
+        const fileBuf = asPdf ? await runtime.google.docxToPdf(buf, name) : buf;
+        const a = workspace.attach(validId(dm[1]), {name, mime: asPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base64: fileBuf.toString('base64')});
         try { await runtime.google.attachmentToDrive(a.id); } catch (e) { try { workspace.db.prepare('DELETE FROM attachments WHERE id=?').run(a.id); } catch {} throw e; } // direto para o Drive (area oculta)
         return send({id: a.id, name: a.name, mime: a.mime, bytes: a.bytes}); } }
     { const lm = p.match(/^\/api\/mobile\/workspace\/attachments\/([A-Za-z0-9_-]{6,80})\/link$/);

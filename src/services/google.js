@@ -1554,6 +1554,30 @@ class GoogleService {
     return job;
   }
 
+  /** 10/11/2026 (Pedro: "quero o mesmo sistema do word no pdf"): converte pelo Google numa copia temporaria (apagada logo
+   * depois; a varredura apaga sobras). from = tipo do arquivo enviado; to = formato exportado. */
+  async convertBytes(bytes, from, to, name) {
+    if (!this.driveOn()) throw new AppError('NO_DRIVE', 'Para editar PDF aqui, conecte o Google em Perfil › Conexões.', 409);
+    const {body, type} = GoogleService.multipart({name: String(name || 'Arquivo').replace(/\.[^.]+$/, '') || 'Arquivo', mimeType: 'application/vnd.google-apps.document', appProperties: {sofia_cat: 'preview_tmp'}}, from, bytes);
+    const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': type});
+    try {
+      const res = await this.fetch(DRIVE + '/files/' + up.id + '/export?mimeType=' + encodeURIComponent(to), {headers: {Authorization: 'Bearer ' + await this.token()}});
+      if (!res.ok) throw new AppError('GOOGLE_API', 'O Google não converteu o arquivo (' + res.status + ').', 502);
+      return Buffer.from(await res.arrayBuffer());
+    } finally { this.call('DELETE', DRIVE + '/files/' + up.id).catch(() => {}); this.sdPreviewSweep().catch(() => {}); }
+  }
+  /** PDF da pagina -> .docx para abrir no editor do Word. Guarda os ultimos 20. */
+  async attachmentDocx(a) {
+    if (!(String(a.mime || '') === 'application/pdf' || /\.pdf$/i.test(String(a.name || '')))) throw new AppError('BAD_FILE', 'Só PDF vira documento para editar.', 415);
+    this.attDocxMemo = this.attDocxMemo || new Map(); const hit = this.attDocxMemo.get(a.id); if (hit) return hit;
+    const job = (async () => this.convertBytes(await this.attachmentBytes(a), 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', a.name))();
+    this.attDocxMemo.set(a.id, job); job.catch(() => this.attDocxMemo.delete(a.id));
+    while (this.attDocxMemo.size > 20) this.attDocxMemo.delete(this.attDocxMemo.keys().next().value);
+    return job;
+  }
+  /** .docx (o que o editor salvou) -> PDF, para o PDF editado voltar a ser PDF. */
+  docxToPdf(bytes, name) { return this.convertBytes(bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf', name); }
+
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
     const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };

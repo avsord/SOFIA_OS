@@ -40,7 +40,7 @@ function inlineForDocx(src: HTMLElement): string {
   return clone.innerHTML;
 }
 
-export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions, target}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void; onShowVersions?: () => void; target?: SaveTarget}) {
+export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions, target, format}: {api: SofiaApi; id: string; name: string; url: string; pageId: string; onSaved: (a: Saved) => void; onShowVersions?: () => void; target?: SaveTarget; format?: 'pdf'}) {
   const drive = target && target.kind === 'drive' ? target : null;
   const [empty, setEmpty] = useState(false);
   const [zoom, setZoom] = useEditorZoom('docx'), scroller = useRef<HTMLDivElement | null>(null);
@@ -78,11 +78,11 @@ export function DocEditor({api, id, name, url, pageId, onSaved, onShowVersions, 
     try {
       // Drive (07/11/2026): o servidor so converte; aqui confere e so entao grava no proprio arquivo do Drive
       const driveBytes = drive ? await api.sdRenderDocx({html, name}) : null;
-      const a = drive ? null : await api.saveDocx(pageId, {html, name});
+      const a = drive ? null : await api.saveDocx(pageId, format === 'pdf' ? {html, name, format} : {html, name}); /* 10/11/2026: PDF editado volta a ser PDF */
       // 07/11/2026 (Pedro: "sumiu conteudo aqui"): antes de trocar o arquivo, abre o salvo escondido e compara com a tela.
       // Se faltar linha de tabela ou texto, NAO troca: o documento continua o de antes.
       const now = measure(host.current?.querySelector('.docx-wrapper') || null);
-      try {const bytes = driveBytes ? driveBytes.slice().buffer : await fetch((await api.attachmentLink(a!.id)).url + '&as=download').then(r => r.arrayBuffer()); const d = host.current!.ownerDocument, box = d.createElement('div'), st = d.createElement('div'); box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;visibility:hidden'; d.body.appendChild(st); d.body.appendChild(box);
+      if (format !== 'pdf') try {const bytes = driveBytes ? driveBytes.slice().buffer : await fetch((await api.attachmentLink(a!.id)).url + '&as=download').then(r => r.arrayBuffer()); const d = host.current!.ownerDocument, box = d.createElement('div'), st = d.createElement('div'); box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;visibility:hidden'; d.body.appendChild(st); d.body.appendChild(box);
         await lib.current.renderAsync(bytes, box, st, {className: 'docxcheck', inWrapper: true, breakPages: false, experimental: true}); const got = measure(box); box.remove(); st.remove();
         if (got.rows < now.rows || got.chars < now.chars * 0.97) {dirty.current = false; blocked.current = html; setStatus('Não salvei para não perder conteúdo (' + (got.rows < now.rows ? 'tabela' : 'texto') + '). O documento continua como estava.'); return;}
       } catch {/* sem como conferir: segue (o servidor ja confere o texto) */}
