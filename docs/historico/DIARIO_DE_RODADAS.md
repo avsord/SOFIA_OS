@@ -19,3 +19,4 @@
 | 2026-11-09 | (delivery) | Notificações: Limpar notificações no lugar de Marcar tudo como lido | tsc/npm test ok, site recompilado |
 | 2026-11-09 | (delivery) | Página com capa não pula mais na 1ª entrada (altura por proporção) | 8 px → 0 medido no navegador; tsc/npm test ok |
 | 2026-11-10 | (delivery) | Início vazio ao abrir o site com o PC ligando (trava das leituras abre sozinha; Início pede de novo); linha do tempo sem travar na rodinha (bolinha leve deslizando, blocos não refeitos) | tsc/npm test ok (exceto os que precisam de Java/Python, ausentes neste PC e já falhando antes); 100%→5% do processador medido |
+| 2026-11-11 | (delivery) | Duplicar página: escolha Clonar idêntica (com subpáginas e conteúdo) ou Só a estrutura | tsc ok; clonar 5/5; npm test só a falha antiga do Java local; site recompilado |

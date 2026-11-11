@@ -16,6 +16,7 @@ import {NotificationBell} from '../components/NotificationCenter';
 import {ProfileAvatar} from '../components/ProfileAvatar';
 import {fuzzyFilter} from '../lib/fuzzy';
 import {comparePageOrder} from '../lib/page-order';
+import {clonePageTree,cloneOrder,type CloneMode} from '../lib/page-clone';
 import {openContextMenu,contextMenu} from '../components/ContextMenu';
 import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
@@ -101,7 +102,12 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
  const newChild=async(parent:Entity)=>{try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent.id,node_type:'page',blocks_json:'[]'}});
   setExpanded(prev=>{const n=new Set(prev);n.add(parent.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});createdPage.set(saved);onOpen(saved.id);}catch(e){appAlert('Não foi possível criar a subpágina',e instanceof Error?e.message:String(e));}};
- const duplicate=async(p:Entity)=>{try{await api.saveEntity({kind:'user_page',title:((p.title||'Sem título')+' (cópia)').slice(0,240),content:p.content||'',area:p.area||'Pessoal',privacy:p.privacy||'private',state:'active',tags:p.tags||[],data:{...p.data}});}catch(e){appAlert('Não foi possível duplicar',e instanceof Error?e.message:String(e));}};
+ // 11/11/2026 (Pedro: "quando duplicar tem que aparecer a opção clonar idêntica igual do notion"): pergunta como duplicar
+ const runClone=async(p:Entity,mode:CloneMode)=>{try{const copy=await clonePageTree(api,pages,p.id,mode);if(copy)onOpen(copy.id);}catch(e){appAlert('Não foi possível duplicar',e instanceof Error?e.message:String(e));}};
+ const duplicate=(p:Entity)=>{const subs=cloneOrder(pages,p.id).length-1;
+  appAlert('Duplicar “'+(p.title||'Sem título')+'”','Clonar idêntica: copia tudo igual (texto, notas, arquivos'+(subs>0?' e '+(subs===1?'a subpágina':'as '+subs+' subpáginas'):'')+').\nSó a estrutura: as mesmas páginas, com nome, ícone e capa, mas vazias.',[{text:'Cancelar',style:'cancel'},
+   {text:'Clonar idêntica',onPress:()=>void runClone(p,'identical')},
+   {text:'Só a estrutura (vazia)',onPress:()=>void runClone(p,'structure')}]);};
  const remove=(p:Entity)=>appAlert('Excluir página?','Excluir “'+(p.title||'Sem título')+'” e suas subpáginas também?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void api.deleteEntity(p.id).catch(e=>appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e)));}}]);
  // arrastar página na barra: meio da linha = dentro; borda de cima/baixo = antes/depois (como no Notion)
  const [drag,setDrag]=useState<{id:string;x:number;y:number;title:string;emoji?:string}|null>(null),[target,setTarget]=useState<{id:string;kind:'before'|'after'|'inside'}|null>(null);
@@ -123,7 +129,7 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:'Duplicar',icon:'copy',run:()=>void duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
