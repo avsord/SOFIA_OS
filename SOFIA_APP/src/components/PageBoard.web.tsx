@@ -277,12 +277,12 @@ export function PageBoard(p: Props) {
   const openFromPage = (cardId: string, d: {id: string; name: string; mime: string; pageId: string}) => {
     const card = byId.get(cardId); if (!card) return;
     const ed = !!editKind(d.mime, d.name) && !p.locked, exist = shown.find(x => x.type === 'file' && String(x.data?.attachment_id || '') === d.id);
-    if (exist) {setSel([exist.id]); if (ed) openItem(exist); else focusOn(geo(exist)); return;}
+    if (exist) {setSel([exist.id]); if (ed) openItem(exist); else reveal(geo(exist)); return;}
     let fromBlock = ''; try {const bs = JSON.parse(String(p.pages.find(x => x.id === d.pageId)?.data?.blocks_json || '[]')); fromBlock = String((Array.isArray(bs) ? bs : []).find((x: any) => String(x?.data?.attachment_id || '') === d.id)?.id || '');} catch {}
     const data: any = {attachment_id: d.id, name: d.name, mime: d.mime, from_page: d.pageId, from_block: fromBlock, from_card: cardId, orig_attachment: d.id, ...(ed ? {window: true} : {})}; // 08/11 (Pedro): janela ligada ao cartao (sai junto) e o anexo original guardado para sincronizar so quando ele pedir
     const cg = geo(card), s2 = ed ? {w: 680, h: 860} : size({id: '', type: 'file', text: '', data} as PageBlock), g2 = {x: cg.x + cg.w + 40, y: cg.y, w: s2.w, h: s2.h, z: topZ()};
     const nb: PageBlock = {id: uid(), type: 'file', text: '', data: {...data, board: g2}};
-    p.edit(bs => [...bs, nb], 'board-file-open'); setSel([nb.id]); focusOn({...cg, w: g2.x + g2.w - cg.x, h: Math.max(cg.h, g2.h)});};
+    p.edit(bs => [...bs, nb], 'board-file-open'); setSel([nb.id]); reveal(g2);};
   const openFromPageRef = useRef(openFromPage); openFromPageRef.current = openFromPage;
   useEffect(() => {const on = (e: MessageEvent) => {const d = e.data; if (e.origin !== location.origin || !d || d.sofia !== 'board-open-file' || !d.id) return;
       const fr = Array.from(host.current?.querySelectorAll('iframe[data-testid=board-page-frame]') || []).find(x => (x as HTMLIFrameElement).contentWindow === e.source);
@@ -323,13 +323,19 @@ export function PageBoard(p: Props) {
   };
   // leva a camera ate o item (cabe na tela, no maximo 100%), como quem aproxima o documento para editar
   const focusOn = (g: Geo) => {const z = Math.min(1, Math.max(MIN_Z, Math.min((size2.w - 80) / g.w, (size2.h - 150) / g.h))); glide({z, x: (size2.w - g.w * z) / 2 - g.x * z, y: Math.max(60, (size2.h - 90 - g.h * z) / 2) - g.y * z});};
+  // 11/11/2026 (Pedro: "quando clico no pdf pra aparecer la no mapa, a tela da um pulo"): abrir um arquivo como janela nao
+  // muda mais o zoom; a camera so desliza (mesmo zoom) se a janela nova nascer fora da vista.
+  const reveal = (g: Geo) => {const v = viewRef.current, W = size2.w, H = size2.h, pad = 24, sx = g.x * v.z + v.x, sy = g.y * v.z + v.y, sw = g.w * v.z;
+    const fitsX = sx >= pad && sx + sw <= W - pad, topOk = sy >= 60 && sy <= H - 220; if (fitsX && topOk) return;
+    const x = fitsX ? v.x : sw <= W - 2 * pad && sx >= pad ? v.x - (sx + sw - (W - pad)) : v.x + (pad - sx), y = topOk ? v.y : v.y + (60 - sy);
+    glide({z: v.z, x, y});};
   const openItem = (b: PageBlock) => {
     if (b.type === 'callout' || b.type === 'todo' || b.type === 'text' || b.type.startsWith('heading') || b.type === 'bullet' || b.type === 'number' || b.type === 'quote') {setEditing(b.id); return;}
     if (b.type === 'bookmark' && b.data?.live) return;
     if (b.type === 'bookmark' && b.data?.link?.url) {window.open(String(b.data.link.url), '_blank', 'noopener'); return;}
     if (b.type === 'page_link') {usePageHere(b); return;} // entra na pagina dentro do cartao (abrir arquivos, editar), nunca numa aba nova
     const id = String(b.data?.attachment_id || ''); if (!id) return;
-    if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); patchBlock(b.id, x => ({...x, data: {...(x.data || {}), window: true, board: {...geo(x), w: Math.max(geo(x).w, 680), h: Math.max(geo(x).h, 860)}}}), 'board-size'); focusOn({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); return;} // 08/11: vira janela do quadro (editor sempre visivel, mesmo clicando em outro item) // editar: o cartao vira uma pagina
+    if (b.type === 'file' && editKind(b.data?.mime, b.data?.name) && !p.locked) {const g = geo(b); patchBlock(b.id, x => ({...x, data: {...(x.data || {}), window: true, board: {...geo(x), w: Math.max(geo(x).w, 680), h: Math.max(geo(x).h, 860)}}}), 'board-size'); reveal({...g, w: Math.max(g.w, 680), h: Math.max(g.h, 860)}); return;} // 08/11: vira janela do quadro (editor sempre visivel, mesmo clicando em outro item) // editar: o cartao vira uma pagina
     openFileWindow(p.api, {id, name: String(b.data?.name || 'arquivo'), mime: String(b.data?.mime || (b.type === 'image' ? 'image/jpeg' : '')), pageId: p.pageId,
       onSaved: a => {patchBlock(b.id, x => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}}), 'board-file'); p.flush();}});
   };
