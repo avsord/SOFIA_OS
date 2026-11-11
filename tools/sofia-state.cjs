@@ -53,7 +53,7 @@ function collect(dir,input={}){
  const code=versionParts(version),pub=published&&versionParts(published.version);
  const runs=input.runs && typeof input.runs==='object'?flat(input.runs.workflow_runs||input.runs).filter(r=>r&&typeof r.status==='string').slice(0,6):undefined;
  const pulls=input.pulls==null?undefined:flat(input.pulls).filter(p=>p&&p.merged_at).slice(0,8);
- return {generatedAt:input.now||new Date().toISOString(),repo:input.repo||'avsord/sofiaos',
+ return {generatedAt:input.now||new Date().toISOString(),repo:input.repo||'avsord/SOFIA_OS',
   head:safeGit(dir,'log','-1','--format=%H'),
   commits:safeGit(dir,'log','-15','--format=%h|%cs|%s').split('\n').filter(Boolean).map(line=>{const [h,d,...s]=line.split('|');return{h,d,s:s.join('|')}}),
   version,versionCode,published,unpublished:code&&pub?cmp(code,pub)>0:null,

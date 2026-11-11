@@ -1,7 +1,7 @@
 # SOFIA_KEY — chave de inicialização do Sofia OS
 
 Este arquivo é o protocolo de retomada do Sofia OS, no repositório público
-`avsord/sofiaos`. É uma orientação, **não uma credencial**: nenhum token,
+`avsord/SOFIA_OS`. É uma orientação, **não uma credencial**: nenhum token,
 senha, chave ou acesso é transferido de uma conta para outra.
 
 Responda em português, confira as ferramentas realmente disponíveis e não peça
@@ -12,9 +12,9 @@ na branch `sofia-app-android`, prefira a versão atual do repositório.
 
 Leia os três documentos, nesta ordem e integralmente:
 
-1. **Estado vivo:** https://raw.githubusercontent.com/avsord/sofiaos/sofia-state/ESTADO_VIVO.md
-2. **Regras:** https://raw.githubusercontent.com/avsord/sofiaos/sofia-app-android/AGENTS.md
-3. **Decisões e pendências:** https://raw.githubusercontent.com/avsord/sofiaos/sofia-app-android/docs/SOFIA_MASTER.md
+1. **Estado vivo:** https://raw.githubusercontent.com/avsord/SOFIA_OS/sofia-state/ESTADO_VIVO.md
+2. **Regras:** https://raw.githubusercontent.com/avsord/SOFIA_OS/sofia-app-android/AGENTS.md
+3. **Decisões e pendências:** https://raw.githubusercontent.com/avsord/SOFIA_OS/sofia-app-android/docs/SOFIA_MASTER.md
 
 Se o estado vivo não estiver acessível, não conclua que a Sofia não existe.
 Confirme HEAD, versão e releases pela API/conector GitHub. O snapshot é
@@ -30,7 +30,7 @@ agrupe os passos de conexão necessários em **uma única mensagem**.
 
 | Capacidade | Quando precisa | Como testar | Quando não funcionar |
 |---|---|---|---|
-| GitHub leitura | Sempre | Repositório `avsord/sofiaos`, branch `sofia-app-android`, via conector, Git ou GitHub CLI | Usar conector GitHub ou pedir os arquivos caso a rede não esteja disponível |
+| GitHub leitura | Sempre | Repositório `avsord/SOFIA_OS`, branch `sofia-app-android`, via conector, Git ou GitHub CLI | Usar conector GitHub ou pedir os arquivos caso a rede não esteja disponível |
 | GitHub escrita | Para editar/aplicar código | Conferir conector autorizado com escrita em Contents e Pull Requests, ou credencial GitHub CLI já conectada | Solicitar autorização na tela de conectores. Não pedir token no chat |
 | GitHub Actions | Para CI, logs e artefatos | Consultar execuções reais e seus jobs | Pedir autorização adequada se o provedor permitir; não inventar APK |
 | Railway | Só para tarefa de servidor, deploy ou banco | Conector Railway no projeto certo, com escopo necessário | Solicitar conexão pelo aplicativo, somente quando necessário |
@@ -102,7 +102,7 @@ Depois pergunte somente **“O que vamos fazer?”**
 
 ## Fatos estáveis
 
-- Repositório: https://github.com/avsord/sofiaos
+- Repositório: https://github.com/avsord/SOFIA_OS
 - Branch Android: `sofia-app-android` · package: `com.avsord.sofiaapp`
 - Servidor: https://sofiaos.up.railway.app
 - `[manual-apk]`: candidato sem publicar. `[approved-apk]`: só após

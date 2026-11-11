@@ -38,7 +38,7 @@ Para abertura: medir do lançamento nativo à interface utilizável, registrando
 Ganho = (tempo anterior − tempo novo) / tempo anterior. A meta de 70% sobre os 30–40 minutos relatados equivale a 9–12 minutos para alterações comparáveis. Ainda não há comprovação desse ganho. Não prometer um tempo único para todos os tipos de alteração.
 
 ## Evidência usada nesta decisão
-Execução [37809157208](https://github.com/avsord/sofiaos/actions/runs/37809157208), fonte compilada `60ee20d7a6333cf235d60cb1ff5acb877817d285`:
+Execução [37809157208](https://github.com/avsord/SOFIA_OS/actions/runs/37809157208), fonte compilada `60ee20d7a6333cf235d60cb1ff5acb877817d285`:
 - Execução completa até o bloqueio: 16 min 41 s; investigação e edição anteriores não estão nesse intervalo.
 - Preparação/build: 7 min 15 s. Etapa do APK de produção: 4 min 34 s; build separado de QA: 41 s.
 - Testes nativos em paralelo: navegação 8 min 35 s; workspace 7 min 22 s. Esses tempos não devem ser somados.

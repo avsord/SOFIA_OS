@@ -21,7 +21,8 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-11 (~05:30 de Brasília), no **Claude Code** (pasta `C:UserspedroOneDriveDocumentosCLAUDE_PCSOFIA`).
+- **Atualizado em:** 2026-11-11 (~05:40 de Brasília), no **Claude Code** (pasta `C:\Users\pedro\OneDrive\Documentos\CLAUDE_PC\SOFIA`).
+- **11/11 ~05:40 (Claude Code), Pedro: "muda lá no git também" (nome "sofiaos" na lateral do app).** Repositório renomeado para **`avsord/SOFIA_OS`** (`gh repo rename`), remote local atualizado e `avsord/sofiaos`→`avsord/SOFIA_OS` em update.ts, delivery.cjs, publish-release.cjs (que exigia o nome exato), workflow, testes e docs vivos (histórico ficou como está). O GitHub redireciona o nome antigo (API 301, download do APK 301→206), então celulares com a versão antiga continuam achando atualizações. Servidor `sofiaos.up.railway.app` não mudou. Padrão do Pedro para nomes: títulos `NOME_NOME`, subpastas `nome-nome`. Próximo passo: conferir a compilação do candidato no Actions.
 - **11/11 ~05:30 (Claude Code), Pedro: "quando duplicar tem que aparecer a opção clonar idêntica igual do notion".** "Duplicar" da página na barra lateral (⋯/botão direito) agora pergunta: **Clonar idêntica** (a página e TODAS as subpáginas com todo o conteúdo; links de subpágina apontam para as cópias) ou **Só a estrutura (vazia)** (mesmas páginas/ícone/capa, sem conteúdo). Antes copiava só a página de cima, sem subpáginas. Abre a cópia ao terminar. `src/lib/page-clone.ts`, teste `clonar-pagina-11-11`. Arquivos da cópia continuam apontando para os mesmos arquivos do Drive (não duplica espaço). Não conferido na tela (só testes). Próximo: Pedro conferir; local estava 8 commits à frente do GitHub (subiram junto).
 - **11/11 ~01:40 (Claude Code), Pedro: "precisa ter função pra esticar nos quatro cantos" (janela do PDF no Quadro).** Janela de arquivo (`isWin`: PDF/Word) tem os 4 cantos de esticar, visíveis só com o mouse em cima ou esticando (Pedro: "não precisa ficar sempre ativado"; classe `board-win-corner`) (antes só com o item selecionado e fora de edição, e a janela nunca fica assim). Robô quadro-pdf-pulo: 4 cantos, estica por baixo/direita e por cima/esquerda.
 - **11/11 ~00:10 (Claude Code), Pedro: "quando clico no pdf pra aparecer lá no mapa, a tela dá um pulo".** Reproduzido no laboratório: clicar no arquivo dentro do cartão da página abria a janela e o `focusOn` mudava o zoom (60%→77%) e a posição. Depois (Pedro: "ainda está pulando como se tivesse alinhando"): a câmera NUNCA mexe; `inView` (PageBoard.web.tsx) faz a janela nascer dentro da vista (à direita do cartão, senão à esquerda, senão encostada na borda) em `openFromPage` e `openItem`. Robô novo `tools/drive-lab/quadro-pdf-pulo.cjs` (com `SOFIA_CHROME=1` usa o Chrome instalado; Playwright não vem no package.json): antes FALHA, depois OK.
@@ -91,12 +92,12 @@ O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofia
 
 ## 3. Estado vivo — sempre ler ao vivo, nunca confiar em número escrito
 
-Antes dos comandos abaixo, consulte **[ESTADO_VIVO.md](https://raw.githubusercontent.com/avsord/sofiaos/sofia-state/ESTADO_VIVO.md)** na branch separada `sofia-state`. O workflow `Sofia estado vivo` gera esse *snapshot* após pushes em `sofia-app-android`: versão, último HEAD, releases, PRs, resultados disponíveis e alertas de possível defasagem do MASTER. A versão do snapshot não é necessariamente o resultado final de uma compilação ainda em andamento; confira a execução ao vivo para aprovar ou entregar um APK.
+Antes dos comandos abaixo, consulte **[ESTADO_VIVO.md](https://raw.githubusercontent.com/avsord/SOFIA_OS/sofia-state/ESTADO_VIVO.md)** na branch separada `sofia-state`. O workflow `Sofia estado vivo` gera esse *snapshot* após pushes em `sofia-app-android`: versão, último HEAD, releases, PRs, resultados disponíveis e alertas de possível defasagem do MASTER. A versão do snapshot não é necessariamente o resultado final de uma compilação ainda em andamento; confira a execução ao vivo para aprovar ou entregar um APK.
 
 Se a branch ainda não existir, o arquivo estiver desatualizado ou a consulta falhar, use os comandos/conectores abaixo. O detector sinaliza alterações de código sem atualização do MASTER, mas não substitui a revisão das decisões humanas. Para um agente novo, o protocolo inicial está em [SOFIA_KEY.md](SOFIA_KEY.md).
 
 ```bash
-git clone --branch sofia-app-android https://github.com/avsord/sofiaos.git
+git clone --branch sofia-app-android https://github.com/avsord/SOFIA_OS.git
 cd sofiaos
 git log --oneline -15
 node -e "const c=require('./SOFIA_APP/app.json').expo; console.log({version:c.version,versionCode:c.android.versionCode,package:c.android.package})"
@@ -104,9 +105,9 @@ node -e "const c=require('./SOFIA_APP/app.json').expo; console.log({version:c.ve
 # Requer GitHub CLI autenticado e dependências JS do app instaladas (npm ci).
 # Só consulta: não executa delivery.cjs prepare, não compila nem publica.
 # Usa a mesma seleção de releases do atualizador, não a ordem do Atom feed.
-gh api --paginate --slurp 'repos/avsord/sofiaos/releases?per_page=100' | node -e "const fs=require('node:fs'); const pages=JSON.parse(fs.readFileSync(0,'utf8')); if(!Array.isArray(pages)||!pages.every(Array.isArray))throw Error('Listagem incompleta'); const rows=pages.flat(); const load=require('./SOFIA_APP/tests/load-ts.cjs'); const u=load('src/lib/update.ts'); const current=require('./SOFIA_APP/app.json').expo.version; console.log(JSON.stringify({codigo:current,publicada:u.newestPublishedUpdate(rows,'0.0.0'),ofertaParaVersaoDoCodigo:u.newestPublishedUpdate(rows,current)},null,2));"
-gh pr list --repo avsord/sofiaos --state all --base sofia-app-android --limit 5 --json number,title,state,updatedAt,headRefName,baseRefName
-gh run list --repo avsord/sofiaos --branch sofia-app-android --limit 5 --json databaseId,headSha,status,conclusion,workflowName
+gh api --paginate --slurp 'repos/avsord/SOFIA_OS/releases?per_page=100' | node -e "const fs=require('node:fs'); const pages=JSON.parse(fs.readFileSync(0,'utf8')); if(!Array.isArray(pages)||!pages.every(Array.isArray))throw Error('Listagem incompleta'); const rows=pages.flat(); const load=require('./SOFIA_APP/tests/load-ts.cjs'); const u=load('src/lib/update.ts'); const current=require('./SOFIA_APP/app.json').expo.version; console.log(JSON.stringify({codigo:current,publicada:u.newestPublishedUpdate(rows,'0.0.0'),ofertaParaVersaoDoCodigo:u.newestPublishedUpdate(rows,current)},null,2));"
+gh pr list --repo avsord/SOFIA_OS --state all --base sofia-app-android --limit 5 --json number,title,state,updatedAt,headRefName,baseRefName
+gh run list --repo avsord/SOFIA_OS --branch sofia-app-android --limit 5 --json databaseId,headSha,status,conclusion,workflowName
 ```
 
 Sem git, gh ou rede no terminal, use os conectores GitHub disponíveis para ler
@@ -378,7 +379,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 0. **Evidência anterior:** 0.3.110 compilou, mas smoke normal falhou ao buscar mensagem antiga específica; pesado preservou rascunho e falhou no swipe. Capturas mostram o gesto dentro de `calendar-month-swipe`, mudando o mês em vez da aba. O novo teste deriva a linha do swipe do cabeçalho fora do calendário, sem retirar a obrigação de alcançar Conversa. Os bloqueios de 319 ms / p95 418 ms eram acima das metas; não há aprovação de fluidez. Rodada direta exige 20 ciclos editar/voltar em cada modo e coleta os logs do erro até no finally.
 0. **R9:** calibrar carga ≥3× contagens reais do painel, habilitar gates reprovadores de desempenho e remover Antigo. Não iniciar nesta R7.
 
-1. **Rodada 5 (0.3.107) compilada, smoke QA aprovado; confirmar primeiros toques no celular** — aquecimento depois da Home sem aguardar histórico, Shell sem rerender ao concluir hidratação. A/B em emulador: DATA 956 → 975 ms (+19 ms); nos quatro primeiros toques, três eventos nativos registrados, incluindo Páginas ainda não montada (um salto protegido). Portanto, ausência total de delay no aparelho físico **não comprovada**. APK candidato manual, não publicado; [execução 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) e [evidências PR #15](https://github.com/avsord/sofiaos/pull/15#issuecomment-6101539253).
+1. **Rodada 5 (0.3.107) compilada, smoke QA aprovado; confirmar primeiros toques no celular** — aquecimento depois da Home sem aguardar histórico, Shell sem rerender ao concluir hidratação. A/B em emulador: DATA 956 → 975 ms (+19 ms); nos quatro primeiros toques, três eventos nativos registrados, incluindo Páginas ainda não montada (um salto protegido). Portanto, ausência total de delay no aparelho físico **não comprovada**. APK candidato manual, não publicado; [execução 38080609693](https://github.com/avsord/SOFIA_OS/actions/runs/38080609693) e [evidências PR #15](https://github.com/avsord/SOFIA_OS/pull/15#issuecomment-6101539253).
 2. **Rodada 4 implementada; confirmar no celular** — briefing histórico em `docs/briefings/BRIEFING_RODADA4_S_e_abas.md`. Conferir o candidato existente antes de recompilar: S entrando em movimento, Páginas com cache sem falso aviso de primeira página e resposta aos toques nos primeiros segundos. O build e o smoke QA da rodada terminaram com sucesso (registro na seção 10); isso não substitui o aceite físico.
 2. **Validar R8 no celular**: login, conversa, páginas, agenda, notificação de
    cápsula, alarmes, secure store, atualizador.
@@ -402,6 +403,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-11 | (delivery) | Repositório do GitHub renomeado de `sofiaos` para `SOFIA_OS` (pedido do Pedro: padrão NOME_NOME); endereço atualizado no atualizador, entrega e docs | tsc ok; npm test sem falhas novas (java/CRLF são do PC); endereço antigo redireciona (301) e o APK baixa por ele; site recompilado |
 | 2026-11-11 | (delivery) | Duplicar página: escolha Clonar idêntica (com subpáginas e conteúdo) ou Só a estrutura | tsc ok; clonar 5/5; npm test só a falha antiga do Java local; site recompilado |
 | 2026-11-11 | (delivery) | Janela do PDF/Word no Quadro estica pelos 4 cantos | robô quadro-pdf-pulo OK; tsc ok; npm test sem falhas novas; site recompilado |
 | 2026-11-11 | (delivery) | Quadro não dá mais pulo (zoom) ao abrir arquivo do cartão da página como janela | robô quadro-pdf-pulo OK; tsc ok; npm test sem falhas novas; site recompilado |
@@ -412,7 +414,6 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 | 2026-11-09 | (delivery) | Compromisso criado sem fim não ganha mais 1 h de duração (só o ponto na linha do tempo) | tsc/npm test ok, site recompilado |
 | 2026-11-09 | (delivery) | Linha do tempo sem travar na rodinha; edição rápida e Conversa na ordem certa; esqueleto das Finanças/apps (raiz 07/11); lembrete feito encerra as outras datas; rodinha rola o cartão do Quadro; ícone de farmácia | tsc/npm test ok, site recompilado; rolagem, esqueleto e cartão conferidos no navegador |
 | 2026-11-09 | (delivery) | Notificações: Limpar notificações no lugar de Marcar tudo como lido | tsc/npm test ok, site recompilado |
-| 2026-11-10 | (delivery) | Início vazio ao abrir o site com o PC ligando (trava das leituras abre sozinha; Início pede de novo); linha do tempo sem travar na rodinha (bolinha leve deslizando, blocos não refeitos) | tsc/npm test ok (exceto os que precisam de Java/Python, ausentes neste PC e já falhando antes); 100%→5% do processador medido |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **09/11: esqueleto por aba vale para TODAS as telas que a aba abre.** Aba Apps abre cada app direto e Páginas abre uma página; o esqueleto da tela-mãe (grade/lista) não serve para elas. Antes de mudar o esqueleto de uma aba, listar o que essa aba abre.

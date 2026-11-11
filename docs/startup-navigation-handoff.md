@@ -156,7 +156,7 @@ Project entry point: SOFIA_MASTER.md, then only the relevant Sofia Delta route. 
 Base branch commit: 089c97e2aac31b0db5204e0a9b5d0f927a40ec0e (0.3.59 runtime plus documentation).
 Change commit: b1810474986b832fc7015ad6a409a3ce6dd80b7a.
 Exact compiled source: 60ee20d7a6333cf235d60cb1ff5acb877817d285 (CI-aligned version metadata).
-Run: https://github.com/avsord/sofiaos/actions/runs/37809157208
+Run: https://github.com/avsord/SOFIA_OS/actions/runs/37809157208
 Successful build job: 113421197079.
 Artifact: 11564921396, Sofia-build-37809157208-1.
 Production APK: 51,599,876 bytes; SHA-256 18fb2a5f3a4d541fe6bed174a7751890227ee172a10627ee7624bd33807d8652.

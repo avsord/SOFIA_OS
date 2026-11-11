@@ -1,7 +1,7 @@
 'use strict';
 // Delivery metadata only. This never changes runtime logic or disables tests.
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
-const REPO='avsord/sofiaos',BRANCH='sofia-app-android',PREFIX='sofia-android-v',PACKAGE='com.avsord.sofiaapp';
+const REPO='avsord/SOFIA_OS',BRANCH='sofia-app-android',PREFIX='sofia-android-v',PACKAGE='com.avsord.sofiaapp';
 function version(v){if(typeof v!=='string'||!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(v))throw Error('Invalid Android version');const n=v.split('.').map(Number);if(!n.every(Number.isSafeInteger))throw Error('Version overflow');return n;}
 function compare(a,b){const x=version(a),y=version(b);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]>y[i]?1:-1;return 0;}
 function tagged(tag){if(typeof tag!=='string'||!tag.startsWith(PREFIX))return null;try{version(tag.slice(PREFIX.length));return tag.slice(PREFIX.length);}catch{return null;}}

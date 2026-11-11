@@ -8,7 +8,7 @@ function api(...args){return JSON.parse(run('gh',['api',...args]));}
 const pkg=JSON.parse(fs.readFileSync(path.join(app,'package.json'),'utf8'));
 const config=JSON.parse(fs.readFileSync(path.join(app,'app.json'),'utf8')).expo;
 const version=pkg.version,repo=process.env.GITHUB_REPOSITORY,tag='sofia-android-v'+version;
-if(!/^\d+\.\d+\.\d+$/.test(version)||repo!=='avsord/sofiaos'||config.android.package!=='com.avsord.sofiaapp'||config.version!==version)throw Error('Invalid release identity');
+if(!/^\d+\.\d+\.\d+$/.test(version)||repo!=='avsord/SOFIA_OS'||config.android.package!=='com.avsord.sofiaapp'||config.version!==version)throw Error('Invalid release identity');
 const source=fs.readFileSync(path.join(app,'dist/SOURCE_COMMIT.txt'),'utf8').trim();
 if(source!==git('rev-parse','HEAD'))throw Error('Build source mismatch');
 if(git('status','--porcelain','--','SOFIA_APP').split('\n').some(line=>line && !line.startsWith('?? SOFIA_APP/dist/')))throw Error('Uncommitted app source');

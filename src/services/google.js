@@ -1208,7 +1208,7 @@ class GoogleService {
     for (const f of files.filter(f => f.name === name)) await this.call('DELETE', DRIVE + '/files/' + f.id).catch(() => {});
     await up(name, 'application/octet-stream', bytes, 'Backup da Sofia OS com senha (abre sem o servidor)');
     if (!files.some(f => f.name === 'COMO-RESTAURAR.md')) {
-      let guide = ''; try { guide = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'COMO-RESTAURAR.md')); } catch { guide = Buffer.from('Veja scripts/COMO-RESTAURAR.md no repositorio avsord/sofiaos (branch sofia-app-android).'); }
+      let guide = ''; try { guide = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'COMO-RESTAURAR.md')); } catch { guide = Buffer.from('Veja scripts/COMO-RESTAURAR.md no repositorio avsord/SOFIA_OS (branch sofia-app-android).'); }
       await up('COMO-RESTAURAR.md', 'text/markdown', Buffer.isBuffer(guide) ? guide : Buffer.from(guide), 'Como recolocar a Sofia OS no ar com este backup');
     }
     for (const old of files.filter(f => /^sofia-com-senha-/.test(f.name) && f.name !== name).slice(6)) await this.call('DELETE', DRIVE + '/files/' + old.id).catch(() => {});

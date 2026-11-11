@@ -1,7 +1,7 @@
 export const APP_VERSION = '0.3.266';
 const RELEASE_PREFIX = 'sofia-android-v';
-const RELEASES_API = 'https://api.github.com/repos/avsord/sofiaos/releases';
-const DOWNLOAD_ROOT = 'https://github.com/avsord/sofiaos/releases/download/';
+const RELEASES_API = 'https://api.github.com/repos/avsord/SOFIA_OS/releases';
+const DOWNLOAD_ROOT = 'https://github.com/avsord/SOFIA_OS/releases/download/';
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 

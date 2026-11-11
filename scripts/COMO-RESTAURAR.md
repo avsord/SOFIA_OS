@@ -3,7 +3,7 @@
 Este guia é para você ou para um assistente (como o Claude) refazer a Sofia OS do zero, mesmo que o
 servidor antigo tenha se perdido. Precisa de três coisas:
 
-1. **O código** — repositório `avsord/sofiaos`, branch `sofia-app-android`, no GitHub.
+1. **O código** — repositório `avsord/SOFIA_OS`, branch `sofia-app-android`, no GitHub.
 2. **O arquivo de backup** — no Google Drive, pasta **Sofia OS/Backup com senha**, o arquivo mais novo
    `sofia-com-senha-AAAA-MM-DD.sofia-backup` (um por dia; ficam os 7 mais recentes).
 3. **A senha do backup** — a mesma colocada na variável `SOFIA_BACKUP_PASSPHRASE` da Railway.

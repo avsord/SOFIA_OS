@@ -62,7 +62,7 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 
 
 ## Atualização v126 — checkpoint Meta/Railway
-- Repositório GitHub oficial: `avsord/sofiaos` (branch `main`).
+- Repositório GitHub oficial: `avsord/SOFIA_OS` (branch `main`).
 - Backend publicado no Railway; `/health` validado publicamente.
 - Política de privacidade pública em `/privacy`.
 - Webhook Meta validado com `WHATSAPP_VERIFY_TOKEN` e campo `messages` assinado.

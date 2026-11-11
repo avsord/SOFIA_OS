@@ -550,7 +550,7 @@ jobs:
           console.log('VERIFIED',file,result.version,result.url);
         }})().catch(e=>{console.error(e);process.exitCode=1});
         NODE
-        gh api "repos/avsord/sofiaos/releases/tags/sofia-android-v${SOFIA_RELEASE_VERSION}" > dist/release.json
+        gh api "repos/avsord/SOFIA_OS/releases/tags/sofia-android-v${SOFIA_RELEASE_VERSION}" > dist/release.json
       id: discovery
     - name: Report delivery outcome
       id: delivery_status

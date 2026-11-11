@@ -4,7 +4,7 @@ const source=fs.readFileSync(path.join(__dirname,'../src/lib/update.ts'),'utf8')
 const exported={};
 vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:exported,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
 const {newestPublishedUpdate:pick,checkForUpdate:check,compareVersions}=exported;
-function release(v,patch={}){return{tag_name:'sofia-android-v'+v,draft:false,prerelease:false,published_at:'2026-10-02T14:24:27Z',name:'Sofia '+v,assets:[{name:'Sofia-OS.apk',state:'uploaded',size:10,browser_download_url:'https://github.com/avsord/sofiaos/releases/download/sofia-android-v'+v+'/Sofia-OS.apk'}],...patch};}
+function release(v,patch={}){return{tag_name:'sofia-android-v'+v,draft:false,prerelease:false,published_at:'2026-10-02T14:24:27Z',name:'Sofia '+v,assets:[{name:'Sofia-OS.apk',state:'uploaded',size:10,browser_download_url:'https://github.com/avsord/SOFIA_OS/releases/download/sofia-android-v'+v+'/Sofia-OS.apk'}],...patch};}
 const response=(data,status=200)=>({ok:status>=200&&status<300,status,json:async()=>data});
 const plain=x=>JSON.parse(JSON.stringify(x));
 test('real regression: 0.3.9 first and 0.3.10 last still offers 0.3.10',()=>{
@@ -23,7 +23,7 @@ test('ignores drafts, prereleases, other prefixes and malformed versions',()=>{
 });
 test('requires complete exact APK assets and the exact trusted tag URL',()=>{
  const good=release('0.3.11');
- for(const patch of [{size:0},{state:'new'},{name:'another-app.apk'},{browser_download_url:'https://github.com.evil.test/avsord/sofiaos/releases/download/sofia-android-v9.0.0/Sofia-OS.apk'},{browser_download_url:good.assets[0].browser_download_url}]){
+ for(const patch of [{size:0},{state:'new'},{name:'another-app.apk'},{browser_download_url:'https://github.com.evil.test/avsord/SOFIA_OS/releases/download/sofia-android-v9.0.0/Sofia-OS.apk'},{browser_download_url:good.assets[0].browser_download_url}]){
   const bad=release('9.0.0');Object.assign(bad.assets[0],patch);assert.equal(pick([bad,good],'0.3.10').version,'0.3.11');
  }
 });
