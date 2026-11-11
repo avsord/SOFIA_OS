@@ -22,3 +22,4 @@
 | 2026-11-11 | (delivery) | Duplicar página: escolha Clonar idêntica (com subpáginas e conteúdo) ou Só a estrutura | tsc ok; clonar 5/5; npm test só a falha antiga do Java local; site recompilado |
 | 2026-11-11 | (delivery) | Repositório do GitHub renomeado de `sofiaos` para `SOFIA_OS` (pedido do Pedro: padrão NOME_NOME); endereço atualizado no atualizador, entrega e docs | tsc ok; npm test sem falhas novas (java/CRLF são do PC); endereço antigo redireciona (301) e o APK baixa por ele; site recompilado |
 | 2026-11-11 | (sem APK) | Quadro: quadrados dos cantos da janela não aparecem mais ao mover nem ao passar o mouse, só esticando | robô quadro-pdf-pulo 11/11; tsc ok; npm test só a falha antiga do Java local; site recompilado |
+| 2026-11-11 | (sem APK) | Quadro: print/imagem colada fica na proporção dela, sem faixa preta (inclusive as já coladas) | robô quadro-print-colado 5/5; quadro-pdf-pulo ok; tsc ok; npm test só a falha antiga do Java; site no ar conferido |

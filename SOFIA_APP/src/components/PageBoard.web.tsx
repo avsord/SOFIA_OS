@@ -64,9 +64,12 @@ export function onBoard(b: PageBlock) {
   if (b.type === 'divider') return false;
   return true;
 }
+// 11/11/2026 (Pedro: "joguei print e ficou assim bugado"): a caixa da imagem nascia 4:3 e o print (mais largo) deixava uma faixa
+// preta embaixo. Ao carregar, a imagem guarda a propria proporcao (data.ratio) e a caixa passa a ter essa proporcao.
+const fitH = (w: number, ratio: unknown) => {const r = Number(ratio); return r > 0.05 && r < 20 ? Math.round(w / r) : Math.round(w * 0.75);};
 function size(b: PageBlock): {w: number; h: number} {
   const k = fileKind(b.data?.mime, b.data?.name), preview = b.data?.view === 'preview' || (!b.data?.view && defaultView(k) === 'preview');
-  if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: 240} : {w: 280, h: 360};
+  if (b.type === 'file') return !preview ? {w: 280, h: 64} : k === 'audio' ? {w: 320, h: 70} : k === 'image' || k === 'video' ? {w: 320, h: fitH(320, b.data?.ratio)} : {w: 280, h: 360};
   if (b.type === 'image') return b.data?.drawing ? {w: Math.max(40, b.data.drawing.w || 200), h: Math.max(40, b.data.drawing.h || 120)} : {w: 320, h: 240};
   if (b.type === 'page_link') return b.data?.view === 'attach' ? {w: 300, h: 64} : b.data?.view === 'list' ? {w: 360, h: 420} : {w: 640, h: 520}; // 08/11: Anexo (linha) ou Visualização (a página) // 08/11/2026: resumo adaptado (ou a pagina inteira)
   if (b.type === 'bookmark' && b.data?.link) return b.data.link.image ? {w: 300, h: 240} : {w: 300, h: 110};
@@ -521,6 +524,7 @@ export function PageBoard(p: Props) {
       guides.y != null ? h('div', {'data-testid': 'board-guide', style: {position: 'absolute', top: guides.y, left: -100000, height: 1 / view.z, width: 200000, background: c.accent, pointerEvents: 'none', zIndex: 2000000}}) : null,
       ...vis.map(b => <BoardItem key={b.id} b={b} g={geo(b)} api={p.api} pageId={p.pageId} pages={p.pages} selected={sel.includes(b.id)} editing={editing === b.id} light={light} zoom={view.z} locked={p.locked}
         onDown={onItemDown(b)} onOpen={() => openItem(b)} onResize={(corner: string) => onResize(b, corner)} single={sel.length === 1 && sel[0] === b.id} patchPageBlock={p.patchPageBlock} onPageView={(v: any) => setPageView(b, v)} onUseHere={() => usePageHere(b)} onDup={() => void duplicate([b.id])} onRemove={() => remove([b.id])} onCard={(k: 'sync' | 'original' | 'stop') => cardAction(b, k)} onMention={(m: Mention) => {if (m.kind === 'page') {const t = p.pages.find(x => x.id === m.id); if (t) p.onOpenPage(t);}}}
+        onFit={(ratio: number) => {if (p.locked || b.data?.ratio) return; patchBlock(b.id, x => {const g = geoOf(x); return {...x, data: {...(x.data || {}), ratio, ...(g ? {board: {...g, h: fitH(g.w, ratio)}} : {})}};}, 'board-fit');}}
         onChange={(f: (x: PageBlock) => PageBlock) => patchBlock(b.id, f, 'board-text-' + b.id)} onDone={() => {setEditing(null); p.flush(); if (b.type === 'page_link' && b.data?.page_id) p.onPageChanged?.(String(b.data.page_id));}} />),
       box ? h('div', {style: {position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, border: '1px solid ' + c.accent, background: c.accent + '22', pointerEvents: 'none'}}) : null),
     !shown.length ? h('div', {'data-board-ui': '1', style: {position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', textAlign: 'center', color: c.muted, fontSize: 14, lineHeight: 1.6, pointerEvents: 'none'}},
@@ -593,7 +597,7 @@ export function PageBoard(p: Props) {
     picker ? <PagePicker pages={p.pages} exclude={p.pageId} onClose={() => setPicker(false)} onPick={async src => {setPicker(false); try {const copy = await track('copiar-pagina', () => p.copyPage(src)); addBlock({id: uid(), type: 'page_link', text: '', data: {page_id: copy.id, copy_id: copy.id, source_id: src.id, synced: false}});} catch (e: any) {fail(String(e?.message || 'Não deu para trazer a página.'));}}} /> : null);
 }
 
-function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove, onCard}: any) {
+function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, locked, single, onDown, onOpen, onResize, onFit, onChange, onDone, onMention, patchPageBlock, onPageView, onUseHere, onDup, onRemove, onCard}: any) {
   // 08/11/2026 (Pedro: "eu digito, ele salva e da um pulo nos conteudos"): o salvamento automatico cria um anexo novo e antes o
   // editor recebia esse anexo e recarregava inteiro (pulo). O editor fica com o arquivo de quando abriu e so grava por tras.
   const editBase = useRef(''); if (b.type === 'file' && !editBase.current && b.data?.attachment_id) editBase.current = String(b.data.attachment_id);
@@ -623,7 +627,7 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
           // janela "original": o salvamento ja vai para o anexo da pagina (sem precisar de Sincronizar)
           const fp = String(b.data?.from_page || ''), fb = String(b.data?.from_block || '');if (fp && fb && patchPageBlock) void patchPageBlock(fp, fb, (x: PageBlock) => ({...x, data: {...(x.data || {}), attachment_id: a.id, name: a.name, mime: a.mime, size: a.bytes}})).catch(() => undefined);}} />)); // 08/11 (Pedro): salvar fica so na janela; o anexo da pagina so muda com Sincronizar
     else if (preview && !light) body = h('div', {style: {width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: k === 'audio' ? c.surface : '#000', display: 'flex', alignItems: 'center'}},
-      h('div', {style: {width: '100%', height: k === 'audio' ? 'auto' : '100%', pointerEvents: selected ? 'auto' : 'none'}, className: 'board-media'}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind={k} name={String(b.data?.name || '')} />));
+      h('div', {style: {width: '100%', height: k === 'audio' ? 'auto' : '100%', pointerEvents: selected ? 'auto' : 'none'}, className: 'board-media', onLoadCapture: k === 'image' && !b.data?.ratio ? (e: any) => {const t = e.target as HTMLImageElement; if (t?.tagName === 'IMG' && t.naturalWidth > 0 && t.naturalHeight > 0) onFit?.(t.naturalWidth / t.naturalHeight);} : undefined}, <InlineMedia api={api} id={String(b.data.attachment_id)} kind={k} name={String(b.data?.name || '')} />));
     else {const meta = (KIND as any)[k] || KIND.other; body = h('div', {style: {width: '100%', height: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', boxSizing: 'border-box', background: c.surface, border: '1px solid ' + c.line, borderRadius: 12, overflow: 'hidden'}},
       h('div', {style: {width: 34, height: 34, flexShrink: 0, borderRadius: 8, background: meta.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center'}}, <Icon name={meta.icon} size={18} color={meta.color} />),
       h('div', {style: {minWidth: 0, flex: 1}}, h('div', {style: {color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, b.data?.name || 'Arquivo'),
