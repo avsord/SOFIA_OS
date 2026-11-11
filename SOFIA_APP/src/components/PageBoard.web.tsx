@@ -317,8 +317,8 @@ export function PageBoard(p: Props) {
       if (corner.includes('e')) w = g0.w + dx; if (corner.includes('w')) {w = g0.w - dx; x = g0.x + dx;} if (corner.includes('s')) hh = g0.h + dy; if (corner.includes('n')) {hh = g0.h - dy; y = g0.y + dy;}
       w = Math.max(60, w); hh = Math.max(36, hh); if (keep) {hh = w / ratio; if (corner.includes('n')) y = g0.y + g0.h - hh;} if (corner.includes('w')) x = g0.x + g0.w - w;
       setLive({[b.id]: {...g0, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(hh)}});};
-    dragOn();
-    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff(); const g = liveRef.current[b.id]; if (g) patchGeo([b.id], () => g, 'board-size'); setLive({});};
+    dragOn(); const item = (e.currentTarget as HTMLElement | null)?.closest?.('[data-board-item]') as HTMLElement | null; item?.setAttribute('data-board-resizing', '1');
+    const up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff(); item?.removeAttribute('data-board-resizing'); const g = liveRef.current[b.id]; if (g) patchGeo([b.id], () => g, 'board-size'); setLive({});};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);
   };
   // leva a camera ate o item (cabe na tela, no maximo 100%), como quem aproxima o documento para editar
@@ -499,7 +499,7 @@ export function PageBoard(p: Props) {
     onScroll: (e: any) => {const el = e.currentTarget as HTMLElement; if (el.scrollTop || el.scrollLeft) {el.scrollTop = 0; el.scrollLeft = 0;}},
     style: {position: 'relative', flex: 1, minHeight: 0, overflow: 'clip', outline: 'none', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: mode === 'draw' ? 'crosshair' : mode === 'link' ? 'alias' : 'default',
       ...gridBg(view, c.bg)}},
-    h('style', null, '[data-board-drag] iframe{pointer-events:none!important}' + /* 11/11 (Pedro: "nao precisa ficar sempre ativado"): cantos da janela so com o mouse em cima ou esticando */ '.board-win-corner{opacity:0;transition:opacity .15s}[data-board-item]:hover>.board-win-corner,[data-board-drag] .board-win-corner{opacity:1}'),
+    h('style', null, '[data-board-drag] iframe{pointer-events:none!important}' + /* 11/11 (Pedro: "quando to movendo fica aparecendo os quadrados nos cantos nao quero / ou quando passa o mouse por cima"): cantos da janela invisiveis (a seta de esticar aparece ao chegar no canto); os quadrados so aparecem na janela que esta sendo esticada */ '.board-win-corner{opacity:0;transition:opacity .15s}[data-board-resizing]>.board-win-corner{opacity:1}'),
     mode === 'hand' ? h('div', {key: 'hand', 'data-testid': 'board-hand', title: 'Mãozinha (H): arrastar o quadro. Aperte H ou Esc para voltar', onPointerDown: handDown, onDoubleClick: (e: any) => e.stopPropagation(), style: {position: 'absolute', inset: 0, zIndex: 29, cursor: grabbing ? 'grabbing' : 'grab', touchAction: 'none'}}) : null,
     // camada do quadro: anda (translate) e cresce (scale) sem nunca mudar o desenho por dentro (ver comentario do zoom no topo)
     h('div', {'data-testid': 'board-layer', style: {position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.z + ')'} as any},

@@ -44,7 +44,14 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
       // 11/11 (Pedro: "nao precisa ficar sempre ativado"): escondidos com o mouse longe; aparecem com o mouse na janela
       const op = () => hs.first().evaluate(e => getComputedStyle(e).opacity); await page.mouse.move(300, 760); await page.waitForTimeout(400); const off = await op();
       const wb0 = await win.boundingBox(); await page.mouse.move(wb0.x + wb0.width / 2, wb0.y + 30); await page.waitForTimeout(400); const on = await op();
-      ok(off === '0' && on === '1', 'cantos só com o mouse em cima (longe: ' + off + ', em cima: ' + on + ')');
+      // 11/11 (Pedro: "quando to movendo fica aparecendo os quadrados nos cantos nao quero / ou quando passa o mouse por cima"): so esticando
+      ok(off === '0' && on === '0', 'cantos escondidos com o mouse longe e em cima (longe: ' + off + ', em cima: ' + on + ')');
+      {const hb = await hs.nth(3).boundingBox(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); const cur = await hs.nth(3).evaluate(e => getComputedStyle(e).cursor);
+        await page.mouse.down(); await page.mouse.move(hb.x + 20, hb.y + 15, {steps: 4}); await page.waitForTimeout(250); const mid = await op(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2, {steps: 4}); await page.mouse.up(); await page.waitForTimeout(400);
+        ok(cur === 'nwse-resize' && mid === '1' && await op() === '0', 'cantos aparecem só esticando (seta: ' + cur + ', esticando: ' + mid + ', depois: ' + await op() + ')');}
+      {const wbm = await win.boundingBox(); await page.mouse.move(wbm.x + wbm.width * 0.6, wbm.y + 6); await page.mouse.down(); await page.mouse.move(wbm.x + wbm.width * 0.6 + 40, wbm.y + 30, {steps: 6}); await page.waitForTimeout(250);
+        const mid = await op(), wbn = await win.boundingBox(); await page.mouse.move(wbm.x + wbm.width * 0.6, wbm.y + 6, {steps: 6}); await page.mouse.up(); await page.waitForTimeout(400);
+        ok(mid === '0', 'movendo a janela, cantos escondidos (' + mid + '; andou ' + Math.round(wbn.x - wbm.x) + ' px)');}
       const drag = async (i, dx, dy) => {const hb = await hs.nth(i).boundingBox(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2 + dy, {steps: 6}); await page.mouse.up(); await page.waitForTimeout(400);};
       const b0 = await win.boundingBox(); await drag(3, 90, 60); const b1 = await win.boundingBox();
       ok(b1.width > b0.width + 60 && b1.height > b0.height + 40 && Math.abs(b1.x - b0.x) < 2, 'canto de baixo à direita estica: ' + Math.round(b0.width) + '×' + Math.round(b0.height) + ' → ' + Math.round(b1.width) + '×' + Math.round(b1.height));
