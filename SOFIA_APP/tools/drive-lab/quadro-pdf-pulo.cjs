@@ -36,8 +36,17 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
     const moved = track.some(t => Math.abs(t.x - c0.x) > 4 || Math.abs(t.y - c0.y) > 4 || t.z !== c0.z);
     fs.writeFileSync(O + 'camera.json', JSON.stringify(track));
     ok(await page.locator('[data-board-editing]').count() >= 1, 'PDF abriu na janela do editor no quadro');
-    {const wb = await page.locator('[data-board-editing]').first().boundingBox(), hb = await page.getByTestId('page-board').boundingBox(); ok(!!wb && wb.x >= hb.x && wb.x + wb.width <= hb.x + hb.width + 1, 'janela do PDF nasce dentro da vista: ' + JSON.stringify(wb && {x: Math.round(wb.x), w: Math.round(wb.width)}) + ' quadro ' + JSON.stringify({x: Math.round(hb.x), w: Math.round(hb.width)}));}
+    {const wb = await page.locator('[data-board-item][data-type=file]:has([data-board-editing])').first().boundingBox(), hb = await page.getByTestId('page-board').boundingBox(); ok(!!wb && wb.x >= hb.x && wb.x + wb.width <= hb.x + hb.width + 1, 'janela do PDF nasce dentro da vista: ' + JSON.stringify(wb && {x: Math.round(wb.x), w: Math.round(wb.width)}) + ' quadro ' + JSON.stringify({x: Math.round(hb.x), w: Math.round(hb.width)}));}
     ok(!moved, 'câmera parada ao abrir o PDF (sem pulo): ' + JSON.stringify(c0) + ' → ' + JSON.stringify(track.at(-1)));
+    // 1b) esticar a janela pelos 4 cantos (Pedro 11/11: "precisa ter funcao pra esticar nos quatro cantos")
+    {const win = page.locator('[data-board-item][data-type=file]:has([data-board-editing])').first(), hs = win.locator(':scope > [aria-label="Mudar o tamanho"]');
+      ok(await hs.count() === 4, 'janela do PDF tem os 4 cantos de esticar (' + await hs.count() + ')');
+      const drag = async (i, dx, dy) => {const hb = await hs.nth(i).boundingBox(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2 + dy, {steps: 6}); await page.mouse.up(); await page.waitForTimeout(400);};
+      const b0 = await win.boundingBox(); await drag(3, 90, 60); const b1 = await win.boundingBox();
+      ok(b1.width > b0.width + 60 && b1.height > b0.height + 40 && Math.abs(b1.x - b0.x) < 2, 'canto de baixo à direita estica: ' + Math.round(b0.width) + '×' + Math.round(b0.height) + ' → ' + Math.round(b1.width) + '×' + Math.round(b1.height));
+      await drag(0, -70, -50); const b2 = await win.boundingBox();
+      ok(b2.x < b1.x - 50 && b2.y < b1.y - 30 && b2.width > b1.width + 50, 'canto de cima à esquerda estica para fora: ' + JSON.stringify({x: Math.round(b2.x - b1.x), y: Math.round(b2.y - b1.y)}));
+      await page.screenshot({path: O + '2b-esticou.png'});}
     // 2) adicionar um PDF pelo botao de arquivo do quadro (Pedro: "quando adiciono o pdf ainda esta pulando")
     await page.mouse.click(300, 700); await page.waitForTimeout(400); fs.writeFileSync(O + 'NOVO.pdf', PDF);
     const c1 = await cam(), t2 = [c1]; const fc = page.waitForEvent('filechooser'); await page.getByTestId('board-add-file').click(); await (await fc).setFiles(O + 'NOVO.pdf');

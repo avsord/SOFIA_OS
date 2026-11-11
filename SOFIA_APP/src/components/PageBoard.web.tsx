@@ -645,7 +645,9 @@ function BoardItem({b, g, api, pageId, pages, selected, editing, light, zoom, lo
       g.caption ? h('span', {'data-testid': 'board-caption-text', style: {color: c.muted, fontSize: 12, width: '100%', lineHeight: 1.4}}, g.caption) : null,
       ...(g.mentions || []).map((m: Mention) => h('button', {key: m.kind + m.id, type: 'button', 'data-testid': 'board-mention-chip', title: m.kind === 'page' ? 'Abrir a página' : m.title, onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => {e.stopPropagation(); onMention(m);},
         style: {border: 0, borderRadius: 6, padding: '2px 7px', background: c.accentSoft, color: c.accent, fontSize: 12, fontWeight: 600, cursor: 'pointer', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, '@' + m.title))) : null,
-    single && !editing ? [handle('nw', {left: o, top: o}), handle('ne', {right: o, top: o}), handle('sw', {left: o, bottom: o}), handle('se', {right: o, bottom: o})] : null);
+    // 11/11/2026 (Pedro: "precisa ter funcao pra esticar nos quatro cantos"): janela de arquivo (PDF/Word) fica sempre editando e o
+    // clique dentro dela nao seleciona o item; os 4 cantos ficam sempre a mao
+    (single && !editing) || (isWin(b) && !light && !locked) ? [handle('nw', {left: o, top: o}), handle('ne', {right: o, top: o}), handle('sw', {left: o, bottom: o}), handle('se', {right: o, bottom: o})] : null);
 }
 
 function Loading({c, label}: any) {return h('div', {style: {width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.input, borderRadius: 10, color: c.muted, fontSize: 12, padding: 8, boxSizing: 'border-box', textAlign: 'center'}}, label);}
