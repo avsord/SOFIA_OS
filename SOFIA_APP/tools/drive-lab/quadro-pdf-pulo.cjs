@@ -24,7 +24,10 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
     await page.screenshot({path: O + '1-antes.png'});
     const frame = page.frameLocator('iframe[data-testid=board-page-frame]').first();
     // a pagina do cartao so fica ativa depois de um clique no cartao
-    const card = page.locator('[data-board-item]').first(); const cb = await card.boundingBox(); await page.mouse.click(cb.x + cb.width / 2, cb.y + 40); await page.waitForTimeout(800);
+    const card = page.locator('[data-board-item]').first();
+    // 11/11 (Pedro: "ainda esta pulando a tela como se tivesse alinhando"): cartao perto da borda direita - a janela nao cabe a direita dele
+    await page.mouse.move(400, 700); await page.keyboard.down('Shift'); for (let i = 0; i < 30 && ((await card.boundingBox()).x + (await card.boundingBox()).width) < 1440; i++) {await page.mouse.wheel(0, -60); await page.waitForTimeout(60);} await page.keyboard.up('Shift'); await page.waitForTimeout(400);
+    const cb = await card.boundingBox(); await page.mouse.click(cb.x + cb.width / 2, cb.y + 40); await page.waitForTimeout(800);
     const row = frame.getByTestId('page-file-row').first(); ok(await row.count() === 1, 'PDF aparece na página do cartão');
     const cam = () => page.evaluate(() => {const o = document.querySelector('[data-testid=board-origin]')?.getBoundingClientRect(), z = document.querySelector('[data-testid=board-zoom]')?.textContent; return {x: Math.round(o?.x || 0), y: Math.round(o?.y || 0), z};});
     const c0 = await cam(), track = [c0];
@@ -33,7 +36,14 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
     const moved = track.some(t => Math.abs(t.x - c0.x) > 4 || Math.abs(t.y - c0.y) > 4 || t.z !== c0.z);
     fs.writeFileSync(O + 'camera.json', JSON.stringify(track));
     ok(await page.locator('[data-board-editing]').count() >= 1, 'PDF abriu na janela do editor no quadro');
+    {const wb = await page.locator('[data-board-editing]').first().boundingBox(), hb = await page.getByTestId('page-board').boundingBox(); ok(!!wb && wb.x >= hb.x && wb.x + wb.width <= hb.x + hb.width + 1, 'janela do PDF nasce dentro da vista: ' + JSON.stringify(wb && {x: Math.round(wb.x), w: Math.round(wb.width)}) + ' quadro ' + JSON.stringify({x: Math.round(hb.x), w: Math.round(hb.width)}));}
     ok(!moved, 'câmera parada ao abrir o PDF (sem pulo): ' + JSON.stringify(c0) + ' → ' + JSON.stringify(track.at(-1)));
+    // 2) adicionar um PDF pelo botao de arquivo do quadro (Pedro: "quando adiciono o pdf ainda esta pulando")
+    await page.mouse.click(300, 700); await page.waitForTimeout(400); fs.writeFileSync(O + 'NOVO.pdf', PDF);
+    const c1 = await cam(), t2 = [c1]; const fc = page.waitForEvent('filechooser'); await page.getByTestId('board-add-file').click(); await (await fc).setFiles(O + 'NOVO.pdf');
+    for (let i = 0; i < 80; i++) {await page.waitForTimeout(50); t2.push(await cam());} await page.screenshot({path: O + '3-adicionou.png'});
+    fs.writeFileSync(O + 'camera2.json', JSON.stringify(t2));
+    ok(!t2.some(t => Math.abs(t.x - c1.x) > 4 || Math.abs(t.y - c1.y) > 4 || t.z !== c1.z), 'câmera parada ao ADICIONAR um PDF: ' + JSON.stringify(c1) + ' → ' + JSON.stringify(t2.find(t => Math.abs(t.x - c1.x) > 4 || Math.abs(t.y - c1.y) > 4 || t.z !== c1.z) || t2.at(-1)));
   } catch (e) {res.push('ERRO ' + (e.stack || e).toString().slice(0, 400));}
   finally {await br.close(); lab.kill();}
   console.log(res.join('\n') + (errs.length ? '\nerros JS: ' + errs.join(' | ') : '') + '\nsaída: ' + O); process.exit(res.some(r => !r.startsWith('OK')) ? 1 : 0);
