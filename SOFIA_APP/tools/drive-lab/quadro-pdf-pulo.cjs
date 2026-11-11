@@ -41,6 +41,10 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
     // 1b) esticar a janela pelos 4 cantos (Pedro 11/11: "precisa ter funcao pra esticar nos quatro cantos")
     {const win = page.locator('[data-board-item][data-type=file]:has([data-board-editing])').first(), hs = win.locator(':scope > [aria-label="Mudar o tamanho"]');
       ok(await hs.count() === 4, 'janela do PDF tem os 4 cantos de esticar (' + await hs.count() + ')');
+      // 11/11 (Pedro: "nao precisa ficar sempre ativado"): escondidos com o mouse longe; aparecem com o mouse na janela
+      const op = () => hs.first().evaluate(e => getComputedStyle(e).opacity); await page.mouse.move(300, 760); await page.waitForTimeout(400); const off = await op();
+      const wb0 = await win.boundingBox(); await page.mouse.move(wb0.x + wb0.width / 2, wb0.y + 30); await page.waitForTimeout(400); const on = await op();
+      ok(off === '0' && on === '1', 'cantos só com o mouse em cima (longe: ' + off + ', em cima: ' + on + ')');
       const drag = async (i, dx, dy) => {const hb = await hs.nth(i).boundingBox(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2 + dy, {steps: 6}); await page.mouse.up(); await page.waitForTimeout(400);};
       const b0 = await win.boundingBox(); await drag(3, 90, 60); const b1 = await win.boundingBox();
       ok(b1.width > b0.width + 60 && b1.height > b0.height + 40 && Math.abs(b1.x - b0.x) < 2, 'canto de baixo à direita estica: ' + Math.round(b0.width) + '×' + Math.round(b0.height) + ' → ' + Math.round(b1.width) + '×' + Math.round(b1.height));
