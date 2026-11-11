@@ -171,7 +171,7 @@ export class SofiaApi {
     if(refresh.length)systemChanged(this);
   }
   readonly owner: string;
-  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {if(token)activeApi=this;this.owner=scope;this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
+  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {if(token)activeApi=this;this.owner=scope;this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope,path=>this.readFresh(path));this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
   get mdLocalOnly(){return this.md.localOnly;}
   /** 0.3.256: ordem das Paginas guardada no aparelho - pronta? carregar; aplicar sem rede */
   get pageOrderReady(){return this.md.orderLoaded;}
@@ -474,7 +474,11 @@ export class SofiaApi {
     try{return await this.saveEntityOnce(input);}catch(e){if(!(e instanceof ApiError)||e.status!==409)throw e;
       // a versao que a tela viu: a que ela passou, ou a copia com essa revisao que veio do servidor (lista, cache)
       const seen=base||this.seenVersion(input.id,input.revision);if(!seen)throw e;
-      const current=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(input.id));return await this.saveEntityOnce(mergeOnConflict(input,seen,current));} }
+      const current=await this.readFresh<Entity>('/workspace/entities/'+encodeURIComponent(input.id));return await this.saveEntityOnce(mergeOnConflict(input,seen,current));} }
+  /** 10/11/2026: leitura para resolver uma gravacao (409, mover pagina): sempre do servidor. A copia pedida na abertura do
+   * site (early.js) e a da memoria de leituras podem ser de antes da ultima gravacao e repetiam o 409. */
+  private readFresh<T>(path:string):Promise<T>{try{const early=typeof window!=='undefined'?(window as any).__sofiaEarly:undefined;if(early)delete early[path];}catch{/* sem janela */}return this.fetchRequest<T>(path,undefined,'GET',20000);}
+  async entityFresh(id: string) { const item=await this.readFresh<Entity>('/workspace/entities/'+encodeURIComponent(id));return item.kind==='user_page'?(await this.md.decorate([item]))[0]:item; }
   private seen=new Map<string,Entity>();
   private noteSeen(data:any){try{const add=(x:any)=>{if(x&&typeof x==='object'&&typeof x.id==='string'&&typeof x.revision==='number'&&x.data&&typeof x.data==='object'){const k=x.id+'@'+x.revision;if(!this.seen.has(k)){this.seen.set(k,JSON.parse(JSON.stringify(x)));if(this.seen.size>4000)this.seen.delete(this.seen.keys().next().value as string);}}};
     add(data);for(const v of Object.values(data||{}))if(Array.isArray(v))for(const x of v.slice(0,2000))add(x);else if(v&&typeof v==='object')add(v);}catch{/* so memoria de apoio */}}

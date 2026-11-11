@@ -23,7 +23,9 @@ export function legacyMovePlan(pages:Entity[],input:MoveInput){
 export class LegacyMdAdapter{
  private supported:boolean|null=null;private probedAt=0;private pending:Promise<boolean>|null=null;
  private order:Record<string,number>={};private dismissed=new Set<string>();private loaded=false;private loading:Promise<void>|null=null;private snapshot:Notice[]=[];
- constructor(private call:Call,private disk:Disk,private scope:string){}
+ // 10/11/2026 (Pedro: "to mudando o lugar e nao ta mudando"): `fresh` le direto do servidor, sem a copia guardada na
+ // abertura do site; mover com a revisao dessa copia velha voltava 409 a partir do 2o movimento.
+ constructor(private call:Call,private disk:Disk,private scope:string,private fresh?:<T>(path:string)=>Promise<T>){}
  async supports():Promise<boolean>{
   if(this.supported!==null&&Date.now()-this.probedAt<300000)return this.supported;
   if(this.pending)return this.pending;
@@ -43,9 +45,11 @@ export class LegacyMdAdapter{
  async clean(input:Partial<Entity>){if(await this.supports()||!input.data)return input;const data={...input.data};delete data.sort_order;delete data.template_id;return {...input,data};}
  async move(input:MoveInput){
   if(await this.supports())return this.call<{items:Entity[]}>('/md/pages/move',input);
-  await this.load();const all:Entity[]=[];for(let offset=0;;offset+=100){const d=await this.call<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&offset='+offset);all.push(...d.items);if(d.items.length<100)break;if(offset>=99900)throw Error('Árvore muito grande para reorganizar neste servidor.');}
+  await this.load();const all:Entity[]=[];for(let offset=0;;offset+=100){const listPath='/workspace/entities?limit=100&kind=user_page&offset='+offset,d=await (this.fresh?this.fresh<{items:Entity[]}>(listPath):this.call<{items:Entity[]}>(listPath));all.push(...d.items);if(d.items.length<100)break;if(offset>=99900)throw Error('Árvore muito grande para reorganizar neste servidor.');}
   const plan=legacyMovePlan(await this.decorate(all.filter(p=>p.state!=='archived')),input);let moved=plan.page;
-  if(pageParentId(moved)!==input.parentId){const body=await this.clean({revision:moved.revision,data:{...moved.data,parent_id:input.parentId,node_type:input.parentId?'page':'space'}});moved=await this.call<Entity>('/workspace/entities/'+encodeURIComponent(moved.id),body,'PATCH');}
+  if(pageParentId(moved)!==input.parentId){const path='/workspace/entities/'+encodeURIComponent(moved.id);
+   const patch=async(cur:Entity)=>this.call<Entity>(path,await this.clean({revision:cur.revision,data:{...cur.data,parent_id:input.parentId,node_type:input.parentId?'page':'space'}}),'PATCH');
+   try{moved=await patch(moved);}catch(e){if((e as {status?:number}).status!==409)throw e;/* a pagina acabou de ser salva (editor aberto): le de novo e move */moved=await patch(await (this.fresh?this.fresh<Entity>(path):this.call<Entity>(path)));}}
   const old={...this.order};plan.siblings.forEach((p,i)=>{this.order[p.id]=(i+1)*1024;});try{await this.persist();}catch(e){this.order=old;throw e;}
   return {items:plan.siblings.map(p=>{const value=p.id===moved.id?moved:p;return {...value,data:{...value.data,sort_order:this.order[p.id]}};})};
  }

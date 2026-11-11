@@ -131,7 +131,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(h){if(!isOpen(h.kid))throw Error('Página trancada: abra com a senha para salvar.');
     if(patch.data){const plain=String((patch.data as any).blocks_json??plainOf(id,h)??'[]');patch={...patch,data:{...patch.data,blocks_json:'[]',lock_json:await seal(id,h.kid,plain)}};}
     const tags=[...((patch.tags as string[]|undefined)||cur?.tags||[])];if(!tags.includes(LOCK_TAG))patch={...patch,tags:[...tags.filter(t=>t!==SECRET_OK_TAG),LOCK_TAG]};}
-   return apiRef.current.saveEntity(patch);},read:id=>apiRef.current.entity(id),
+   return apiRef.current.saveEntity(patch);},read:id=>apiRef.current.entityFresh(id),
   // 07/11/2026 (Pedro: trancou e a pagina ficou aberta com 'Nao salvo'): rascunho de pagina trancada nao vai para o disco
   // (era o texto aberto, com a senha que ele escreveu, guardado sem criptografia no navegador).
   persist:all=>{const items=all.filter(it=>!isLocked(it.base)&&!isLocked(pagesRef.current.find(x=>x.id===it.base.id)));return items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts');},
