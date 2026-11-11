@@ -24,7 +24,7 @@ import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
-import {PageEditorStore,newBlock,expandedIds,toggleExpanded} from '../lib/page-editor';
+import {PageEditorStore,newBlock,expandedIds,toggleExpanded,UPLOADING} from '../lib/page-editor';
 import type {PageBlock,PageDraft} from '../lib/page-editor';
 import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {blocksFromMarkdown,TEXT_BLOCKS,splitBlock,backspaceAtStart,deleteAtEnd,markdownShortcut,slashMatches,slashStart,applySlash,pastedLines,listNumber,neighbourText} from '../lib/page-block-keys';
@@ -469,27 +469,27 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 09/11/2026 (Pedro: "quando eu copiar algo que tem uma estrutura igual ta no anexo, quero que ele seja copiado e mantido na mesma estrutura")
  function pasteTableBlock(b:PageBlock,rows:string[][]){const block={...newBlock('table'),text:tablePlainText(rows).slice(0,12000),data:{rows}};
   edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===b.id);const empty=b.type==='text'&&!String(b.text||'').trim();if(i<0)blocks.push(block);else if(empty)blocks.splice(i,1,block);else blocks.splice(i+1,0,block);if(blocks[blocks.length-1].id===block.id)blocks.push(newBlock());return {...d,blocks};});}
- async function pasteImageBlock(b:PageBlock,img:Blob){if(!selectedId)return;const pageId=selectedId,block={...newBlock('image'),text:'',data:{uploading:true}};
+ async function pasteImageBlock(b:PageBlock,img:Blob){if(!selectedId)return;const pageId=selectedId,block={...newBlock('image'),text:'',data:{uploading:true}};UPLOADING.add(block.id);
   edit(d=>{const blocks=d.blocks.slice(),i=blocks.findIndex(x=>x.id===b.id);const empty=b.type==='text'&&!String(b.text||'').trim();if(i<0)blocks.push(block);else if(empty)blocks.splice(i,1,block);else blocks.splice(i+1,0,block);if(blocks[blocks.length-1].id===block.id)blocks.push(newBlock());return {...d,blocks};});
   try{const id=await uploadPageImage(api,pageId,img);store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===block.id?{...x,data:{attachment_id:id,caption:''}}:x)}));void store.flush(pageId);}
-  catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==block.id)}));setError(errorText(e));}}
+  catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==block.id)}));setError(errorText(e));}finally{UPLOADING.delete(block.id);}}
  // 07/11/2026 (Pedro: "arrastar um docx, pdf, o que for, ele fica uma linha com o tipo e o nome"): cada arquivo vira um bloco
  // 'file' logo depois do bloco onde caiu (ou no lugar dele, se estiver vazio); imagem, video e audio ja aparecem na pagina.
  async function dropFiles(after:PageBlock|null,files:File[]){if(!selectedId||!files.length)return;const pageId=selectedId,cur=store.get(pageId);
   if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
-  const made=files.map(f=>({...newBlock('file'),text:'',data:{uploading:true,name:f.name,size:f.size,mime:guessMime(f)}}));
+  const made=files.map(f=>({...newBlock('file'),text:'',data:{uploading:true,name:f.name,size:f.size,mime:guessMime(f)}}));made.forEach(m=>UPLOADING.add(m.id));
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
    if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   const onBoardPage=cur?.draft.appearance.layout==='board';/* 08/11/2026: no Quadro, envio que falha ou demora entra no registro [quadro] */
   await Promise.all(files.map(async(f,n)=>{const blk=made[n],s0=Date.now();try{const up=await uploadPageFile(api,pageId,f);if(onBoardPage)boardNote('enviar',true,{ms:Date.now()-s0,file:{name:f.name,size:f.size}});store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...up,view:defaultView(fileKind(up.mime,up.name))}}:x)}));}
-   catch(e){if(onBoardPage)boardNote('enviar',false,{ms:Date.now()-s0,file:{name:f.name,size:f.size},error:e});store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}));
+   catch(e){if(onBoardPage)boardNote('enviar',false,{ms:Date.now()-s0,file:{name:f.name,size:f.size},error:e});store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}finally{UPLOADING.delete(blk.id);}}));
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "integracao com as paginas: poder copiar e colar la qualquer tipo de item"): colar o que foi copiado no
  // Drive (ou arquivos de outra pagina) cria blocos de arquivo; o servidor copia o arquivo (nada passa pelo navegador).
  async function pasteClipBlocks(after:PageBlock|null,clip:SofiaClip){if(!selectedId)return;const pageId=selectedId,cur=store.get(pageId);
   if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
   const names=clip.sofia==='drive-items'?clip.names:clip.items.map(x=>x.name);if(!names.length)return;
-  const made=names.map((n,i)=>({...newBlock('file'),text:'',data:{uploading:true,name:n,mime:clip.sofia==='page-files'?clip.items[i].mime:guessMime({name:n})}}));
+  const made=names.map((n,i)=>({...newBlock('file'),text:'',data:{uploading:true,name:n,mime:clip.sofia==='page-files'?clip.items[i].mime:guessMime({name:n})}}));made.forEach(m=>UPLOADING.add(m.id));
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
    if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   const drop=(ids:Set<string>)=>store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>!ids.has(x.id))}));
@@ -497,15 +497,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>{const n=made.findIndex(m=>m.id===x.id);if(n<0)return x;const up=r.items[n] as any;if(!up||up.error){gone.add(x.id);if(up?.error)errs.push(String(up.error));return x;}return {...x,data:{attachment_id:up.id,name:up.name,mime:up.mime,size:up.bytes,view:defaultView(fileKind(up.mime,up.name))}};})}));
    if(gone.size)drop(gone);if(errs.length)setError(errs[0]);else if(r.skipped.length)setError('Pastas não entram na página: '+r.skipped.join(', ')+'.');}
   catch(e){if(cur?.draft.appearance.layout==='board')boardNote('colar-arquivo',false,{error:e,n:names.length});drop(new Set(made.map(x=>x.id)));setError(errorText(e));}
+  finally{made.forEach(m=>UPLOADING.delete(m.id));}
   void store.flush(pageId);}
  // 07/11/2026 (Pedro: "a Sofia consegue criar um arquivo doc na pagina e comecar a editar"): .docx em branco + editor aberto
  async function createDoc(after:PageBlock|null,kind:'docx'|'xlsx'|'pptx'='docx'){if(!selectedId||Platform.OS!=='web')return;const pageId=selectedId,cur=store.get(pageId);
   if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
-  const title=String(cur?.draft?.title||'').trim().replace(/[\\/:*?"<>|]/g,'').slice(0,80),mime=kind==='xlsx'?XLSX_MIME:kind==='pptx'?PPTX_MIME:DOCX_MIME,name=(title||(kind==='xlsx'?'Planilha':kind==='pptx'?'Apresentação':'Documento'))+'.'+kind,blk={...newBlock('file'),text:'',data:{uploading:true,name,mime}};
+  const title=String(cur?.draft?.title||'').trim().replace(/[\\/:*?"<>|]/g,'').slice(0,80),mime=kind==='xlsx'?XLSX_MIME:kind==='pptx'?PPTX_MIME:DOCX_MIME,name=(title||(kind==='xlsx'?'Planilha':kind==='pptx'?'Apresentação':'Documento'))+'.'+kind,blk={...newBlock('file'),text:'',data:{uploading:true,name,mime}};UPLOADING.add(blk.id);
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();if(i<0)blocks.push(blk);else if(empty)blocks.splice(i,1,blk);else blocks.splice(i+1,0,blk);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   const put=(a:{id:string;name:string;mime:string;bytes:number})=>store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>x.id===blk.id?{...x,data:{...(x.data||{}),uploading:false,attachment_id:a.id,name:a.name,mime:a.mime,size:a.bytes,view:'attach'}}:x)}));
   try{const a=kind==='docx'?await api.saveDocx(pageId,{html:'<p></p>',name}):await uploadOfficeBytes(api,pageId,kind==='xlsx'?await blankXlsx():await blankPptx(),name,mime);put(a);void store.flush(pageId);openFileWindow(api,{id:a.id,name:a.name,mime:a.mime,pageId,onSaved:x=>{put(x);void store.flush(pageId);}});}
-  catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}}
+  catch(e){store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>x.id!==blk.id)}));setError(errorText(e));}finally{UPLOADING.delete(blk.id);}}
  function pickFiles(after:PageBlock|null){if(Platform.OS!=='web')return;const input=document.createElement('input');input.type='file';input.multiple=true;input.onchange=()=>{const list=[...(input.files||[])] as File[];if(list.length)void dropFiles(after,list);};input.click();}
  const editorDrop=useRef<any>(null),[fileOver,setFileOver]=useState(false);
  // 07/11/2026 (Pedro: "a foto num monitor maior fica fora da posicao"): capa com a MESMA proporcao em qualquer tela (largura/6),
