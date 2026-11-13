@@ -268,7 +268,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
     if (!p.active || Platform.OS !== 'web' || typeof document === 'undefined') return; // 03/11/2026: no Android o window existe sem addEventListener
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null; if (t && /input|textarea|select/i.test(t.tagName)) return; if (e.defaultPrevented || document.querySelector('[aria-modal="true"],[role="dialog"]')) return; // 03/11/2026: com uma janela aberta, Esc/setas sao dela, nao da Agenda atras
-      if (e.key === 'Escape') {if (level === 'day') go('month', p.selected); else if (level === 'month') go('year', p.selected);}
+      if (e.key === 'Escape') {if (level === 'day') {e.preventDefault(); go('month', p.selected);} else if (level === 'month') {e.preventDefault(); go('year', p.selected);}}
       else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1);
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);

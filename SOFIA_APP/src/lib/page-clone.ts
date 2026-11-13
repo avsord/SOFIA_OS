@@ -31,14 +31,43 @@ export function remapBlocksJson(json:unknown,ids:ReadonlyMap<string,string>):str
  const out=walk(blocks);return changed?JSON.stringify(out):raw;
 }
 
+/** 13/11/2026 (Pedro: "só a estrutura tem que vir só o modelo, vazio"): antes a cópia "Só a estrutura" saía sem NENHUM
+ * bloco (blocks_json '[]'), perdendo o modelo. Agora fica o esqueleto: blocos, seções, tabelas com o cabeçalho, coleções
+ * com propriedades/visões/colunas do Kanban, pastas de notas - e sai o conteúdo: texto, notas, linhas/cartões,
+ * imagens, arquivos, desenhos, links e blocos espelhados de outras páginas. */
+const CONTENT_BLOCKS=new Set(['image','file','attachment','video','audio','embed','bookmark','drawing']);
+const CONTENT_KEYS=['content','value','values','page_content','caption','url','src','name','size','mime','attachment_id','drawing','link','live','synced','source_id','copy_id','uploading'];
+export function structureBlock(b:any,ids?:ReadonlyMap<string,string>):any|null{
+ if(!b||typeof b!=='object')return null;const d=b.data&&typeof b.data==='object'?b.data:{};
+ if(CONTENT_BLOCKS.has(String(b.type))||d.attachment_id||d.drawing||d.live||d.synced||d.source_id||d.copy_id)return null;
+ // link/janela para outra página: só fica se aponta para uma subpágina que também foi copiada
+ if(typeof d.page_id==='string'&&!(ids&&ids.has(d.page_id)))return null;
+ const out:any={...b};
+ if('text' in out)out.text='';if('html' in out)out.html='';if('checked' in out)out.checked=false;
+ const data:any={...d};for(const k of CONTENT_KEYS)delete data[k];
+ if(typeof d.page_id==='string'&&ids)data.page_id=ids.get(d.page_id);
+ if(Array.isArray(d.rows))data.rows=b.type==='table'&&Array.isArray(d.rows[0])?[d.rows[0].map((cell:unknown)=>typeof cell==='string'?cell:'')]:[];
+ for(const k of ['items','records','entries','cards'])if(Array.isArray(d[k]))data[k]=[];
+ for(const k of ['notebooks','books'])if(Array.isArray(d[k]))data[k]=d[k].map((book:any)=>book&&typeof book==='object'?{...book,expanded:false,pages:[]}:book);
+ for(const k of ['blocks','children'])if(Array.isArray(d[k]))data[k]=d[k].map((x:any)=>structureBlock(x,ids)).filter((x:any)=>x!==null);
+ if(Array.isArray(b.children))out.children=b.children.map((x:any)=>structureBlock(x,ids)).filter((x:any)=>x!==null);
+ if(b.data)out.data=data;
+ return out;
+}
+export function structureBlocksJson(json:unknown,ids?:ReadonlyMap<string,string>):string{
+ let blocks:unknown;try{blocks=JSON.parse(typeof json==='string'?json:'[]');}catch{return '[]';}
+ if(!Array.isArray(blocks))return '[]';
+ return JSON.stringify(blocks.map(b=>structureBlock(b,ids)).filter(b=>b!==null));
+}
+
 /** O que se grava para a cópia de uma página (sem id: nasce uma página nova). */
 export function cloneInput(src:Entity,opts:{parentId:string;isRoot:boolean;mode:CloneMode;ids?:ReadonlyMap<string,string>}):Partial<Entity>{
  const data:Record<string,unknown>={...(src.data||{}),parent_id:opts.parentId};
- if(opts.mode==='structure')data.blocks_json='[]';
+ if(opts.mode==='structure'){data.blocks_json=structureBlocksJson(data.blocks_json,opts.ids);if('lock_json' in data)data.lock_json='';}
  else if(opts.ids)data.blocks_json=remapBlocksJson(data.blocks_json,opts.ids);
  return {kind:'user_page',title:(opts.isRoot?(src.title||'Sem título')+' (cópia)':(src.title||'Sem título')).slice(0,240),
   content:opts.mode==='structure'?'':src.content||'',area:src.area||'Pessoal',privacy:src.privacy||'private',state:'active',
-  tags:(src.tags||[]).filter(t=>t!=='board-copy'),data:data as Entity['data']};
+  tags:(src.tags||[]).filter(t=>t!=='board-copy'&&!(opts.mode==='structure'&&/^sofia-(lock|secret-ok)-v1$/.test(t))),data:data as Entity['data']};
 }
 
 /** Grava a cópia (página + subpáginas). Devolve a página de cima copiada. */
@@ -47,13 +76,14 @@ export async function clonePageTree(api:{saveEntity:(input:Partial<Entity>)=>Pro
  const ids=new Map<string,string>(),saved:{src:Entity;copy:Entity}[]=[];
  for(const [i,src] of list.entries()){
   const parentId=i===0?pageParentId(src):ids.get(pageParentId(src))||'';
-  const copy=await api.saveEntity(cloneInput(src,{parentId,isRoot:i===0,mode}));
+  const copy=await api.saveEntity(cloneInput(src,{parentId,isRoot:i===0,mode,ids}));
   ids.set(src.id,copy.id);saved.push({src,copy});
  }
  // segunda passada: só as páginas que têm link para subpágina copiada
- if(mode==='identical')for(const {src,copy} of saved){
-  const before=typeof src.data?.blocks_json==='string'?src.data.blocks_json:'[]',after=remapBlocksJson(before,ids);
-  if(after!==before)await api.saveEntity({...copy,data:{...(copy.data||{}),blocks_json:after} as Entity['data']});
+ for(const {src,copy} of saved){
+  const before=typeof src.data?.blocks_json==='string'?src.data.blocks_json:'[]';
+  if(mode==='identical'){const after=remapBlocksJson(before,ids);if(after!==before)await api.saveEntity({...copy,data:{...(copy.data||{}),blocks_json:after} as Entity['data']});}
+  else{const after=structureBlocksJson(before,ids);if(after!==copy.data?.blocks_json)await api.saveEntity({...copy,data:{...(copy.data||{}),blocks_json:after} as Entity['data']});}
  }
  return saved[0].copy;
 }

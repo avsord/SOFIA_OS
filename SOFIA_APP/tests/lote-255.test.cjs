@@ -26,7 +26,7 @@ test('0.3.255: agenda do Inicio nao repete a tarefa e mostra a concluida riscada
   const recs=d.dayRecords([{id:'task:t1',kind:'task',title:'T1',state:'todo',revision:1,data:{start_at:due,task_id:'t1'}},{id:'task:t2',kind:'task',title:'T2',state:'done',revision:2,data:{start_at:due,task_id:'t2'}}],[{id:'t1',title:'T1',state:'todo',due_at:due,revision:1}]);
   assert.deepEqual(j(recs.map(x=>x.id).sort()),['t1','task:t2']);assert.ok(recs.every(x=>x.isTask));
   assert.equal(recs.find(x=>x.id==='task:t2').original.state,'done');
-  assert.ok(read('src/lib/agenda-recurrence.ts').includes("&&!(item.kind==='task'&&item.state==='done'))return [];"));
+  assert.ok(read('src/lib/agenda-recurrence.ts').includes("&&!(item.kind==='task'&&item.state==='done')&&!(keepDone&&['done','completed'].includes(item.state)))return [];"));
   assert.ok(read('src/components/DashboardWidgets.tsx').includes("textDecorationLine:done?'line-through':'none'"));
 });
 

@@ -4,16 +4,30 @@ import {useEffect, useState} from 'react';
 import type {SofiaApi} from './api';
 import type {Entity} from './types';
 import {useCapsules} from './capsule-store';
-import {manualDues, todayISO, reserveOf, moneySplit, upcoming, type Due} from './finance';
+import {manualDues, todayISO, reserveOf, moneySplit, upcoming, addDays, cardInvoices, type Due, type Tx, type Card} from './finance';
 import type {GoalNumbers} from '../components/GoalProgress';
 import {readCache, toData, loadAll, financeWindow} from '../screens/finance/core';
 import {classify, type Pack} from '../screens/PackagesApp';
 import {leftAfterBills, spendControl, looseSpending} from './finance-left';
 
+/** 13/11/2026 (Pedro: "marquei recebi o aluguel e sumiu da linha do tempo"): contas, receitas e faturas da linha do tempo.
+ * As em aberto (como antes) e TAMBEM as ja pagas/recebidas pela Sofia (paid_at preenchido) no periodo da linha: ficam no lugar,
+ * marcadas como feitas. Gasto lancado ja pago (sem paid_at) nao entra: nunca foi conta a pagar. */
+export function timelineMoney(txs: Tx[], cards: Card[], today = todayISO(), days = 4): Due[] {
+  const open = upcoming(txs, cards, today, days).filter(x => !x.paid), from = addDays(today, -31), until = addDays(today, days), ids = new Set(open.map(x => x.id));
+  const paid: Due[] = txs.filter(t => t.paid && !!t.paidAt && !t.virtual && !t.cardId && (t.kind === 'expense' || t.kind === 'income') && t.date >= from && t.date <= until && !ids.has(t.id))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: t.kind === 'income' ? 'receber' as const : 'pagar' as const, late: false, paid: true, tx: t}));
+  for (const c of cards) if (!c.archived) for (const i of cardInvoices(c, txs, today)) {
+    if (i.total > 0 && (i.status === 'paga' || i.total <= i.paid) && i.due >= from && i.due <= until) paid.push({id: 'fatura:' + c.id + ':' + i.month, title: 'Fatura ' + c.name, amount: i.total, date: i.due, kind: 'fatura', late: false, paid: true, invoice: i});
+  }
+  return [...open, ...paid].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export type HomeBriefData = {
   ready: boolean;
   capsules: ReturnType<typeof useCapsules>;
   packs: Pack[];
+  timelinePacks: Pack[]; // 13/11/2026: tambem as entregues (a entrega fica na linha do tempo, marcada como feita)
   dues: Due[] | null; // null = Financas ainda sem dados neste aparelho
   left: {left: number; end: string} | null; // o que sobra depois de tudo pago (0.3.303)
   spend: {spent: number; available: number; pct: number} | null; // controle de gastos do mes (0.3.305)
@@ -48,7 +62,7 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
         try {setSpend(spendControl(data as any, today));} catch {setSpend(null);}
         try {setLoose(looseSpending(data as any, today));} catch {setLoose(null);}
         setFin(data);
-        try {setMoneyDues(upcoming((data as any).txs || [], (data as any).cards || [], today, 4).filter(x => !x.paid));} catch {setMoneyDues([]);}
+        try {setMoneyDues(timelineMoney((data as any).txs || [], (data as any).cards || [], today, 4));} catch {setMoneyDues([]);}
         // a mesma meta que Financas mostra (papel "reserve"); antes vinha de outra leitura, que podia chegar tarde ou nao chegar
         try {const r = reserveOf((data as any).goals || []); if (r && Number(r.target) > 0) {const sp = moneySplit(r, (data as any).moves || [], (data as any).accounts, (data as any).txs, (data as any).cards, today.slice(0, 7)); setGoal({name: r.name || 'Sua meta', saved: sp.saved, target: Number(r.target), monthly: sp.planned || 0, deadline: String(r.entity?.data?.deadline || ''), today});} else setGoal(null);} catch {setGoal(null);}
         };
@@ -76,7 +90,8 @@ export function useHomeBriefData(api: SofiaApi, active: boolean): HomeBriefData 
     })();
     return () => {alive = false;};
   }, [api, active, epoch]);
-  const packs = (pkgItems || []).filter(i => i.state !== 'archived' && i.state !== 'delivered').map(classify).filter(x => !x.delivered);
+  const timelinePacks = (pkgItems || []).filter(i => i.state !== 'archived').map(classify);
+  const packs = timelinePacks.filter(x => x.e.state !== 'delivered' && !x.delivered);
   const ready = !!capsules.loaded && pkgItems !== undefined && dues !== undefined && mailNew !== undefined;
-  return {ready, capsules, packs, dues: dues ?? null, left, spend, goal, loose, money: moneyDues, fin, reload: () => setEpoch(e => e + 1), mailNew: mailNew || []};
+  return {ready, capsules, packs, timelinePacks, dues: dues ?? null, left, spend, goal, loose, money: moneyDues, fin, reload: () => setEpoch(e => e + 1), mailNew: mailNew || []};
 }

@@ -28,7 +28,7 @@ export function ContextMenuHost() {
   }, [open, anim]);
   useEffect(() => {
     if (!open || typeof document === 'undefined') return;
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(null); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setOpen(null); } };
     document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
   }, [open]);
   const shown = open || (leaving ? last.current : null);

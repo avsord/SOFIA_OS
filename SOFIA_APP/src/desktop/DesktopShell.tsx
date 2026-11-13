@@ -8,7 +8,7 @@ import {PALETTE} from '../lib/palette';
 import type {Task} from '../lib/types';
 // (ver lib/desktop.ts). Barra lateral fixa e recolhivel, barra de cima com caminho, busca e avisos,
 // busca global (Ctrl+K) e atalhos de teclado. As telas sao as mesmas do celular.
-import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon,type IconName} from '../components/Icon';
@@ -17,6 +17,10 @@ import {ProfileAvatar} from '../components/ProfileAvatar';
 import {fuzzyFilter} from '../lib/fuzzy';
 import {comparePageOrder} from '../lib/page-order';
 import {clonePageTree,cloneOrder,type CloneMode} from '../lib/page-clone';
+import {pageUndo,pageSpot,type PageSpot} from '../lib/page-undo'; // 13/11/2026: Ctrl+Z na barra das Paginas
+import {trashPageTree,restorePageTree,staleTrash} from '../lib/page-trash';
+import {moveNoteToPage} from '../lib/notes-move'; // 13/11/2026: nota arrastada para uma pagina da barra
+import {useToast} from '../components/AppKit';
 import {openContextMenu,contextMenu} from '../components/ContextMenu';
 import type {MenuItem} from '../components/ContextMenu';
 import {appAlert} from '../lib/app-alert';
@@ -42,6 +46,7 @@ type Props={
 
 /** Le as paginas para a arvore da barra lateral sem esperar a aba Paginas abrir. */
 const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
+let trashSwept=false;
 function usePageDirectory(api:SofiaApi){
  const all=useStore(pagesDirectory);
  // 08/11/2026 (Pedro: "se adiciono uma pagina pra dentro [do Quadro] nao duplica ali nas abas"): copia de Quadro fica so no Quadro
@@ -51,8 +56,10 @@ function usePageDirectory(api:SofiaApi){
   let live=true;
   async function load(){
    try{
-    const items:Entity[]=[];
-    for(let offset=0;offset<3000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;}
+    const items:Entity[]=[],seen:Entity[]=[];let complete=false;
+    for(let offset=0;offset<3000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));seen.push(...r.items);if(r.items.length<100){complete=true;break;}}
+    const stale=complete?staleTrash(seen):[]; // so com a lista inteira (ver staleTrash)
+     if(live&&!trashSwept){trashSwept=true;for(const x of stale.slice(0,5))void api.deleteEntity(x.id).catch(()=>{/* tenta na proxima abertura */});} // lixeira com mais de 30 dias
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
     if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
@@ -96,7 +103,8 @@ function Section({title,children,action}:{title:string;children:React.ReactNode;
 const EXPANDED_KEY='sofia.desktop.tree.expanded';
 function readExpanded():Set<string>{try{return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY)||'[]'));}catch{return new Set();}}
 
-function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi}){
+const NOTE_MIME='application/x-sofia-note';
+function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
  const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
@@ -108,7 +116,19 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
   appAlert('Duplicar “'+(p.title||'Sem título')+'”','Clonar idêntica: copia tudo igual (texto, notas, arquivos'+(subs>0?' e '+(subs===1?'a subpágina':'as '+subs+' subpáginas'):'')+').\nSó a estrutura: as mesmas páginas, com nome, ícone e capa, mas vazias.',[{text:'Cancelar',style:'cancel'},
    {text:'Clonar idêntica',onPress:()=>void runClone(p,'identical')},
    {text:'Só a estrutura (vazia)',onPress:()=>void runClone(p,'structure')}]);};
- const remove=(p:Entity)=>appAlert('Excluir página?','Excluir “'+(p.title||'Sem título')+'” e suas subpáginas também?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void api.deleteEntity(p.id).catch(e=>appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e)));}}]);
+ const remove=(p:Entity)=>appAlert('Excluir página?','Excluir “'+(p.title||'Sem título')+'” e suas subpáginas também?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void trashTree(p);}}]);
+ // 13/11/2026 (Pedro: Ctrl+Z traz de volta): excluir arquiva a arvore (lib/page-trash); desfazer volta tudo no mesmo lugar
+ const setDir=(fn:(list:Entity[])=>Entity[])=>{const now=pagesDirectory.get();if(now)pagesDirectory.set(fn(now));};
+ const trashTree=async(p:Entity)=>{const name=p.title||'Sem título',ids=new Set(cloneOrder([...byIdRef.current.values()],p.id).map(x=>x.id));
+  try{let current=await trashPageTree(api,[...byIdRef.current.values()],p.id);setDir(list=>list.filter(x=>!ids.has(x.id)));systemChanged(api);
+   pageUndo.push({label:'Excluir “'+name+'”',undoText:'Página “'+name+'” restaurada',redoText:'Página “'+name+'” excluída',
+    undo:async()=>{current=await restorePageTree(api,current);const back=current;setDir(list=>[...list.filter(x=>!ids.has(x.id)),...back]);systemChanged(api);},
+    redo:async()=>{current=await trashPageTree(api,current,p.id);setDir(list=>list.filter(x=>!ids.has(x.id)));systemChanged(api);}});
+   toast('Página “'+name+'” excluída',[{label:'Desfazer',run:undoNow}]);
+  }catch(e){appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e));}};
+ const movePageTo=(id:string,spot:PageSpot)=>{const cur=byIdRef.current.get(id)||pagesDirectory.get()?.find(x=>x.id===id);if(!cur)return Promise.reject(Error('A página não está mais na lista.'));
+  setDir(list=>list.map(x=>x.id===id?{...x,data:{...x.data,parent_id:spot.parentId,node_type:spot.parentId?'page':'space'}}:x));
+  return api.movePage({id,revision:cur.revision,parentId:spot.parentId,kind:spot.kind,anchorId:spot.anchorId}).then(r=>{const items=r?.items||[];if(items.length)setDir(list=>list.map(x=>items.find(y=>y.id===x.id)||x));systemChanged(api);});};
  // arrastar página na barra: meio da linha = dentro; borda de cima/baixo = antes/depois (como no Notion)
  const [drag,setDrag]=useState<{id:string;x:number;y:number;title:string;emoji?:string}|null>(null),[target,setTarget]=useState<{id:string;kind:'before'|'after'|'inside'}|null>(null);
  const justDragged=useRef(false),byIdRef=useRef(new Map<string,Entity>());byIdRef.current=new Map(pages.map(p=>[p.id,p]));
@@ -123,25 +143,45 @@ function PageTree({pages,openId,onOpen,api}:{pages:Entity[];openId:string;onOpen
    const up=()=>{d.removeEventListener('mousemove',move);d.removeEventListener('mouseup',up);if(!on)return;justDragged.current=true;setTimeout(()=>{justDragged.current=false;},60);setDrag(null);setTarget(null);
     if(!last)return;const anchor=byIdRef.current.get(last.id);if(!anchor)return;const parentId=last.kind==='inside'?anchor.id:String(anchor.data?.parent_id||'');
     if(last.kind==='inside')setExpanded(prev=>{const n=new Set(prev);n.add(anchor.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
-    {const now=pagesDirectory.get();if(now)pagesDirectory.set(now.map(x=>x.id===p.id?{...x,data:{...x.data,parent_id:parentId,node_type:parentId?'page':'space'}}:x));}
-    void api.movePage({id:p.id,revision:p.revision,parentId,kind:last.kind,anchorId:anchor.id}).then(r=>{const items=r?.items||[];const now=pagesDirectory.get();if(now&&items.length)pagesDirectory.set(now.map(x=>items.find(y=>y.id===x.id)||x));systemChanged(api);}).catch(e=>appAlert('Não foi possível mover a página',e instanceof Error?e.message:String(e)));};
+    const from=pageSpot([...byIdRef.current.values()],p.id),to:PageSpot={parentId,kind:last.kind,anchorId:anchor.id},name=byIdRef.current.get(p.id)?.title||p.title||'Sem título';
+    void movePageTo(p.id,to).then(()=>{if(from&&!(from.parentId===to.parentId&&from.kind===to.kind&&from.anchorId===to.anchorId))pageUndo.push({label:'Mover “'+name+'”',undoText:'Página “'+name+'” voltou para o lugar',redoText:'Página “'+name+'” movida de novo',undo:()=>movePageTo(p.id,from),redo:()=>movePageTo(p.id,to)});}).catch(e=>appAlert('Não foi possível mover a página',e instanceof Error?e.message:String(e)));};
    d.addEventListener('mousemove',move);d.addEventListener('mouseup',up);});};
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
  const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
+ // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
+ // fechada abre as subpaginas; soltar move a nota (lib/notes-move) e Ctrl+Z devolve
+ const [noteOver,setNoteOver]=useState<string|null>(null),treeRef=useRef<any>(null),expandedRef=useRef(expanded);expandedRef.current=expanded;
+ const kidsRef=useRef(new Map<string,number>());kidsRef.current=new Map();for(const x of pages){const parent=String(x.data?.parent_id||'');if(parent)kidsRef.current.set(parent,(kidsRef.current.get(parent)||0)+1);}
+ useEffect(()=>{const node=treeRef.current;if(!node||typeof node.addEventListener!=='function')return;let hover:{id:string;timer:ReturnType<typeof setTimeout>}|null=null;
+  const clear=()=>{if(hover){clearTimeout(hover.timer);hover=null;}};
+  const isNote=(e:DragEvent)=>Array.from(e.dataTransfer?.types||[]).includes(NOTE_MIME);
+  const rowOf=(e:DragEvent)=>{const el=(e.target as HTMLElement|null)?.closest?.('[data-testid^="sidebar-page-"]') as HTMLElement|null;const id=el?.getAttribute('data-testid')?.replace(/^sidebar-page-/,'').replace(/-(more|add)$/,'')||'';return id&&byIdRef.current.has(id)?id:'';};
+  const over=(e:DragEvent)=>{if(!isNote(e))return;const id=rowOf(e);if(!id){setNoteOver(null);clear();return;}e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='move';setNoteOver(prev=>prev===id?prev:id);
+   if(hover?.id!==id){clear();if(kidsRef.current.get(id)&&!expandedRef.current.has(id))hover={id,timer:setTimeout(()=>{hover=null;setExpanded(prev=>{const n=new Set(prev);n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});},700)};}};
+  const leave=(e:DragEvent)=>{const to=e.relatedTarget as Node|null;if(to&&node.contains(to))return;setNoteOver(null);clear();};
+  const drop=(e:DragEvent)=>{if(!isNote(e))return;const id=rowOf(e);setNoteOver(null);clear();if(!id)return;e.preventDefault();let info:any={};try{info=JSON.parse(e.dataTransfer?.getData(NOTE_MIME)||'{}');}catch{return;}
+   const noteId=String(info?.noteId||''),from=String(info?.fromPageId||''),title=String(info?.title||'Nota');if(!noteId||!from||from===id)return;
+   const name=byIdRef.current.get(id)?.title||'Sem título',fromName=byIdRef.current.get(from)?.title||'a página de antes';
+   void moveNoteToPage(noteId,from,id).then(()=>{systemChanged(api);toast('Nota movida para '+name,[{label:'Desfazer',run:undoNow}]);
+    pageUndo.push({label:'Mover nota “'+title+'”',undoText:'Nota “'+title+'” voltou para '+fromName,redoText:'Nota movida para '+name,undo:()=>moveNoteToPage(noteId,id,from).then(()=>systemChanged(api)),redo:()=>moveNoteToPage(noteId,from,id).then(()=>systemChanged(api))});})
+    .catch(err=>appAlert('Não foi possível mover a nota',err instanceof Error?err.message:String(err)));};
+  node.addEventListener('dragover',over);node.addEventListener('dragleave',leave);node.addEventListener('drop',drop);
+  return()=>{clear();node.removeEventListener('dragover',over);node.removeEventListener('dragleave',leave);node.removeEventListener('drop',drop);};
+ },[api,toast,undoNow]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
-  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:null} dimmed={drag?.id===p.id}/>);
+  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
  const c=useTheme();
- return <View testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
+ return <View ref={treeRef} testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
   {drag.emoji?<Text style={{fontSize:14}}>{drag.emoji}</Text>:<Icon name="book" size={14} color={c.muted}/>}<Text style={{color:c.text,fontSize:13}}>{drag.title}</Text></View>:null}</View>;
 }
 
@@ -221,6 +261,20 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  useDesktopCss(true,c);
  const keys=useMemo(()=>({palette:()=>setPalette(v=>!v),sidebar:()=>setCollapsed(!collapsed),tab:(i:number)=>{const t=TAB_ORDER[i];if(t)onNavigate(t);},escape:()=>setPalette(false)}),[collapsed,onNavigate]);
  useDesktopKeys(true,keys);
+ // 13/11/2026 (Pedro: Ctrl+Z na barra das Paginas): desfaz excluir/mover/reordenar/mover nota; o editor da pagina fica com o
+ // Ctrl+Z quando foi ele que mudou por ultimo (pageUndo.markEditor). Digitando num campo, o Ctrl+Z e do campo.
+ const {toast,toastNode}=useToast(),tabRef=useRef(tab),inSidebar=useRef(false);tabRef.current=tab;
+ const runUndo=useCallback(async(redo:boolean)=>{try{const step=await (redo?pageUndo.redo():pageUndo.undo());if(step)toast((redo?step.redoText:step.undoText)||(redo?'Refeito: ':'Desfeito: ')+step.label);}catch(e){appAlert(redo?'Não foi possível refazer':'Não foi possível desfazer',e instanceof Error?e.message:String(e));}},[toast]);
+ const undoNow=useCallback(()=>{void runUndo(false);},[runUndo]);
+ useEffect(()=>{if(typeof document==='undefined')return;
+  const down=(e:MouseEvent)=>{const t=e.target as HTMLElement|null;if(t?.closest?.('[role="dialog"],[data-testid="context-menu"],[data-testid="app-toast"]'))return;inSidebar.current=!!t?.closest?.('[data-testid="desktop-sidebar"]');};
+  const key=(e:KeyboardEvent)=>{const mod=(e.ctrlKey||e.metaKey)&&!e.altKey,k=e.key.toLowerCase();if(!mod||(k!=='z'&&k!=='y'))return;
+   const t=e.target as HTMLElement|null;if((t as any)?.isContentEditable||t?.closest?.('textarea,input,select,[contenteditable="true"],[data-drive-float]'))return;
+   if(tabRef.current!=='pages'&&!inSidebar.current)return;const redo=k==='y'||e.shiftKey;if(!pageUndo.wants(redo))return;
+   e.preventDefault();e.stopImmediatePropagation();void runUndo(redo);};
+  document.addEventListener('mousedown',down,true);document.addEventListener('keydown',key,true);
+  return()=>{document.removeEventListener('mousedown',down,true);document.removeEventListener('keydown',key,true);};
+ },[runUndo]);
  const commands=useMemo<Command[]>(()=>[
   ...TAB_ORDER.map((t,i)=>({id:'tab:'+t,label:TAB_LABELS[t].label,group:'Menus',icon:TAB_LABELS[t].icon,hint:'Alt+'+(i+1),run:()=>onNavigate(t)})),
   {id:'tab:notifications',label:'Notificações',group:'Menus',icon:'bell',run:()=>onNavigate('notifications')},
@@ -252,7 +306,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
      <UpcomingEvents api={api} onOpen={()=>onNavigate('agenda')}/>
      {favorites.length&&pages?<Section title="Favoritos">{favorites.map(id=>pages.find(p=>p.id===id)).filter(Boolean).map(p=><Row key={'fav-'+p!.id} testID={'sidebar-fav-'+p!.id} emoji={isEmoji(p!.data?.icon)?String(p!.data?.icon):undefined} icon={isEmoji(p!.data?.icon)?undefined:'star'} label={p!.title||'Sem título'} selected={openPageId===p!.id} onPress={()=>onOpenPage(p!.id)}/>)}</Section>:null}
      <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={createRootPage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
-      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
+      {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api} toast={toast} undoNow={undoNow}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}
    </ScrollView>
@@ -272,7 +326,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
    </View>
    <View style={{flex:1,minHeight:0}}>{children}</View>
   </View>
-  <CommandPalette visible={palette} onClose={()=>setPalette(false)} commands={commands}/>
+  <CommandPalette visible={palette} onClose={()=>setPalette(false)} commands={commands}/>{toastNode}
  </View>;
 }
 

@@ -39,9 +39,10 @@ function zoned(y:number,m:number,d:number,h:number,i:number,s:number,zone:string
  if(zonedMemo.size>=MEMO_LIMIT)zonedMemo.clear();zonedMemo.set(key,stamp);return new Date(stamp);
 }
 /** Recurrence stays on one server record. Versioned tags are supported by the existing API. */
-export function occurrences(item:AgendaItem,from:Date,to:Date):AgendaItem[]{
+export function occurrences(item:AgendaItem,from:Date,to:Date,keepDone=false):AgendaItem[]{
  // 0.3.255: tarefa concluida continua no dia dela, riscada (as outras concluidas saem da agenda)
- if(['done','cancelled','completed','archived'].includes(item.state)&&!(item.kind==='task'&&item.state==='done'))return [];
+ // 13/11/2026: keepDone (so a linha do tempo do Inicio) mantem lembrete/compromisso concluido no lugar, com o tique
+ if(['done','cancelled','completed','archived'].includes(item.state)&&!(item.kind==='task'&&item.state==='done')&&!(keepDone&&['done','completed'].includes(item.state)))return [];
  const start=eventStart(item),base=new Date(start.length===10?start+'T09:00:00':start);if(!start||!Number.isFinite(base.getTime()))return [];
  // 0.3.317: ocorrencia arrastada na linha do tempo (so aquela vez) aparece no horario novo; data.sofia_moved_from guarda
  // o inicio original. A busca olha 3 dias a mais para cada lado, para pegar o que foi levado de um dia para outro.
@@ -59,7 +60,30 @@ export function occurrences(item:AgendaItem,from:Date,to:Date):AgendaItem[]{
   const occ=moved({...item,data},date);if(occ&&(!pad||inRange(occ)))out.push(occ);
  }return out;
 }
+/** 13/11/2026 (Pedro: "o que foi feito fica ticado na linha do tempo"): "Feito so desta vez" num lembrete que repete pula para a
+ * proxima data (a repeticao nao muda) e guarda a vez feita numa marca "sofia-done-v1:<inicio ISO>" no proprio registro
+ * (o servidor so aceita os campos previstos em data; marcas sao livres). Ficam so as 3 ultimas e nunca passa de 20 marcas. */
+export const DONE_PREFIX='sofia-done-v1:';
+export function withDoneOnce(tags:string[]|null|undefined,at:string):string[]{
+ const list=(tags||[]).filter(t=>typeof t==='string');if(!Number.isFinite(Date.parse(at)))return list;const iso=new Date(at).toISOString();
+ const others=list.filter(t=>!t.startsWith(DONE_PREFIX)),done=[...list.filter(t=>t.startsWith(DONE_PREFIX)&&t!==DONE_PREFIX+iso),DONE_PREFIX+iso].slice(-3);
+ const room=Math.max(0,20-others.length);return [...others,...(room?done.slice(-room):[])];
+}
+function doneOnceOccurrences(e:AgendaItem,from:Date,until:Date,have:AgendaItem[]):AgendaItem[]{
+ const seen=new Set(have.map(o=>minuteKey(eventStart(o)))),out:AgendaItem[]=[];
+ for(const t of e.tags||[]){if(typeof t!=='string'||!t.startsWith(DONE_PREFIX))continue;const at=Date.parse(t.slice(DONE_PREFIX.length));if(!Number.isFinite(at)||at<from.getTime()||at>=until.getTime())continue;
+  const iso=new Date(at).toISOString();if(seen.has(minuteKey(iso)))continue;seen.add(minuteKey(iso));const data={...e.data} as any,old=eventStart(e);
+  if(data.start_at)data.start_at=iso;else if(data.remind_at)data.remind_at=iso;else data.due_at=iso;
+  if(data.end_at&&old&&Number.isFinite(Date.parse(old)))data.end_at=new Date(at+Date.parse(data.end_at)-Date.parse(old)).toISOString();
+  out.push({...e,state:'done',data});}
+ return out;
+}
 export function expandAgenda(items:AgendaItem[],month:Date){const from=new Date(month.getFullYear(),month.getMonth(),1),to=new Date(month.getFullYear(),month.getMonth()+1,1);return items.flatMap(i=>occurrences(i,from,to));}
 /** 0.3.317: o Inicio abre as repeticoes (compromisso/lembrete que se repete aparece em cada dia; antes so no primeiro) e
  * mostra a vez arrastada na linha do tempo no horario novo. Tarefas e dia inteiro passam como estao. */
-export function expandForHome(items:AgendaItem[],now=new Date()):AgendaItem[]{const from=new Date(now.getTime()-62*864e5),to=new Date(now.getTime()+400*864e5);return items.flatMap(e=>e.kind==='task'||e.data?.calendar_all_day?[e]:occurrences(e,from,to));}
+export function expandForHome(items:AgendaItem[],now=new Date(),keepDone=false):AgendaItem[]{const from=new Date(now.getTime()-62*864e5),to=new Date(now.getTime()+400*864e5),dayEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+ // 13/11/2026: concluido com repeticao so fica nos dias ate hoje (as vezes futuras de algo encerrado nao aparecem como feitas)
+ // 13/11/2026: keepDone tambem traz a vez marcada "Feito so desta vez" (marca sofia-done-v1) ate hoje, como feita
+ return items.flatMap(e=>{if(e.kind==='task'||e.data?.calendar_all_day)return [e];
+  const occ=keepDone&&['done','completed'].includes(e.state)?occurrences(e,from,to,true).filter((o,i,all)=>all.length===1||Date.parse(eventStart(o))<dayEnd.getTime()):occurrences(e,from,to);
+  return keepDone&&!['cancelled','archived'].includes(e.state)?[...occ,...doneOnceOccurrences(e,from,dayEnd,occ)]:occ;});}

@@ -179,7 +179,7 @@ const hosts: object[] = [];
 export function FileWindowHost() {
   const list = useWins(), me = useRef({}).current, lead = useSyncExternalStore(fn => {subs.add(fn); return () => {subs.delete(fn);};}, () => hosts[0] === me, () => hosts[0] === me);
   useEffect(() => {hosts.push(me); emit(); return () => {hosts.splice(hosts.indexOf(me), 1); emit();};}, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length || hosts[0] !== me) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) closeWin(top.key);}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
+  useEffect(() => {if (!WEB) return; const onKey = (e: KeyboardEvent) => {if (e.key !== 'Escape' || !wins.length || hosts[0] !== me) return; const ae = document.activeElement as HTMLElement | null; if (ae && (ae.isContentEditable || /INPUT|TEXTAREA/.test(ae.tagName))) return; const top = [...wins].sort((a, b) => b.z - a.z)[0]; if (top) {e.preventDefault(); closeWin(top.key);}}; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);}, []);
   if (!WEB || !list.length || !lead) return null;
   return <OverAll>{list.map(w => <FileWindow key={w.key} win={w} />)}</OverAll>;
 }

@@ -41,7 +41,7 @@ function BlockTitle({value,onCommit}:{value:string;onCommit:(v:string)=>void}){
  return <TextInput accessibilityLabel="Título do bloco" value={text} onChangeText={setText} onEndEditing={done} onBlur={done} returnKeyType="done" blurOnSubmit placeholder="Sem título" placeholderTextColor={c.muted}
   style={{fontSize:16,fontWeight:'600',color:c.text,marginBottom:7,paddingVertical:2}}/>;
 }
-export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChange}:{onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;block:PageBlock;onChange:(data:Record<string,any>,group?:string)=>void}){
+export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChange,pageId}:{pageId?:string;onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;block:PageBlock;onChange:(data:Record<string,any>,group?:string)=>void}){
  const c=useTheme(),d=useMemo(()=>normalized(block),[block]),active=d.views.find(v=>v.id===d.active_view)||d.views[0];
  const [statusEdit,setStatusEdit]=useState<{propKey:string;value:string|null;title:string;color:string}|null>(null);
  const [config,setConfig]=useState(false),[choose,setChoose]=useState<{row:Row;prop:Prop}|null>(null),[rowEdit,setRowEdit]=useState<string|null>(null);
@@ -95,7 +95,7 @@ export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChan
    <Pressable onPress={()=>addRow()} style={{padding:9}}><Text style={{color:c.muted,fontSize:12}}>＋ Nova página</Text></Pressable>
   </View></ScrollView>;
  };
- if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} onChange={onChange} onDelete={onDelete} onInteractionChange={onInteractionChange}/>;
+ if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} pageId={pageId} onChange={onChange} onDelete={onDelete} onInteractionChange={onInteractionChange}/>;
  return <View style={{marginVertical:5}}>
   {/* 0.3.201: o titulo do bloco que veio do template (Kanban, Formulario...) agora se edita com um toque */}
   {d.show_title?<BlockTitle value={d.title||''} onCommit={(title:string)=>{const next=clone(d);next.title=title;commit(next,'collection-title:'+block.id);}}/>:null}

@@ -64,7 +64,7 @@ const ALLOW_SECRET=new Set<string>(),STORES=new Set<PageEditorStore>();
 export type PageEntry={allowSecret?:boolean;secretAsk?:boolean;base:Entity;baseDraft:PageDraft;draft:PageDraft;past:PageDraft[];future:PageDraft[];version:number;acked:number;state:SaveState;error:string;group:string;groupAt:number;firstChange:number;merges?:number};
 export type PendingPage={base:Entity;baseDraft:PageDraft;draft:PageDraft};
 type Deps={view?:(e:Entity)=>Entity;save:(patch:Partial<Entity>)=>Promise<Entity>;read:(id:string)=>Promise<Entity>;
- persist:(entries:PendingPage[])=>Promise<void>;onSaved?:(page:Entity)=>void;delay?:number;maxWait?:number;now?:()=>number};
+ persist:(entries:PendingPage[])=>Promise<void>;onSaved?:(page:Entity)=>void;onEdit?:()=>void;delay?:number;maxWait?:number;now?:()=>number};
 
 /** One serialized save lane per page. A response never replaces newer local typing. */
 export class PageEditorStore {
@@ -106,7 +106,7 @@ export class PageEditorStore {
  edit(id:string,change:(draft:PageDraft)=>PageDraft,group=''){
   const e=this.entries.get(id);if(!e)return;const next=change(clone(e.draft));if(same(next,e.draft))return;
   const now=this.now();if(!group||group!==e.group||now-e.groupAt>700){e.past.push(clone(e.draft));if(e.past.length>80)e.past.shift();}
-  e.future=[];e.group=group;e.groupAt=now;e.draft=next;this.dirty(id,e);
+  e.future=[];e.group=group;e.groupAt=now;e.draft=next;this.dirty(id,e);try{this.deps.onEdit?.();}catch{/* so aviso */}
  }
  undo(id:string){const e=this.entries.get(id);if(!e?.past.length)return;e.future.push(clone(e.draft));e.draft=e.past.pop()!;e.group='';this.dirty(id,e);}
  redo(id:string){const e=this.entries.get(id);if(!e?.future.length)return;e.past.push(clone(e.draft));e.draft=e.future.pop()!;e.group='';this.dirty(id,e);}
@@ -114,8 +114,10 @@ export class PageEditorStore {
  private schedule(id:string){
   if(this.disposed)return;const e=this.entries.get(id);if(!e||e.state==='conflict')return;
   const old=this.timers.get(id);if(old)clearTimeout(old);
-  const remaining=(this.deps.maxWait??1800)-(this.now()-e.firstChange);
-  this.timers.set(id,setTimeout(()=>{this.timers.delete(id);void this.flush(id);},Math.max(0,Math.min(this.deps.delay??650,remaining))));
+  // 13/11/2026 (Pedro: "o salvando fica histerico a cada tecla"): salva 1 s depois de parar de digitar (digitando sem parar, a cada 4 s).
+  // O rascunho vai para o disco a cada mudanca, entao nada se perde no intervalo.
+  const remaining=(this.deps.maxWait??4000)-(this.now()-e.firstChange);
+  this.timers.set(id,setTimeout(()=>{this.timers.delete(id);void this.flush(id);},Math.max(0,Math.min(this.deps.delay??1000,remaining))));
  }
  private persist(){
   const pending=[...this.entries.values()].filter(e=>e.version>e.acked).map(e=>clone({base:e.base,baseDraft:e.baseDraft,draft:e.draft}));

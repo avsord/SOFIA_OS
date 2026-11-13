@@ -1,5 +1,5 @@
 import {useDraft} from '../lib/draft-bus';
-import {REPEATS,agendaTags,occurrences,readRepeat,type Repeat} from '../lib/agenda-recurrence';
+import {REPEATS,agendaTags,occurrences,readRepeat,withDoneOnce,type Repeat} from '../lib/agenda-recurrence';
 import {dpx} from '../lib/content-width';
 import {useDesktop} from '../lib/desktop';
 import React,{useEffect,useMemo,useState} from 'react';
@@ -111,7 +111,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
    const others=membersOf(item).filter(m=>m.state==='active'&&m.id!==item.id);
    if(readRepeat(item).frequency!=='none'){const cur=Date.parse(String(item.data?.remind_at||''));const next=occurrences(item as any,new Date(cur+60000),new Date(cur+400*86400000)).map(o=>Date.parse(String((o as any).data?.remind_at||'')))
      .filter(t=>Number.isFinite(t)&&t>cur).sort((a,b)=>a-b)[0];
-    if(next){records.merge(await api.saveEntity({...item,revision:item.revision,data:{...item.data,remind_at:new Date(next).toISOString()}}));return;}}
+    if(next){/* 13/11/2026: a vez feita fica ticada na linha do tempo do Inicio (marca sofia-done-v1; a repeticao segue igual) */records.merge(await api.saveEntity({...item,revision:item.revision,tags:withDoneOnce(item.tags,new Date(cur).toISOString()),data:{...item.data,remind_at:new Date(next).toISOString()}}));return;}}
    if(others.length||readRepeat(item).frequency==='none')records.merge(await api.saveEntity({...item,state:'done',revision:item.revision}));
  }catch(e){setError(errorText(e));}finally{setBusy(false);}}
  function askDone(item:Entity,e?:any){

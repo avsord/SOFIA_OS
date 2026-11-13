@@ -45,13 +45,13 @@ test('Foto do perfil no site: pedida junto com a pagina (early.js) e o avatar ja
 });
 test('Linha do tempo: selecao sai com Esc e clicando fora do quadro',()=>{
   const s=read('src/desktop/HomeBrief.tsx');
-  assert.ok(s.includes("document.addEventListener('pointerdown', out, true)")&&s.includes("if (e.key === 'Escape') setSel([]);"));
+  assert.ok(s.includes("document.addEventListener('pointerdown', out, true)")&&s.includes("if (e.key === 'Escape') {e.preventDefault(); setSel([]);}"));
   assert.ok(fs.existsSync(path.join(__dirname,'..','tools','ux-sweep.cjs')),'varredura de coerencia do site');
 });
 test('Linha do tempo: arrasto pendurado (mouse sem botao) e cancelado sem gravar; Esc fecha o balao mesmo com o mouse em cima',()=>{
   const s=read('src/desktop/HomeBrief.tsx');
   assert.ok(s.includes("if (ev.pointerType === 'mouse' && ev.buttons === 0) {const d = stop();"),'bolinha nao pode seguir o mouse sem botao');
-  assert.ok(s.includes("if (e.key === 'Escape') {setPin(''); setHover('');}"));
+  assert.ok(s.includes("if (e.key === 'Escape') {e.preventDefault(); setPin(''); setHover('');}"));
   const sw=read('tools/ux-sweep.cjs');assert.ok(sw.includes('dado-mudou-sem-pedir'),'varredura confere dados antes/depois');
 });
 test('Linha do tempo: clique rapido nao prepara arrasto com botao ja solto; Esc so e segurado durante arrasto de verdade',()=>{
@@ -72,7 +72,7 @@ test('E-mail da Sofia e estrutura do app: nenhuma tela de usuario pede conexao d
 });
 test('Inicio: prazo fixo para mostrar os blocos (nao recomeca) e alarme de qual leitura faltou; portao de qualidade existe',()=>{
   const h=read('src/screens/Home.tsx');
-  assert.ok(h.includes('if(!deskDeadline.current)deskDeadline.current=Date.now()+8000;')&&h.includes("alert:'inicio-incompleto'"));
+  assert.ok(h.includes('if(!deskDeadline.current)deskDeadline.current=Date.now()+5000;')&&h.includes("alert:'inicio-incompleto'"));
   assert.ok(fs.existsSync(path.join(__dirname,'..','tools','release-check.cjs')));
 });
 test('Aparencia escolhida vai para o servidor (pagina compartilhada com a mesma cara)',()=>{

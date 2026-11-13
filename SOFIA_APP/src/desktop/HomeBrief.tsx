@@ -49,7 +49,11 @@ const isOut = (x: {step: number; needs: string; delivered: boolean}) => !x.deliv
 /** 0.3.332: urgencia do item (importante 3 > media 2 > leve 1 > sem 0) - o mais urgente manda no miolo da bolinha agrupada */
 // 05/11/2026 (Pedro: "quando for ticado precisa aparecer como 2 e nao como 3"): o que ja foi concluido nao conta no numero da bolinha
 const isDoneRec = (r: DayRecord) => !!r.isTask && (r.original as any)?.state === 'done';
-const openRecs = (recs: DayRecord[]) => {const o = recs.filter(x => !isDoneRec(x)); return o.length ? o : recs;};
+/** 13/11/2026 (Pedro: "marquei e sumiu da linha do tempo"): lembrete/compromisso concluido fica no lugar, com o simbolo dele e o tique. */
+export const isDoneEv = (r: DayRecord) => !r.isTask && ['done', 'completed'].includes(String((r.original as any)?.state || ''));
+const openRecs = (recs: DayRecord[]) => {const o = recs.filter(x => !isDoneRec(x) && !isDoneEv(x)); return o.length ? o : recs;};
+/** 13/11/2026: tique verde por cima do simbolo original (conta paga, receita recebida, dose tomada, lembrete feito, encomenda entregue). */
+const DoneTick = ({left, top, ring, ok}: {left: any; top: number; ring: string; ok: string}) => <View pointerEvents="none" testID="timeline-done-tick" style={{position: 'absolute', left, top, width: 12, height: 12, marginLeft: 2, borderRadius: 6, backgroundColor: ok, alignItems: 'center', justifyContent: 'center', zIndex: 3, boxShadow: '0 0 0 1.5px ' + ring} as any}><Icon name="check" size={8} color="#fff" /></View>;
 const urgOf = (r: DayRecord) => {const o: any = r.original || {}; const v = o.data?.priority_level ?? o.priority_level; return v === 'important' ? 3 : v === 'medium' ? 2 : v === 'light' ? 1 : 0;};
 const LIME = '#C3DC82', IMPORTANT_RED = '#D94B57';
 /** 06/11/2026 (Pedro: "ta sumindo, tem que ser infinito"): inicio (em horas desde a meia-noite de hoje) de cada dia que aparece na
@@ -216,25 +220,26 @@ export function HomeBrief(p: HomeBriefProps) {
   const onMove = (moves: Move[]) => {const marks = moves.filter(x => 'mark' in x.t), rest = moves.filter(x => !('mark' in x.t));
     if (marks.length) moveMarks(marks.map(x => ({id: (x.t as {mark: TimeMark}).mark.id, to: x.to}))); if (rest.length) p.onMove?.(rest);};
   const gearBox = useRef<View>(null); useClickOutside(gearBox, () => setGear(false), gear, '[data-testid="timeline-gear"]');
-  useEffect(() => {if (!gear || !WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setGear(false);}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
+  useEffect(() => {if (!gear || !WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); setGear(false);}}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [gear]);
   const timeMarks = useMemo(() => {
     const out: TimeMark[] = [], todayKey = todayISO(), money = (v: number) => p.masked ? 'R$ •••' : brl(v);
-    for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount), late: d.date < todayKey && d.kind !== 'receber'});
+    for (const d of p.data.money || []) out.push({due: d, id: 'f' + d.id + d.date, kind: d.kind === 'receber' ? 'income' : d.kind === 'fatura' ? 'invoice' : 'bill', at: new Date(d.date + 'T09:00:00'), title: d.title, sub: (d.kind === 'receber' ? '+' : '') + money(d.amount) + (d.paid ? (d.kind === 'receber' ? ' · recebido' : ' · pago') : ''), late: !d.paid && d.date < todayKey && d.kind !== 'receber', done: !!d.paid, check: !!d.paid});
     const from = Date.now() - 2 * 864e5;
-    for (const pk of p.data.packs) {
-      for (const ev of pk.events || []) {const t = Date.parse(ev.at); if (Number.isFinite(t) && t >= from) out.push({id: 'p' + pk.id + ev.at, kind: 'package', at: new Date(t), title: pk.title, sub: ev.status, done: true});}
-      if (pk.estimated && /^\d{4}-\d{2}-\d{2}/.test(pk.estimated)) out.push({id: 'pe' + pk.id, kind: 'package', at: new Date(pk.estimated.slice(0, 10) + 'T12:00:00'), title: pk.title, sub: 'previsão de entrega'});
+    for (const pk of p.data.timelinePacks || p.data.packs) {
+      const gone = pk.delivered || pk.e.state === 'delivered', last = (pk.events || []).reduce((a, ev) => Math.max(a, Date.parse(ev.at) || 0), 0);
+      for (const ev of pk.events || []) {const t = Date.parse(ev.at); if (Number.isFinite(t) && t >= from) out.push({id: 'p' + pk.id + ev.at, kind: 'package', at: new Date(t), title: pk.title, sub: ev.status, done: true, check: gone && t === last});}
+      if (!gone && pk.estimated && /^\d{4}-\d{2}-\d{2}/.test(pk.estimated)) out.push({id: 'pe' + pk.id, kind: 'package', at: new Date(pk.estimated.slice(0, 10) + 'T12:00:00'), title: pk.title, sub: 'previsão de entrega'});
     }
     for (let k = -Math.min(7, timelineRange().back); k <= Math.min(30, timelineRange().ahead); k++) {
       const day = new Date(); day.setDate(day.getDate() + k);
-      try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : hhmm(ds.date), done: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
+      try {for (const ds of capsuleDoses(p.data.capsules.plans, p.data.capsules.history, capsuleDay(day))) out.push({id: 'r' + ds.plan.id + ds.day + ds.time, kind: 'routine', at: ds.date, title: ds.plan.title, sub: ds.taken ? 'feito' : hhmm(ds.date), done: !!ds.taken, check: !!ds.taken, dose: {planId: ds.plan.id, day: ds.day, time: ds.time, type: String(ds.plan.data?.rotina_type || 'capsula'), color: typeInfo(ds.plan).color, icon: typeInfo(ds.plan).icon, mutedOne: (ds.plan.tags || []).includes('sofia-skip-v1:' + ds.day + 'T' + ds.time), mutedAll: !ds.plan.data?.notifications}});} catch {}
     }
     for (const m of out) {const iso = m.kind !== 'routine' ? markMoves[m.id] : ''; if (iso) {m.at = new Date(iso); m.late = false;}}
     return out.filter(m => !hiddenMarks[m.id]).sort((x, y) => x.at.getTime() - y.at.getTime());
   }, [p.data, p.masked, markMoves, hiddenMarks]);
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
-  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
+  const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any) && !isDoneEv(r)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
   // 05/11/2026 (Pedro: "em Agenda proximos coloca o que vai vir so um dia depois... nao de hoje, pro usuario ficar atento"):
   // o de hoje ja esta na linha do tempo; o bloco mostra a partir de amanha (dia inteiro pela data, sem o fuso puxar para hoje)
   const fromTomorrow = useMemo(() => {const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + 1); const at = (r: DayRecord) => /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? new Date(r.date + 'T00:00:00') : new Date(r.date); return nextItems.filter(r => at(r).getTime() >= start.getTime());}, [nextItems, now.toDateString()]);
@@ -331,7 +336,7 @@ type BillMark = {id: string; title: string; date: string; amount: number; late: 
 /** 0.3.311 (Pedro): cada area na linha do tempo do seu jeito. kind: bill (conta a pagar, losango ambar "$"), income
  * (receita a receber, losango verde "+"), invoice (fatura do cartao, losango lilas), package (status de encomenda,
  * quadrado laranja com caixa), routine (item da rotina, pilula verde-agua). */
-export type TimeMark = {id: string; kind: 'bill' | 'income' | 'invoice' | 'package' | 'routine'; at: Date; title: string; sub: string; late?: boolean; done?: boolean;
+export type TimeMark = {id: string; kind: 'bill' | 'income' | 'invoice' | 'package' | 'routine'; at: Date; title: string; sub: string; late?: boolean; done?: boolean; check?: boolean; // check: tique verde de feito por cima do simbolo
   dose?: {planId: string; day: string; time: string; type: string; color?: string; icon?: string; mutedOne: boolean; mutedAll: boolean}; more?: TimeMark[]; due?: Due};
 /** 0.3.312: desligar o aviso so desta vez ou de todas as vezes (item da Agenda/lembrete ou dose da Rotina). */
 export type MuteTarget = {rec: DayRecord} | {dose: NonNullable<TimeMark['dose']>};
@@ -472,7 +477,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
-  useEffect(() => {if (!WEB || !(pin || hover)) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {setPin(''); setHover('');} /* 06/11/2026 (varredura): com o mouse ainda na bolinha o balao continuava pelo hover */}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin, hover]);
+  useEffect(() => {if (!WEB || !(pin || hover)) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); setPin(''); setHover('');} /* 06/11/2026 (varredura): com o mouse ainda na bolinha o balao continuava pelo hover */}; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);}, [pin, hover]);
   const enter = (key: string) => {clearTimeout(hide.current); setHover(key);};
   // 0.3.340 (Pedro: "tem que ter uma pontaria muito boa"): a bolinha mais perto do mouse (ate 26 px para os lados) ja abre
   // a previa e o clique ali seleciona ela - nao precisa acertar em cima da bolinha
@@ -498,7 +503,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       const keys = allRef.current.filter(q => q.x >= lo && q.x <= hi && tgtOf.current[q.key]).map(q => q.key); if (keys.length) setSel(o => [...new Set([...o, ...keys])]);};
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); return true;};
   marqStart.current = beginMarquee;
-  useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') setSel([]);};
+  useEffect(() => {if (!WEB || !sel.length) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); setSel([]);}};
     // 06/11/2026 (Pedro: "fez a selecao mas nao fez a funcao de quando clicar fora tira a selecao"): clicar fora do quadro
     // da linha do tempo desmarca, como em qualquer programa (dentro do quadro continua valendo o clique na linha/bolinhas)
     const out = (e: PointerEvent) => {const card = (lineBox.current as any)?.closest?.('[data-testid="home-brief"]'); const t = e.target as Node | null; if (card && t && !card.contains(t) && !(t as any).closest?.('[data-testid="timeline-selected"]')) setSel([]);};
@@ -610,7 +615,7 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {if (!list.length) return; e.preventDefault(); kbIdx.current = Math.max(0, Math.min(list.length - 1, kbIdx.current < 0 ? (e.key === 'ArrowRight' ? 0 : list.length - 1) : kbIdx.current + (e.key === 'ArrowRight' ? 1 : -1))); setPin(list[kbIdx.current].key); setHover(list[kbIdx.current].key);}
       else if (e.key === 'Enter' && kbIdx.current >= 0 && list[kbIdx.current]) {e.preventDefault(); const q = list[kbIdx.current]; setPin(''); setHover(''); if (q.recs[0]) actions.onEdit(q.recs[0]); else if (q.marks[0] && actions.onMarkOpen) actions.onMarkOpen(q.marks[0]);}
       else if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && (actions.sofia || actions.onAddAt)) {e.preventDefault(); const now = new Date(), fx = Math.max(0.02, Math.min(0.98, pos(now))); setPin(''); setHover(''); setAdding({fx, at: new Date(Math.ceil(now.getTime() / 300000) * 300000)});}
-      else if (e.key === 'Escape') {kbIdx.current = -1; setPin(''); setHover('');}};
+      else if (e.key === 'Escape') {if (pin || hover || kbIdx.current >= 0) e.preventDefault(); kbIdx.current = -1; setPin(''); setHover('');}};
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);});
   return <View ref={box} {...({onMouseEnter: () => {overLine.current = true;}, onMouseLeave: () => {overLine.current = false;}} as any)} style={{marginTop: 26, height: 56 + OFF, userSelect: 'none', outlineStyle: 'none'} as any}>
    <View ref={lineBox} {...(pan ? pan.panHandlers : {})} nativeID={WEB ? undefined : 'sofia-calendar-gesture'} collapsable={false} onLayout={e => {const v = e.nativeEvent.layout.width; if (v > 0) setW(v); if (!WEB) (lineBox.current as any)?.measureInWindow?.((x: number, _y: number, w2: number) => {lineRect.current = {left: x, width: w2};});}} style={{position: 'absolute', top: 0, bottom: 0, left: side === 'left' ? inset : 0, right: side === 'right' ? inset : 0} as any}>
@@ -678,13 +683,13 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
           const col = markColor(m, c.danger), diamond = m.kind === 'bill' || m.kind === 'income' || m.kind === 'invoice';
           const shape = diamond ? {width: 20, height: 20, marginLeft: -10, top: 29 + OFF - 10, borderRadius: 6, transform: [{rotate: '45deg'}]} : m.kind === 'package' ? {width: 22, height: 22, marginLeft: -11, top: 29 + OFF - 11, borderRadius: 6} : {width: 26, height: 16, marginLeft: -13, top: 29 + OFF - 8, borderRadius: 8};
           const glyph = m.kind === 'bill' ? '$' : m.kind === 'income' ? '+' : m.kind === 'invoice' ? '▭' : '';
-          return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
+          return <React.Fragment key={p.key}><Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.marks.map(x => x.title + ' · ' + x.sub + (x.check ? ' (feito)' : '')).join(', ')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg} style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, ...shape, backgroundColor: m.done ? c.surface : col, borderWidth: m.done ? 2 : 3, borderColor: m.done ? col : c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: (p.marks.length > 1 ? '3px -3px 0 -1px ' + tint(col, 0.55) + ', ' : '') + '0 0 0 4px ' + tint(col, hovered || pin === p.key ? 0.3 : 0.16), zIndex: 2} as any)}>
             {glyph ? <Text style={{transform: [{rotate: '-45deg'}], fontSize: 10, fontWeight: '700', color: '#17122A'}}>{glyph}</Text> : <Icon name={m.kind === 'package' ? 'box' : ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName)} size={m.kind === 'package' ? 11 : 10} color={m.done ? col : '#17122A'} />}
-          </Dot>;
+          </Dot>{m.check ? <DoneTick left={(xo * 100 + '%') as any} top={29 + OFF - 17} ring={c.surface} ok={c.success} /> : null}</React.Fragment>;
         }
         const isNext = !!next && p.recs.includes(next), many = p.recs.length > 1, past = !isNext && p.recs.every(x => new Date(x.date).getTime() < Date.now()); // 0.3.332: o que ja passou fica mais apagado
-        if (!many && r.kind === 'reminder') return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
-          style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Dot>;
+        if (!many && r.kind === 'reminder') return <React.Fragment key={p.key}><Dot key={p.key} accessibilityRole="button" accessibilityLabel={'Lembrete ' + hhmm(new Date(r.date)) + ' ' + r.title + (isDoneEv(r) ? ' (feito)' : '')} onPress={open} hitSlop={12} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+          style={({hovered}: any) => ({position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - 11, width: 22, height: 22, marginLeft: -11, borderRadius: 11, borderWidth: 2, borderColor: REMIND, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 4px ' + tint(REMIND, hovered || pin === p.key ? 0.3 : 0.16)} as any)}><Icon name="bell" size={11} color={REMIND} /></Dot>{isDoneEv(r) ? <DoneTick left={(xo * 100 + '%') as any} top={29 + OFF - 17} ring={c.surface} ok={c.success} /> : null}</React.Fragment>;
         // 0.3.332 (aprovado por foto): bolinha solta menor; agrupada do mesmo tamanho de antes, com o miolo na cor do mais
         // urgente e um anel inteiro mostrando a mistura (um pedaco por item, na cor de cada um)
         if (many) {const cols = p.recs.map(x => colorOf(x, c.accent)), step = 360 / cols.length;
@@ -699,8 +704,8 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
           <Icon name="check" size={11} color="#fff" />
         </Dot>;
         const size = isNext ? 11 : 9;
-        return <Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
-          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />;
+        return <React.Fragment key={p.key}><Dot key={p.key} accessibilityRole="button" accessibilityLabel={p.recs.map(x => hhmm(new Date(x.date)) + ' ' + x.title + (isDoneEv(x) ? ' (feito)' : '')).join(', ')} onPress={open} hitSlop={14} dataSet={{noveil: '1', tldot: '1'}} {...hov} {...drg}
+          style={{position: 'absolute', left: (xo * 100 + '%') as any, ...extra, top: 29 + OFF - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: colorOf(r, c.accent), boxShadow: '0 0 0 2.5px ' + c.surface, outlineStyle: 'none'} as any} />{isDoneEv(r) ? <DoneTick left={(xo * 100 + '%') as any} top={29 + OFF - size / 2 - 9} ring={c.surface} ok={c.success} /> : null}</React.Fragment>;
       })}{HITS}
       {marq && Math.abs(marq.b - marq.a) >= 4 ? <OverAll><View pointerEvents="none" testID="timeline-marquee" style={{position: 'absolute', left: Math.min(marq.a, marq.b), top: Math.min(marq.y0, marq.y1), width: Math.abs(marq.b - marq.a), height: Math.max(2, Math.abs(marq.y1 - marq.y0)), borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent, backgroundColor: tint(c.accent, 0.1), borderRadius: 3, zIndex: 50} as any} /></OverAll> : null}
       {/* 04/11/2026: os nomes so aparecem depois de medir a largura da linha (antes nasciam numa altura e pulavam 24 px) */}{all.map(p => place[p.key] == null || !wS || (WEB && moving && (p.x < -0.01 || p.x > 1.01)) /* deslizando: nome so de quem ja esta na tela (os de fora seriam puxados para a borda) */ ? null : (() => {const t = tagOf(p), lx = settle[p.key] != null ? (settle[p.key] - start) / SPAN : p.x, lw = t.sub ? LW + 70 : LW; return <View key={'l' + p.key} pointerEvents="none" style={{position: 'absolute', left: clampX(lx, lw / 2, lw, w), top: place[p.key] === 0 ? OFF - 2 : OFF - 26, width: lw, alignItems: 'center', opacity: drag?.key === p.key ? 0 : p.marks[0] ? op.mark(p.marks[0]) : op.rec(p.recs[0]), ...(settle[p.key] != null ? {transitionProperty: 'left', transitionDuration: '260ms', transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'} : {})} as any}>
@@ -784,7 +789,7 @@ function SofiaAdd({lineW, fx, at, sofia, onMore, onSaved, onClose}: {lineW: numb
   const textRef = useRef(''); textRef.current = text;
   const [when, setWhen] = useState(at), fileIn = useRef<any>(null), rec = useRef<any>(null), scroller = useRef<any>(null);
   useClickOutside(box, onClose);
-  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
+  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); e.stopPropagation(); if (kind) setKind(null); else onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, [kind]);
   useEffect(() => () => {if (preview) URL.revokeObjectURL(preview); try {rec.current?.stop();} catch {/* sem microfone */}}, []);
   useEffect(() => {setTimeout(() => {const el = scroller.current as any; if (el?.scrollTo) el.scrollTo({y: 99999, animated: true});}, 30);}, [msgs.length, busy]);
   const hm = hhmm(when), dayTxt = (() => {const d = new Date(when), n = new Date(); return d.toDateString() === n.toDateString() ? 'hoje' : d.toLocaleDateString('pt-BR', {weekday: 'short', day: 'numeric', month: 'numeric'});})();
@@ -933,7 +938,7 @@ function useClickOutside(ref: React.RefObject<View | null>, onOut: () => void, o
 function AddMenu({fx, when, onPick, onClose, lw = 0}: {fx: number; when: string; onPick: (k: AddKind) => void; onClose: () => void; lw?: number}) {
   const c = useTheme(), box = useRef<View>(null);
   useClickOutside(box, onClose);
-  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
+  useEffect(() => {if (!WEB) return; const k = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); e.stopPropagation(); onClose();}}; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true);}, []);
   const ITEMS: {id: AddKind; label: string; icon: IconName; color: string}[] = [{id: 'event', label: 'Compromisso', icon: 'calendar', color: '#8fb4ff'}, {id: 'task', label: 'Tarefa', icon: 'checklist', color: '#F5A0AE'}, {id: 'reminder', label: 'Lembrete', icon: 'bell', color: REMIND}, {id: 'routine', label: 'Rotina', icon: 'capsule', color: '#5FD3C6'}];
   return <>
     <View ref={box} testID="add-menu" accessibilityRole="menu" style={{position: 'absolute', left: clampX(fx, 110, 220, lw), top: 29 + 44 + 14, width: 220, zIndex: 12, backgroundColor: c.bg, borderRadius: 14, paddingVertical: 6, boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)'} as any}>
@@ -1003,7 +1008,7 @@ function QuickEditor({r, color, kind, priority, description, onSave, onCancel, o
   const field = {borderRadius: 10, backgroundColor: c.input, color: c.text, paddingHorizontal: 11, fontSize: 14, outlineStyle: 'none'} as any;
   return <View ref={rootRef} style={{padding: 12, gap: 9}}>
     <Text style={{fontSize: 11, color: c.muted}}>Editar {kind.toLowerCase()}</Text>
-    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') cancel();}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
+    <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') {e.preventDefault?.(); cancel();}}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
     <TextInput value={desc} onChangeText={setDesc} multiline placeholder="Descrição" placeholderTextColor={c.muted} accessibilityLabel="Descrição" style={[field, {minHeight: 96, maxHeight: 220, paddingVertical: 8, fontSize: 13, lineHeight: 19, textAlignVertical: 'top'}]} />
     <DateTimeField label="Data e horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} />
     <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{TASK_PRIORITIES.map(o => {const on = prio === o.value, col = o.color || c.muted;
@@ -1119,10 +1124,10 @@ function PreviewCard({point, width, pinned, actions, desc, onEnter, onLeave, onC
       <Text style={{fontSize: 14, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums']}}>{firstAt ? hhmm(firstAt) : ''}</Text><Text style={{fontSize: 12, color: c.muted}}>{total} itens</Text>
       <View style={{flex: 1}} />{imp ? <View style={{borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: tint(IMPORTANT_RED, 0.16)}}><Text style={{fontSize: 11, color: IMPORTANT_RED}}>{imp} importante{imp > 1 ? 's' : ''}</Text></View> : null}
     </View> : null}
-    {recs.map((r, n) => Row({k: r.id + n, first: n === 0, color: colOf(r), icon: iconOf(r), time: hhmm(new Date(r.date)), title: r.title, meta: metaOf(r) + (desc(r) && !many ? ' · ' + desc(r) : ''), done: r.isTask ? (r.original as any)?.state === 'done' : false,
+    {recs.map((r, n) => Row({k: r.id + n, first: n === 0, color: colOf(r), icon: iconOf(r), time: hhmm(new Date(r.date)), title: r.title, meta: metaOf(r) + (desc(r) && !many ? ' · ' + desc(r) : ''), done: r.isTask ? (r.original as any)?.state === 'done' : isDoneEv(r),
       check: r.isTask && actions.onToggleTask ? () => actions.onToggleTask!(r) : undefined, onEdit: () => {if (actions.onQuickEdit) {onPin?.(); setQuick(r);} else {onClose(); actions.onEdit(r);}}, onRemove: askRemove ? () => askRemove(r) : undefined, grab: onGrab && total > 1 ? (e: any) => onGrab(e, {rec: r}, colOf(r)) : undefined}))}
     {marks.map((m, n) => Row({k: m.id, first: !recs.length && n === 0, color: markColor(m, c.danger), icon: m.kind === 'package' ? 'box' : m.kind === 'routine' ? ((m.dose?.icon || ROUTINE_ICON[m.dose?.type || 'capsula'] || 'capsule') as IconName) : m.kind === 'income' ? 'plus' : 'wallet',
-      time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: m.done && m.kind === 'routine',
+      time: m.kind === 'routine' || m.kind === 'package' ? hhmm(m.at) : m.at.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}), title: m.title, meta: m.kind === 'routine' ? (m.done ? 'Rotina · feito' : 'Rotina') : m.sub, done: !!m.done && (m.kind === 'routine' || !!m.check),
       action: markAction(m), onAction: actions.onMarkAction ? () => actions.onMarkAction!(m) : undefined, onEdit: m.kind === 'routine' && m.dose && actions.onMove ? () => {onPin?.(); setQuickMark(m);} : actions.onMarkOpen ? () => {onClose(); actions.onMarkOpen!(m);} : undefined, onRemove: askHide ? () => askHide(m) : undefined, grab: onGrab && point.marks.length > 1 ? (e: any) => onGrab(e, m.kind === 'routine' && m.dose ? {dose: m.dose} : {mark: m}, markColor(m, c.danger)) : undefined}))}
     {extra > 0 ? <Text style={{fontSize: 11, color: c.muted, paddingHorizontal: 16, paddingVertical: 6}}>+{extra} mais</Text> : null}
     {onAddHere ? addLine : null}

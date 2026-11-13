@@ -25,7 +25,7 @@ test('clonar idêntica copia a árvore inteira com conteúdo; estrutura copia va
   assert.equal(byTitle.b.data.parent_id,top.id);assert.equal(byTitle.c.data.parent_id,byTitle.b.id);
   const finalTop=saved.filter(x=>x.id===top.id).at(-1);
   if(mode==='identical'){assert.equal(JSON.parse(finalTop.data.blocks_json)[0].data.page_id,byTitle.b.id);assert.equal(byTitle.b.content,'texto b');}
-  else{assert.equal(finalTop.data.blocks_json,'[]');assert.equal(byTitle.b.content,'');assert.equal(byTitle.b.data.icon,'📝');}
+  else{const fb=JSON.parse(finalTop.data.blocks_json);assert.equal(fb[0].data.page_id,byTitle.b.id);assert.equal(fb[1].data.books[0].pages.length,0); /* 13/11/2026: estrutura mantém o modelo, sem conteúdo */assert.equal(byTitle.b.content,'');assert.equal(byTitle.b.data.icon,'📝');}
  }
 });
 test('o original não é tocado e a cópia não herda a marca de cópia escondida do Quadro',()=>{

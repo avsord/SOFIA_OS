@@ -9,8 +9,11 @@ export async function readProfilePhoto(_scope:string){
  // sem esperar o login do app ficar pronto (as iniciais apareciam primeiro e a foto entrava depois)
  const early=typeof window!=='undefined'?(window as any).__sofiaEarly?.['/profile/photo']:undefined;
  if(early){delete (window as any).__sofiaEarly['/profile/photo'];const r=await early.catch(()=>null);if(r&&'photo' in r)return r.photo?'data:'+r.photo.mime+';base64,'+r.photo.base64:'';}
- const api=currentApi()||await waitApi();if(!api)return '';
- try{const r=await api.profilePhoto();return r.photo?'data:'+r.photo.mime+';base64,'+r.photo.base64:'';}catch{return '';}
+ // 13/11/2026 (Pedro: "a foto so aparece depois de recarregar a pagina"): uma leitura que FALHAVA (login ainda abrindo, sessao
+ // renovando, servidor reiniciando) virava "sem foto", ficava guardada na memoria ate recarregar e ainda apagava a copia pequena.
+ // Agora a falha e erro: nada fica guardado e o avatar tenta de novo sozinho. So "sem foto" de verdade (resposta do servidor) mostra as iniciais.
+ const api=currentApi()||await waitApi();if(!api)throw new Error('Conta ainda nao conectada para ler a foto.');
+ const r=await api.profilePhoto();return r.photo?'data:'+r.photo.mime+';base64,'+r.photo.base64:'';
 }
 async function toBase64(uri:string):Promise<{mime:string;base64:string}>{
  if(uri.startsWith('data:')){const m=/^data:([^;,]+)[^,]*,(.*)$/.exec(uri);if(m)return {mime:m[1],base64:m[2]};}

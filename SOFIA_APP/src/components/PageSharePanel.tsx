@@ -34,7 +34,7 @@ function SharePopover({api,pageId,pageTitle,anchor,onClose}:{api:SofiaApi;pageId
  const c=useTheme(),[token,setToken]=useState<string|null|undefined>(undefined),[busy,setBusy]=useState(false),[err,setErr]=useState(''),[copied,setCopied]=useState(false),[confirmNew,setConfirmNew]=useState(false);
  const box=useRef<any>(null);
  useEffect(()=>{let live=true;api.pageShare(pageId).then(r=>{if(live)setToken(r?.token||null);}).catch(e=>{if(live){setToken(null);setErr(errorText(e));}});return()=>{live=false;};},[api,pageId]);
- useEffect(()=>{const d=(globalThis as any).document;if(!d)return;const down=(e:any)=>{const n=box.current;if(n&&typeof n.contains==='function'&&n.contains(e.target))return;if(e.target?.closest?.('[data-testid="page-share"]'))return;onClose();};const key=(e:any)=>{if(e.key==='Escape')onClose();};
+ useEffect(()=>{const d=(globalThis as any).document;if(!d)return;const down=(e:any)=>{const n=box.current;if(n&&typeof n.contains==='function'&&n.contains(e.target))return;if(e.target?.closest?.('[data-testid="page-share"]'))return;onClose();};const key=(e:any)=>{if(e.key==='Escape'){e.preventDefault?.();onClose();}};
   d.addEventListener('mousedown',down,true);d.addEventListener('keydown',key);return()=>{d.removeEventListener('mousedown',down,true);d.removeEventListener('keydown',key);};},[onClose]);
  async function change(on:boolean,regenerate=false){setBusy(true);setErr('');setCopied(false);try{const r=await api.setPageShare(pageId,{on,regenerate});setToken(r?.token||null);refreshSharedPages(api);setConfirmNew(false);}catch(e){setErr(errorText(e));}finally{setBusy(false);}}
  const url=token?shareUrl(token):'',vw=typeof window!=='undefined'?window.innerWidth:1200,W=380,left=Math.max(8,Math.min(anchor.x-W,vw-W-8));

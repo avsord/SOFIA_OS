@@ -3,9 +3,10 @@ export function localDateKey(input:Date|string):string{if(typeof input==='string
 export function monthCells(month:Date):(Date|null)[]{const out:(Date|null)[]=Array.from({length:month.getDay()},()=>null);for(let day=1;day<=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();day++)out.push(new Date(month.getFullYear(),month.getMonth(),day));while(out.length%7)out.push(null);return out;}
 export type DayRecord={id:string;title:string;date:string;kind:string;location?:string;isTask:boolean;original:AgendaItem|Task};
 /** 0.3.255: a tarefa vem uma vez so (a Agenda tambem manda as tarefas com data); concluida aparece riscada no dia dela. */
-export function dayRecords(events:AgendaItem[],tasks:Task[]):DayRecord[]{
+/** 13/11/2026: keepDone (linha do tempo do Inicio) mantem lembrete/compromisso concluido; o resto do Inicio e a Agenda seguem sem eles. */
+export function dayRecords(events:AgendaItem[],tasks:Task[],keepDone=false):DayRecord[]{
  const own=new Set(tasks.map(t=>t.id)),recent=Date.now()-62*864e5,taskId=(e:AgendaItem)=>String((e.data as {task_id?:string}).task_id||e.id.replace(/^task:/,''));
- const fromEvents:DayRecord[]=events.filter(e=>e.kind==='task'?!own.has(taskId(e))&&e.state!=='cancelled':!['cancelled','archived','completed','done'].includes(e.state)).map(e=>e.kind==='task'
+ const fromEvents:DayRecord[]=events.filter(e=>e.kind==='task'?!own.has(taskId(e))&&e.state!=='cancelled':!['cancelled','archived',...(keepDone?[]:['completed','done'])].includes(e.state)).map(e=>e.kind==='task'
   ?{id:e.id,title:e.title,date:e.data.start_at||'',kind:'task',isTask:true,original:{id:taskId(e),title:e.title,state:e.state,due_at:e.data.start_at,revision:e.revision,priority_level:e.data.priority_level} as Task}
   :{id:e.id,title:e.title,date:e.data.calendar_all_day?e.data.calendar_date_start||'':e.data.start_at||e.data.remind_at||e.data.due_at||'',kind:e.kind,location:e.data.location,isTask:false,original:e});
  const fromTasks:DayRecord[]=tasks.filter(t=>t.state!=='cancelled'&&t.due_at&&(t.state!=='done'||Date.parse(t.due_at)>=recent)).map(t=>({id:t.id,title:t.title,date:t.due_at||'',kind:'task',isTask:true,original:t}));

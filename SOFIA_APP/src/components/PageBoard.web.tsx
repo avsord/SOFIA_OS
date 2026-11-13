@@ -108,7 +108,7 @@ export function PageBoard(p: Props) {
   const pinching = useRef(false), [mailAtt, setMailAtt] = useState<{card: string; hit: string; items: {part: string; name: string; mime: string; bytes: number}[] | null; err: string; busy: string} | null>(null);
   const [livePick, setLivePick] = useState(false), [ask, setAsk] = useState<{q: string; busy: boolean; err: string} | null>(null), [find, setFind] = useState<{q: string; i: number} | null>(null);
   useEffect(() => {setAsk(null); setCapEdit(null); setMailAtt(m => m && sel[0] === m.card ? m : null);}, [sel.join(',')]);
-  useEffect(() => {if (!ask && !selLink) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') {setAsk(null); setSelLink(null);}}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [!!ask, !!selLink]); // trocou a selecao: fecha a caixa da Sofia e a da legenda
+  useEffect(() => {if (!ask && !selLink) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); setAsk(null); setSelLink(null);}}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [!!ask, !!selLink]); // trocou a selecao: fecha a caixa da Sofia e a da legenda
   const [picker, setPicker] = useState(false), [rec, setRec] = useState<MediaRecorder | null>(null), [size2, setSize2] = useState({w: 1200, h: 800});
   const anchor = useRef<{x: number; y: number} | null>(null);
   // 08/11/2026: registro do Quadro ("[quadro]" no servidor): cada aviso de erro mostrado tambem entra no registro (sem textos do usuario)
@@ -380,10 +380,10 @@ export function PageBoard(p: Props) {
       up = () => {window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); dragOff(); setGrabbing(false);};
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('blur', up);};
   const onKey = (e: any) => {
-    const t = e.target as HTMLElement; if (t.closest('input,textarea,[contenteditable="true"],[data-board-editing]')) {if (e.key === 'Escape') {setEditing(null); setAsk(null); host.current?.focus();} return;}
+    const t = e.target as HTMLElement; if (t.closest('input,textarea,[contenteditable="true"],[data-board-editing]')) {if (e.key === 'Escape') {e.preventDefault(); setEditing(null); setAsk(null); host.current?.focus();} return;}
     const mod = (e.ctrlKey || e.metaKey) && !e.altKey, k = e.key;
     if (mod && k.toLowerCase() === 'f') {e.preventDefault(); setFind({q: '', i: 0}); return;}
-    if (k === 'Escape') {if (ask || selLink) {setAsk(null); setSelLink(null); return;} setSel([]); setMode(''); return;}
+    if (k === 'Escape') {if (ask || selLink) {e.preventDefault(); setAsk(null); setSelLink(null); return;} if (sel.length || mode) e.preventDefault(); setSel([]); setMode(''); return;}
     if (mod && k.toLowerCase() === 'a') {e.preventDefault(); setSel(shown.map(b => b.id)); return;}
     if (!sel.length) return;
     if (k === 'Delete' || k === 'Backspace') {e.preventDefault(); remove(sel); return;}
@@ -789,7 +789,7 @@ function PageFrameCard({b, pages, editing, light, onDone, selected, tools}: Page
   // so mostra a pagina quando ELA avisa que esta desenhada (board-embed-ready); 8 s sem aviso: mostra assim mesmo
   useEffect(() => {if (!live || loaded) return; const on = (e: MessageEvent) => {if (e.origin === location.origin && e.data?.sofia === 'board-embed-ready' && e.source === frame.current?.contentWindow) setLoaded(true);};
     window.addEventListener('message', on); const t2 = setTimeout(() => setLoaded(true), 8000); return () => {window.removeEventListener('message', on); clearTimeout(t2);};}, [live, loaded, id]);
-  useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onDone();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
+  useEffect(() => {if (!editing) return; const on = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); onDone();}}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [editing, onDone]);
   return h('div', {'data-board-editing': editing ? '1' : undefined, 'data-board-pageframe': live && loaded ? '1' : undefined, style: {width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden', borderRadius: 12, background: c.bg, border: '1px solid ' + c.line, display: 'flex', flexDirection: 'column', position: 'relative'}},
     h('div', {'data-board-handle': '1', style: {height: head, flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px 0 12px', borderBottom: '1px solid ' + c.line, background: c.surface, cursor: 'grab'}}, <Icon name="book" size={15} color={c.accent} />,
       h('span', {style: {flex: 1, minWidth: 0, color: c.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, t ? (t.title || 'Sem título') : 'Página removida'),
@@ -814,7 +814,7 @@ function PagePicker({pages, exclude, onPick, onClose, title = 'Trazer página pa
   const byParent = useMemo(() => {const m = new Map<string, Entity[]>(), ids = new Set(live.map(x => x.id)); for (const x of live) {const par = String(x.data?.parent_id || ''), key = ids.has(par) ? par : ''; if (!m.has(key)) m.set(key, []); m.get(key)!.push(x);}
     for (const l of m.values()) l.sort((a, b) => (Number(a.data?.sort_order) || 0) - (Number(b.data?.sort_order) || 0) || String(a.title || '').localeCompare(String(b.title || ''), 'pt-BR')); return m;}, [live]);
   const pathOf = (x: Entity) => {const out: string[] = []; let cur = live.find(y => y.id === String(x.data?.parent_id || '')), guard = 0; while (cur && guard++ < 20) {out.unshift(cur.title || 'Sem título'); cur = live.find(y => y.id === String(cur!.data?.parent_id || ''));} return out.join(' / ');};
-  useEffect(() => {const on = (e: KeyboardEvent) => {if (e.key === 'Escape') onClose();}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [onClose]);
+  useEffect(() => {const on = (e: KeyboardEvent) => {if (e.key === 'Escape') {e.preventDefault(); onClose();}}; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on);}, [onClose]);
   const row = (x: Entity, depth: number, sub = ''): any => {const kids = byParent.get(x.id) || [], isOpen = open[x.id] ?? depth === 0, me = x.id === exclude, ic = x.data?.icon;
     return h('div', {key: x.id}, h('div', {role: 'treeitem', 'aria-expanded': kids.length ? isOpen : undefined, 'data-testid': 'picker-row', onMouseEnter: () => setHover(x.id), onMouseLeave: () => setHover(''),
         style: {display: 'flex', alignItems: 'center', gap: 6, height: 36, paddingLeft: 8 + depth * 18, paddingRight: 10, borderRadius: 9, background: hover === x.id && !me ? c.input : 'transparent', opacity: me ? 0.45 : 1}},

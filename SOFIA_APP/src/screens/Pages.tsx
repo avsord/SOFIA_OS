@@ -1,4 +1,8 @@
 import {EMBED} from '../lib/embed';
+import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
+import {SaveStatus} from '../components/SaveStatus'; // 13/11/2026: Salvando… -> Salvo, sem piscar // 13/11/2026: Esc volta para a pagina mae
+import {pageUndo} from '../lib/page-undo';
+import {trashPageTree,restorePageTree} from '../lib/page-trash';
 import Svg,{Path} from 'react-native-svg';
 import {PagesLoadingBody} from '../components/ScreenSkeleton';
 import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMime,openFileWindow,DOCX_MIME,XLSX_MIME,PPTX_MIME} from '../components/PageFiles';
@@ -42,7 +46,7 @@ import {Button,Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI'
 import {Sheet} from '../components/Sheet';
 import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
-import {entryBackTarget} from '../lib/page-navigation';
+import {entryBackTarget,pageBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {openContextMenu} from '../components/ContextMenu';
 import {PageCover,PageAppearance,PAGE_COVERS,coverPosition,prefetchPageCover,PageAttachmentImage,uploadPageImage} from '../components/PageAppearance';
@@ -107,7 +111,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const restoredStore=useRef<PageEditorStore|null>(null);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
- const selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
+ const selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{}),escBack=useRef<()=>void>(()=>{});
  const pageInteractionRef=useRef(false),kanbanInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
  function changePageInteraction(value:boolean){
   pageInteractionRef.current=value;refreshGuard.current.setActive(value);
@@ -125,7 +129,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 06/11/2026 (pagina com senha): pagina trancada (ou subpagina nova de uma trancada e aberta) sai daqui cifrada; o servidor
  // so recebe lock_json. Trancada e fechada nunca salva (o texto aberto nao existe aqui).
  const apiRef=useRef(api);apiRef.current=api;
- const store=useMemo(()=>new PageEditorStore({view:viewOf,save:async patch=>{
+ const store=useMemo(()=>new PageEditorStore({view:viewOf,onEdit:()=>pageUndo.markEditor(),save:async patch=>{
    const id=String(patch.id),all=pagesRef.current,cur=all.find(x=>x.id===id);let h=cur&&isLocked(cur)?lockHeader(cur):null;
    if(!h&&cur){const par=all.find(x=>x.id===String((patch.data as any)?.parent_id??cur.data?.parent_id??''));const ph=par&&isLocked(par)?lockHeader(par):null;if(ph&&isOpen(ph.kid))h=ph;}
    if(h){if(!isOpen(h.kid))throw Error('Página trancada: abra com a senha para salvar.');
@@ -190,6 +194,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   return()=>{alive=false;cancelLoad();mounted.current=false;state.remove();keyboard.remove();leaveSession();};
  },[store,key,storeSession]);
  useEffect(()=>{if(!active){kanbanInteractionRef.current=false;endPageTouch();setFocus(null);void store.flushAll();}},[active,store]);
+ // 13/11/2026 (Pedro: "Esc volta um nivel"): pagina aberta -> Esc vai para a pagina mae (as notas/pastas registram niveis acima)
+ useEffect(()=>{if(Platform.OS!=='web'||EMBED||!active||!selectedId)return;return pushEsc(()=>{escBack.current();},ESC_LEVEL.page);},[active,selectedId]);
+ // nada digitado se perde: fechar/recarregar a aba salva na hora
+ useEffect(()=>{if(Platform.OS!=='web'||typeof window==='undefined')return;const out=()=>{void store.flushAll();};window.addEventListener('pagehide',out);window.addEventListener('beforeunload',out);return()=>{window.removeEventListener('pagehide',out);window.removeEventListener('beforeunload',out);};},[store]);
  useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);},[selectedId,pageInteraction,onDepthChange]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
@@ -582,6 +590,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  }
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setCoverMove(false);setError('');}
  function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);setCoverMove(false);const parent=entryBackTarget(byId,selectedId,history.current);if(parent)history.current.splice(history.current.lastIndexOf(parent));else history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
+ escBack.current=()=>{const parent=pageBackTarget(byId,selectedId);if(!parent){back();return;}if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);setCoverMove(false);open(byId.get(parent)!,false);};
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(pageInteractionRef.current)return true;if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
  function startCoverMove(){if(!selectedId)return;coverLive.current=coverPosition(store.get(selectedId)?.draft.appearance||{});setCoverMove(true);}
@@ -604,7 +613,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   {text:'Cancelar',style:'cancel'},{text:'Usar versão do site',onPress:()=>void store.resolve(id,false)},{text:'Manter minhas alterações',onPress:()=>void store.resolve(id,true)}]);}
  function confirmDeletePage(page:Entity){const id=page.id;appAlert('Excluir página?','Excluir “'+page.title+'” e suas subpáginas também do site?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
   const ids=new Set<string>();const collect=(key:string)=>{if(ids.has(key))return;ids.add(key);for(const p of children.get(key)||[])collect(p.id);};collect(id);
-  await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);mutationEpoch.current++;for(const key of ids)store.forget(key);
+  await Promise.all([...ids].map(key=>store.flush(key)));
+  // 13/11/2026 (Pedro: Ctrl+Z traz de volta): arquiva a arvore em vez de apagar de vez (lib/page-trash)
+  let trashed=await trashPageTree(api,pagesRef.current,id);mutationEpoch.current++;for(const key of ids)store.forget(key);const name=page.title||'Sem título';
+  pageUndo.push({label:'Excluir “'+name+'”',undoText:'Página “'+name+'” restaurada',redoText:'Página “'+name+'” excluída',
+   undo:async()=>{trashed=await restorePageTree(api,trashed);mutationEpoch.current++;const back=trashed;if(mounted.current)setPages(old=>[...old.filter(p=>!ids.has(p.id)),...back]);},
+   redo:async()=>{trashed=await trashPageTree(api,trashed,id);mutationEpoch.current++;if(mounted.current)setPages(old=>old.filter(p=>!ids.has(p.id)));}});
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
  function removePage(){if(entry)confirmDeletePage(entry.base);}
@@ -659,7 +673,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(b.type==='image'&&b.data?.uploading)return <View key={b.id} style={{marginVertical:8,height:120,borderRadius:8,backgroundColor:c.input,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Enviando imagem…</Text></View>;
   if(b.type==='image'&&b.data?.attachment_id&&desktop)return <Pressable key={b.id} accessible={false} onPress={()=>{setFocus(b.id);/* 06/11/2026 (Pedro: "tentando apagar isso e nao ta indo"): clicar na imagem a seleciona como no Notion; Delete/Backspace apaga, Esc solta */if(desktop){try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id||picked.has(b.id)?c.accent:'transparent',alignSelf:'flex-start',maxWidth:'100%'}}><PageAttachmentImage api={api} id={String(b.data.attachment_id)} caption={b.data.caption?String(b.data.caption):''} loop={!!b.data.gif_loop} onLoop={v=>updateBlock(b,{data:{...b.data,gif_loop:v}})}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{marginVertical:8,borderRadius:8,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
-  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
+  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} pageId={selectedId||undefined} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
   if(b.type==='file'&&Platform.OS==='web')return <View key={b.id} testID={'page-block-'+b.id}><PageFileBlock api={api} pageId={selectedId||undefined} data={(b.data||{}) as any} selected={focus===b.id||picked.has(b.id)} onSelect={()=>{setFocus(b.id);try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}} onChange={data=>updateBlock(b,{data})} onRemove={()=>removeBlock(b.id)}/></View>;
   if(b.type==='table'&&Array.isArray(b.data?.rows))return <Pressable key={b.id} accessible={false} onPress={()=>{setFocus(b.id);if(desktop){try{((globalThis as any).document?.activeElement as any)?.blur?.();}catch{}setPicked(new Set([b.id]));}}} style={{marginVertical:8,padding:4,borderRadius:8,borderWidth:2,borderColor:focus===b.id||picked.has(b.id)?c.accent:'transparent',maxWidth:'100%'}}><PageTable rows={b.data.rows} editable={desktop} onChange={rows=>updateBlock(b,{text:tablePlainText(rows).slice(0,12000),data:{...b.data,rows}})}/></Pressable>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onPress={()=>{Keyboard.dismiss();setFocus(b.id);}} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5,borderWidth:2,borderColor:focus===b.id?c.accent:'transparent'}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text>{(()=>{const link=String((b as any).url||'').trim()||(String(b.text||'').match(/https?:\/\/\S+/)||[''])[0];if(!link)return null;
@@ -860,7 +874,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const pageItems:{label:string;icon:any;run:()=>void;danger?:boolean}[]=[...(BOARD_SUPPORTED&&Platform.OS==='web'&&desktop?[isBoard?{label:'Ver como página',icon:'listView',run:()=>setLayout('notes')}:{label:'Ver como quadro',icon:'gridView',run:()=>setLayout('board')}]:[]),...lockItems,{label:'Versões anteriores…',icon:'history',run:()=>setVersionsOpen(true)}];
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
- const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
+ const status=entry.state==='saving'||entry.state==='pending'?'Salvando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type,coverH=coverW?Math.max(200,Math.min(460,Math.round(coverW/6))):250;
  const editor=<View ref={editorDrop} style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   {fileOver?<View pointerEvents="none" testID="page-file-drop" style={{position:'absolute',top:10,left:10,right:10,bottom:10,zIndex:80,borderRadius:16,borderWidth:2,borderStyle:'dashed',borderColor:c.accent,backgroundColor:c.bg+'cc',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="upload" size={30} color={c.accent}/><Text style={{color:c.text,fontSize:16,fontWeight:'600'}}>Solte para anexar à página</Text><Text style={{color:c.muted,fontSize:12}}>Qualquer arquivo até 25 MB · PDF, Word, Excel, imagem, vídeo, áudio…</Text></View>:null}
@@ -868,7 +882,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
       estado (salvo, salvando) e as ferramentas, sem fundo de cartao - o documento ocupa a cena, como no Notion. */}
   <View style={desktop?{zIndex:20,minHeight:40,flexDirection:'row',alignItems:'center',paddingHorizontal:16}:{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
    {desktop?null:<IconButton name="back" label="Voltar" size={34} onPress={back}/>}
-   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}>{desktop?null:<Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text>}<Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:desktop?12:10,marginTop:desktop?0:3}}>{status}</Text></View>
+   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}>{desktop?null:<Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text>}<Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:desktop?12:10,marginTop:desktop?0:3}} numberOfLines={1}><SaveStatus key={selected.id} state={entry.state} fallback={status}/></Text></View>
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     {desktop?<>
      <Text testID="page-edited" numberOfLines={1} style={{color:c.muted,fontSize:12,marginRight:6}}>{flash||(selected.updated_at?editedLabel(String(selected.updated_at)):'')}</Text>

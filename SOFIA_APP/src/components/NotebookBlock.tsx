@@ -16,17 +16,28 @@ import {contextMenu,openContextMenu} from './ContextMenu';
 import type {MenuItem} from './ContextMenu';
 import {Icon} from './Icon';
 import {useHoverKey} from '../lib/hover-hold';
+import {NOTE_DRAG_TYPE,ROOT_BOOK,addLooseNote,applyDrop,hitTarget,registerLiveNotes} from '../lib/notes-move';
+import type {NoteBook,NoteDragItem,NoteRect} from '../lib/notes-move';
+import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
 
 /** 0.3.201: Notas reestruturadas - pastas em cartoes, notas com previa e data, busca que acha com letra
  * errada, e acoes claras. Os dados continuam no mesmo formato (nenhuma nota antiga se perde). */
 /** 0.3.228: parent = pasta-mae (pastas dentro de pastas); root = notas fora de pastas (nao aparece como pasta). */
-type Book={id:string;name:string;emoji:string;expanded:boolean;pages:Leaf[];parent?:string;root?:boolean};
-type DragItem={kind:'note'|'folder';id:string;from:string;label:string};
-const ROOT_BOOK='__fora_de_pastas__';
+type Book=NoteBook;
+type DragItem=NoteDragItem;
 type Dated=Leaf&{updated_at?:string};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=<T,>(v:T):T=>JSON.parse(JSON.stringify(v));
-function parentOfIn(all:Book[],b:Book){return b.parent&&all.some(x=>x.id===b.parent&&!x.root)?b.parent:'';}
+/** 13/11/2026 (Pedro: "arrastar nao funciona"): no computador (mouse) o arrastar usa o do navegador - funciona dentro das
+ * Notas e leva a nota para outra pagina pela barra lateral (tipo application/x-sofia-note). No toque continua o
+ * segurar-e-arrastar (PanResponder). */
+type DomH=Partial<Record<'dragstart'|'dragend'|'dragover'|'dragleave'|'drop',(e:any)=>void>>&{draggable?:boolean};
+const domH=new WeakMap<any,DomH>();
+function bindDom(el:any,h:DomH){
+ if(!el||typeof el.addEventListener!=='function'||typeof el.setAttribute!=='function')return;const first=!domH.has(el);domH.set(el,h);
+ if(h.draggable!==undefined)el.setAttribute('draggable',h.draggable?'true':'false');
+ if(first)for(const ev of ['dragstart','dragend','dragover','dragleave','drop'] as const)el.addEventListener(ev,(e:any)=>domH.get(el)?.[ev]?.(e));
+}
 const EMOJIS=['📁','📒','📓','📝','💼','🏠','💡','🎬','📸','✈️','💰','❤️','📚','🎵'];
 export function leafPreview(p:Leaf):string{
  const fromBlocks=(p.blocks||[]).map(b=>(b.checked===true?'✓ ':b.type==='todo'||b.type==='check'?'☐ ':'')+String(b.text||'')).filter(Boolean).join(' · ');
@@ -41,7 +52,7 @@ export function leafStamp(p:Dated):string{
 const stampOf=(p:Leaf)=>String((p as Dated).updated_at||p.created_at||'');
 const lastEdited=(b:Book)=>[...b.pages].sort((x,y)=>stampOf(y).localeCompare(stampOf(x)))[0];
 
-export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data:Record<string,any>;onChange:(data:Record<string,any>,group?:string)=>void;onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void}){
+export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId}:{data:Record<string,any>;onChange:(data:Record<string,any>,group?:string)=>void;onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;pageId?:string}){
  const leafTitle=useRef<TextInput>(null);
  const c=useTheme(),books:Book[]=Array.isArray(data.notebooks)?data.notebooks:(data.rows||[]).map((r:any)=>({id:r.id,name:String(r.values?.name||''),emoji:'',expanded:false,pages:r.page_content?[{id:r.id+'-leaf',title:'',content:r.page_content}]:[]}));
  const [openBook,setOpenBook]=useState<string|null>(null),[query,setQuery]=useState(''),[title,setTitle]=useState(String(data.title||'Notas'));
@@ -54,11 +65,15 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  const parentOf=(b:Book)=>exists(b.parent)?b.parent!:'';
  const foldersIn=(pid:string)=>books.filter(b=>!b.root&&parentOf(b)===pid);
  const rootNotes=books.find(b=>b.id===ROOT_BOOK)?.pages||[];
- const isInside=(id:string,ancestor:string):boolean=>{let cur=books.find(b=>b.id===id),guard=0;while(cur&&guard++<50){if(cur.id===ancestor)return true;cur=books.find(b=>b.id===parentOf(cur!));}return false;};
  const booksRef=useRef(books);booksRef.current=books;const openedRef=useRef(opened);openedRef.current=opened;
- const dragRef=useRef<DragItem|null>(null),[drag,setDrag]=useState<DragItem|null>(null),[hover,setHover]=useState<string|null>(null),hoverRef=useRef<string|null>(null);
- const ghost=useRef(new Animated.ValueXY({x:0,y:0})).current,rootRef=useRef<View>(null),rootPos=useRef({x:0,y:0}),targets=useRef<Record<string,View|null>>({}),rects=useRef<{id:string;x:number;y:number;w:number;h:number}[]>([]),moved=useRef(false),captured=useRef(false),startPt=useRef({x:0,y:0});
- function hit(x:number,y:number){const d=dragRef.current;for(const r of rects.current){if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){if(d&&d.kind==='folder'&&(r.id===d.id))continue;if(r.id.startsWith('note:')){if(!d||d.kind!=='note'||r.id.endsWith(':'+d.id))continue;return r.id+(y>r.y+r.h/2?'|after':'|before');}return r.id;}}return null;}
+ // 13/11/2026 (ESC volta um nível): nota aberta -> pasta/lista (item); dentro de pasta -> pasta de cima/raiz das notas (section); na raiz o Esc segue para a página mãe.
+ useEffect(()=>leaf?pushEsc(()=>{setLeafId(null);setBookId(null);},ESC_LEVEL.item):undefined,[!!leaf]);
+ useEffect(()=>opened?pushEsc(()=>{const o=openedRef.current;if(!o)return false;setOpenBook(!o.root?(parentOf(o)||null):null);},ESC_LEVEL.section):undefined,[!!opened]);
+ const dataRef=useRef(data);dataRef.current=data;const onChangeRef=useRef(onChange);onChangeRef.current=onChange;
+ const dragRef=useRef<DragItem|null>(null),[drag,setDrag]=useState<DragItem|null>(null),[hover,setHover]=useState<string|null>(null),hoverRef=useRef<string|null>(null),webDrag=useRef(false);
+ const ghost=useRef(new Animated.ValueXY({x:0,y:0})).current,rootRef=useRef<View|null>(null),rootPos=useRef({x:0,y:0}),targets=useRef<Record<string,View|null>>({}),rects=useRef<NoteRect[]>([]),moved=useRef(false),captured=useRef(false),startPt=useRef({x:0,y:0});
+ // a regra de qual alvo esta embaixo (r.id.startsWith('note:') = reordenar notas) fica em lib/notes-move.ts (hitTarget)
+ function hit(x:number,y:number){return hitTarget(rects.current,dragRef.current,x,y);}
  function startDrag(item:DragItem,e:{nativeEvent:{pageX:number;pageY:number}}){
   dragRef.current=item;moved.current=false;captured.current=false;startPt.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};hoverRef.current=null;setHover(null);setDrag(item);onInteractionChange?.(true);
   rects.current=[];rootRef.current?.measureInWindow((x,y)=>{rootPos.current={x,y};ghost.setValue({x:startPt.current.x-x-60,y:startPt.current.y-y-22});});
@@ -66,23 +81,33 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  // mede as pastas-alvo DEPOIS que a tela se redesenhou com o item levantado (nao por tempo fixo)
  useEffect(()=>{if(!drag)return;rects.current=[];Object.entries(targets.current).forEach(([id,v])=>v?.measureInWindow((x,y,w,h)=>{rects.current.push({id,x,y,w,h});}));},[drag]);
  function endDrag(drop:boolean){
-  const item=dragRef.current,target=hoverRef.current,didMove=moved.current;dragRef.current=null;hoverRef.current=null;setDrag(null);setHover(null);onInteractionChange?.(false);
+  const item=dragRef.current,target=hoverRef.current,didMove=moved.current,wasWeb=webDrag.current;dragRef.current=null;hoverRef.current=null;webDrag.current=false;setDrag(null);setHover(null);if(!wasWeb)onInteractionChange?.(false);
   if(drop&&item&&target&&didMove)moveItem(item,target);
  }
+ /** Reordenar, entrar na pasta, sair dela: regras em lib/notes-move.ts (applyDrop); a ordem nova fica gravada na pagina. */
  function moveItem(item:DragItem,target:string){
-  const all=booksRef.current,op=openedRef.current;
-  if(item.kind==='folder'){
-   const newParent=target==='__up__'?(op?parentOfIn(all,op):''):target;
-   if(newParent&&(newParent===item.id||isInside(newParent,item.id))){appAlert('Não dá para mover','Uma pasta não pode ir para dentro dela mesma.');return;}
-   update(next=>{const f=next.find(b=>b.id===item.id);if(f){if(newParent)f.parent=newParent;else delete f.parent;}},'notebook-move');return;
-  }
-  if(target.startsWith('note:')){const [ref,side]=target.split('|'),[,destBook,destNote]=ref.split(':');if(destNote===item.id)return;
-   update(next=>{const src=next.find(b=>b.id===item.from),d=next.find(b=>b.id===destBook);const p=src?.pages.find(x=>x.id===item.id);if(!src||!d||!p)return;src.pages=src.pages.filter(x=>x.id!==item.id);const at=d.pages.findIndex(x=>x.id===destNote);d.pages.splice(at<0?d.pages.length:side==='after'?at+1:at,0,p);},'notebook-move');return;}
-  const dest=target==='__up__'?(op?(parentOfIn(all,op)||ROOT_BOOK):ROOT_BOOK):target;
-  if(dest===item.from)return;
-  update(next=>{const src=next.find(b=>b.id===item.from);const p=src?.pages.find(x=>x.id===item.id);if(!src||!p)return;src.pages=src.pages.filter(x=>x.id!==item.id);
-   let d=next.find(b=>b.id===dest);if(!d){d={id:ROOT_BOOK,name:'Fora de pastas',emoji:'📝',expanded:true,pages:[],root:true};next.push(d);}d.pages.unshift(p);},'notebook-move');
+  const r=applyDrop(booksRef.current,item,target,openedRef.current?.id||null);
+  if(r.error){appAlert('Não dá para mover',r.error);return;}
+  if(r.books)commitBooks(r.books,'notebook-move');
  }
+ // ---- arrastar do navegador (mouse): mesmo resultado do arrastar por toque, e a nota pode ir para outra pagina ----
+ function htmlStart(item:DragItem,e:any,note?:Leaf){
+  e?.stopPropagation?.();const dt=e?.dataTransfer;
+  try{if(dt){dt.effectAllowed='move';if(note)dt.setData(NOTE_DRAG_TYPE,JSON.stringify({noteId:note.id,fromPageId:pageId||'',title:note.title||'Sem título'}));else dt.setData('application/x-sofia-notes-folder',item.id);}}catch{/* navegador sem dataTransfer */}
+  if(dragRef.current&&!webDrag.current)onInteractionChange?.(false);// o segurar ja tinha comecado: o do navegador assume
+  dragRef.current=item;webDrag.current=true;moved.current=true;hoverRef.current=null;
+  // redesenhar DENTRO do dragstart cancela o arrastar no Chrome: marca o item levantado logo depois
+  setTimeout(()=>{if(dragRef.current===item){setDrag(item);setHover(null);}},0);
+ }
+ function liveRects():NoteRect[]{const out:NoteRect[]=[];for(const [id,el] of Object.entries(targets.current)){const r=(el as any)?.getBoundingClientRect?.();if(r&&r.width&&r.height)out.push({id,x:r.left,y:r.top,w:r.width,h:r.height});}return out;}
+ function htmlOver(e:any){
+  const item=dragRef.current;if(!item||!webDrag.current)return;e.preventDefault();e.stopPropagation?.();if(e.dataTransfer)e.dataTransfer.dropEffect='move';
+  const t=hitTarget(liveRects(),item,e.clientX,e.clientY);if(t!==hoverRef.current){hoverRef.current=t;setHover(t);}
+ }
+ function htmlLeave(e:any){const root:any=rootRef.current;if(root?.contains&&e?.relatedTarget&&root.contains(e.relatedTarget))return;if(hoverRef.current){hoverRef.current=null;setHover(null);}}
+ function htmlDrop(e:any){const item=dragRef.current;if(!item||!webDrag.current)return;e.preventDefault();e.stopPropagation?.();hoverRef.current=hitTarget(liveRects(),item,e.clientX,e.clientY);endDrag(true);}
+ function htmlEnd(){if(webDrag.current)endDrag(false);}
+ const dragProps=(item:DragItem,note?:Leaf):DomH=>({draggable:true,dragstart:e=>htmlStart(item,e,note),dragend:htmlEnd});
  // o detector e criado uma vez: chama SEMPRE a versao atual (com as pastas e notas de agora), nunca uma copia antiga
  const endRef=useRef(endDrag);endRef.current=endDrag;
  const pan=useMemo(()=>PanResponder.create({
@@ -98,12 +123,22 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  /** 0.3.229: soltou sem arrastar -> so cancela (sem menu). Quando o arrastar pega o dedo, o Android avisa o cartao que
   * ele perdeu o toque; antes isso era lido como "soltou" e cancelava o arrastar abrindo Renomear. */
  function pressOut(){if(dragRef.current&&!captured.current&&!moved.current)endDrag(false);}
- function update(fn:(next:Book[])=>void,group='notebooks'){const next=clone(books);fn(next);onChange({...data,mode:'notebooks',notebooks:next},group);}
+ function commitBooks(next:Book[],group='notebooks'){onChangeRef.current({...dataRef.current,mode:'notebooks',notebooks:next},group);}
+ function update(fn:(next:Book[])=>void,group='notebooks'){const next=clone(booksRef.current);fn(next);commitBooks(next,group);}
+ /** 13/11/2026 (Pedro): ＋ Nota cria a nota SOLTA na lista que esta aberta (raiz ou pasta). Antes criava a pasta "Geral". */
  function addLeaf(id?:string){
-  let target=id||openBook||books[0]?.id;const p={id:uid(),title:'',content:'',created_at:new Date().toISOString()};
-  update(next=>{let b=next.find(x=>x.id===target);if(!b){b={id:uid(),name:'Geral',emoji:'📝',expanded:true,pages:[]};next.push(b);target=b.id;}b.pages.unshift(p);b.expanded=true;});
-  setBookId(target||null);setLeafId(p.id);
+  const p={id:uid(),title:'',content:'',created_at:new Date().toISOString()};
+  const r=addLooseNote(booksRef.current,id||(opened&&!opened.root?opened.id:null),p);commitBooks(r.books);
+  setBookId(r.bookId);setLeafId(p.id);
  }
+ // a pagina aberta avisa que tem estas Notas: arrastar uma nota para outra pagina pela barra lateral usa o rascunho vivo
+ const liveRef=useRef({find:(_id:string):Leaf|null=>null,remove:(_id:string)=>{},addLoose:(_n:Leaf)=>{}});
+ liveRef.current={
+  find:id=>{for(const b of booksRef.current){const p=b.pages.find(x=>x.id===id);if(p)return clone(p);}return null;},
+  remove:id=>{update(next=>{for(const b of next)b.pages=b.pages.filter(x=>x.id!==id);},'notebook-move-out');if(leafId===id){setLeafId(null);setBookId(null);}},
+  addLoose:n=>commitBooks(addLooseNote(booksRef.current,null,n).books,'notebook-move-in'),
+ };
+ useEffect(()=>pageId?registerLiveNotes(pageId,{find:id=>liveRef.current.find(id),remove:id=>liveRef.current.remove(id),addLoose:n=>liveRef.current.addLoose(n)}):undefined,[pageId]);
  function changeLeaf(patch:Partial<Leaf>){if(!book||!leaf)return;update(next=>{const p=next.find(b=>b.id===book.id)?.pages.find(p=>p.id===leaf.id);if(p){Object.assign(p,applyLeafPatch(p,patch));(p as Dated).updated_at=new Date().toISOString();}},'leaf:'+leaf.id+':'+Object.keys(patch).join(','));}
  // 05/11/2026 (Pedro): opcoes da nota no "⋯" de cada linha e num menu pequeno (antes: janela grande com botoes roxos)
  function deleteNote(bid:string,pid:string){const b=books.find(x=>x.id===bid),p=b?.pages.find(x=>x.id===pid);if(!b||!p)return;appAlert('Excluir nota?',`“${p.title||'Sem título'}” será removida desta pasta.`,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{update(next=>{const f=next.find(x=>x.id===bid);if(f)f.pages=f.pages.filter(x=>x.id!==pid);});if(leafId===pid){setLeafId(null);setBookId(null);}setMenu(false);}}]);}
@@ -133,22 +168,24 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  const results=useMemo(()=>query.trim()?books.flatMap(b=>b.pages.map(p=>({b,p,score:fuzzyScore((p.title||'')+' '+leafPreview(p),query)}))).filter(x=>x.score>0).sort((a,b)=>b.score-a.score):[],[books,query]);
  const open=(b:Book,p:Leaf)=>{setBookId(b.id);setLeafId(p.id);};
 
- const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id;
-  return <View key={b.id} ref={r=>{targets.current[b.id]=r;}} collapsable={false} style={{width:desktop?224:'48%'}}>
+ /** 13/11/2026 (Pedro: "pastas com alturas diferentes"): todo cartao de pasta tem a MESMA altura e as mesmas 4 linhas
+  * (pasta vazia mostra "Vazia" no lugar de "Última: ..."). Arrastando uma pasta: bordas = reordenar, meio = entrar. */
+ const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id,item:DragItem={kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},bar=(side:string)=>hover==='folder:'+b.id+'|'+side?<View pointerEvents="none" style={{position:'absolute',top:6,bottom:6,width:3,borderRadius:2,backgroundColor:c.accent,[side==='before'?'left':'right']:3}}/>:null;
+  return <View key={b.id} ref={r=>{targets.current[b.id]=r;bindDom(r,dragProps(item));}} collapsable={false} style={{width:desktop?224:'48%',position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir pasta '+(b.name||'Sem título')} accessibilityHint="Segure e arraste para mover" onPress={()=>{if(!dragRef.current)setOpenBook(b.id);}} delayLongPress={300}
-    onLongPress={e=>startDrag({kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},e)} onPressOut={()=>pressOut()}
-    style={({pressed})=>({minHeight:118,backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:14,gap:6,opacity:lifted?0.35:pressed?0.75:1})}>
-    <Text style={{fontSize:28}}>{b.emoji||'📁'}</Text>
+    onLongPress={e=>startDrag(item,e)} onPressOut={()=>pressOut()}
+    style={({pressed})=>({height:132,overflow:'hidden',backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:over?13:14,gap:6,opacity:lifted?0.35:pressed?0.75:1})}>
+    <Text style={{fontSize:28,lineHeight:34}}>{b.emoji||'📁'}</Text>
     <Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{b.name||'Sem título'}</Text>
-    <Text style={{color:c.muted,fontSize:12}}>{b.pages.length+(b.pages.length===1?' nota':' notas')+(subs?' · '+subs+(subs===1?' pasta':' pastas'):'')}</Text>
-    {last?<Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{'Última: '+(last.title||'Sem título')}</Text>:null}
+    <Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>{b.pages.length+(b.pages.length===1?' nota':' notas')+(subs?' · '+subs+(subs===1?' pasta':' pastas'):'')}</Text>
+    <Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{last?'Última: '+(last.title||'Sem título'):'Vazia'}</Text>{bar('before')}{bar('after')}
    </Pressable>
   </View>;};
- const noteCard=(b:Book,p:Leaf,showFolder=false)=>{const prev=leafPreview(p),stamp=leafStamp(p as Dated),lifted=drag?.kind==='note'&&drag.id===p.id,tid='note:'+b.id+':'+p.id,line=(side:string)=>hover===tid+'|'+side?<View pointerEvents="none" style={{position:'absolute',left:6,right:6,[side==='before'?'top':'bottom']:-6,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null,hovered=noteHover.key===tid,showDots=!showFolder&&(!desktop||hovered||lifted);
-  return <View key={b.id+':'+p.id} ref={showFolder?undefined:r=>{targets.current[tid]=r;}} collapsable={false} style={{position:'relative'}}>
+ const noteCard=(b:Book,p:Leaf,showFolder=false)=>{const prev=leafPreview(p),stamp=leafStamp(p as Dated),lifted=drag?.kind==='note'&&drag.id===p.id,tid='note:'+b.id+':'+p.id,line=(side:string)=>hover===tid+'|'+side?<View pointerEvents="none" style={{position:'absolute',left:6,right:6,[side==='before'?'top':'bottom']:-6,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null,hovered=noteHover.key===tid,showDots=!showFolder&&(!desktop||hovered||lifted);const item:DragItem={kind:'note',id:p.id,from:b.id,label:'📝 '+(p.title||'Sem título')};
+  return <View key={b.id+':'+p.id} ref={r=>{if(!showFolder)targets.current[tid]=r;bindDom(r,dragProps(item,p));}} collapsable={false} style={{position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir nota '+(p.title||'Sem título')} onPress={()=>{if(!dragRef.current)open(b,p);}} onHoverIn={()=>noteHover.enter(tid)} onHoverOut={noteHover.leave}
     {...(desktop?contextMenu(()=>noteItems(b.id,p.id,null,false)):{})}
-    delayLongPress={300} onLongPress={showFolder?undefined:e=>startDrag({kind:'note',id:p.id,from:b.id,label:'📝 '+(p.title||'Sem título')},e)} onPressOut={showFolder?undefined:()=>pressOut()}
+    delayLongPress={300} onLongPress={showFolder?undefined:e=>startDrag(item,e)} onPressOut={showFolder?undefined:()=>pressOut()}
     style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,opacity:lifted?0.35:pressed?0.75:1})}>
     <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
      <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:16,fontWeight:'600'}}>{p.title||'Sem título'}</Text>
@@ -160,11 +197,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
    </Pressable>{line('before')}{line('after')}
   </View>;};
 
- return <View ref={rootRef} collapsable={false} {...pan.panHandlers} style={{gap:12}}>
+ return <View ref={r=>{rootRef.current=r;bindDom(r,{dragover:htmlOver,dragleave:htmlLeave,drop:htmlDrop});}} collapsable={false} {...pan.panHandlers} style={{gap:12}}>
   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
    <View style={{flex:1}}>
     {/* 05/11/2026 (Pedro: "ta desalinhado"): o voltar vira uma linha propria acima do nome da pasta; nome, contagem e busca na mesma margem */}
-    {opened?<Pressable accessibilityRole="button" accessibilityLabel="Voltar às pastas" onPress={()=>setOpenBook(opened&&!opened.root?(parentOf(opened)||null):null)} hitSlop={8} style={({hovered}:any)=>({alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,marginBottom:2,opacity:hovered?1:0.8})}><Text style={{color:c.accent,fontSize:13,fontWeight:'600'}}>{'‹ '+(()=>{const up=parentOf(opened);const b=up?books.find(x=>x.id===up):null;return b?(b.emoji||'📁')+' '+(b.name||'Sem título'):(title||'Notas');})()}</Text></Pressable>:null}
+    {/* 13/11/2026: soltar uma nota ou pasta no "‹ Notas" tira da pasta (igual à faixa de baixo) */}
+    {opened?<View ref={r=>{targets.current['__back__']=r;}} collapsable={false} style={{alignSelf:'flex-start',borderRadius:8,backgroundColor:drag&&hover==='__up__'?c.accentSoft:'transparent'}}><Pressable accessibilityRole="button" accessibilityLabel="Voltar às pastas" onPress={()=>setOpenBook(opened&&!opened.root?(parentOf(opened)||null):null)} hitSlop={8} style={({hovered}:any)=>({alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,marginBottom:2,opacity:hovered?1:0.8})}><Text style={{color:c.accent,fontSize:13,fontWeight:'600'}}>{'‹ '+(()=>{const up=parentOf(opened);const b=up?books.find(x=>x.id===up):null;return b?(b.emoji||'📁')+' '+(b.name||'Sem título'):(title||'Notas');})()}</Text></Pressable></View>:null}
     {opened?<Text numberOfLines={1} style={{fontSize:24,fontWeight:'700',color:c.text}}>{(opened.emoji||'📁')+' '+(opened.name||'Sem título')}</Text>
      :<TextInput accessibilityLabel="Título do bloco de notas" value={title} onChangeText={setTitle} onEndEditing={commitTitle} onBlur={commitTitle} blurOnSubmit returnKeyType="done" style={{fontSize:24,fontWeight:'700',color:c.text,paddingVertical:0}}/>}
     <Text style={{color:c.muted,fontSize:12}}>{opened?opened.pages.length+(opened.pages.length===1?' nota':' notas'):foldersIn('').length+(foldersIn('').length===1?' pasta':' pastas')+' · '+total+(total===1?' nota':' notas')}</Text>
@@ -188,8 +226,9 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
    </View>:null}
   </View>:<View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
    {foldersIn('').map(folderTile)}
-   {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:4}}><Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Fora de pastas</Text>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
-   {!books.length?<Pressable onPress={()=>{setEditingBook(null);setNewName('');setCreate(true);}} style={{flex:1,borderRadius:18,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:28}}>📁</Text><Text style={{color:c.muted,fontSize:13,textAlign:'center'}}>Crie a primeira pasta para organizar suas notas.</Text></Pressable>:null}
+   {/* 13/11/2026 (Pedro): na raiz, pastas e notas soltas juntas (a nota solta é um cartão, sem pasta "Geral") */}
+   {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:foldersIn('').length?4:0}}>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
+   {!foldersIn('').length&&!rootNotes.length?<Pressable onPress={()=>addLeaf()} style={{flex:1,borderRadius:18,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:28}}>📝</Text><Text style={{color:c.muted,fontSize:13,textAlign:'center'}}>{tap('Nenhuma nota ainda. Toque para criar a primeira nota (ou use ＋ Pasta).')}</Text></Pressable>:null}
   </View>}
   {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>{tap('Segure uma nota ou pasta e arraste para mudar a ordem, para dentro de outra pasta ou para fora dela.')}</Text>:null}
   {drag?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:0,zIndex:50,elevation:8,transform:ghost.getTranslateTransform(),backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.accent,paddingHorizontal:14,paddingVertical:10,maxWidth:240}}>
