@@ -179,6 +179,48 @@ function notesData() {
       await page.keyboard.press('Escape'); await page.waitForTimeout(500); await page.keyboard.press('Escape'); await page.waitForTimeout(2500);
       const bs = await books(); const n2 = bs.flatMap(k => k.pages).find(x => x.id === 'n2'); ok(!!n2 && (n2.blocks || []).some(b => b.type === 'file' && b.data && b.data.attachment_id), 'nota guardou o bloco do anexo');
     }
+    // 14/11/2026 (Pedro, print da nota sofia-alterações): mover a foto, digitar depois dela, cantos como no Quadro, painel que estica, pastas
+    if (want('foto')) {
+      await openAnot(); await card('Solta A').click().catch(() => {}); await page.waitForTimeout(1300);
+      const P = '[data-testid="side-peek-panel"] ';
+      const ed = page.locator(P + '[data-rich-block]').first(); await ed.click(); await page.keyboard.type('linha antes'); await page.waitForTimeout(300);
+      await page.evaluate(async () => {const c = document.createElement('canvas'); c.width = 600; c.height = 300; const g = c.getContext('2d'); g.fillStyle = '#3a6'; g.fillRect(0, 0, 600, 300);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'image.png', {type: 'image/png'}));
+        document.activeElement.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));});
+      await page.waitForTimeout(3500);
+      ok(await page.locator(P + '[data-testid="page-file-preview"]').count() === 1, 'imagem colada aparece mostrando a foto');
+      await page.keyboard.type('depois da foto'); await page.waitForTimeout(400); await page.screenshot({path: O + 'foto-digitar-depois.png'});
+      const order = async () => page.evaluate(() => [...document.querySelectorAll('[data-testid="side-peek-panel"] [data-leaf-block]')].map(r => r.querySelector('[data-testid="page-file-preview"]') ? 'FOTO' : (r.innerText || '').replace('⋮⋮', '').trim().slice(0, 15)));
+      let o = await order(); res.push('ordem: ' + JSON.stringify(o)); ok(o.indexOf('depois da foto') === o.indexOf('FOTO') + 1, 'cursor vai para a linha depois da foto e dá para digitar');
+      // cantos
+      const img = page.locator(P + '[data-testid="page-file-preview"]').first(); await img.hover(); await page.waitForTimeout(300);
+      ok(await page.locator(P + '[data-testid^="page-file-corner-"]').count() === 4, 'foto tem os 4 cantos de esticar, como no Quadro');
+      const b0 = await img.boundingBox(), se = await page.locator(P + '[data-testid="page-file-corner-se"]').first().boundingBox();
+      await page.mouse.move(se.x + 6, se.y + 6); await page.mouse.down(); for (let i = 1; i <= 8; i++) {await page.mouse.move(se.x + 6 - i * 15, se.y + 6 - i * 8); await page.waitForTimeout(30);} await page.mouse.up(); await page.waitForTimeout(400);
+      const b1 = await img.boundingBox(); res.push('foto: ' + Math.round(b0.width) + 'x' + Math.round(b0.height) + ' -> ' + Math.round(b1.width) + 'x' + Math.round(b1.height));
+      ok(b1.width < b0.width - 60 && Math.abs(b1.width / b1.height - b0.width / b0.height) < 0.08, 'canto diminui a foto mantendo a proporção');
+      // mover a foto pela alça para cima da primeira linha
+      const row = page.locator(P + '[data-leaf-block]').filter({has: page.locator('[data-testid="page-file-preview"]')}).first(); await row.hover(); await page.waitForTimeout(300);
+      const g = await row.locator('[data-testid="leaf-grip"]').first().boundingBox(); const first = await page.locator(P + '[data-leaf-block]').first().boundingBox();
+      ok(!!g, 'foto mostra a alça ⋮⋮ com o mouse em cima');
+      if (g) {await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2); await page.mouse.down(); for (let i = 1; i <= 10; i++) {await page.mouse.move(g.x + 10, g.y + (first.y + 3 - g.y) * i / 10); await page.waitForTimeout(30);} await page.screenshot({path: O + 'foto-movendo.png'}); await page.mouse.up(); await page.waitForTimeout(600);}
+      o = await order(); res.push('ordem depois de mover: ' + JSON.stringify(o)); ok(o[0] === 'FOTO', 'foto se move arrastando pela alça');
+      // clicar embaixo escreve no fim
+      await page.locator(P + '[data-testid="leaf-write-below"]').first().click(); await page.waitForTimeout(500); res.push('foco depois do clique: ' + await page.evaluate(() => {const a = document.activeElement; return a.tagName + ' ' + (a.getAttribute('data-testid') || '') + ' ce=' + a.isContentEditable + ' ' + (a.closest('[data-leaf-block]')?.getAttribute('data-leaf-block') || '-');})); await page.keyboard.type('fim da nota'); await page.waitForTimeout(400);
+      o = await order(); ok(o[o.length - 1] === 'fim da nota', 'clicar embaixo da nota escreve no fim (' + o.slice(-1) + ')');
+      // painel estica pela borda
+      const pan = page.locator('[data-testid="side-peek-panel"]').first(), w0 = (await pan.boundingBox()).width, e = await page.locator('[data-testid="side-peek-resize"]').first().boundingBox();
+      if (e) {await page.mouse.move(e.x + 3, e.y + 200); await page.mouse.down(); for (let i = 1; i <= 8; i++) {await page.mouse.move(e.x + 3 - i * 25, e.y + 200); await page.waitForTimeout(30);} await page.mouse.up(); await page.waitForTimeout(300);}
+      const w1 = (await pan.boundingBox()).width; res.push('painel: ' + Math.round(w0) + ' -> ' + Math.round(w1)); ok(!!e && w1 > w0 + 150, 'painel lateral da nota estica arrastando a borda esquerda');
+      await page.screenshot({path: O + 'foto-painel.png'});
+      await page.keyboard.press('Escape'); await page.waitForTimeout(500); await page.keyboard.press('Escape'); await page.waitForTimeout(2500);
+      const bs = await books(); const n3 = bs.flatMap(k => k.pages).find(x => x.id === 'n2'); const types = (n3 && n3.blocks || []).map(b => b.type === 'file' ? 'FOTO' : (b.text || '').slice(0, 15));
+      res.push('nota salva: ' + JSON.stringify(types)); ok(types[0] === 'FOTO' && types.some(t => /^depois da foto/.test(t)) && types[types.length - 1] === 'fim da nota', 'ordem nova fica guardada');
+      // pastas dividem a linha
+      await openAnot(); await page.screenshot({path: O + 'pastas.png'});
+      const m = await page.evaluate(() => {const g = document.querySelector('[data-testid="notes-folder-grid"]'); const t = [...g.querySelectorAll('[aria-label^="Abrir pasta"]')].map(x => x.getBoundingClientRect()); const gr = g.getBoundingClientRect(); const r0 = t.filter(x => Math.abs(x.top - t[0].top) < 2); return {gw: gr.width, n: r0.length, right: r0[r0.length - 1].right - gr.left, ws: [...new Set(t.map(x => Math.round(x.width)))]};});
+      res.push('pastas: ' + JSON.stringify(m)); ok(m.ws.length === 1 && m.ws[0] >= 190 && m.ws[0] <= 320, 'pastas com a mesma largura, entre 190 e 320 px');
+    }
     if (want('paginas')) {
       await openAnot(); const sec = page.locator('[data-testid="sidebar-section-Páginas"]'); ok(await sec.count() > 0, 'título Páginas da barra lateral é um link');
       if (await sec.count()) {await sec.first().click(); await page.waitForTimeout(2500); res.push('url: ' + page.url()); ok(/\/paginas\/?$/.test(new URL(page.url()).pathname), 'clicar em Páginas abre /paginas');

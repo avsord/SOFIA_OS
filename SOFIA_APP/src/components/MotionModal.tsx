@@ -1,5 +1,5 @@
 import {uiScale} from '../web/desktop-scale';
-import React,{useContext,useLayoutEffect,useRef} from 'react';
+import React,{useContext,useLayoutEffect,useRef,useState} from 'react';
 import {PresenceClosing} from './Presence';
 import {useWebBackClose} from '../lib/web-panels';
 import {PALETTE} from '../lib/palette';
@@ -44,11 +44,24 @@ function SidePeek({visible=true,children,onRequestClose,peekWidth,peekDim}:Modal
    panel?.animate([{transform:'translateX(0px)',opacity:1},{transform:'translateX(40px)',opacity:0}],{duration:240,easing:'cubic-bezier(0.4,0,1,1)',fill:'forwards'});
    if(dim&&dim!==panel)dim.animate([{opacity:1},{opacity:0}],{duration:240,easing:'ease-out',fill:'forwards'});
    setTimeout(()=>ghost.remove(),280);}catch{/* sem animacao */}},[]);
+ // 14/11/2026 (Pedro: "a tela lateral nao tem opcao de escalar, abrir mais"): como no Notion, a borda esquerda do painel
+ // estica arrastando (360 px ate 96% da janela); a largura fica lembrada neste navegador. Dois cliques na borda voltam ao padrao.
+ const wKey='sofia.peek.w.'+(peekWidth||'d');
+ const [userW,setUserW]=useState<number|null>(()=>{try{const v=Number((globalThis as any).localStorage?.getItem(wKey));return v>0?v:null;}catch{return null;}});
+ const [resizing,setResizing]=useState(false);
+ const panelStyle=():any=>{if(!userW||typeof window==='undefined'||!window.innerWidth)return peekSize(peekWidth);const W=window.innerWidth,px=Math.max(Math.min(360,W),Math.min(userW,W*0.96));return {width:(px/W*100).toFixed(3)+'%',maxWidth:'100%',overflow:'hidden'};};
+ const startResize=(e:any)=>{if(Platform.OS!=='web')return;e.preventDefault?.();e.stopPropagation?.();setResizing(true);let last=userW;
+  const mv=(ev:PointerEvent)=>{const W=window.innerWidth;last=Math.round(Math.max(Math.min(360,W),Math.min(W*0.96,W-ev.clientX)));setUserW(last);};
+  const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);setResizing(false);try{if(last)localStorage.setItem(wKey,String(last));}catch{/* sem memoria */}};
+  window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);};
+ const resetW=()=>{setUserW(null);try{localStorage.removeItem(wKey);}catch{/* sem memoria */}};
+ const edge=Platform.OS==='web'?React.createElement('div',{'data-testid':'side-peek-resize',role:'separator','aria-orientation':'vertical','aria-label':'Arraste para mudar a largura do painel',title:'Arraste para mudar a largura · dois cliques volta ao padrão',onPointerDown:startResize,onDoubleClick:resetW,
+  style:{position:'absolute',left:0,top:0,bottom:0,width:7,cursor:'ew-resize',zIndex:30,background:resizing?c.accent:'transparent',opacity:resizing?0.6:1,transition:'background .12s'}}):null;
  return <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>
   <View ref={rootEl} testID="side-peek" style={{flex:1,flexDirection:'row'}} pointerEvents={visible?'auto':'none'}>
    <Animated.View style={{flex:1,opacity:progress}}><Pressable accessibilityLabel="Fechar painel" onPress={()=>onRequestClose?.({} as any)} style={{flex:1,backgroundColor:PALETTE.black+(peekDim||'59')}}/></Animated.View>
-   <Animated.View testID="side-peek-panel" style={{...peekSize(peekWidth),height:'100%',backgroundColor:c.bg,borderLeftWidth:1,borderColor:c.line,shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:-8,height:0},opacity:progress,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[40,0]})}]}}>
-    <DialogContext.Provider value={true}>{visible?children:last.current}</DialogContext.Provider>
+   <Animated.View testID="side-peek-panel" style={{...panelStyle(),height:'100%',backgroundColor:c.bg,borderLeftWidth:1,borderColor:c.line,shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:-8,height:0},opacity:progress,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[40,0]})}]}}>
+    <DialogContext.Provider value={true}>{visible?children:last.current}</DialogContext.Provider>{edge}
    </Animated.View>
   </View>
  </Modal>;

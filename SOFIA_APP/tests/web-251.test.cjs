@@ -14,6 +14,7 @@ test('telas cheias viram painel lateral; janelas mantem botoes na largura; fora 
 });
 test('Paginas: capa e barra largas, texto em coluna de leitura; pastas em cartoes fixos',()=>{
   const p=read('src/screens/Pages.tsx');assert.ok(p.includes("maxWidth:960,alignSelf:'center'")&&p.includes("hasCover&&desktop?{width:'100%',aspectRatio:6,minHeight:200,maxHeight:460}:{height:hasCover?190:28}") /* 09/11: capa larga pela proporcao */);
-  assert.ok(read('src/components/NotebookBlock.tsx').includes("width:desktop?224:'48%'"));
+  // 14/11/2026 (Pedro: "arrumar diagramacao das pastas"): cartoes de mesma largura dividindo a linha em fileiras equilibradas (190-320 px)
+  {const n=read('src/components/NotebookBlock.tsx');assert.ok(n.includes("width:desktop?tileW:'48%'")&&n.includes('Math.min(320,')&&n.includes('Math.ceil(n/rows)'));}
   assert.ok(!read('src/lib/desktop.ts').includes("if(tab==='pages')return 980;"));
 });
