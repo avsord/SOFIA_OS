@@ -2,7 +2,9 @@
 // Sofia entre o Drive e as Paginas. Fica na memoria desta aba e tambem vai como texto marcado para a area de transferencia
 // do computador (assim colar em outra aba da Sofia funciona). Nada de arquivo passa pelo navegador: o servidor copia.
 export type ClipDrive = {sofia: 'drive-items'; ids: string[]; names: string[]};
-export type ClipPage = {sofia: 'page-files'; items: {attachment_id: string; name: string; mime: string}[]};
+/** `blocks` (13/11/2026, Pedro: "copio texto + anexo e so vem o anexo"): a selecao inteira da pagina, na ordem; os blocos
+ * de arquivo dela sao os `items`, na mesma ordem. */
+export type ClipPage = {sofia: 'page-files'; items: {attachment_id: string; name: string; mime: string}[]; blocks?: any[]};
 export type SofiaClip = ClipDrive | ClipPage;
 const MARK = 'sofia-clip:';
 let mem: {clip: SofiaClip; text: string} | null = null;
@@ -17,10 +19,20 @@ export function parseSofiaClip(text: string | null | undefined): SofiaClip | nul
   if (t.startsWith(MARK)) { try { const c = JSON.parse(t.slice(MARK.length)); if (c && (c.sofia === 'drive-items' && Array.isArray(c.ids) || c.sofia === 'page-files' && Array.isArray(c.items))) return c; } catch {} return null; }
   return null;
 }
+/** Guarda o item da Sofia so nesta aba, ligado ao texto legivel que foi para a area de transferencia (copiar texto + anexos:
+ * fora da Sofia cola o texto; dentro, colar esse mesmo texto traz os blocos com os arquivos). */
+export function rememberSofiaClip(clip: SofiaClip, text: string) { mem = {clip, text}; }
+const norm = (t: string) => String(t || '').replace(/\r\n?/g, '\n').trim();
+/** Item da Sofia por tras de um texto colado: o texto marcado, ou o texto legivel guardado nesta aba. */
+export function sofiaClipFor(text: string | null | undefined): SofiaClip | null {
+  const c = parseSofiaClip(text); if (c) return c;
+  const t = norm(String(text || ''));
+  return mem && t && t === norm(mem.text) ? mem.clip : null;
+}
 /** Colar: o texto do evento manda (o que o computador tem agora); se nao houver texto e nem arquivos, vale o desta aba. */
 export function clipFromPaste(e: ClipboardEvent | {clipboardData?: DataTransfer | null}): SofiaClip | null {
   const dt = (e as any).clipboardData as DataTransfer | null | undefined; const text = dt?.getData?.('text/plain') || '';
-  const c = parseSofiaClip(text); if (c) return c;
+  const c = sofiaClipFor(text); if (c) return c;
   if (!text && !(dt?.files && dt.files.length) && mem) return mem.clip;
   return null;
 }

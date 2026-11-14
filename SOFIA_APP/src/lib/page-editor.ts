@@ -31,6 +31,14 @@ export function conflictingFields(base:Entity,patch:Partial<Entity>,remote:Entit
 export const UPLOADING=new Set<string>();
 const orphanUpload=(b:PageBlock)=>!!b?.data?.uploading&&!b.data.attachment_id&&!UPLOADING.has(b.id);
 export function dropOrphanUploads(blocks:PageBlock[]):PageBlock[]{const out=blocks.filter(b=>!orphanUpload(b));return out.length===blocks.length?blocks:out.length?out:[newBlock()];}
+/** 13/11/2026 (Pedro: Ctrl+Z deixa o PDF preso em "Enviando..."): o passo guardado no historico pode ter o arquivo ainda
+ * subindo. Ao voltar/refazer, o arquivo que ja terminou de subir fica como esta agora (com o anexo); envio que ninguem
+ * mais esta fazendo sai da pagina. */
+export function settleUploads(target:PageDraft,current:PageDraft):PageDraft{
+ const done=new Map(current.blocks.filter(b=>b?.data?.attachment_id).map(b=>[b.id,b]));let hit=false;
+ const blocks=target.blocks.map(b=>{if(b?.data?.uploading&&!b.data.attachment_id&&done.has(b.id)){hit=true;return clone(done.get(b.id)!);}return b;});
+ const out=dropOrphanUploads(blocks);return hit||out!==target.blocks?{...target,blocks:out}:target;
+}
 const serverBlocks=(blocks:PageBlock[])=>blocks.filter(b=>!(b?.data?.uploading&&!b.data.attachment_id));
 /** Junta as duas versoes quando o salvar volta 409 (a pagina mudou em outro lugar, ou a resposta do proprio salvar se
  * perdeu numa aba recarregada). Cada campo e cada bloco: quem mudou em relacao a base vence; so e conflito de verdade
@@ -108,8 +116,8 @@ export class PageEditorStore {
   const now=this.now();if(!group||group!==e.group||now-e.groupAt>700){e.past.push(clone(e.draft));if(e.past.length>80)e.past.shift();}
   e.future=[];e.group=group;e.groupAt=now;e.draft=next;this.dirty(id,e);try{this.deps.onEdit?.();}catch{/* so aviso */}
  }
- undo(id:string){const e=this.entries.get(id);if(!e?.past.length)return;e.future.push(clone(e.draft));e.draft=e.past.pop()!;e.group='';this.dirty(id,e);}
- redo(id:string){const e=this.entries.get(id);if(!e?.future.length)return;e.past.push(clone(e.draft));e.draft=e.future.pop()!;e.group='';this.dirty(id,e);}
+ undo(id:string){const e=this.entries.get(id);if(!e?.past.length)return;e.future.push(clone(e.draft));e.draft=settleUploads(e.past.pop()!,e.draft);e.group='';this.dirty(id,e);}
+ redo(id:string){const e=this.entries.get(id);if(!e?.future.length)return;e.past.push(clone(e.draft));e.draft=settleUploads(e.future.pop()!,e.draft);e.group='';this.dirty(id,e);}
  private dirty(id:string,e:PageEntry){if(e.version===e.acked)e.firstChange=this.now();e.version++;if(e.state!=='conflict'){e.state='pending';e.error='';this.schedule(id);}this.changed();this.persist();}
  private schedule(id:string){
   if(this.disposed)return;const e=this.entries.get(id);if(!e||e.state==='conflict')return;

@@ -22,7 +22,7 @@ function notesData() {
   const lab = spawn(process.execPath, [path.join(__dirname, 'lab-server.cjs'), String(PORT), O + 'data'], {stdio: ['ignore', 'pipe', 'pipe']}); let log = ''; lab.stdout.on('data', d => log += d); lab.stderr.on('data', d => log += d);
   for (let i = 0; i < 80 && !/pronto/.test(log); i++) await new Promise(r => setTimeout(r, 250));
   const api = async (p, body, method) => {const r = await fetch(B + '/api/mobile' + p, {method: method || (body ? 'POST' : 'GET'), headers: {'Content-Type': 'application/json', ...(api.t ? {Authorization: 'Bearer ' + api.t} : {})}, body: body ? JSON.stringify(body) : undefined}); const t = await r.text(); try {return JSON.parse(t);} catch {return t;}};
-  const br = await chromium.launch(process.env.SOFIA_CHROME ? {channel: 'chrome'} : {}); const ctx = await br.newContext({viewport: {width: 1500, height: 900}}); const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)));
+  const br = await chromium.launch(process.env.SOFIA_CHROME ? {channel: 'chrome'} : {}); const ctx = await br.newContext({viewport: {width: 1500, height: 900}, permissions: ['clipboard-read', 'clipboard-write']}); const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(String(e.message).slice(0, 200)));
   const want = n => !only.length || only.includes(n);
   try {
     api.t = (await api('/auth/login', {email: 'lab@sofia.local', password: 'senha-do-laboratorio-123', device_name: 'robo'})).token;
@@ -112,9 +112,62 @@ function notesData() {
       const e = await api('/workspace/entities/' + outra.id), ent = e.entity || e, order = JSON.parse(ent.data.blocks_json).map(x => x.id).join(',');
       res.push('ordem depois de arrastar a subpágina: ' + order); ok(order.indexOf('bl1') > order.indexOf('bt3'), 'subpágina se move arrastando pelo ⋮⋮, igual texto');
     }
+    // 13/11/2026 22h (Pedro, com print): subpágina da lista do topo (não é bloco) também arrasta; Ctrl+Z não prende o anexo em
+    // "Enviando..."; copiar texto + anexo leva os dois
+    if (want('subtopo')) {
+      const ref = await mk('Referência', [{id: 'rt1', type: 'text', text: 'Link um'}, {id: 'rt2', type: 'text', text: 'Link dois'}]);
+      const tr = await mk('Trilha(GWM)', [{id: 'tt1', type: 'text', text: 'trilha'}]);
+      await api('/workspace/entities/' + tr.id, {...tr, data: {...tr.data, parent_id: ref.id}}, 'PATCH').catch(() => {});
+      await page.goto(B + '/paginas/' + ref.id); await page.waitForTimeout(3000);
+      const row = page.locator('[data-testid="page-subpage-row-' + tr.id + '"]').first(); ok(await row.count() > 0, 'subpágina aparece na lista do topo');
+      await row.hover(); await page.waitForTimeout(300); const g = await page.locator('[data-testid="page-subpage-grip-' + tr.id + '"]').first().boundingBox(); const t2 = await page.locator('[data-testid="page-block-rt2"]').first().boundingBox();
+      if (g && t2) {await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2); await page.mouse.down(); for (let i = 1; i <= 10; i++) {await page.mouse.move(g.x + g.width / 2 + 20, g.y + (t2.y + t2.height - 2 - g.y) * i / 10); await page.waitForTimeout(30);} await page.mouse.up(); await page.waitForTimeout(2600);}
+      await page.screenshot({path: O + 'subpagina-topo.png'});
+      const e = await api('/workspace/entities/' + ref.id), ent = e.entity || e, bl = JSON.parse(ent.data.blocks_json), order = bl.map(x => x.type === 'page_link' ? 'LINK' : x.id).join(',');
+      res.push('ordem depois de arrastar a subpágina do topo: ' + order); ok(order.indexOf('LINK') > order.indexOf('rt2') && order.split('LINK').length === 2, 'subpágina do topo se move arrastando pelo ⋮⋮ (vira bloco onde foi solta, sem duplicar)');
+      ok(await page.locator('[data-testid="page-subpage-row-' + tr.id + '"]').count() === 0, 'e sai da lista do topo');
+    }
+    if (want('anexo')) {
+      const pg = await mk('Reunião anexo', [{id: 'at1', type: 'text', text: 'Reunião com Marcio'}]);
+      const blocksOf = async () => {const e = await api('/workspace/entities/' + pg.id), ent = e.entity || e; return JSON.parse(ent.data.blocks_json);};
+      await page.goto(B + '/paginas/' + pg.id); await page.waitForTimeout(3000); await page.mouse.click(1300, 700); await page.waitForTimeout(300);
+      await page.evaluate(() => {const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10])], 'Estudo Marca.pdf', {type: 'application/pdf'})); (document.activeElement || document.body).blur?.(); document.body.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));});
+      await page.waitForTimeout(4000); let bl = await blocksOf(); ok(bl.some(b => b.type === 'file' && b.data && b.data.attachment_id), 'PDF colado na página subiu');
+      await page.mouse.click(1300, 700); await page.keyboard.press('Control+z'); await page.waitForTimeout(1500); await page.screenshot({path: O + 'anexo-ctrlz.png'});
+      ok(await page.locator('[data-testid="page-file-uploading"]').count() === 0, 'Ctrl+Z não deixa o PDF preso em "Enviando..."');
+      await page.keyboard.press('Control+y'); await page.waitForTimeout(1500);
+      await page.locator('[data-testid="page-block-at1"] [contenteditable="true"], [data-testid="page-block-at1"] textarea').first().click(); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+      await page.keyboard.press('Control+a'); await page.waitForTimeout(200); await page.keyboard.press('Control+c'); await page.waitForTimeout(500);
+      const clip = await page.evaluate(() => navigator.clipboard.readText().catch(e => 'ERRO ' + e)); res.push('texto copiado: ' + JSON.stringify(clip)); ok(/Reunião com Marcio/.test(clip) && /Estudo Marca\.pdf/.test(clip), 'copiar texto + anexo leva o texto e o nome do arquivo');
+      await page.keyboard.press('Escape'); await page.mouse.click(1300, 700); await page.keyboard.press('Control+v'); await page.waitForTimeout(4500); await page.screenshot({path: O + 'anexo-colado.png'});
+      bl = await blocksOf(); const nT = bl.filter(b => /Reunião com Marcio/.test(b.text || '')).length, nF = bl.filter(b => b.type === 'file' && b.data && b.data.attachment_id).length;
+      res.push('depois de colar: ' + bl.map(b => b.type + (b.text ? ':' + b.text.slice(0, 12) : '')).join(' | ')); ok(nT === 2 && nF === 2, 'colar na Sofia traz o texto E o anexo (' + nT + ' textos, ' + nF + ' anexos)');
+    }
+    // 13/11/2026 22h (Pedro: "editor de texto no texto das notas"; "tab na area de texto da o espaco maior do tab")
+    if (want('editor')) {
+      await openAnot(); await card('Solta A').click().catch(() => {}); await page.waitForTimeout(1300);
+      const ed = page.locator('[data-testid="side-peek-panel"] [data-rich-block]').first(); ok(await ed.count() > 0, 'texto da nota usa o editor rico no site');
+      await ed.click(); await page.keyboard.type('palavra forte aqui'); await page.waitForTimeout(400);
+      await page.evaluate(() => {const el = document.querySelector('[data-testid="side-peek-panel"] [data-rich-block]'); const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) {const i = n.textContent.indexOf('forte'); if (i >= 0) {const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 5); const s = getSelection(); s.removeAllRanges(); s.addRange(r); break;}}});
+      await page.waitForTimeout(400); await page.screenshot({path: O + 'nota-barra.png'});
+      const bar = page.locator('[data-testid="note-format-bar"]'); ok(await bar.count() > 0, 'selecionar texto na nota mostra a barra de formatação');
+      if (await bar.count()) {await bar.locator('[aria-label="Negrito (Ctrl+B)"]').click(); await page.waitForTimeout(300); await bar.locator('[aria-label="Marcar: amarelo"]').click().catch(() => {}); await page.waitForTimeout(300);}
+      ok(await ed.locator('b,strong').count() > 0, 'negrito aparece no texto da nota');
+      await page.keyboard.press('End'); await page.keyboard.press('Tab'); await page.keyboard.type('fim'); await page.waitForTimeout(400);
+      ok((await ed.innerText()).includes('\tfim'), 'Tab na nota escreve o espaço grande da tabulação');
+      await page.keyboard.press('Escape'); await page.waitForTimeout(500); await page.keyboard.press('Escape'); await page.waitForTimeout(2500);
+      const bs = await books(); const n3 = bs.flatMap(k => k.pages).find(x => x.id === 'n2'); const blk = (n3 && n3.blocks || []).find(b => /forte/.test(b.text || ''));
+      res.push('nota salva: ' + JSON.stringify(blk ? {text: blk.text, marks: blk.marks} : n3 && n3.content).slice(0, 300));
+      ok(!!blk && (blk.marks || []).some(m => m.bold && blk.text.slice(m.start, m.end) === 'forte'), 'negrito fica guardado na nota (o celular lê igual)');
+      ok(!!blk && (blk.marks || []).some(m => m.highlight), 'marca-texto fica guardado na nota');
+      ok(!!blk && blk.text.includes('\tfim'), 'tabulação fica guardada na nota');
+      await page.goto(B + '/paginas/' + outra.id); await page.waitForTimeout(3000);
+      const pb = page.locator('[data-testid="page-block-bt3"] [contenteditable="true"]').first(); await pb.click(); await page.keyboard.press('End'); await page.keyboard.press('Tab'); await page.keyboard.type('x'); await page.waitForTimeout(400);
+      ok((await pb.innerText()).includes('\tx'), 'Tab no meio/fim do texto da página escreve o espaço grande');
+    }
     if (want('imagem')) {
       await openAnot(); await card('Solta A').click().catch(() => {}); await page.waitForTimeout(1300);
-      const ed = page.locator('[data-testid="side-peek-panel"] textarea').nth(1); await ed.click();
+      const ed = page.locator('[data-testid="side-peek-panel"] [data-rich-block]').first(); await ed.click();
       await page.evaluate(async () => {const c = document.createElement('canvas'); c.width = 300; c.height = 160; const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, 300, 160);
         const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'image.png', {type: 'image/png'}));
         document.activeElement.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));});

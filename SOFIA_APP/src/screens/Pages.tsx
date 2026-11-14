@@ -11,7 +11,7 @@ import {PageFileBlock,FileWindowHost,uploadPageFile,defaultView,fileKind,guessMi
 import {blankXlsx} from '../components/SheetEditor';
 import {blankPptx} from '../components/SlideEditor';
 import {uploadOfficeBytes} from '../lib/office-save';
-import {clipFromPaste,parseSofiaClip,setSofiaClip,type SofiaClip} from '../lib/sofia-clipboard';
+import {clipFromPaste,parseSofiaClip,rememberSofiaClip,setSofiaClip,sofiaClipFor,type SofiaClip} from '../lib/sofia-clipboard';
 import {Presence} from '../components/Presence';
 import {noteFluencyMovement} from '../lib/fluency';
 import {PALETTE} from '../lib/palette';
@@ -321,10 +321,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  function pickedIndexes(){const blocks=currentBlocks();return blocks.map((x,i)=>pickedRef.current.has(x.id)?i:-1).filter(i=>i>=0);}
  // 07/11/2026 (Pedro: "copiar o texto em bold tambem vai o bold, italico"): copiar blocos leva texto E formatacao
  function copyBlocks(idx:number[]){const w:any=globalThis,text=blocksText(idx),blocks=currentBlocks();
-  const html=idx.map(i=>{const x=blocks[i];const inner=x.html?String(x.html):textToHtml(String(x.text||''));return x.type==='heading'?'<h1>'+inner+'</h1>':x.type==='heading2'?'<h2>'+inner+'</h2>':'<p>'+inner+'</p>';}).join('');
-  try{if(w.ClipboardItem&&w.navigator?.clipboard?.write){void w.navigator.clipboard.write([new w.ClipboardItem({'text/plain':new Blob([text],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]).catch(()=>w.navigator?.clipboard?.writeText?.(text));return;}}catch{}
-  void w.navigator?.clipboard?.writeText?.(text);}
- function blocksText(idx:number[]){const blocks=currentBlocks();let n=0;return idx.map(i=>{const x=blocks[i],t=String(x.text||'');n=x.type==='number'?n+1:0;const pre=({heading1:'# ',heading2:'## ',heading3:'### ',bullet:'- ',number:n+'. ',todo:x.checked?'[x] ':'[ ] ',quote:'> '} as Record<string,string>)[x.type];return pre!==undefined?pre+t:x.type==='divider'?'---':t;}).join('\n');}
+  const html=idx.map(i=>{const x=blocks[i];const inner=x.type==='file'?textToHtml(String(x.data?.name||'arquivo')):x.html?String(x.html):textToHtml(String(x.text||''));return x.type==='heading'?'<h1>'+inner+'</h1>':x.type==='heading2'?'<h2>'+inner+'</h2>':'<p>'+inner+'</p>';}).join('');
+  try{if(w.ClipboardItem&&w.navigator?.clipboard?.write){void w.navigator.clipboard.write([new w.ClipboardItem({'text/plain':new Blob([text],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]).catch(()=>w.navigator?.clipboard?.writeText?.(text));return text;}}catch{}
+  void w.navigator?.clipboard?.writeText?.(text);return text;}
+ function blocksText(idx:number[]){const blocks=currentBlocks();let n=0;return idx.map(i=>{const x=blocks[i],t=String(x.text||'');n=x.type==='number'?n+1:0;const pre=({heading1:'# ',heading2:'## ',heading3:'### ',bullet:'- ',number:n+'. ',todo:x.checked?'[x] ':'[ ] ',quote:'> '} as Record<string,string>)[x.type];return pre!==undefined?pre+t:x.type==='divider'?'---':x.type==='file'?String(x.data?.name||'arquivo'):t;}).join('\n');}
  // o arrasto começa no mousedown do próprio ⋮⋮ (o onPressIn do Pressable chega depois do clique e deixava o arrasto "preso")
  const dragStart=useRef<(b:PageBlock,e:any)=>void>(()=>{});dragStart.current=(b,e)=>startBlockDrag(b,e);
  function bindGrip(node:any,b:PageBlock){if(!webKeys||!node||typeof node.addEventListener!=='function'||node.__sofiaGrip===b.id)return;node.__sofiaGrip=b.id;node.addEventListener('mousedown',(ev:MouseEvent)=>{if(ev.button!==0)return;ev.preventDefault();dragMoved.current=false;dragStart.current(b,ev);});}
@@ -336,7 +336,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const up=(ev:MouseEvent)=>{d.removeEventListener('mousemove',move);d.removeEventListener('mouseup',up);
    dragMoved.current=moved;if(!moved)return;
    const t=target(ev.clientY);setDrop(null);setDragging(null);if(!t)return;
-   edit(dr=>{const blocks=dr.blocks.slice(),from=blocks.findIndex(x=>x.id===b.id);if(from<0)return dr;let to=t.index;if(from<to)to--;if(to===from)return dr;const [m]=blocks.splice(from,1);blocks.splice(to,0,m);return {...dr,blocks};});};
+   edit(dr=>{const blocks=dr.blocks.slice(),from=blocks.findIndex(x=>x.id===b.id);
+    // 13/11/2026 (Pedro: "pedi pra subpagina mover tambem"): a subpagina da lista do topo vira bloco onde for solta
+    if(from<0){if(b.type!=='page_link'||blocks.some(x=>x.type==='page_link'&&String(x.data?.page_id||'')===String(b.data?.page_id||'')))return dr;blocks.splice(t.index,0,b);return {...dr,blocks};}let to=t.index;if(from<to)to--;if(to===from)return dr;const [m]=blocks.splice(from,1);blocks.splice(to,0,m);return {...dr,blocks};});};
   d.addEventListener('mousemove',move);d.addEventListener('mouseup',up);
  }
  useEffect(()=>{if(!webKeys||!active)return;const d=(globalThis as any).document;if(!d)return;
@@ -350,8 +352,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(mod&&k==='a'){e.preventDefault();pickRange(0,last);return;}
    if(mod&&(k==='c'||k==='x')){e.preventDefault();const files=idx.map(i=>blocks[i]).filter(x=>x.type==='file'&&x.data?.attachment_id);
     // arquivos selecionados: Copiar leva o arquivo (colar no Drive ou em outra pagina); so texto: copia o texto
-    if(files.length)setSofiaClip({sofia:'page-files',items:files.map(x=>({attachment_id:String(x.data!.attachment_id),name:String(x.data!.name||'arquivo'),mime:String(x.data!.mime||'')}))});
-    else copyBlocks(idx);if(k==='x'){const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());}return;}
+    const items=files.map(x=>({attachment_id:String(x.data!.attachment_id),name:String(x.data!.name||'arquivo'),mime:String(x.data!.mime||'')}));
+    // 13/11/2026 (Pedro: texto + anexo copiava so o anexo): selecao mista vai como texto para fora da Sofia e, colada aqui, volta com os arquivos
+    if(files.length&&files.length===idx.length)setSofiaClip({sofia:'page-files',items});
+    else{const text=copyBlocks(idx);if(files.length)rememberSofiaClip({sofia:'page-files',items,blocks:idx.map(i=>JSON.parse(JSON.stringify(blocks[i])))},text);}if(k==='x'){const gone=new Set(idx.map(i=>blocks[i].id));edit(dr=>{const rest=dr.blocks.filter(x=>!gone.has(x.id));return {...dr,blocks:rest.length?rest:[newBlock()]};});setPicked(new Set());}return;}
    if(mod&&k==='d'){e.preventDefault();const copies=idx.map(i=>({...JSON.parse(JSON.stringify(blocks[i])),id:newBlock().id}));const at=idx[idx.length-1]+1;edit(dr=>{const next=dr.blocks.slice();next.splice(at,0,...copies);return {...dr,blocks:next};});setPicked(new Set(copies.map(x=>x.id)));return;}
   };
   // arrastar o mouse de um bloco para outro (ou a partir da margem) seleciona os blocos do caminho
@@ -507,8 +511,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(cur&&isLocked(cur.base)){setError('Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.');return;}
   const names=clip.sofia==='drive-items'?clip.names:clip.items.map(x=>x.name);if(!names.length)return;
   const made=names.map((n,i)=>({...newBlock('file'),text:'',data:{uploading:true,name:n,mime:clip.sofia==='page-files'?clip.items[i].mime:guessMime({name:n})}}));made.forEach(m=>UPLOADING.add(m.id));
+  // 13/11/2026: texto + anexos copiados juntos voltam na mesma ordem (o texto com ids novos; cada arquivo e copiado no servidor)
+  let nf=0;const all:PageBlock[]=clip.sofia==='page-files'&&Array.isArray(clip.blocks)?clip.blocks.flatMap((x:any)=>x?.type==='file'?(x.data?.attachment_id&&made[nf]?[made[nf++]]:[]):[{...JSON.parse(JSON.stringify(x)),id:newBlock().id}]):made;
   edit(d=>{const blocks=d.blocks.slice(),i=after?blocks.findIndex(x=>x.id===after.id):-1,empty=!!after&&after.type==='text'&&!String(after.text||'').trim();
-   if(i<0)blocks.push(...made);else if(empty)blocks.splice(i,1,...made);else blocks.splice(i+1,0,...made);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
+   if(i<0)blocks.push(...all);else if(empty)blocks.splice(i,1,...all);else blocks.splice(i+1,0,...all);if(blocks[blocks.length-1].type!=='text')blocks.push(newBlock());return {...d,blocks};});
   const drop=(ids:Set<string>)=>store.edit(pageId,d=>({...d,blocks:d.blocks.filter(x=>!ids.has(x.id))}));
   try{const r=await api.sdToPage(pageId,clip.sofia==='drive-items'?{ids:clip.ids}:{attachments:clip.items.map(x=>x.attachment_id)});const gone=new Set<string>(),errs:string[]=[];
    store.edit(pageId,d=>({...d,blocks:d.blocks.map(x=>{const n=made.findIndex(m=>m.id===x.id);if(n<0)return x;const up=r.items[n] as any;if(!up||up.error){gone.add(x.id);if(up?.error)errs.push(String(up.error));return x;}return {...x,data:{attachment_id:up.id,name:up.name,mime:up.mime,size:up.bytes,view:defaultView(fileKind(up.mime,up.name))}};})}));
@@ -550,6 +556,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(key==='Escape'){e.preventDefault();const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0)enterPick(i);return;}
   // 13/11/2026 (Pedro: "quando aperta tab na pagina ele da o espaco grande"): Tab recua o bloco um nivel (como no Notion),
   // Shift+Tab volta; nunca escreve a tabulacao nem pula o foco para outro lugar
+  // 13/11/2026 22h (Pedro: "pedi que tab na area de texto da o espaco maior do tab"): com o cursor no meio ou no fim do texto,
+  // Tab escreve o espaco grande da tabulacao; no comeco da linha (ou com Shift) continua recuando o bloco
+  if(key==='Tab'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&start>0){e.preventDefault();const d:any=(globalThis as any).document;if(!d?.execCommand?.('insertText',false,'\t')){const t=text.slice(0,start)+'\t'+text.slice(end);updateBlock(b,{text:t},'tab:'+b.id);}return;}
   if(key==='Tab'&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey){e.preventDefault();const was=Math.max(0,Number(b.indent)||0),lv=Math.max(0,Math.min(6,was+(ne.shiftKey?-1:1)));if(lv!==was)updateBlock(b,{indent:lv||undefined},'indent:'+b.id);return;}
   if(key===' '&&!text&&b.type==='text'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey){e.preventDefault();setSlash(null);setAiText('');setAi({id:b.id,busy:false,error:''});return;}
   if(ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&((key==='ArrowUp'&&start===0&&end===0)||(key==='ArrowDown'&&start===text.length&&end===text.length))){const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0){e.preventDefault();enterPick(i,Math.max(0,Math.min(currentBlocks().length-1,i+(key==='ArrowDown'?1:-1))));}return;}
@@ -707,7 +716,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     onChange={(text:string,html:string)=>onBlockText(b,text,html)} onKeyPress={preview?undefined:(e:any)=>onBlockKey(e,b)} onFocus={()=>setFocus(b.id)}
     onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}}
     onPasteImage={(img:Blob)=>void pasteImageBlock(b,img)} onDropFiles={(files:File[])=>void dropFiles(b,files)} onPasteTable={(rows:string[][])=>{pasteTableBlock(b,rows);return true;}}
-    onPasteText={(pasted:string,a:number,z:number,html?:string)=>{const clip=parseSofiaClip(pasted);if(clip){void pasteClipBlocks(b,clip);return true;}if(!pasted.includes('\n'))return false;const before=String(b.text||''),cur=currentBlocks();return applyCaret(richPasted(pastedLines(cur,b.id,before,before.slice(0,a)+pasted+before.slice(z)),cur,b.id,html));}}
+    onPasteText={(pasted:string,a:number,z:number,html?:string)=>{const clip=sofiaClipFor(pasted);if(clip){void pasteClipBlocks(b,clip);return true;}if(!pasted.includes('\n'))return false;const before=String(b.text||''),cur=currentBlocks();return applyCaret(richPasted(pastedLines(cur,b.id,before,before.slice(0,a)+pasted+before.slice(z)),cur,b.id,html));}}
     style={{flex:1,minHeight:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0,...(desktop&&b.type==='quote'?{borderLeftWidth:3,borderLeftColor:c.text,borderRadius:0,paddingLeft:14,marginVertical:4}:{}),...(desktop&&b.type==='code'?{paddingVertical:14,paddingHorizontal:16,borderRadius:6,fontSize:13}:{}),...(b.type==='todo'&&b.checked&&desktop?{textDecorationLine:'line-through' as const,color:c.muted}:{})}}/>
    :<TextInput scrollEnabled={false} editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>onBlockText(b,text)} onKeyPress={preview?undefined:e=>onBlockKey(e,b)} {...(webKeys?({numberOfLines:1,dataSet:{pageBlock:!desktop&&!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id?'collapsed':'open'}} as any):{})}
     onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);if(webKeys)setTimeout(()=>setSlash(sl=>sl?.id===b.id&&domInput(b.id)!==(globalThis as any).document?.activeElement?null:sl),180);}} multiline placeholder={desktop&&webKeys&&b.type==='text'&&blockFocus===b.id&&!String(b.text||'')?'Aperte espaço para chamar a Sofia ou “/” para comandos':pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
@@ -769,7 +778,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     </>}
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     {/* subpáginas que ainda não estão no texto aparecem no topo, como links (Notion) */}
-    {desktop&&subpages.length?<View testID="page-subpage-links" style={{marginBottom:4,gap:2}}>{subpages.filter(sp=>!draft.blocks.some(x=>x.type==='page_link'&&String(x.data?.page_id||'')===sp.id)).map(sp=>pageLinkView(sp,'sub-'+sp.id))}</View>:null}
+    {desktop&&subpages.length?<View testID="page-subpage-links" style={{marginBottom:4,gap:2}}>{subpages.filter(sp=>!draft.blocks.some(x=>x.type==='page_link'&&String(x.data?.page_id||'')===sp.id)).map(sp=><Pressable key={'sub-'+sp.id} testID={'page-subpage-row-'+sp.id} focusable={false} style={{flexDirection:'row',alignItems:'center',marginLeft:-24}}>{({hovered}:any)=><>
+     <View testID={'page-subpage-grip-'+sp.id} accessibilityLabel="Arrastar subpágina" ref={(n:any)=>{if(!webKeys||!n||typeof n.addEventListener!=='function'||n.__sofiaSubGrip===sp.id)return;n.__sofiaSubGrip=sp.id;n.addEventListener('mousedown',(ev:MouseEvent)=>{if(ev.button!==0)return;ev.preventDefault();dragMoved.current=false;dragStart.current({...newBlock('page_link'),text:'',data:{page_id:sp.id}},ev);});}}
+      style={{width:20,height:26,alignItems:'center',justifyContent:'center',opacity:hovered?1:0,cursor:'grab'} as any}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></View>
+     <View style={{marginLeft:4}}>{pageLinkView(sp,'sub-link-'+sp.id)}</View></>}</Pressable>)}</View>:null}
     <View testID={preview?undefined:"page-blocks"} style={{gap:2,position:'relative'}}>{draft.blocks.map((block,index)=><View key={block.id} style={{borderRadius:4,backgroundColor:!preview&&picked.has(block.id)?c.accentSoft:'transparent',opacity:dragging===block.id?0.4:1,zIndex:(slash?.id===block.id||blockMenu===block.id)?50:0}}>{blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus)}{preview?null:aiBox(block)}</View>)}
      {!preview&&drop?<View pointerEvents="none" testID="page-drop-line" style={{position:'absolute',left:0,right:0,top:drop.y-2,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null}</View>
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
