@@ -19,7 +19,8 @@ import {comparePageOrder} from '../lib/page-order';
 import {clonePageTree,cloneOrder,type CloneMode} from '../lib/page-clone';
 import {pageUndo,pageSpot,type PageSpot} from '../lib/page-undo'; // 13/11/2026: Ctrl+Z na barra das Paginas
 import {trashPageTree,restorePageTree,staleTrash} from '../lib/page-trash';
-import {moveNoteToPage} from '../lib/notes-move'; // 13/11/2026: nota arrastada para uma pagina da barra
+import {moveNoteToPage} from '../lib/notes-move';
+import {pageShortcuts,requestOpenShortcut,shortcutsFor,useLiveShortcuts} from '../lib/note-shortcuts'; // 14/11/2026: atalhos de nota/pasta // 13/11/2026: nota arrastada para uma pagina da barra
 import {useToast} from '../components/AppKit';
 import {openContextMenu,contextMenu} from '../components/ContextMenu';
 import type {MenuItem} from '../components/ContextMenu';
@@ -61,7 +62,7 @@ function usePageDirectory(api:SofiaApi){
     const stale=complete?staleTrash(seen):[]; // so com a lista inteira (ver staleTrash)
      if(live&&!trashSwept){trashSwept=true;for(const x of stale.slice(0,5))void api.deleteEntity(x.id).catch(()=>{/* tenta na proxima abertura */});} // lixeira com mais de 30 dias
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
-    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order}})));
+    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x)}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
   void load();
@@ -177,9 +178,12 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
+ const liveSc=useLiveShortcuts();
  const rows:React.ReactNode[]=[];
- const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
-  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
+ const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id),sc=shortcutsFor(p,liveSc);
+  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0||sc.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
+  // 14/11/2026 (Pedro): atalho de nota/pasta ligado no menu dela aparece como subpagina; clicar abre a pagina com ela aberta
+  if(open)for(const s of sc)rows.push(<Row key={'sc-'+p.id+'-'+s.kind+'-'+s.id} testID={'sidebar-shortcut-'+s.kind+'-'+s.id} depth={depth+1} emoji={s.emoji} label={s.label} trailing="↗" selected={false} onPress={()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpen(p.id);}}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);

@@ -221,6 +221,29 @@ function notesData() {
       const m = await page.evaluate(() => {const g = document.querySelector('[data-testid="notes-folder-grid"]'); const t = [...g.querySelectorAll('[aria-label^="Abrir pasta"]')].map(x => x.getBoundingClientRect()); const gr = g.getBoundingClientRect(); const r0 = t.filter(x => Math.abs(x.top - t[0].top) < 2); return {gw: gr.width, n: r0.length, right: r0[r0.length - 1].right - gr.left, ws: [...new Set(t.map(x => Math.round(x.width)))]};});
       res.push('pastas: ' + JSON.stringify(m)); ok(m.ws.length === 1 && m.ws[0] >= 190 && m.ws[0] <= 320, 'pastas com a mesma largura, entre 190 e 320 px');
     }
+    // 14/11/2026 (Pedro): nota/pasta vira atalho (subpágina na barra lateral) só quando ativada no menu dela
+    if (want('atalho')) {
+      await openAnot();
+      const sc = s => page.locator('[data-testid="sidebar-shortcut-' + s + '"]');
+      const expand = async () => {const t = page.locator('[aria-label="Abrir Anotações"]'); if (await t.count()) {await t.first().click(); await page.waitForTimeout(500);}};
+      await expand();
+      ok(await page.locator('[data-testid^="sidebar-shortcut-"]').count() === 0, 'por padrão nenhum atalho aparece na barra lateral');
+      const menuPick = async (target, label) => {await target.click({button: 'right'}); await page.waitForTimeout(500); const it = page.getByText(label, {exact: true}).last(); const has = await it.count(); if (has) {await it.click(); await page.waitForTimeout(2600);} return !!has;};
+      ok(await menuPick(card('Solta A'), 'Virar atalho'), 'menu da nota tem "Virar atalho"');
+      ok(await menuPick(folder('Ideias'), 'Virar atalho'), 'menu da pasta tem "Virar atalho"');
+      await expand(); await page.screenshot({path: O + 'atalho-barra.png'});
+      ok(await sc('note-n2').count() === 1 && await sc('folder-f2').count() === 1, 'nota e pasta aparecem como atalho embaixo de Anotações');
+      const e = await api('/workspace/entities/' + anot.id); const d = JSON.parse((e.entity || e).data.blocks_json).find(b => b.id === 'bnotes').data;
+      res.push('atalhos guardados: ' + JSON.stringify(d.shortcuts)); ok((d.shortcuts || []).length === 2 && await where('n2') === '__fora_de_pastas__', 'atalho fica guardado e a nota continua no lugar');
+      await page.goto(B + '/paginas/' + outra.id); await page.waitForTimeout(3000); await expand();
+      await sc('note-n2').first().click(); await page.waitForTimeout(3500); await page.screenshot({path: O + 'atalho-abriu-nota.png'});
+      ok(page.url().includes(anot.id) && await page.locator('[data-testid="side-peek-panel"]').count() > 0, 'clicar no atalho da nota (vindo de outra página) abre Anotações com a nota aberta');
+      await page.keyboard.press('Escape'); await page.waitForTimeout(800);
+      await sc('folder-f2').first().click(); await page.waitForTimeout(1500); await page.screenshot({path: O + 'atalho-abriu-pasta.png'});
+      ok(await page.getByText('‹ Notas').count() > 0, 'clicar no atalho da pasta (com a página já aberta) abre a pasta');
+      await openAnot(); ok(await menuPick(card('Solta A'), 'Tirar atalho'), 'menu da nota tem "Tirar atalho" quando já é atalho'); await expand();
+      ok(await sc('note-n2').count() === 0 && await sc('folder-f2').count() === 1, 'tirar o atalho some só com ele');
+    }
     if (want('paginas')) {
       await openAnot(); const sec = page.locator('[data-testid="sidebar-section-Páginas"]'); ok(await sec.count() > 0, 'título Páginas da barra lateral é um link');
       if (await sec.count()) {await sec.first().click(); await page.waitForTimeout(2500); res.push('url: ' + page.url()); ok(/\/paginas\/?$/.test(new URL(page.url()).pathname), 'clicar em Páginas abre /paginas');

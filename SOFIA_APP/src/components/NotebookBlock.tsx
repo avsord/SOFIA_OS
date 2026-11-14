@@ -20,6 +20,7 @@ import {NOTE_DRAG_TYPE,ROOT_BOOK,addLooseNote,applyDrop,hitTarget,registerLiveNo
 import type {NoteBook,NoteDragItem,NoteRect} from '../lib/notes-move';
 import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
 import {useWebBackDepth} from '../lib/web-panels';
+import {hasShortcut,listenOpenShortcut,publishShortcuts,resolveShortcuts,toggleShortcut} from '../lib/note-shortcuts';
 
 /** 0.3.201: Notas reestruturadas - pastas em cartoes, notas com previa e data, busca que acha com letra
  * errada, e acoes claras. Os dados continuam no mesmo formato (nenhuma nota antiga se perde). */
@@ -156,6 +157,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   addLoose:n=>commitBooks(addLooseNote(booksRef.current,null,n).books,'notebook-move-in'),
  };
  // 13/11/2026: "Notas editadas recentemente" (tela Paginas) abre a pagina ja com a nota aberta
+ // 14/11/2026 (Pedro): atalho de nota/pasta (subpagina na barra lateral) - publica a lista e abre o que o atalho pede
+ const shortcutOwner=useRef({}).current;
+ useEffect(()=>{if(pageId)publishShortcuts(pageId,shortcutOwner,resolveShortcuts(data));},[pageId,data,shortcutOwner]);
+ useEffect(()=>listenOpenShortcut(pageId,r=>{if(r.kind==='folder'){if(booksRef.current.some(b=>b.id===r.id&&!b.root)){setLeafId(null);setBookId(null);setOpenBook(r.id);}return;}const b=booksRef.current.find(k=>k.pages.some(p=>p.id===r.id));if(b){setBookId(b.id);setLeafId(r.id);}}),[pageId]);
+ function flipShortcut(kind:'note'|'folder',id:string){onChangeRef.current(toggleShortcut({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},kind,id),'notebook-shortcut');}
+ const shortcutItem=(kind:'note'|'folder',id:string):MenuItem=>hasShortcut(data,kind,id)?{label:'Tirar atalho',icon:'link',run:()=>flipShortcut(kind,id)}:{label:'Virar atalho',icon:'link',run:()=>flipShortcut(kind,id)};
  useEffect(()=>{const n=takeOpenNote(pageId);if(!n)return;const b=booksRef.current.find(k=>k.pages.some(p=>p.id===n));if(b){setBookId(b.id);setLeafId(n);}},[pageId]);
  useEffect(()=>pageId?registerLiveNotes(pageId,{find:id=>liveRef.current.find(id),remove:id=>liveRef.current.remove(id),addLoose:n=>liveRef.current.addLoose(n)}):undefined,[pageId]);
  function changeLeaf(patch:Partial<Leaf>){if(!book||!leaf)return;update(next=>{const p=next.find(b=>b.id===book.id)?.pages.find(p=>p.id===leaf.id);if(p){Object.assign(p,applyLeafPatch(p,patch));(p as Dated).updated_at=new Date().toISOString();}},'leaf:'+leaf.id+':'+Object.keys(patch).join(','));}
@@ -169,6 +176,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
    ...(inEditor?[]:[{label:'Abrir',icon:'note' as const,run:()=>{setBookId(bid);setLeafId(pid);}}]),
    {label:'Renomear',icon:'edit',run:()=>{setBookId(bid);setLeafId(pid);setTimeout(()=>leafTitle.current?.focus(),inEditor?60:320);}},
    {label:'Duplicar',icon:'copy',run:()=>duplicateNote(bid,pid,inEditor)},
+   shortcutItem('note',pid),
    {label:'Mover para outra pasta',icon:'move',run:()=>{const dests=moveDests(bid);if(where&&dests.length){openContextMenu(where.x,where.y,dests.map(d=>({label:d.label,run:()=>moveNoteTo(bid,pid,d.id)})));return;}setMenuNote({book:bid,leaf:pid});setMoving(true);}},
    {label:'Excluir nota',icon:'trash',danger:true,run:()=>deleteNote(bid,pid)},
   ];
@@ -186,6 +194,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   ...(withOpen?[{label:'Abrir',icon:'note' as const,run:()=>setOpenBook(b.id)}]:[]),
   {label:'Renomear',icon:'edit',run:()=>{setEditingBook(b.id);setNewName(b.name);setCreate(true);}},
   {label:'Trocar ícone',icon:'sparkle',run:()=>{setEmojiBook(b.id);setEmoji(b.emoji||'');}},
+  shortcutItem('folder',b.id),
   {label:'Excluir pasta',icon:'trash',danger:true,run:()=>removeBook(b.id)}];}
  const commitTitle=()=>{const t=title.trim()||'Notas';setTitle(t);if(t!==String(data.title||'Notas'))onChange({...data,mode:'notebooks',title:t,notebooks:books},'notebook-title');};
  // 0.3.251 (computador): pastas em cartoes de tamanho fixo, quantos couberem na linha (no celular, 2 por linha)
