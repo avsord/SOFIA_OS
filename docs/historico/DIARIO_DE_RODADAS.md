@@ -33,3 +33,4 @@
 | 2026-11-14 | (sem APK) | Cartão do link não trava mais; atalhos de nota/pasta como subpágina na barra lateral (menu Virar atalho) | robô 9/9, testes da mudança 79/79 |
 | 2026-11-14 | (sem APK) | Atalho na barra lateral vira ponto colorido (9 cores) + nome menor; "arrastar nota não funciona" da Mimic conferido: alarme falso do robô | site recompilado; testado no laboratório local |
 | 2026-11-14 | (sem APK) | Página trancada: Ctrl+A seleciona a senha, não a página inteira | site recompilado; conferido no laboratório |
+- 14/11/2026: Páginas e tabelas: a tela não pula mais ao digitar ou apertar Enter (a rolagem é guardada ao medir o campo). Testes ok, exceto o 061 que precisa do Java (ambiente).

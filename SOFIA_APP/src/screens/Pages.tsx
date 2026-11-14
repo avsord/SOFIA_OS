@@ -293,10 +293,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // a fonte do site pode chegar depois: mede de novo titulo e linhas quando ela termina de carregar
  useEffect(()=>{if(!webKeys)return;const d=(globalThis as any).document;void d?.fonts?.ready?.then(()=>{const t=titleRef.current;if(t)t.__size='';for(const r of inputRefs.current.values())(r as any).__size='';setResizeTick(v=>v+1);});},[webKeys,selectedId]);
  useLayoutEffect(()=>{if(!webKeys)return;
+  // 14/11/2026 (Pedro: pagina se move ao escrever/Enter): encolher o campo a 0 faz o navegador puxar a rolagem; guarda e devolve
+  const d0=(globalThis as any).document;let sc0:any=null;{let p:any=(titleRef.current as any)?.parentElement;while(p&&p!==d0?.body){const o=getComputedStyle(p).overflowY;if((o==='auto'||o==='scroll')&&p.scrollHeight>p.clientHeight){sc0=p;break;}p=p.parentElement;}}const top0=sc0?sc0.scrollTop:0;
   // 05/11/2026 (Pedro: titulo cortado com barrinha de rolagem): o titulo tambem tem a altura do texto, sem rolagem propria
   {const t=titleRef.current as HTMLTextAreaElement&{__size?:string}|null;if(t?.style&&t.tagName==='TEXTAREA'){t.style.overflow='hidden';const key=t.value+'|'+t.clientWidth+'|'+getComputedStyle(t).fontSize;if(t.__size!==key){t.__size=key;t.style.height='0px';t.style.height=t.scrollHeight+'px';}}}
   for(const ref of inputRefs.current.values()){const n=ref as unknown as HTMLTextAreaElement&{__size?:string};if(!n?.style||n.tagName!=='TEXTAREA')continue;
-  if(n.dataset?.pageBlock==='collapsed'){n.__size='';n.style.height='0px';continue;}const key=n.value+'|'+n.clientWidth;if(n.__size===key)continue;n.__size=key;n.style.height='0px';n.style.height=n.scrollHeight+'px';}});
+  if(n.dataset?.pageBlock==='collapsed'){n.__size='';n.style.height='0px';continue;}const key=n.value+'|'+n.clientWidth;if(n.__size===key)continue;n.__size=key;n.style.height='0px';n.style.height=n.scrollHeight+'px';}
+  if(sc0&&sc0.scrollTop!==top0)sc0.scrollTop=top0;});
  const currentBlocks=()=>(selectedId&&store.get(selectedId)?.draft.blocks)||[];
  const domInput=(id:string)=>inputRefs.current.get(id) as unknown as (HTMLTextAreaElement&{setSelectionRange?:(a:number,b:number)=>void})|undefined;
  function placeCaret(id:string,caret:number|'end'){const run=()=>{const node=domInput(id);if(!node)return false;node.focus?.();const len=String(node.value??'').length;const at=caret==='end'?len:Math.min(caret,len);node.setSelectionRange?.(at,at);return true;};if(!run())requestAnimationFrame(()=>{if(!run())requestAnimationFrame(run);});}

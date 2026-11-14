@@ -425,8 +425,8 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-14 | (sem APK) | Páginas e tabelas: a tela não pula mais ao digitar ou apertar Enter (rolagem guardada ao medir o campo) | tsc ok, testes ok (061 precisa de Java) |
 | 2026-11-14 | (sem APK) | Página trancada: Ctrl+A seleciona a senha, não a página inteira | site recompilado; conferido no laboratório |
-| 2026-11-14 | (sem APK) | Atalho na barra lateral vira ponto colorido (9 cores) + nome menor; "arrastar nota não funciona" da Mimic conferido: alarme falso do robô | site recompilado; testado no laboratório local |
 | 2026-11-14 | (sem APK) | Cartão do link não trava mais; atalhos de nota/pasta como subpágina na barra lateral (menu Virar atalho) | robô 9/9, testes da mudança 79/79 |
 | 2026-11-14 | (sem APK) | Notas (print do Pedro): alça ⋮⋮ move foto/linhas, linha para digitar depois da foto, 4 cantos de escala como no Quadro, painel lateral estica pela borda, pastas em fileiras equilibradas | site recompilado; notas-lab 45/45; "travado" a esclarecer |
 | 2026-11-14 | (sem APK) | Templates do Notion no site: Tabela (10 tipos, menu da coluna, filtros/ordem/busca, rodapé) e Kanban avançado (6 visões, painel lateral, arrastar); Formulário vira Tabela; colar imagem na nota sem pergunta | Laboratório local ok; tsc ok; npm test só 061 antiga |
