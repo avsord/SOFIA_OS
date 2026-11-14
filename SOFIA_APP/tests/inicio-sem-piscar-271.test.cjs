@@ -14,10 +14,11 @@ test('Inicio: Stat das Financas fica fora do FinanceTile (nao e recriado a cada 
   assert.ok(!/const Stat\s*=/.test(ft),'componente criado dentro do FinanceTile');
   assert.ok(s.indexOf('function Stat(')>=0&&s.indexOf('function Stat(')<s.indexOf('function FinanceTile('));
 });
-test('Inicio estatico (07/11, Pedro: "tudo estatico"): sem pulso do agora, sem fade/escala no texto, sem bolinha nem fade na abertura',()=>{
+test('Inicio estatico (07/11, Pedro: "tudo estatico"): agora pulsa só em CSS, sem fade/escala no texto, sem bolinha nem fade na abertura',()=>{
   const b=read('src/desktop/HomeBrief.tsx'),h=read('src/components/HomeHero.tsx'),m=read('src/screens/Home.tsx'),i=read('public/index.html'),l=read('src/lib/launch-handoff.ts');
   const nb=b.slice(b.indexOf('function NowBeacon('),b.indexOf('\n}\n',b.indexOf('function NowBeacon(')));
-  assert.ok(!nb.includes('Animated.loop')&&!b.includes("animationIterationCount: 'infinite'"),'pulso voltou');
+  // 14/11 (Pedro): o ponto do agora volta a pulsar, mas só a auréola e só em CSS (sem JavaScript redesenhando a página)
+  assert.ok(!nb.includes('Animated.loop')&&b.split("animationIterationCount: 'infinite'").length===2&&b.includes('const NOW_PULSE = StyleSheet.create({halo: {animationKeyframes'),'pulso só na auréola do agora, em CSS');
   assert.ok(h.includes('const fadeIn = (_delay: number) => ({} as any);')&&m.includes('const NO_INTRO=true;'),'texto animado voltou');
   assert.ok(!i.includes('class="spin"')&&i.includes('#sofia-veil.out { animation: sofia-veil-open 180ms')&&l.includes("veil.classList.add('out')"),'sem bolinha; so o fade rapido do veu');
 });

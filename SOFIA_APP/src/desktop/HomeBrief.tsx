@@ -972,8 +972,8 @@ function PeriodIcon({kind}: {kind: string}) {
 /** Marca de "agora": ponto com aureola que pulsa devagar, linha fina descendo ate a escala e a hora numa etiqueta. */
 /* 06/11/2026 (Pedro: "o Inicio esta piscando as bolinhas"): a aureola do "agora" pulsava pelo JavaScript, reescrevendo o estilo
  * 60 vezes por segundo (e a posicao junto, tremendo em fracoes de pixel). Agora o proprio navegador anima (CSS), sem tocar na pagina. */
-// 07/11/2026 (Pedro: "tudo estatico" no Inicio): sem o pulso da bolinha do agora
-const NOW_PULSE = StyleSheet.create({halo: {opacity: 0} as any});
+// 14/11/2026 (Pedro: "o ponto de hora parou de pulsar, tem que ficar pulsando"): volta o pulso, só em CSS (o navegador anima, a página não redesenha)
+const NOW_PULSE = StyleSheet.create({halo: {animationKeyframes: {'0%': {opacity: 0.5, transform: 'scale(0.4)'}, '70%': {opacity: 0, transform: 'scale(1)'}, '100%': {opacity: 0, transform: 'scale(1)'}}, animationDuration: '2400ms', animationTimingFunction: 'ease-out', animationIterationCount: 'infinite'} as any});
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(), reduced = useReducedMotion(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
