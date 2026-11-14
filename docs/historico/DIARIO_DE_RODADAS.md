@@ -43,3 +43,4 @@
 - 14/11/2026: capa antiga só é apagada quando sai das últimas 20 versões da página (desfazer/versões anteriores voltam a abrir; causa provável do 'capa desapareceu').
 
 **14/11 ~05:20 (Claude Code), só site, SEM APK:** atalhos da barra lateral mostram só "nome / página principal" (sem pasta nem cadeia); clicar na bolinha abre seletor de cor em gradiente contínuo (quadrado + barra de matiz, `desktop/ColorPicker.tsx`); cor de atalho de página fica no navegador (`shortcutPageColors`). tsc ok, testes ok (061 só sem Java).
+| 2026-11-14 | (sem APK) | Seletor de cor de atalho/subatalho refeito: 10 cores prontas, barras de matiz e tom, prévia + código da cor, Padrão, Esc cancela, clique fora/Enter guarda, abre para cima se não couber | tsc ok; testes ok (061 só sem Java; notas-atalho-14-11 já falhava antes); não conferido no navegador |
