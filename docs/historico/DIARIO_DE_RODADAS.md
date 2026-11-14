@@ -37,3 +37,4 @@
 - 14/11/2026: caminho no topo clicável (abre a página/pasta clicada).
 - 14/11/2026: aviso Caps Lock nos campos de senha (login e páginas trancadas).
 - 14/11/2026: opção Atalhos no menu da página (barra lateral).
+- 14/11/2026: página vira atalho (seção Atalhos no topo da barra lateral).

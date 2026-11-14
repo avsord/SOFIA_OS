@@ -86,6 +86,11 @@ function readFavorites():string[]{try{const v=JSON.parse((globalThis as any).loc
 export const favoritePages=store<string[]>(readFavorites());
 /** 06/11/2026: paginas publicadas na web (sinal na barra lateral e no botao Compartilhar). */
 export const sharedPages=store<string[]>([]);
+// 14/11/2026 (Pedro: "essas paginas tambem podem virar atalho"): atalho de pagina = secao Atalhos no topo da barra lateral (guardado neste navegador, como os Favoritos)
+const SC_KEY='sofia.desktop.shortcut-pages';
+function readShortcutPages():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(SC_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}
+export const shortcutPages=store<string[]>(readShortcutPages());
+export function toggleShortcutPage(id:string){const now=shortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];shortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SC_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function toggleFavoritePage(id:string){const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}
 export function samePages(a:Entity[]|null,b:Entity[]):boolean{
