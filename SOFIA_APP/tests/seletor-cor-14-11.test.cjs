@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert'),fs=require('fs');
 const src=fs.readFileSync(__dirname+'/../src/desktop/ColorPicker.tsx','utf8');
-test('seletor de cor: cores prontas, codigo, Esc cancela, Padrao, nao sai da tela',()=>{
- for(const s of ['SWATCHES','color-hex','Escape','finish(null)','color-reset','y-H-36','onCommit(cur.current)'])assert.ok(src.includes(s),s);
- assert.ok(!src.includes('onPointerUp:()=>onCommit'),'nao grava a cada soltar');
+test('seletor de cor: so as barras de cor e luz, no body, Esc cancela',()=>{
+ for(const s of ['color-hue','color-shade','createPortal','Escape','finish(false)'])assert.ok(src.includes(s),s);
+ for(const s of ['SWATCHES','color-hex','color-reset'])assert.ok(!src.includes(s),s);
 });
-test('subatalho e atalho passam a cor padrao',()=>{
+test('seletor abre junto do clique na bolinha',()=>{
  const sh=fs.readFileSync(__dirname+'/../src/desktop/DesktopShell.tsx','utf8');
- assert.equal((sh.match(/defaultColor=\{DEFAULT_SHORTCUT_COLOR\}/g)||[]).length,2);
+ assert.equal((sh.match(/clientX\?\?\(b\?b\.left:0\)\)\+14/g)||[]).length,3);
 });
