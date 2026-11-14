@@ -121,7 +121,7 @@ function ShortcutsSection({pages,ids,openPageId,onOpenPage,api}:{pages:Entity[];
  if(!rows.length)return null;
  return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={picker?.key===r.key&&picker.live?picker.live:r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();setPicker({key:r.key,x:b?b.left:(e?.nativeEvent?.pageX??0),y:b?b.bottom+4:(e?.nativeEvent?.pageY??0)});}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}{picker?(()=>{const r=rows.find(q=>q.key===picker.key);return r?<ColorPicker color={r.color} x={picker.x} y={picker.y} onLive={c=>setPicker(q=>q?{...q,live:c}:q)} onCommit={c=>r.pick(c)} onClose={()=>setPicker(null)}/>:null;})():null}</Section>;
 }
-function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){
+function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){ const liveSc=useLiveShortcuts();
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
  const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
@@ -198,7 +198,8 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
   rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
-  // 14/11/2026 (Pedro): atalhos de nota/pasta NAO ficam mais como subpagina; todos vao para a secao Atalhos do topo
+  // 14/11/2026 (Pedro: sub atalho embaixo da propria pagina, mesmo fechada): atalhos de nota/pasta ficam abaixo da pagina, alem da secao Atalhos
+  for(const sc of shortcutsFor(p,liveSc))rows.push(<Row key={'sub-'+p.id+sc.kind+sc.id} small dot={sc.color||DEFAULT_SHORTCUT_COLOR} depth={depth+1} testID={'sidebar-subshortcut-'+p.id+'-'+sc.id} label={sc.label} onPress={()=>{requestOpenShortcut(p.id,{kind:sc.kind,id:sc.id});onOpen(p.id);}}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
