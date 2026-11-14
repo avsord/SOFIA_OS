@@ -59,7 +59,7 @@ import type {PageDrop} from '../lib/page-order';
 import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
 import {DatabaseView} from '../components/DatabaseView';
-import {PAGE_TEMPLATES,freshTemplate,insertTemplateBlocks,diaryFromBlocks,diaryEnter,diaryHidden,diaryDays,isDiaryEntry} from '../lib/page-templates';
+import {PAGE_TEMPLATES,freshTemplate,insertTemplateBlocks,diaryFromBlocks,diaryEnter,diaryHidden,diaryDays,isDiaryEntry,isDiaryPage} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
@@ -757,7 +757,7 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
   const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
   const titleInput=<TextInput ref={preview?undefined:(n:any)=>{titleRef.current=n;}} scrollEnabled={false} editable={!preview} autoFocus={desktop&&!preview&&draft.title==='Sem título'&&emptyBody} accessibilityLabel="Título da página" {...(Platform.OS==='web'?{numberOfLines:1}:{})} value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>;
-  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
+  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} toEnd={!preview&&isDiaryPage(draft.blocks||[])} scrollRef={preview?undefined:docScroll} onScrollY={y=>{if(!preview){const far=desktop&&y>600;if(far!==showTopRef.current){showTopRef.current=far;setShowTop(far);}}scrollPositions.current.set(selected.id,y);}}>
    <View onLayout={e=>{const w=Math.round(e.nativeEvent.layout.width);if(Math.abs(w-coverW)>2)setCoverW(w);}} style={{/* 09/11/2026 (Pedro: "quando entro pela primeira vez nessa pagina ela da um salto"): no computador a altura vinha da largura MEDIDA (so existe depois do 1o desenho: 250 px e depois largura/6); agora o navegador calcula pela proporcao desde o 1o quadro */...(hasCover&&desktop?{width:'100%',aspectRatio:6,minHeight:200,maxHeight:460}:{height:hasCover?190:28}),overflow:'hidden',backgroundColor:hasCover?(imageCover?c.input:c.accentSoft):'transparent'}}>
     {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>
      // 0.3.267 (computador): como no Notion a capa não abre nada ao clicar; "Alterar capa" e "Reposicionar" aparecem no hover
@@ -999,7 +999,10 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
 }
 
 /** Preserve each page's viewport, and keep preview/editor native text metrics identical. */
-function PageDocumentScroll({pageId,preview,enabled,initialY,onScrollY,children,scrollRef}:{pageId:string;preview:boolean;enabled:boolean;initialY:number;onScrollY:(y:number)=>void;children:React.ReactNode;scrollRef?:React.RefObject<ScrollView|null>}){
+function PageDocumentScroll({pageId,preview,enabled,initialY,onScrollY,children,scrollRef,toEnd}:{toEnd?:boolean;pageId:string;preview:boolean;enabled:boolean;initialY:number;onScrollY:(y:number)=>void;children:React.ReactNode;scrollRef?:React.RefObject<ScrollView|null>}){
  const initialOffset=useRef({x:0,y:initialY}).current;
+ // 14/11/2026 (Pedro: "quando abrir a página que tiver o template de diário pode abrir embaixo direto"): o Diário abre no último registro
+ const endedFor=useRef('');
+ useEffect(()=>{if(!toEnd||endedFor.current===pageId)return;endedFor.current=pageId;const go=()=>scrollRef?.current?.scrollToEnd?.({animated:false});const raf=(globalThis as any).requestAnimationFrame?.(go);const t1=setTimeout(go,250),t2=setTimeout(go,700);return ()=>{(globalThis as any).cancelAnimationFrame?.(raf);clearTimeout(t1);clearTimeout(t2);};},[toEnd,pageId,scrollRef]);
  return <ScrollView ref={scrollRef} testID={(preview?'page-preview-':'page-document-')+pageId} scrollEnabled={!preview&&enabled} contentOffset={initialOffset} onScroll={preview?undefined:e=>{noteFluencyMovement();onScrollY(e.nativeEvent.contentOffset.y);}} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>{children}</ScrollView>;
 }

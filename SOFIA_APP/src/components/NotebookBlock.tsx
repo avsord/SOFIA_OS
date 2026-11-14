@@ -211,7 +211,9 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  // 14/11/2026 (Pedro: "arrumar diagramacao das pastas"): no computador os cartoes de pasta dividem a linha inteira por igual
   // (antes 224 px fixos: sobrava um vao a direita e a ultima pasta ficava sozinha embaixo de um jeito torto)
   // linhas equilibradas: 4 pastas num espaco de 3 viram 2x2 (nada de uma pasta sozinha na ultima linha); cartao entre 190 e 320 px
-  const tileFor=(n:number)=>{if(!(gridW>0)||n<1)return 224;const max=Math.max(1,Math.floor((gridW+10)/(190+10))),rows=Math.ceil(n/max),cols=Math.max(1,Math.ceil(n/rows));return Math.min(320,Math.floor((gridW-10*(cols-1))/cols)-0.5);};
+  // 14/11/2026 (Pedro: "ampliar as pastas para alinhar com a parte de cima; em monitor maior, mais pastas por linha em vez de blocos gigantes"):
+  // colunas de no mínimo 300 px que ocupam a largura toda (a fileira cheia termina junto da busca); tela maior = mais colunas.
+  const tileFor=(n:number)=>{if(!(gridW>0)||n<1)return 224;const cols=Math.max(1,Math.floor((gridW+10)/(300+10)));return Math.floor((gridW-10*(cols-1))/cols)-0.5;};
   const tileW=tileFor(opened?foldersIn(opened.id).length:foldersIn('').length);
   const gridLayout=(e:any)=>{const w=Math.round(e?.nativeEvent?.layout?.width||0);if(w&&Math.abs(w-gridW)>1){lastGridW=w;setGridW(w);}};
   const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id,item:DragItem={kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},bar=(side:string)=>hover==='folder:'+b.id+'|'+side?<View pointerEvents="none" style={{position:'absolute',top:6,bottom:6,width:3,borderRadius:2,backgroundColor:c.accent,[side==='before'?'left':'right']:3}}/>:null;
