@@ -1,6 +1,6 @@
 // 06/11/2026 (Pedro: "paginas com senha"; desenho aprovado em 3 telas): trancar (senha + nivel), pagina trancada (destrancar /
 // esqueci a senha) e a pergunta quando a pagina tem uma senha escrita ("Quer trancar? Nao, salvar sem senha").
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Pressable, Text, TextInput, View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
@@ -73,8 +73,16 @@ export function PageLockScreen({title, level, onUnlock, onRecover}: {title: stri
 /** 07/11/2026 (Pedro: "alinhar a diagramacao de todos que entram com bloqueio, padronizado"): a mesma moldura para toda
  * tela de senha (pagina, Drive, etiqueta de notas): cadeado, titulo, explicacao e campos de 300 px, na mesma altura. */
 export function LockFrame({testID, title, text, children, foot}: {testID?: string; title: string; text: string; children: React.ReactNode; foot?: string}) {
-  const c = useTheme();
-  return <View testID={testID} style={{flex: 1, alignItems: 'center', paddingTop: 80, paddingBottom: 40, paddingHorizontal: 24}}>
+  const c = useTheme(), box = useRef<any>(null);
+  // 14/11/2026 (Pedro: "quando dou control a na senha pra selecionar tudo seleciona a pagina inteira"): fora de um campo
+  // (ex.: depois de "Senha incorreta" o cursor sai do campo), Ctrl+A seleciona a senha, nunca a pagina
+  useEffect(() => {const d = (globalThis as any).document; if (!d?.addEventListener) return;
+    const key = (e: KeyboardEvent) => {if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 'a') return;
+      const t = e.target as HTMLElement | null; if (t?.closest?.('input,textarea,[contenteditable="true"]')) return;
+      const root = box.current as HTMLElement | null, inputs = Array.from(root?.querySelectorAll?.('input') || []) as HTMLInputElement[]; if (!inputs.length) return;
+      e.preventDefault(); const i = inputs.find(x => x.value) || inputs[0]; i.focus(); i.select();};
+    d.addEventListener('keydown', key); return () => d.removeEventListener('keydown', key);}, []);
+  return <View ref={box} testID={testID} style={{flex: 1, alignItems: 'center', paddingTop: 80, paddingBottom: 40, paddingHorizontal: 24}}>
     <View style={{width: 58, height: 58, borderRadius: 16, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16}}><Icon name="lock" size={26} color={c.accent} /></View>
     <Text style={{color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center'}}>{title}</Text>
     <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', maxWidth: 340, marginTop: 6}}>{text}</Text>

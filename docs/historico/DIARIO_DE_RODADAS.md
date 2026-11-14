@@ -32,3 +32,4 @@
 | 2026-11-14 | (sem APK) | Notas (print do Pedro): alça ⋮⋮ move foto/linhas, linha para digitar depois da foto, 4 cantos de escala como no Quadro, painel lateral estica pela borda, pastas em fileiras equilibradas | site recompilado; notas-lab 45/45; "travado" a esclarecer |
 | 2026-11-14 | (sem APK) | Cartão do link não trava mais; atalhos de nota/pasta como subpágina na barra lateral (menu Virar atalho) | robô 9/9, testes da mudança 79/79 |
 | 2026-11-14 | (sem APK) | Atalho na barra lateral vira ponto colorido (9 cores) + nome menor; "arrastar nota não funciona" da Mimic conferido: alarme falso do robô | site recompilado; testado no laboratório local |
+| 2026-11-14 | (sem APK) | Página trancada: Ctrl+A seleciona a senha, não a página inteira | site recompilado; conferido no laboratório |
