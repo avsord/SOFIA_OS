@@ -98,8 +98,14 @@ const SUB_KEY='sofia.desktop.subshortcut-pages';
 function readSub():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(SUB_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}
 export const subShortcutPages=store<string[]>(readSub());
 export function toggleSubShortcutPage(id:string){const now=subShortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];subShortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SUB_KEY,JSON.stringify(next));}catch{/* modo privado */}}
-export function toggleShortcutPage(id:string){const now=shortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];shortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SC_KEY,JSON.stringify(next));}catch{/* modo privado */}}
-export function toggleFavoritePage(id:string){const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
+/** 14/11/2026 (Pedro: "pra sempre tudo estar sincronizado"): Favoritos e Atalhos ficam também na conta (sidebar_fav /
+ * sidebar_shortcut nos dados da página); a barra lateral registra aqui quem grava na conta. */
+export let pageFlagSink:((key:'sidebar_fav'|'sidebar_shortcut',id:string,on:boolean)=>void)|null=null;
+export function setPageFlagSink(f:typeof pageFlagSink){pageFlagSink=f;}
+/** Troca a lista inteira (vinda da conta) sem gravar de volta. */
+export function setPageList(key:'sidebar_fav'|'sidebar_shortcut',next:string[]){const st=key==='sidebar_fav'?favoritePages:shortcutPages;st.set(next);try{(globalThis as any).localStorage?.setItem(key==='sidebar_fav'?FAV_KEY:SC_KEY,JSON.stringify(next));}catch{/* modo privado */}}
+export function toggleShortcutPage(id:string){pageFlagSink?.('sidebar_shortcut',id,!shortcutPages.get().includes(id));const now=shortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];shortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SC_KEY,JSON.stringify(next));}catch{/* modo privado */}}
+export function toggleFavoritePage(id:string){pageFlagSink?.('sidebar_fav',id,!favoritePages.get().includes(id));const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}
 export function samePages(a:Entity[]|null,b:Entity[]):boolean{
  if(!a||a.length!==b.length)return false;

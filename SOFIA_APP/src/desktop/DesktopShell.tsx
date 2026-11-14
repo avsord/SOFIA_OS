@@ -35,7 +35,7 @@ import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,setPageFlagSink,setPageList,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -130,6 +130,16 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const saveColor=(id:string,c:string)=>{setShortcutPageColor(id,c);const isPage=pages.some(p=>p.id===id),owner=isPage?null:ownerOf(id);const t=isPage?id:owner?.id;if(!t)return;void patchPage(t,d=>isPage?{...d,sidebar_color:c}:{...d,sidebar_colors:{...(d.sidebar_colors||{}),[id]:c}}).catch(()=>{/* fica a copia do navegador */});};
  const toggleSub=(id:string)=>{const was=subs.includes(id);if(was!==localSubs.includes(id)){if(!was)toggleSubShortcutPage(id);}else toggleSubShortcutPage(id);void patchPage(id,d=>({...d,sidebar_sub:!was})).catch(()=>{/* fica a copia do navegador */});};
  const migrated=useRef(false);
+ // Favoritos e Atalhos: a conta manda (true/false); o que só estava neste navegador sobe uma vez; cada troca grava na conta.
+ useEffect(()=>{setPageFlagSink((key,id,on)=>{if(pages.some(p=>p.id===id))void patchPage(id,d=>({...d,[key]:on})).catch(()=>{/* fica a copia do navegador */});});return ()=>setPageFlagSink(null);});
+ const flagsUp=useRef(false);
+ useEffect(()=>{if(!pages.length)return;for(const [key,st] of [['sidebar_fav',favoritePages],['sidebar_shortcut',shortcutPages]] as const){const local=st.get();let next=local.slice();
+   for(const p of pages){const v=p.data?.[key];if(v===true&&!next.includes(p.id))next.push(p.id);else if(v===false&&next.includes(p.id))next=next.filter(x=>x!==p.id);}
+   if(next.length!==local.length||next.some((x,i)=>x!==local[i]))setPageList(key,next);
+   if(!flagsUp.current){let n=0;for(const id of local){const p=pages.find(x=>x.id===id);if(p&&p.data?.[key]===undefined&&n++<30)void patchPage(id,d=>d[key]===undefined?{...d,[key]:true}:d).catch(()=>{});}}}
+  flagsUp.current=true;
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[pages]);
  useEffect(()=>{if(migrated.current||!pages.length)return;migrated.current=true;let n=0;for(const id of localSubs){const p=pages.find(x=>x.id===id);if(p&&p.data?.sidebar_sub===undefined&&n++<20)void patchPage(id,d=>d.sidebar_sub===undefined?{...d,sidebar_sub:true}:d).catch(()=>{});}
   for(const id of Object.keys(localColors)){const c=localColors[id];const p=pages.find(x=>x.id===id);if(p){if(!p.data?.sidebar_color&&n++<40)void patchPage(id,d=>d.sidebar_color?d:{...d,sidebar_color:c}).catch(()=>{});}else{const o=ownerOf(id);if(o&&!(o.data?.sidebar_colors||{})[id]&&n++<40)void patchPage(o.id,d=>(d.sidebar_colors||{})[id]?d:{...d,sidebar_colors:{...(d.sidebar_colors||{}),[id]:c}}).catch(()=>{});}}
  // eslint-disable-next-line react-hooks/exhaustive-deps

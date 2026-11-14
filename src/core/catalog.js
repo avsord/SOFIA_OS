@@ -949,6 +949,8 @@ const CATALOG={
       {"key":"blocks_json","label":"Conteúdo em blocos","type":"textarea","max":250000},
       {"key":"lock_json","label":"Conteúdo trancado (cifrado no navegador)","type":"textarea","max":400000,"developerOnly":true},
       {"key":"sidebar_sub","label":"Subatalho na barra lateral","type":"flag","developerOnly":true},
+      {"key":"sidebar_fav","label":"Favorita na barra lateral","type":"flag","developerOnly":true},
+      {"key":"sidebar_shortcut","label":"Atalho na barra lateral","type":"flag","developerOnly":true},
       {"key":"sidebar_color","label":"Cor do ponto na barra lateral","type":"text","max":20,"developerOnly":true},
       {"key":"sidebar_colors","label":"Cores dos pontos das notas na barra lateral","type":"colormap","developerOnly":true}
     ],
