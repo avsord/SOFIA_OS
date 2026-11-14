@@ -219,9 +219,14 @@ export function AgendaDesk(p: AgendaDeskProps) {
     return m;
   }, [p.items]);
 
+  // 13/11/2026 (Mimic Kaizen: "ESC na Agenda aberta pelo Inicio nao volta"): o Esc refaz so os passos dados DENTRO da
+  // Agenda (dia -> mes -> ano, na ordem em que se entrou); sem passos, o Esc volta para a tela de onde se veio (Inicio...)
+  const trail = useRef<{level: Level; date: Date}[]>([]), fromEsc = useRef(false);
+  useEffect(() => {if (!p.active) trail.current = [];}, [p.active]);
   function go(next: Level, date: Date, from?: string) {
     if (anim) return;
     const prev = level, prevDate = p.selected;
+    if (!fromEsc.current && next !== prev) trail.current = [...trail.current, {level: prev, date: prevDate}].slice(-12);
     const deeper = DEPTH[next] > DEPTH[prev], shallower = DEPTH[next] < DEPTH[prev];
     p.setSelected(date);
     if (date.getFullYear() !== p.month.getFullYear() || date.getMonth() !== p.month.getMonth()) p.setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
@@ -268,7 +273,7 @@ export function AgendaDesk(p: AgendaDeskProps) {
     if (!p.active || Platform.OS !== 'web' || typeof document === 'undefined') return; // 03/11/2026: no Android o window existe sem addEventListener
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null; if (t && /input|textarea|select/i.test(t.tagName)) return; if (e.defaultPrevented || document.querySelector('[aria-modal="true"],[role="dialog"]')) return; // 03/11/2026: com uma janela aberta, Esc/setas sao dela, nao da Agenda atras
-      if (e.key === 'Escape') {if (level === 'day') {e.preventDefault(); go('month', p.selected);} else if (level === 'month') {e.preventDefault(); go('year', p.selected);}}
+      if (e.key === 'Escape') {const back = trail.current[trail.current.length - 1]; if (back && !anim) {e.preventDefault(); trail.current = trail.current.slice(0, -1); fromEsc.current = true; try {go(back.level, back.date);} finally {fromEsc.current = false;}}}
       else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1);
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);

@@ -410,7 +410,10 @@ function makeMobileApi(runtime, deps) {
     }
     // 07/11/2026 (Pedro): Sofia Drive - "um Google Drive dentro da Sofia", guardado no Drive do proprio usuario.
     if (p.startsWith('/api/mobile/md/sofiadrive/')) {
-      { const rec = runtime.google.kvGet('driveLock'); if (rec && !((driveOpen.get(session.token_hash) || 0) > Date.now())) fail('DRIVE_LOCKED', 'O Drive está trancado. Digite a senha do Drive.', 423); }
+      // 13/11/2026 (Pedro: "copio conteudo de uma pagina pra outra que tem anexo e pede a senha do drive"): copiar anexo de
+      // PAGINA para pagina nao abre o Drive dele, entao nao pede a senha. So arquivos do Drive (ids) continuam trancados.
+      const driveLocked = () => { const rec = runtime.google.kvGet('driveLock'); return !!rec && !((driveOpen.get(session.token_hash) || 0) > Date.now()); };
+      if (p !== '/api/mobile/md/sofiadrive/to-page' && driveLocked()) fail('DRIVE_LOCKED', 'O Drive está trancado. Digite a senha do Drive.', 423);
       const g = runtime.google, sd = p.slice('/api/mobile/md/sofiadrive/'.length); let mm;
       const notLinked = e => e.code === 'DRIVE_NOT_CONNECTED' || e.code === 'DRIVE_NEEDS_PERMISSION' || e.code === 'GOOGLE_NOT_CONNECTED';
       const read = async run => { rate(session, 'sofiadrive', 240); try { return send({connected: true, ...(await run())}); } catch (e) { if (notLinked(e)) return send({connected: false, code: e.code, reason: e.message, items: []}); throw e; } };
@@ -452,6 +455,7 @@ function makeMobileApi(runtime, deps) {
       if (sd === 'to-page' && m === 'POST') {
         rate(session, 'sofiadrive-write', 120); const b = await bodyJson(req, 16384), pageId = validId(String(b.page || '')), page = workspace.get(pageId);
         if ((page.tags || []).includes('sofia-lock-v1')) fail('LOCKED', 'Arquivos ainda não entram em páginas trancadas: o arquivo não seria criptografado.', 409);
+        if (Array.isArray(b.ids) && b.ids.length && driveLocked()) fail('DRIVE_LOCKED', 'O Drive está trancado. Digite a senha do Drive.', 423);
         // ids: arquivos do Drive; attachments: arquivos de outra pagina (copiar de uma pagina e colar em outra). items fica na
         // mesma ordem do pedido (null = pasta, que nao entra); um erro num arquivo nao derruba os outros.
         const src = [...(Array.isArray(b.ids) ? b.ids : []).map(x => ({drive: String(x)})), ...(Array.isArray(b.attachments) ? b.attachments : []).map(x => ({att: String(x)}))].slice(0, 30), items = [], skipped = [];

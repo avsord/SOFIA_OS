@@ -43,7 +43,10 @@ export function structureBlock(b:any,ids?:ReadonlyMap<string,string>):any|null{
  // link/janela para outra página: só fica se aponta para uma subpágina que também foi copiada
  if(typeof d.page_id==='string'&&!(ids&&ids.has(d.page_id)))return null;
  const out:any={...b};
- if('text' in out)out.text='';if('html' in out)out.html='';if('checked' in out)out.checked=false;
+ // 13/11/2026 (Mimic Kaizen: a copia vinha sem 4 de 6 partes do modelo, ex. "Opções"): titulos de secao SAO o modelo e ficam;
+ // o resto do texto sai
+ const keepText=/^heading/.test(String(b.type||''));
+ if('text' in out&&!keepText)out.text='';if('html' in out&&!keepText)out.html='';if('checked' in out)out.checked=false;
  const data:any={...d};for(const k of CONTENT_KEYS)delete data[k];
  if(typeof d.page_id==='string'&&ids)data.page_id=ids.get(d.page_id);
  if(Array.isArray(d.rows))data.rows=b.type==='table'&&Array.isArray(d.rows[0])?[d.rows[0].map((cell:unknown)=>typeof cell==='string'?cell:'')]:[];
@@ -71,10 +74,13 @@ export function cloneInput(src:Entity,opts:{parentId:string;isRoot:boolean;mode:
 }
 
 /** Grava a cópia (página + subpáginas). Devolve a página de cima copiada. */
-export async function clonePageTree(api:{saveEntity:(input:Partial<Entity>)=>Promise<Entity>},pages:readonly Entity[],rootId:string,mode:CloneMode):Promise<Entity|null>{
+export async function clonePageTree(api:{saveEntity:(input:Partial<Entity>)=>Promise<Entity>;entityFresh?:(id:string)=>Promise<Entity>},pages:readonly Entity[],rootId:string,mode:CloneMode):Promise<Entity|null>{
  const list=cloneOrder(pages,rootId);if(!list.length)return null;
  const ids=new Map<string,string>(),saved:{src:Entity;copy:Entity}[]=[];
- for(const [i,src] of list.entries()){
+ // 13/11/2026 (Mimic Kaizen: "Só a estrutura" saía em branco, sem o bloco de Notas): a lista da barra lateral pode ser a cópia
+ // curta guardada na abertura (sem o conteúdo das páginas). Cada página é lida inteira do servidor antes de copiar.
+ for(const [i,listed] of list.entries()){
+  let src=listed;if(api.entityFresh){try{src=await api.entityFresh(listed.id);}catch{src=listed;}list[i]=src;}
   const parentId=i===0?pageParentId(src):ids.get(pageParentId(src))||'';
   const copy=await api.saveEntity(cloneInput(src,{parentId,isRoot:i===0,mode,ids}));
   ids.set(src.id,copy.id);saved.push({src,copy});

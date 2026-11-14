@@ -4,8 +4,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const React=require('react'),{act,create}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
 const load=require('./load-ts.cjs');
 const host=name=>function H(props){return React.createElement(name,props,props.children);};
-let pan=null,locks=[];const rects={};
-function labelOf(p){const ch=Array.isArray(p.children)&&p.children[0]&&p.children[0].props&&String(p.children[0].props.accessibilityLabel||'').startsWith('Abrir nota')?p.children[0]:p.children;if(ch&&ch.props&&ch.props.accessibilityLabel)return ch.props.accessibilityLabel;if(p.style&&p.style.borderStyle==='dashed')return '__up__';return 'root';}
+let pan=null,locks=[];const rects={},alerts=[];
+function labelOf(p){const ch=Array.isArray(p.children)&&p.children[0]&&p.children[0].props&&String(p.children[0].props.accessibilityLabel||'').startsWith('Abrir nota')?p.children[0]:p.children;if(ch&&ch.props&&ch.props.accessibilityLabel)return ch.props.accessibilityLabel;if(p.testID==='notes-trash')return '__trash__';if(p.style&&p.style.borderStyle==='dashed')return '__up__';return 'root';}
 const RN={View:React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({measureInWindow:cb=>{const r=rects[labelOf(p)]||{x:0,y:0,w:0,h:0};cb(r.x,r.y,r.w,r.h);}}));return React.createElement('View',p,p.children);}),
  Text:host('Text'),TextInput:host('TextInput'),ScrollView:host('ScrollView'),Pressable:host('Pressable'),
  PanResponder:{create:c=>{pan=c;return {panHandlers:{}};}},
@@ -14,7 +14,7 @@ const M=load('src/components/NotebookBlock.tsx',{react:React,'react/jsx-runtime'
  './MotionModal':{MotionModal:()=>null},'../lib/leaf-document':{applyLeafPatch:(p,x)=>({...p,...x})},'./KeyboardViewport':{KeyboardViewport:host('KV')},'./LeafEditor':{LeafEditor:()=>null},
  '../lib/theme':{useTheme:()=>({text:'t',muted:'m',surface:'s',line:'l',accent:'a',accentSoft:'as',input:'i',onAccent:'o',danger:'d',bg:'b'})},
  './UI':{Button:host('Button'),IconButton:host('IconButton')},'./Sheet':{Sheet:p=>p.visible?React.createElement('Sheet',p,p.children):null},
- '../lib/app-alert':{appAlert:()=>{}},'../lib/fuzzy':{fuzzyScore:()=>0},'../lib/desktop':{tap:t=>t,useDesktop:()=>false},'./ContextMenu':{contextMenu:()=>({}),openContextMenu:()=>{}},'./Icon':{Icon:()=>null},'../lib/hover-hold':{useHoverKey:()=>({key:null,enter(){},leave(){}})}});
+ '../lib/app-alert':{appAlert:(...a)=>{alerts.push(a);}},'../lib/fuzzy':{fuzzyScore:()=>0},'../lib/desktop':{tap:t=>t,useDesktop:()=>false},'./ContextMenu':{contextMenu:()=>({}),openContextMenu:()=>{}},'./Icon':{Icon:()=>null},'../lib/hover-hold':{useHoverKey:()=>({key:null,enter(){},leave(){}})}});
 const leaf=(id,t)=>({id,title:t,content:'',created_at:'2026-10-25T10:00:00Z'});
 const base=()=>({mode:'notebooks',title:'Notas',notebooks:[
  {id:'A',name:'Trabalho',emoji:'💼',expanded:true,pages:[leaf('n1','Ideia 1'),leaf('n2','Ideia 2')]},
@@ -96,4 +96,20 @@ test('pasta criada dentro de uma pasta aberta vira subpasta; contagem mostra as 
  const d=base();d.notebooks[2].parent='B';const st=setup(d);
  const tile=st.tree.root.findAll(n=>n.type==='Text'&&typeof n.props.children==='string'&&n.props.children.includes('· 1 pasta'));
  assert.ok(tile.length>0,'Casa mostra "0 notas · 1 pasta"');
+});
+
+// 13/11/2026 (Pedro: "arrastar nota ou pasta, aparece lixeira tambem pra remover"): soltar na lixeira pergunta e apaga
+test('arrastar a nota para a lixeira pergunta e, confirmando, apaga so ela',async()=>{
+ const st=setup(base());alerts.length=0;
+ act(()=>{st.press('Abrir pasta Trabalho').props.onPress();});
+ await drag(st,'Abrir nota Ideia 1','__trash__');
+ assert.equal(alerts.length,1,'pergunta antes de apagar');assert.equal(alerts[0][0],'Excluir nota?');
+ act(()=>{alerts[0][2].find(b=>b.text==='Excluir').onPress();});st.sync();
+ assert.deepEqual(ids(book(st,'A').pages),['n2'],'so a Ideia 1 saiu');
+});
+test('arrastar a pasta para a lixeira pergunta antes de apagar a pasta',async()=>{
+ const st=setup(base());alerts.length=0;
+ await drag(st,'Abrir pasta Viagens','__trash__');
+ assert.equal(alerts.length,1);assert.equal(alerts[0][0],'Excluir pasta?');
+ assert.ok(book(st,'C'),'nada sai sem confirmar');
 });

@@ -92,10 +92,11 @@ function Row({onAuxOpen,icon,emoji,label,selected,onPress,depth=0,collapsed,trai
  </Pressable>;
 }
 
-function Section({title,children,action}:{title:string;children:React.ReactNode;action?:React.ReactNode}){
- const c=useTheme();
+function Section({title,children,action,onTitle}:{title:string;children:React.ReactNode;action?:React.ReactNode;onTitle?:()=>void}){
+ const c=useTheme(),label=title.charAt(0)+title.slice(1).toLowerCase();
+ // 13/11/2026 (Pedro: "Paginas ter um link proprio, clicar e la ter os itens"): o titulo da secao vira link (abre /paginas)
  return <View style={{marginTop:18}}>
-  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}><Text style={{flex:1,color:c.muted,fontSize:12,fontWeight:'600'}}>{title.charAt(0)+title.slice(1).toLowerCase()}</Text>{action}</View>
+  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}>{onTitle?<Pressable accessibilityRole="link" accessibilityLabel={'Abrir '+label} testID={'sidebar-section-'+label} onPress={onTitle} style={({hovered}:any)=>({flex:1,alignSelf:'flex-start',flexDirection:'row'})}>{({hovered}:any)=><Text style={{color:hovered?c.text:c.muted,fontSize:12,fontWeight:'600',textDecorationLine:hovered?'underline':'none'}}>{label}</Text>}</Pressable>:<Text style={{flex:1,color:c.muted,fontSize:12,fontWeight:'600'}}>{label}</Text>}{action}</View>
   {children}
  </View>;
 }
@@ -165,8 +166,10 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
   const drop=(e:DragEvent)=>{if(!isNote(e))return;const id=rowOf(e);setNoteOver(null);clear();if(!id)return;e.preventDefault();let info:any={};try{info=JSON.parse(e.dataTransfer?.getData(NOTE_MIME)||'{}');}catch{return;}
    const noteId=String(info?.noteId||''),from=String(info?.fromPageId||''),title=String(info?.title||'Nota');if(!noteId||!from||from===id)return;
    const name=byIdRef.current.get(id)?.title||'Sem título',fromName=byIdRef.current.get(from)?.title||'a página de antes';
-   void moveNoteToPage(noteId,from,id).then(()=>{systemChanged(api);toast('Nota movida para '+name,[{label:'Desfazer',run:undoNow}]);
-    pageUndo.push({label:'Mover nota “'+title+'”',undoText:'Nota “'+title+'” voltou para '+fromName,redoText:'Nota movida para '+name,undo:()=>moveNoteToPage(noteId,id,from).then(()=>systemChanged(api)),redo:()=>moveNoteToPage(noteId,from,id).then(()=>systemChanged(api))});})
+   // 13/11/2026 (Mimic Kaizen achou "Nao foi possivel mover a nota · Sem conexao"): sem a API, a pagina de destino FECHADA
+   // nao tinha como ser lida e gravada; agora vai junto
+   void moveNoteToPage(noteId,from,id,api).then(()=>{systemChanged(api);toast('Nota movida para '+name,[{label:'Desfazer',run:undoNow}]);
+    pageUndo.push({label:'Mover nota “'+title+'”',undoText:'Nota “'+title+'” voltou para '+fromName,redoText:'Nota movida para '+name,undo:()=>moveNoteToPage(noteId,id,from,api).then(()=>systemChanged(api)),redo:()=>moveNoteToPage(noteId,from,id,api).then(()=>systemChanged(api))});})
     .catch(err=>appAlert('Não foi possível mover a nota',err instanceof Error?err.message:String(err)));};
   node.addEventListener('dragover',over);node.addEventListener('dragleave',leave);node.addEventListener('drop',drop);
   return()=>{clear();node.removeEventListener('dragover',over);node.removeEventListener('dragleave',leave);node.removeEventListener('drop',drop);};
@@ -305,7 +308,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}
      <UpcomingEvents api={api} onOpen={()=>onNavigate('agenda')}/>
      {favorites.length&&pages?<Section title="Favoritos">{favorites.map(id=>pages.find(p=>p.id===id)).filter(Boolean).map(p=><Row key={'fav-'+p!.id} testID={'sidebar-fav-'+p!.id} emoji={isEmoji(p!.data?.icon)?String(p!.data?.icon):undefined} icon={isEmoji(p!.data?.icon)?undefined:'star'} label={p!.title||'Sem título'} selected={openPageId===p!.id} onPress={()=>onOpenPage(p!.id)}/>)}</Section>:null}
-     <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={createRootPage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
+     <Section title="Páginas" onTitle={()=>onNavigate('pages')} action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={createRootPage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
       {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api} toast={toast} undoNow={undoNow}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}
      </Section>
     </>}

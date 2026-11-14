@@ -1,5 +1,5 @@
 export type Mark={start:number;end:number;bold?:boolean;italic?:boolean;underline?:boolean;strike?:boolean;code?:boolean;color?:string;highlight?:string;nolink?:boolean};
-export type LeafBlock={id:string;text:string;type:string;marks:Mark[];checked?:boolean;align?:'left'|'center'|'right'};
+export type LeafBlock={id:string;text:string;type:string;marks:Mark[];checked?:boolean;align?:'left'|'center'|'right';data?:Record<string,any>};
 export type Leaf={id:string;title:string;content:string;created_at?:string;blocks?:LeafBlock[];properties?:{id:string;name:string;value:string}[]};
 export const leafId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 export function leafBlocks(leaf:Leaf):LeafBlock[]{return leaf.blocks?.length?leaf.blocks:[{id:leaf.id+'-body',text:leaf.content||'',type:'text',marks:[]}];}

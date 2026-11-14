@@ -26,7 +26,9 @@ test('Só a estrutura: página de notas fica com as pastas e sem notas; tabela f
   const top=await clone.clonePageTree(api,[notes,table],p.id,'structure');
   const blocks=JSON.parse(saved.filter(x=>x.id===top.id).at(-1).data.blocks_json),json=JSON.stringify(blocks);
   assert.equal(top.content,'');
-  for(const word of ['segredo','texto da nota','linha','comprar pão','att1','a2','cartão','"A"','"B"','Minhas notas'])assert.ok(!json.includes(word),p.id+' ainda tem '+word);
+  for(const word of ['segredo','texto da nota','linha','comprar pão','att1','a2','cartão','"A"','"B"'])assert.ok(!json.includes(word),p.id+' ainda tem '+word);
+  // 13/11/2026 (Mimic Kaizen): o titulo de secao e parte do modelo e fica
+  if(json.includes('"id":"h"'))assert.ok(json.includes('Minhas notas'),p.id+' perdeu o titulo do modelo');
   if(p.id==='n'){
    assert.deepEqual(blocks.map(b=>b.type),['heading','collection','todo']);
    const col=blocks[1].data;assert.equal(col.notebooks.length,1);assert.equal(col.notebooks[0].name,'Ideias');assert.equal(col.notebooks[0].pages.length,0);assert.equal(col.rows.length,0);assert.equal(col.properties[0].label,'Nome');

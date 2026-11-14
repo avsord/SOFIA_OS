@@ -14,7 +14,10 @@ import type {LinkPop} from './LinkHover';
 import type {Leaf,LeafBlock,Mark} from '../lib/leaf-document';
 import {Sheet} from './Sheet';
 import {Button,IconButton} from './UI';
-export function LeafEditor({leaf,onChange,titleRef}:{leaf:Leaf;onChange:(patch:Partial<Leaf>)=>void;titleRef:React.RefObject<TextInput|null>}){
+import {PageFileBlock,uploadPageFile} from './PageFiles';
+import {currentApi} from '../lib/api';
+import {appAlert} from '../lib/app-alert';
+export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(patch:Partial<Leaf>)=>void;titleRef:React.RefObject<TextInput|null>;pageId?:string}){
  const keyboard=useKeyboardVisible();
  const c=useTheme(),blocks=leafBlocks(leaf),[active,setActive]=useState(blocks[0].id),[selection,setSelection]=useState({start:0,end:0}),[typing,setTyping]=useState<Partial<Mark>>({}),[format,setFormat]=useState(false),[property,setProperty]=useState(false),[propName,setPropName]=useState(''),[propValue,setPropValue]=useState('');
  const desktop=useDesktop(),titleNode=useRef<any>(null);
@@ -27,7 +30,11 @@ export function LeafEditor({leaf,onChange,titleRef}:{leaf:Leaf;onChange:(patch:P
  function add(type='text'){const next={id:leafId(),text:'',type,marks:[]};const at=blocks.findIndex(b=>b.id===active);save([...blocks.slice(0,at+1),next,...blocks.slice(at+1)]);setActive(next.id);setSelection({start:0,end:0});setTyping({});setFormat(false);setTimeout(()=>inputs.current.get(next.id)?.focus(),100);}
  // 05/11/2026 (Pedro: "um puta espaco entre titulo e o que vem depois"): no site cada campo (titulo e linhas) nascia com
  // 2 linhas de altura; agora tem a altura do proprio texto, sem rolagem propria.
- const sizeField=(n:any)=>{if(!n?.style||n.tagName!=='TEXTAREA')return;n.style.overflow='hidden';n.style.height='0px';n.style.height=n.scrollHeight+'px';};
+ // 13/11/2026 (Pedro: "a pagina da nota buga quando o texto passa do tamanho da pagina e fica bugando o scroll"): medir o campo
+ // encolhia ele a 0 por um instante e o navegador puxava a rolagem para cima a cada tecla. Agora guarda e devolve a rolagem
+ // de quem rola, e so mexe na altura quando ela muda de fato.
+ const scrollerOf=(n:any)=>{let p=n?.parentElement;while(p&&p!==document.body){const o=getComputedStyle(p).overflowY;if((o==='auto'||o==='scroll')&&p.scrollHeight>p.clientHeight)return p;p=p.parentElement;}return null;};
+ const sizeField=(n:any)=>{if(!n?.style||n.tagName!=='TEXTAREA')return;const sc=scrollerOf(n),top=sc?sc.scrollTop:0,before=n.style.height;n.style.overflow='hidden';n.style.height='0px';const want=n.scrollHeight+'px';n.style.height=want;if(sc&&sc.scrollTop!==top)sc.scrollTop=top;return before!==want;};
  useLayoutEffect(()=>{if(Platform.OS!=='web')return;sizeField(titleNode.current);for(const n of inputs.current.values())sizeField(n);});
  // 06/11/2026 (Pedro: "erro novamente e nao consigo descer"): a janela da nota entra deslizando e muda de largura depois do
  // primeiro desenho; a linha que passa a quebrar em duas ficava com altura de uma (cortada, sem rolagem). Mede de novo
@@ -37,6 +44,28 @@ export function LeafEditor({leaf,onChange,titleRef}:{leaf:Leaf;onChange:(patch:P
   const watch=()=>{ro.disconnect();if(titleNode.current?.tagName==='TEXTAREA')ro.observe(titleNode.current);for(const n of inputs.current.values())if((n as any)?.tagName==='TEXTAREA')ro.observe(n as any);};
   watch();const t=setInterval(watch,1500);try{(globalThis as any).document?.fonts?.ready?.then(()=>{sizeField(titleNode.current);for(const n of inputs.current.values())sizeField(n);});}catch{}
   return()=>{clearInterval(t);ro.disconnect();};},[]);
+ // 13/11/2026 (Pedro: "em notas poder colar imagem, escolher se aparece como anexo ou print mostrando"): a imagem vira
+ // anexo da pagina (o mesmo das Paginas) e um bloco 'file' da nota; Anexo = so o nome.jpeg, Visualizacao = o print.
+ const rootRef=useRef<any>(null),activeRef=useRef(active);activeRef.current=active;
+ const pasteRef=useRef<(f:File)=>void>(()=>{});
+ pasteRef.current=(f:File)=>{
+  const api=currentApi();if(!api||!pageId){appAlert('Não deu para colar','Abra a nota dentro de uma página para colar imagens.');return;}
+  const d=new Date(),two=(n:number)=>String(n).padStart(2,'0'),ext=(f.type.split('/')[1]||'png').replace('jpeg','jpg').replace(/[^a-z0-9]/g,'').slice(0,5)||'png';
+  const name=f.name&&!/^image\.(png|jpe?g|gif|webp)$/i.test(f.name)?f.name:'print-'+two(d.getDate())+'-'+two(d.getMonth()+1)+'-'+d.getFullYear()+'-'+two(d.getHours())+'h'+two(d.getMinutes())+'.'+ext;
+  const go=(view:'attach'|'preview')=>{
+   const blk:LeafBlock={id:leafId(),text:'',type:'file',marks:[],data:{uploading:true,name,mime:f.type,size:f.size,view}};
+   const cur=latest.current,at=cur.findIndex(b=>b.id===activeRef.current),empty=at>=0&&cur[at].type==='text'&&!cur[at].text;
+   const next=at<0?[...cur,blk]:empty?[...cur.slice(0,at),blk,...cur.slice(at)]:[...cur.slice(0,at+1),blk,...cur.slice(at+1)];save(next);
+   uploadPageFile(api,pageId,new File([f],name,{type:f.type})).then(up=>save(latest.current.map(x=>x.id===blk.id?{...x,data:{...up,view}}:x),false))
+    .catch((e:any)=>{save(latest.current.filter(x=>x.id!==blk.id),false);appAlert('Não deu para colar a imagem',String(e?.message||e));});
+  };
+  appAlert('Colar imagem','Como a imagem deve aparecer na nota?',[{text:'Cancelar',style:'cancel'},{text:'Só o anexo ('+name+')',onPress:()=>go('attach')},{text:'Mostrar o print',onPress:()=>go('preview')}]);
+ };
+ React.useEffect(()=>{if(Platform.OS!=='web')return;const el=rootRef.current;if(!el?.addEventListener)return;
+  const onPaste=(e:any)=>{const items=[...(e.clipboardData?.items||[])] as any[];const f=items.find(x=>x.kind==='file'&&/^image\//.test(x.type))?.getAsFile?.();if(!f)return;e.preventDefault();e.stopPropagation();pasteRef.current(f);};
+  el.addEventListener('paste',onPaste,true);return()=>el.removeEventListener('paste',onPaste,true);},[]);
+ const fileBlock=(b:LeafBlock)=>{const api=currentApi();return <View key={b.id} testID="leaf-file-block" style={{marginBottom:desktop?6:16}}>{api?<PageFileBlock api={api} pageId={pageId} data={(b.data||{}) as any} selected={active===b.id} onSelect={()=>setActive(b.id)}
+  onChange={d=>save(latest.current.map(x=>x.id===b.id?{...x,data:d as any}:x))} onRemove={()=>save(latest.current.filter(x=>x.id!==b.id))}/>:<Text style={{color:c.muted}}>{String(b.data?.name||'arquivo')}</Text>}</View>;};
  const action=(label:string,text:string,fn:()=>void)=><Pressable key={label} accessibilityLabel={label} onPress={fn} style={{minWidth:42,height:44,alignItems:'center',justifyContent:'center',paddingHorizontal:10}}><Text style={{color:c.text,fontSize:18}}>{text}</Text></Pressable>;
  // 05/11/2026 (Pedro: links como no Notion): no site o campo da linha e um textarea (sem link clicavel). Quando a linha
  // tem endereco, uma camada por cima desenha o mesmo texto com o link sublinhado e clicavel; o textarea continua
@@ -57,12 +86,12 @@ export function LeafEditor({leaf,onChange,titleRef}:{leaf:Leaf;onChange:(patch:P
    if(!l)return <Text key={start} style={base}>{t}</Text>;
    return <Text key={start} accessibilityRole="link" {...({href:l.url,hrefAttrs:{target:'_blank',rel:'noopener noreferrer'},onMouseEnter:(e:any)=>{popKeep();const rc=e?.currentTarget?.getBoundingClientRect?.();if(rc)setLinkPop({url:l.url,x:rc.left,y:rc.bottom,block:b.id,start:l.start,end:l.end});},onMouseLeave:popLeave} as any)} onPress={(e:any)=>{e?.preventDefault?.();openUrl(l.url);}} style={{...base,pointerEvents:'auto',cursor:'pointer',textDecorationLine:'underline',textDecorationColor:c.muted} as any}>{t}</Text>;})}</Text>;
  }
- return <View style={{flex:1}}><ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={desktop?{paddingHorizontal:48,paddingTop:28,paddingBottom:80,width:'100%',maxWidth:820,alignSelf:'center'}:{padding:24,paddingBottom:80}}>
+ return <View ref={rootRef} style={{flex:1}}><ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={desktop?{paddingHorizontal:48,paddingTop:28,paddingBottom:80,width:'100%',maxWidth:820,alignSelf:'center'}:{padding:24,paddingBottom:80}}>
  <TextInput scrollEnabled={false} ref={(n:any)=>{(titleRef as any).current=n;titleNode.current=n;}} {...(Platform.OS==='web'?({numberOfLines:1} as any):{})} accessibilityLabel="Título da nota" value={leaf.title} onChangeText={title=>onChange({title})} multiline placeholder="Sem título" placeholderTextColor={c.muted+'88'} style={{fontSize:32,fontWeight:'700',color:c.text,padding:0,marginBottom:desktop?10:22}}/>
  <View style={{marginBottom:desktop?4:16}}><DateTimeField compact allowClear={false} label="Criado em" value={leaf.created_at||''} emptyLabel="Ao começar a escrever" onChange={created_at=>onChange({created_at})}/></View>
  {(leaf.properties||[]).map(p=><View key={p.id} style={{flexDirection:'row',gap:14,marginVertical:4}}><Text style={{color:c.muted,width:120,paddingVertical:8}}>{p.name}</Text><TextInput accessibilityLabel={'Propriedade '+p.name} value={p.value} onChangeText={value=>onChange({properties:leaf.properties!.map(x=>x.id===p.id?{...x,value}:x)})} style={{flex:1,color:c.text,paddingVertical:8}}/></View>)}
  <Pressable accessibilityLabel="Adicionar propriedade" onPress={()=>{setPropName('');setPropValue('');setProperty(true);}} style={({hovered}:any)=>({paddingVertical:desktop?6:12,paddingHorizontal:desktop?6:0,marginLeft:desktop?-6:0,alignSelf:'flex-start',borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:desktop?13:undefined}}>＋ Adicionar propriedade</Text></Pressable><View style={{height:1,backgroundColor:c.line,marginTop:desktop?8:14,marginBottom:desktop?16:24}}/>
- {blocks.map((b,i)=>b.type==='divider'?<Pressable key={b.id} onPress={()=>setActive(b.id)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>:<View key={b.id} style={{flexDirection:'row',marginBottom:desktop?4:16,borderLeftWidth:b.type==='quote'?3:0,borderColor:c.accent,paddingLeft:b.type==='quote'?14:0,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:4}}>
+ {blocks.map((b,i)=>b.type==='file'?fileBlock(b):b.type==='divider'?<Pressable key={b.id} onPress={()=>setActive(b.id)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>:<View key={b.id} style={{flexDirection:'row',marginBottom:desktop?4:16,borderLeftWidth:b.type==='quote'?3:0,borderColor:c.accent,paddingLeft:b.type==='quote'?14:0,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:4}}>
  {['bullet','number','todo'].includes(b.type)?<Pressable onPress={()=>{setActive(b.id);if(b.type==='todo')save(blocks.map(x=>x.id===b.id?{...x,checked:!x.checked}:x));}} style={{paddingTop:8,paddingRight:10}}><Text style={{color:c.text}}>{b.type==='todo'?(b.checked?'☑':'☐'):b.type==='number'?String(i+1)+'.':'•'}</Text></Pressable>:null}
  <View style={{flex:1,position:'relative',flexDirection:'row'/* 06/11/2026: em linha, o flex:1 do campo vale para a largura; em coluna ele ignorava a altura e cortava a 2a linha */}}><TextInput scrollEnabled={false} {...(Platform.OS==='web'?({numberOfLines:1} as any):{})} ref={r=>{if(r)inputs.current.set(b.id,r);else inputs.current.delete(b.id);}} accessibilityLabel={i===0?'Conteúdo da nota':'Bloco de texto '+(i+1)} multiline onFocus={()=>{setActive(b.id);setTypingIn(b.id);}} onBlur={()=>setTypingIn(t=>t===b.id?null:t)} onSelectionChange={e=>{if(active===b.id)setSelection(e.nativeEvent.selection);}} onChangeText={text=>save(blocks.map(x=>x.id===b.id?editBlockText(x,text,typing):x))} placeholder={i===0?'Escreva algo…':''} placeholderTextColor={c.muted+'77'} style={{flex:1,minHeight:42,color:c.text,padding:0,textAlignVertical:'top',...blockFont(b),...(webLinks(b).length?{color:'transparent',caretColor:c.text} as any:{})}} {...(Platform.OS==='web'?{value:b.text}:{})}>{Platform.OS==='web'?null:textRuns(b).map(r=><Text key={r.start} style={{fontWeight:r.style.bold?'700':undefined,fontStyle:r.style.italic?'italic':undefined,textDecorationLine:r.style.underline&&r.style.strike?'underline line-through':r.style.underline?'underline':r.style.strike?'line-through':'none',fontFamily:r.style.code?'monospace':undefined,color:r.style.color||c.text,backgroundColor:r.style.highlight||'transparent'}}>{r.text}</Text>)}</TextInput>{linkLayer(b)}</View></View>)}
  </ScrollView><KeyboardToolbar visible={keyboard&&!property} testID="leaf-format-toolbar"><View style={{borderTopWidth:1,borderColor:c.line,backgroundColor:c.surface}}><ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false}>{action('Novo bloco','＋',()=>add())}{action('Estilos de texto','Aa',()=>setFormat(true))}{action('Negrito','B',()=>toggleStyle('bold'))}{action('Itálico','𝘐',()=>toggleStyle('italic'))}{action('Sublinhado','U̲',()=>toggleStyle('underline'))}{action('Desfazer na nota','↶',()=>undo())}{action('Refazer na nota','↷',()=>undo(true))}{action('Excluir bloco','⌫',()=>{const next=blocks.filter(b=>b.id!==active);if(!next.length)next.push({id:leafId(),type:'text',text:'',marks:[]});save(next);setActive(next[0].id);})}{action('Fechar teclado','⌨',()=>Keyboard.dismiss())}</ScrollView></View></KeyboardToolbar>

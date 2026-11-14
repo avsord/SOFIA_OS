@@ -31,3 +31,25 @@ export function useWebBackClose(visible:boolean,onClose:(()=>void)|undefined){
   };
  },[visible]);
 }
+
+/** 13/11/2026 (Pedro: "quando apertar voltar, nas anotacoes vai voltando; hoje volta atualizando a pagina"): um passo no
+ * historico por NIVEL aberto (pasta, subpasta...). O voltar do navegador sobe um nivel (onBack); subir pela tela devolve
+ * os passos sem trocar de pagina. depth 0 = nada aberto. */
+export function useWebBackDepth(depth:number,onBack:()=>void){
+ const back=useRef(onBack);back.current=onBack;const own=useRef<Entry[]>([]);
+ useEffect(()=>{
+  if(!web())return;const mine=own.current;
+  while(mine.length<depth){
+   const entry:Entry={id:++seq,close:()=>{const i=mine.indexOf(entry);if(i>=0)mine.splice(i,1);back.current();}};
+   try{window.history.pushState({...(window.history.state||{}),sofiaPanel:entry.id},'',window.location.pathname+window.location.search);}catch{return;}
+   mine.push(entry);stack.push(entry);
+  }
+  drop(depth);
+ },[depth]);
+ // devolve os passos so se o historico ainda esta no ultimo deles (trocou de pagina pela barra lateral: nao volta)
+ function drop(keep:number){const mine=own.current,top=mine[mine.length-1]?.id;let n=0;while(mine.length>keep){const entry=mine.pop()!;const i=stack.indexOf(entry);if(i>=0){stack.splice(i,1);n++;}}
+  if(n&&top&&window.history.state?.sofiaPanel===top){ignore++;window.history.go(-n);}}
+ // saindo da tela (trocou de pagina): so tira os passos da pilha, sem mexer no historico (a troca de pagina acabou de
+ // empilhar o passo dela; voltar agora desfaria a troca)
+ useEffect(()=>()=>{const mine=own.current;while(mine.length){const entry=mine.pop()!;const i=stack.indexOf(entry);if(i>=0)stack.splice(i,1);}},[]);
+}

@@ -44,7 +44,7 @@ import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff, revealWebVeil,holdVeil} from './src/lib/launch-handoff';
 import {wipeEncryptedStorage} from './src/lib/encrypted-storage';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
-import {isWeb,pathToRoute,routeTitle,routeToPath,pageIdFromPath} from './src/lib/web-route';
+import {isWeb,pathToRoute,routeTitle,routeToPath,pageIdFromPath,routeMeta} from './src/lib/web-route';
 import {installEscStack,pushEsc,ESC_LEVEL} from './src/lib/esc-stack'; // 13/11/2026: Esc volta um nivel em todo o site
 import {installSpellcheckFocus} from './src/lib/web-spellcheck'; // 13/11/2026: sublinhado vermelho so no campo em edicao
 import {installWebPage} from './src/lib/web-page';
@@ -210,7 +210,8 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
    // 0.3.267: /paginas/<id> abre aquela página (link copiado, F5)
    const pid=pageIdFromPath(window.location.pathname);if(pid)setTimeout(()=>setPageTarget(v=>({n:v.n+1,id:pid})),0);}
   routeReady.current=true;
-  const onPop=()=>{const p=pathToRoute(window.location.pathname)||{tab:'home' as Tab,module:''};routeFromPop.current=true;
+  const onPop=()=>{const p=pathToRoute(window.location.pathname)||{tab:'home' as Tab,module:''};routeFromPop.current=true;routeMeta.fromPop=true;
+   if(p.tab==='pages'&&!pageIdFromPath(window.location.pathname))setPagesListKey(v=>v+1);
    if(p.tab==='apps'&&p.module)openModule(p.module);else{navigate(p.tab);if(p.tab==='apps')setWorkspaceReset(v=>v+1);}
    const pid=pageIdFromPath(window.location.pathname);if(pid)setPageTarget(v=>({n:v.n+1,id:pid}));};
   window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
@@ -224,7 +225,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
   const opening=!!initialPath.current;if(opening&&path===initialPath.current)initialPath.current='';
   const quick=lastPush.current.path==='/apps'&&path.startsWith('/apps/')&&Date.now()-lastPush.current.at<1500;
   // 07/11/2026: abrindo o site num endereco com ?pasta=... (Drive), a parte depois do ? fica (recarregar nao perde a pasta)
-  if(routeFromPop.current||quick||opening||window.location.pathname==='/'){window.history.replaceState(route,'',path+(opening?window.location.search:''));routeFromPop.current=false;}else window.history.pushState(route,'',path);
+  if(routeFromPop.current||quick||opening||window.location.pathname==='/'){window.history.replaceState(route,'',path+(opening?window.location.search:''));routeFromPop.current=false;}else{window.history.pushState(route,'',path);routeMeta.pushedAt=Date.now();}
   lastPush.current={path,at:Date.now()};
  },[tab,appsModule]);
  const [mailTarget,setMailTarget]=useState(0);const openMail=useCallback(()=>{navigate('apps');setMailTarget(v=>v+1);},[navigate]);
@@ -232,6 +233,10 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const [pageTarget,setPageTarget]=useState({n:0,id:''}),[createPageKey,setCreatePageKey]=useState(0);
  const openPage=useCallback((id:string)=>{navigate('pages');setPageTarget(v=>({n:v.n+1,id}));},[navigate]);
  const createPage=useCallback(()=>{navigate('pages');setCreatePageKey(v=>v+1);},[navigate]);
+ // 13/11/2026 (Pedro: "Paginas ter um link proprio"): o link Paginas (barra lateral e caminho do topo) sempre mostra a tela
+ // Paginas (recentes, notas editadas, todas as paginas), mesmo com uma pagina aberta
+ const [pagesListKey,setPagesListKey]=useState(0);
+ const navigateShell=useCallback((t:Tab)=>{if(t==='pages')setPagesListKey(v=>v+1);navigate(t);},[navigate]);
  const [financeTarget,setFinanceTarget]=useState(0);const openFinance=useCallback(()=>{navigate('apps');setFinanceTarget(v=>v+1);},[navigate]);
  // Tocar num aviso leva ao lugar dele.
  const [filesOpen,setFilesOpen]=useState(false);const closeFiles=useCallback(()=>setFilesOpen(false),[]);
@@ -260,12 +265,12 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
  return <ThemeContext.Provider value={c}><NotificationProvider api={api} onOpen={openNotice} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><AppAlertHost/><ContextMenuHost/>{Platform.OS==='web'?<UnreadTitle/>:null}<View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:desktop?undefined:760,alignSelf:'center',backgroundColor:c.bg}}>
- {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<Spinner size={26}/>:null}<Text style={{fontSize:24,fontWeight:'500',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:tablet&&auth?<TabletSite auth={auth}/>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<DesktopGate on={desktop} api={api} tab={tab} locked={locked} profile={bootstrap.profile} onNavigate={navigate} onOpenModule={openModule} onOpenPage={openPage} onCreatePage={createPage}><View style={{flex:1}}>
+ {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<Spinner size={26}/>:null}<Text style={{fontSize:24,fontWeight:'500',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:tablet&&auth?<TabletSite auth={auth}/>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<DesktopGate on={desktop} api={api} tab={tab} locked={locked} profile={bootstrap.profile} onNavigate={navigateShell} onOpenModule={openModule} onOpenPage={openPage} onCreatePage={createPage}><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} fluencyMode={fluency==='new'?'new':'old'} onPreviewTabs={setPreviewTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    {initialDataReady?<DeferredScreen load={loadHome} screenProps={{homeTopKey:homeTop.n,homeTopSmooth:homeTop.smooth,launchVisible:visible,onDiscussTask:discussTask,onOpenCapsules:openCapsules,onOpenMonitoring:openMonitoringFromHome,onOpenTasks:openTasks,onOpenModule:openModule,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>}
    {<FadeSwap ready={mountedTabs.has('chat')} fallback={<ScreenSkeleton tab='chat'/>}><DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,onGoHome:goHome,onOpenModule:openModule,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/></FadeSwap>}
-   {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages' pageId={pageTarget.id}/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{openPageKey:pageTarget.n,openPageId:pageTarget.id,createPageKey,api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages' pageId={pageTarget.id}/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{openPageKey:pageTarget.n,openPageId:pageTarget.id,createPageKey,listKey:pagesListKey,api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('agenda')} fallback={<ScreenSkeleton tab='agenda'/>}><DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('apps')} fallback={<ScreenSkeleton tab='apps' module={moduleTarget.id||(financeTarget||tasksTarget||capsulesTarget||mailTarget||monitoringTarget.n?'app':'')}/>}><DeferredScreen load={loadWorkspace} screenProps={{onModuleChange:setAppsModule,onGestureLock:setGestureLocked,onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openModuleKey:moduleTarget.n,openModuleId:moduleTarget.id,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('profile')} fallback={<ScreenSkeleton tab='profile'/>}><DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/></FadeSwap>}

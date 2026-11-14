@@ -1,6 +1,8 @@
 import {EMBED} from '../lib/embed';
 import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
 import {SaveStatus} from '../components/SaveStatus'; // 13/11/2026: Salvando… -> Salvo, sem piscar // 13/11/2026: Esc volta para a pagina mae
+import {requestOpenNote} from '../lib/notes-move'; // 13/11/2026: nota recente abre ja aberta
+import {leafStamp} from '../components/NotebookBlock';
 import {pageUndo} from '../lib/page-undo';
 import {trashPageTree,restorePageTree} from '../lib/page-trash';
 import Svg,{Path} from 'react-native-svg';
@@ -62,7 +64,7 @@ import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
 import {createdPage,favoritePages,pagePath,pagesDirectory,samePages,sharedPages,tap,toggleFavoritePage,useDesktop,useStore} from '../lib/desktop';
-import {pageUrlPath,pageTabTitle,setOpenPageTitle} from '../lib/web-route';
+import {pageUrlPath,pageTabTitle,setOpenPageTitle,routeMeta} from '../lib/web-route';
 import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
 import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,hasPlain,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
 import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
@@ -96,7 +98,7 @@ function richPasted(r:any,before:PageBlock[],id:string,html?:string){
   const lk=linkify(textToHtml(text));return lk!==textToHtml(text)?{...x,html:lk}:x;})};
 }
 
-export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openPageId='',createPageKey=0}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void;openPageKey?:number;openPageId?:string;createPageKey?:number}){useRenderCost('pages');
+export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openPageId='',createPageKey=0,listKey=0}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void;openPageKey?:number;openPageId?:string;createPageKey?:number;listKey?:number}){useRenderCost('pages');
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
  // 0.3.251 (computador): barra e capa na largura toda; o texto fica numa coluna de leitura centralizada
  const desktop=useDesktop();
@@ -264,7 +266,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  // 10/11/2026: nome da pagina aberta na aba do navegador ("(3) Mapa · Sofia"); sem pagina aberta volta para "Páginas · Sofia"
  const tabName=entry?(String(entry.draft.title||'').trim()||'Sem título'):'';
  useEffect(()=>{if(Platform.OS!=='web')return;setOpenPageTitle(active?tabName:'');if(!active||EMBED)return;try{const d=(globalThis as any).document;if(!d)return;const pre=/^\(\d+\) /.exec(d.title)?.[0]||'',next=pre+(tabName?pageTabTitle(tabName):'Páginas · Sofia');if(d.title!==next)d.title=next;}catch{/* sem titulo */}},[active,tabName]);
- useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path!==next)w.history?.replaceState?.(w.history.state,'',next);}catch{/* sem endereço */}},[selectedId,active]);
+ useEffect(()=>{if(Platform.OS!=='web'||!active)return;try{const w=globalThis as any,path=w.location?.pathname||'';if(!path.startsWith('/paginas'))return;const next=pageUrlPath(selectedId||'');if(path===next){routeMeta.fromPop=false;return;}
+  // 13/11/2026: trocar de pagina empilha um passo (o voltar do navegador volta para a pagina anterior sem recarregar o site);
+  // veio do proprio voltar, ou a tela Paginas acabou de entrar no historico: so substitui
+  const replace=routeMeta.fromPop||(path==='/paginas'&&Date.now()-routeMeta.pushedAt<1500);routeMeta.fromPop=false;
+  if(replace)w.history?.replaceState?.(w.history.state,'',next);else w.history?.pushState?.({tab:'pages',module:''},'',next);}catch{/* sem endereço */}},[selectedId,active]);
  useEffect(()=>{showTopRef.current=false;setShowTop(false);},[selectedId]);
  function editedLabel(at:string){const d=new Date(at);if(Number.isNaN(d.getTime()))return '';const now=new Date(),same=d.toDateString()===now.toDateString();return 'Editada '+(same?'hoje às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})}));}
  // 07/11/2026 (Pedro: "esse simbolo tem que ser pra copiar o compartilhado e nao o meu pessoal"): copia o link PUBLICO da
@@ -542,6 +548,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if((key==='Enter'||key==='Tab')&&items.length){e.preventDefault();chooseSlash(b,items[Math.min(slash.active,items.length-1)].type);return;}
    if(key==='Escape'){e.preventDefault();setSlash(null);return;}}
   if(key==='Escape'){e.preventDefault();const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0)enterPick(i);return;}
+  // 13/11/2026 (Pedro: "quando aperta tab na pagina ele da o espaco grande"): Tab recua o bloco um nivel (como no Notion),
+  // Shift+Tab volta; nunca escreve a tabulacao nem pula o foco para outro lugar
+  if(key==='Tab'&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey){e.preventDefault();const was=Math.max(0,Number(b.indent)||0),lv=Math.max(0,Math.min(6,was+(ne.shiftKey?-1:1)));if(lv!==was)updateBlock(b,{indent:lv||undefined},'indent:'+b.id);return;}
   if(key===' '&&!text&&b.type==='text'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey){e.preventDefault();setSlash(null);setAiText('');setAi({id:b.id,busy:false,error:''});return;}
   if(ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&((key==='ArrowUp'&&start===0&&end===0)||(key==='ArrowDown'&&start===text.length&&end===text.length))){const i=currentBlocks().findIndex(x=>x.id===b.id);if(i>=0){e.preventDefault();enterPick(i,Math.max(0,Math.min(currentBlocks().length-1,i+(key==='ArrowDown'?1:-1))));}return;}
   if(key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&b.type!=='code'){e.preventDefault();const r=splitBlock(currentBlocks(),b.id,start,end);const halves=b.html&&r?(node as any)?.__splitHtml?.(start,end):null;
@@ -589,6 +598,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   finally{pendingPosition.current.clear();moveBusy.current=false;mutationEpoch.current++;if(mounted.current)setMovingId(null);}
  }
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setCoverMove(false);setError('');}
+ // 13/11/2026: link Paginas -> fecha a pagina aberta e mostra a tela Paginas
+ const listSeen=useRef(listKey);
+ useEffect(()=>{if(!listKey||listSeen.current===listKey)return;listSeen.current=listKey;if(selectedId)void store.flush(selectedId);history.current=[];setFocus(null);setAppearance(null);setCoverMove(false);setSelectedId(null);},[listKey]);// eslint-disable-line react-hooks/exhaustive-deps
  function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);setCoverMove(false);const parent=entryBackTarget(byId,selectedId,history.current);if(parent)history.current.splice(history.current.lastIndexOf(parent));else history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
  escBack.current=()=>{const parent=pageBackTarget(byId,selectedId);if(!parent){back();return;}if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);setCoverMove(false);open(byId.get(parent)!,false);};
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(pageInteractionRef.current)return true;if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
@@ -683,7 +695,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(listNumber(currentBlocks().length?currentBlocks():[b],currentBlocks().length?i:0)||i+1)+'. ':b.type==='quote'&&!desktop?'│ ':b.type==='callout'?'💡 ':'';
   const slashOpen=webKeys&&!preview&&slash?.id===b.id,menuOpen=desktop&&!preview&&blockMenu===b.id,lineH=heading+9;
   const slashItems=slashOpen&&slash?slashMatches(String(b.text||'').slice(slash.start+1,slash.caret)):[];
-  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0,...(desktop&&b.type==='callout'?{backgroundColor:c.input,borderRadius:6,paddingHorizontal:14,paddingVertical:10,marginVertical:4,gap:8}:{})}}>{()=><>
+  return <Pressable key={b.id} accessible={false} testID={'page-block-'+b.id} onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,position:'relative',zIndex:slashOpen||menuOpen?50:0,marginLeft:Math.max(0,Math.min(6,Number(b.indent)||0))*26,...(desktop&&b.type==='callout'?{backgroundColor:c.input,borderRadius:6,paddingHorizontal:14,paddingVertical:10,marginVertical:4,gap:8}:{})}}>{()=><>
    {desktop&&!preview?<View testID={'page-block-gutter-'+b.id} style={{position:'absolute',left:-48,top:Math.max(0,(lineH-26)/2)+4,flexDirection:'row',opacity:rowHover.key===b.id||menuOpen?1:0}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Adicionar bloco abaixo" onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} onPress={()=>insertWithSlash(b)} style={({hovered:h}:any)=>({width:22,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Arraste para mover · clique para opções" onHoverIn={()=>rowHover.enter(b.id)} onHoverOut={rowHover.leave} ref={(n:any)=>bindGrip(n,b)} onPress={()=>{if(!dragMoved.current)setBlockMenu(m=>m===b.id?null:b.id);dragMoved.current=false;}} style={({hovered:h}:any)=>({width:20,height:26,borderRadius:5,alignItems:'center',justifyContent:'center',backgroundColor:h||menuOpen?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,letterSpacing:-3,fontWeight:'700'}}>⋮⋮</Text></Pressable>
@@ -777,6 +789,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   useEffect(()=>{if(Platform.OS!=='web'||!desktop)return;const list=[...displayPages].filter(p=>p.data?.cover_type==='attachment'&&p.data?.cover_attachment_id).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,12);
    const timers=list.map((p,i)=>setTimeout(()=>prefetchPageCover(api,p.data),600+i*350));return()=>timers.forEach(clearTimeout);},[displayPages,desktop,api]);
   const recentPages=useMemo(()=>[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived'&&!(p.tags||[]).includes('board-copy')).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6),[displayPages]);
+  // 13/11/2026 (Pedro: "em Paginas ter um link proprio e la ter os itens das paginas, por exemplo os recem editados"): as
+  // notas mexidas por ultimo, de todas as paginas (paginas trancadas ficam de fora); clicar abre a pagina ja com a nota aberta
+  const recentNotes=useMemo(()=>{if(!desktop)return [];const out:{page:Entity;id:string;title:string;at:string;stamp:string}[]=[];
+   for(const p of displayPages){if(p.kind!=='user_page'||p.state==='archived'||isLocked(p)||(p.tags||[]).includes('board-copy'))continue;let bl:any;try{bl=JSON.parse(String(p.data?.blocks_json||'[]'));}catch{continue;}if(!Array.isArray(bl))continue;
+    for(const b of bl){if(b?.type!=='collection'||!Array.isArray(b.data?.notebooks))continue;for(const k of b.data.notebooks)for(const n of (k?.pages||[])){const at=String(n?.updated_at||n?.created_at||'');if(at&&n?.id)out.push({page:p,id:String(n.id),title:String(n.title||'Sem título'),at,stamp:leafStamp(n)});}}}
+   return out.sort((a,b)=>b.at.localeCompare(a.at)).slice(0,8);},[displayPages,desktop]);
  const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
@@ -792,6 +810,15 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
     {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
     <View style={{gap:2,flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
    </Pressable>)}</View>
+   {recentNotes.length?<View testID="pages-recent-notes" style={{gap:2,marginTop:10}}>
+    <Text style={{color:c.muted,fontSize:12,fontWeight:'600',marginBottom:4}}>Notas editadas recentemente</Text>
+    {recentNotes.map(r=><Pressable key={r.page.id+':'+r.id} accessibilityRole="button" accessibilityLabel={'Abrir nota '+r.title} onPress={()=>{requestOpenNote(r.page.id,r.id);open(r.page);}}
+     style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:7,paddingHorizontal:10,marginHorizontal:-10,borderRadius:8,backgroundColor:hovered?c.input:'transparent'})}>
+     <Icon name="note" size={16} color={c.muted}/><Text numberOfLines={1} style={{flex:1,minWidth:0,color:c.text,fontSize:14}}>{r.title}</Text>
+     <Text numberOfLines={1} style={{color:c.muted,fontSize:12,maxWidth:240}}>{(r.page.data?.icon&&r.page.data?.icon_mode!=='image'?String(r.page.data.icon)+' ':'')+(r.page.title||'Sem título')}</Text>
+     <Text numberOfLines={1} style={{color:c.muted,fontSize:12,width:96,textAlign:'right'}}>{r.stamp}</Text>
+    </Pressable>)}
+   </View>:null}
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600',marginTop:10}}>Todas as páginas</Text>
   </View>:null}
   {/* 03/11/2026 (desenho 36): no celular, "Recentes" em cartoezinhos que rolam para o lado (dentro do bloco, a tela nao
@@ -874,7 +901,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const pageItems:{label:string;icon:any;run:()=>void;danger?:boolean}[]=[...(BOARD_SUPPORTED&&Platform.OS==='web'&&desktop?[isBoard?{label:'Ver como página',icon:'listView',run:()=>setLayout('notes')}:{label:'Ver como quadro',icon:'gridView',run:()=>setLayout('board')}]:[]),...lockItems,{label:'Versões anteriores…',icon:'history',run:()=>setVersionsOpen(true)}];
  void rawKey;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
- const status=entry.state==='saving'||entry.state==='pending'?'Salvando…':entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
+ const status=/* 13/11/2026: salvar calado como o Notion (SaveStatus mostra Salvando… so se demorar) */entry.state==='error'||entry.state==='secret'?'Não salvo':lk?(lockedNow?'Trancada':'Destrancada'):entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type,coverH=coverW?Math.max(200,Math.min(460,Math.round(coverW/6))):250;
  const editor=<View ref={editorDrop} style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   {fileOver?<View pointerEvents="none" testID="page-file-drop" style={{position:'absolute',top:10,left:10,right:10,bottom:10,zIndex:80,borderRadius:16,borderWidth:2,borderStyle:'dashed',borderColor:c.accent,backgroundColor:c.bg+'cc',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="upload" size={30} color={c.accent}/><Text style={{color:c.text,fontSize:16,fontWeight:'600'}}>Solte para anexar à página</Text><Text style={{color:c.muted,fontSize:12}}>Qualquer arquivo até 25 MB · PDF, Word, Excel, imagem, vídeo, áudio…</Text></View>:null}

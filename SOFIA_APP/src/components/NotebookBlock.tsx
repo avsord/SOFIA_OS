@@ -5,7 +5,7 @@ import {KeyboardViewport} from './KeyboardViewport';
 import {LeafEditor} from './LeafEditor';
 import type {Leaf} from '../lib/leaf-document';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Animated,PanResponder,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {Animated,PanResponder,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
 import {Button,IconButton} from './UI';
@@ -16,9 +16,10 @@ import {contextMenu,openContextMenu} from './ContextMenu';
 import type {MenuItem} from './ContextMenu';
 import {Icon} from './Icon';
 import {useHoverKey} from '../lib/hover-hold';
-import {NOTE_DRAG_TYPE,ROOT_BOOK,addLooseNote,applyDrop,hitTarget,registerLiveNotes} from '../lib/notes-move';
+import {NOTE_DRAG_TYPE,ROOT_BOOK,addLooseNote,applyDrop,hitTarget,registerLiveNotes,takeOpenNote} from '../lib/notes-move';
 import type {NoteBook,NoteDragItem,NoteRect} from '../lib/notes-move';
 import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
+import {useWebBackDepth} from '../lib/web-panels';
 
 /** 0.3.201: Notas reestruturadas - pastas em cartoes, notas com previa e data, busca que acha com letra
  * errada, e acoes claras. Os dados continuam no mesmo formato (nenhuma nota antiga se perde). */
@@ -38,7 +39,14 @@ function bindDom(el:any,h:DomH){
  if(h.draggable!==undefined)el.setAttribute('draggable',h.draggable?'true':'false');
  if(first)for(const ev of ['dragstart','dragend','dragover','dragleave','drop'] as const)el.addEventListener(ev,(e:any)=>domH.get(el)?.[ev]?.(e));
 }
-const EMOJIS=['📁','📒','📓','📝','💼','🏠','💡','🎬','📸','✈️','💰','❤️','📚','🎵'];
+/** 13/11/2026 (Pedro: "animacao da nota arrastando com in e out"): a nota/pasta levantada encolhe e esmaece suave, a que
+ * caiu no lugar novo entra com um fade curto, a lixeira sobe de baixo. CSS so do site (no celular nada muda). */
+if(Platform?.OS==='web'&&typeof document!=='undefined'&&!document.getElementById('sofia-notes-motion')){try{const st=document.createElement('style');st.id='sofia-notes-motion';
+ st.textContent='[data-notes-item]{transition:opacity .16s ease,transform .16s ease}[data-notes-lifted="1"]{opacity:.35;transform:scale(.97)}'+
+  '[data-notes-landed="1"]{animation:sofiaNoteIn .32s cubic-bezier(.2,0,0,1)}@keyframes sofiaNoteIn{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}'+
+  '[data-notes-trash]{animation:sofiaTrashIn .2s cubic-bezier(.2,0,0,1)}@keyframes sofiaTrashIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'+
+  '@media (prefers-reduced-motion:reduce){[data-notes-item],[data-notes-landed="1"],[data-notes-trash]{transition:none;animation:none}}';document.head.appendChild(st);}catch{/* sem animacao */}}
+const EMOJIS=['📁','📂','🗂️','📒','📓','📔','📕','📗','📘','📙','📝','✏️','📌','⭐','💼','🏠','💡','🎬','📸','🎨','✈️','💰','❤️','📚','🎵','🧠','🛒','🏋️','🍳','🎯','🚀','🌱'];
 export function leafPreview(p:Leaf):string{
  const fromBlocks=(p.blocks||[]).map(b=>(b.checked===true?'✓ ':b.type==='todo'||b.type==='check'?'☐ ':'')+String(b.text||'')).filter(Boolean).join(' · ');
  return (fromBlocks||String(p.content||'')).replace(/\s+/g,' ').trim();
@@ -69,7 +77,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  // 13/11/2026 (ESC volta um nível): nota aberta -> pasta/lista (item); dentro de pasta -> pasta de cima/raiz das notas (section); na raiz o Esc segue para a página mãe.
  useEffect(()=>leaf?pushEsc(()=>{setLeafId(null);setBookId(null);},ESC_LEVEL.item):undefined,[!!leaf]);
  useEffect(()=>opened?pushEsc(()=>{const o=openedRef.current;if(!o)return false;setOpenBook(!o.root?(parentOf(o)||null):null);},ESC_LEVEL.section):undefined,[!!opened]);
+ // 13/11/2026 (Pedro: "quando apertar voltar, nas anotacoes vai voltando"): cada pasta aberta e um passo do voltar do navegador
+ const depthOf=(b:Book|null)=>{if(!b)return 0;if(b.root)return 1;let d=1,cur:Book|undefined=b,g=0;while(cur&&g++<50){const up=parentOf(cur);if(!up)break;d++;cur=books.find(x=>x.id===up);}return d;};
+ useWebBackDepth(depthOf(opened),()=>{const o=openedRef.current;if(!o)return;setOpenBook(!o.root?(parentOf(o)||null):null);});
  const dataRef=useRef(data);dataRef.current=data;const onChangeRef=useRef(onChange);onChangeRef.current=onChange;
+ const desktop=useDesktop(),mouse=desktop&&Platform?.OS==='web',[landed,setLanded]=useState<string|null>(null);
+ useEffect(()=>{if(!landed)return;const t=setTimeout(()=>setLanded(null),420);return()=>clearTimeout(t);},[landed]);
  const dragRef=useRef<DragItem|null>(null),[drag,setDrag]=useState<DragItem|null>(null),[hover,setHover]=useState<string|null>(null),hoverRef=useRef<string|null>(null),webDrag=useRef(false);
  const ghost=useRef(new Animated.ValueXY({x:0,y:0})).current,rootRef=useRef<View|null>(null),rootPos=useRef({x:0,y:0}),targets=useRef<Record<string,View|null>>({}),rects=useRef<NoteRect[]>([]),moved=useRef(false),captured=useRef(false),startPt=useRef({x:0,y:0});
  // a regra de qual alvo esta embaixo (r.id.startsWith('note:') = reordenar notas) fica em lib/notes-move.ts (hitTarget)
@@ -86,9 +99,10 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  }
  /** Reordenar, entrar na pasta, sair dela: regras em lib/notes-move.ts (applyDrop); a ordem nova fica gravada na pagina. */
  function moveItem(item:DragItem,target:string){
+  if(target==='__trash__'){if(item.kind==='note')deleteNote(item.from,item.id);else removeBook(item.id);return;}
   const r=applyDrop(booksRef.current,item,target,openedRef.current?.id||null);
   if(r.error){appAlert('Não dá para mover',r.error);return;}
-  if(r.books)commitBooks(r.books,'notebook-move');
+  if(r.books){commitBooks(r.books,'notebook-move');setLanded(item.id);}
  }
  // ---- arrastar do navegador (mouse): mesmo resultado do arrastar por toque, e a nota pode ir para outra pagina ----
  function htmlStart(item:DragItem,e:any,note?:Leaf){
@@ -118,7 +132,9 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   onPanResponderMove:e=>{const {pageX,pageY}=e.nativeEvent;if(Math.abs(pageX-startPt.current.x)+Math.abs(pageY-startPt.current.y)>8)moved.current=true;
    ghost.setValue({x:pageX-rootPos.current.x-60,y:pageY-rootPos.current.y-22});const t=hit(pageX,pageY);if(t!==hoverRef.current){hoverRef.current=t;setHover(t);}},
   onPanResponderRelease:()=>endRef.current(true),
-  onPanResponderTerminate:()=>endRef.current(false),
+  // 13/11/2026 (Pedro: "tenho que arrastar duas vezes"): quando o arrastar do navegador assume, o navegador cancela o toque;
+  // antes esse cancelamento apagava o arrastar e o 1o soltar nao fazia nada
+  onPanResponderTerminate:()=>{if(!webDrag.current)endRef.current(false);},
  }),[]);// eslint-disable-line react-hooks/exhaustive-deps
  /** 0.3.229: soltou sem arrastar -> so cancela (sem menu). Quando o arrastar pega o dedo, o Android avisa o cartao que
   * ele perdeu o toque; antes isso era lido como "soltou" e cancelava o arrastar abrindo Renomear. */
@@ -138,6 +154,8 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   remove:id=>{update(next=>{for(const b of next)b.pages=b.pages.filter(x=>x.id!==id);},'notebook-move-out');if(leafId===id){setLeafId(null);setBookId(null);}},
   addLoose:n=>commitBooks(addLooseNote(booksRef.current,null,n).books,'notebook-move-in'),
  };
+ // 13/11/2026: "Notas editadas recentemente" (tela Paginas) abre a pagina ja com a nota aberta
+ useEffect(()=>{const n=takeOpenNote(pageId);if(!n)return;const b=booksRef.current.find(k=>k.pages.some(p=>p.id===n));if(b){setBookId(b.id);setLeafId(n);}},[pageId]);
  useEffect(()=>pageId?registerLiveNotes(pageId,{find:id=>liveRef.current.find(id),remove:id=>liveRef.current.remove(id),addLoose:n=>liveRef.current.addLoose(n)}):undefined,[pageId]);
  function changeLeaf(patch:Partial<Leaf>){if(!book||!leaf)return;update(next=>{const p=next.find(b=>b.id===book.id)?.pages.find(p=>p.id===leaf.id);if(p){Object.assign(p,applyLeafPatch(p,patch));(p as Dated).updated_at=new Date().toISOString();}},'leaf:'+leaf.id+':'+Object.keys(patch).join(','));}
  // 05/11/2026 (Pedro): opcoes da nota no "⋯" de cada linha e num menu pequeno (antes: janela grande com botoes roxos)
@@ -162,19 +180,25 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  }
  function removeBook(id:string){const b=books.find(x=>x.id===id);if(!b)return;setFolderMenu(null);
   appAlert('Excluir pasta?',b.pages.length?`“${b.name||'Sem título'}” e as ${b.pages.length} nota(s) dentro dela serão removidas.`:`“${b.name||'Sem título'}” será removida.`,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const up=parentOf(b);update(next=>{for(const k of next)if(k.parent===id){if(up)k.parent=up;else delete k.parent;}const i=next.findIndex(x=>x.id===id);if(i>=0)next.splice(i,1);});if(openBook===id)setOpenBook(up||null);}}]);}
+ /** 13/11/2026 (Pedro: "poder alterar o icone da pasta de anotacoes"): o mesmo menu no ⋯ da pasta aberta e no botao direito do cartao */
+ function folderItems(b:Book,withOpen=false):MenuItem[]{return [
+  ...(withOpen?[{label:'Abrir',icon:'note' as const,run:()=>setOpenBook(b.id)}]:[]),
+  {label:'Renomear',icon:'edit',run:()=>{setEditingBook(b.id);setNewName(b.name);setCreate(true);}},
+  {label:'Trocar ícone',icon:'sparkle',run:()=>{setEmojiBook(b.id);setEmoji(b.emoji||'');}},
+  {label:'Excluir pasta',icon:'trash',danger:true,run:()=>removeBook(b.id)}];}
  const commitTitle=()=>{const t=title.trim()||'Notas';setTitle(t);if(t!==String(data.title||'Notas'))onChange({...data,mode:'notebooks',title:t,notebooks:books},'notebook-title');};
  // 0.3.251 (computador): pastas em cartoes de tamanho fixo, quantos couberem na linha (no celular, 2 por linha)
- const desktop=useDesktop();
  const results=useMemo(()=>query.trim()?books.flatMap(b=>b.pages.map(p=>({b,p,score:fuzzyScore((p.title||'')+' '+leafPreview(p),query)}))).filter(x=>x.score>0).sort((a,b)=>b.score-a.score):[],[books,query]);
  const open=(b:Book,p:Leaf)=>{setBookId(b.id);setLeafId(p.id);};
 
  /** 13/11/2026 (Pedro: "pastas com alturas diferentes"): todo cartao de pasta tem a MESMA altura e as mesmas 4 linhas
   * (pasta vazia mostra "Vazia" no lugar de "Última: ..."). Arrastando uma pasta: bordas = reordenar, meio = entrar. */
  const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id,item:DragItem={kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},bar=(side:string)=>hover==='folder:'+b.id+'|'+side?<View pointerEvents="none" style={{position:'absolute',top:6,bottom:6,width:3,borderRadius:2,backgroundColor:c.accent,[side==='before'?'left':'right']:3}}/>:null;
-  return <View key={b.id} ref={r=>{targets.current[b.id]=r;bindDom(r,dragProps(item));}} collapsable={false} style={{width:desktop?224:'48%',position:'relative'}}>
+  return <View key={b.id} ref={r=>{targets.current[b.id]=r;bindDom(r,dragProps(item));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===b.id?'1':'0'}} as any)} style={{width:desktop?224:'48%',position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir pasta '+(b.name||'Sem título')} accessibilityHint="Segure e arraste para mover" onPress={()=>{if(!dragRef.current)setOpenBook(b.id);}} delayLongPress={300}
-    onLongPress={e=>startDrag(item,e)} onPressOut={()=>pressOut()}
-    style={({pressed})=>({height:132,overflow:'hidden',backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:over?13:14,gap:6,opacity:lifted?0.35:pressed?0.75:1})}>
+    {...(desktop?contextMenu(()=>folderItems(b,true)):{})}
+    onLongPress={mouse?undefined:e=>startDrag(item,e)} onPressOut={mouse?undefined:()=>pressOut()}
+    style={({pressed})=>({height:132,overflow:'hidden',backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:over?13:14,gap:6,opacity:lifted&&!mouse?0.35:pressed?0.75:1})}>
     <Text style={{fontSize:28,lineHeight:34}}>{b.emoji||'📁'}</Text>
     <Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{b.name||'Sem título'}</Text>
     <Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>{b.pages.length+(b.pages.length===1?' nota':' notas')+(subs?' · '+subs+(subs===1?' pasta':' pastas'):'')}</Text>
@@ -182,11 +206,11 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
    </Pressable>
   </View>;};
  const noteCard=(b:Book,p:Leaf,showFolder=false)=>{const prev=leafPreview(p),stamp=leafStamp(p as Dated),lifted=drag?.kind==='note'&&drag.id===p.id,tid='note:'+b.id+':'+p.id,line=(side:string)=>hover===tid+'|'+side?<View pointerEvents="none" style={{position:'absolute',left:6,right:6,[side==='before'?'top':'bottom']:-6,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null,hovered=noteHover.key===tid,showDots=!showFolder&&(!desktop||hovered||lifted);const item:DragItem={kind:'note',id:p.id,from:b.id,label:'📝 '+(p.title||'Sem título')};
-  return <View key={b.id+':'+p.id} ref={r=>{if(!showFolder)targets.current[tid]=r;bindDom(r,dragProps(item,p));}} collapsable={false} style={{position:'relative'}}>
+  return <View key={b.id+':'+p.id} ref={r=>{if(!showFolder)targets.current[tid]=r;bindDom(r,dragProps(item,p));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===p.id?'1':'0'}} as any)} style={{position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir nota '+(p.title||'Sem título')} onPress={()=>{if(!dragRef.current)open(b,p);}} onHoverIn={()=>noteHover.enter(tid)} onHoverOut={noteHover.leave}
     {...(desktop?contextMenu(()=>noteItems(b.id,p.id,null,false)):{})}
-    delayLongPress={300} onLongPress={showFolder?undefined:e=>startDrag(item,e)} onPressOut={showFolder?undefined:()=>pressOut()}
-    style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,opacity:lifted?0.35:pressed?0.75:1})}>
+    delayLongPress={300} onLongPress={showFolder||mouse?undefined:e=>startDrag(item,e)} onPressOut={showFolder||mouse?undefined:()=>pressOut()}
+    style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,opacity:lifted&&!mouse?0.35:pressed?0.75:1})}>
     <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
      <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:16,fontWeight:'600'}}>{p.title||'Sem título'}</Text>
      {stamp?<Text style={{color:c.muted,fontSize:11}}>{stamp}</Text>:null}
@@ -203,12 +227,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
     {/* 05/11/2026 (Pedro: "ta desalinhado"): o voltar vira uma linha propria acima do nome da pasta; nome, contagem e busca na mesma margem */}
     {/* 13/11/2026: soltar uma nota ou pasta no "‹ Notas" tira da pasta (igual à faixa de baixo) */}
     {opened?<View ref={r=>{targets.current['__back__']=r;}} collapsable={false} style={{alignSelf:'flex-start',borderRadius:8,backgroundColor:drag&&hover==='__up__'?c.accentSoft:'transparent'}}><Pressable accessibilityRole="button" accessibilityLabel="Voltar às pastas" onPress={()=>setOpenBook(opened&&!opened.root?(parentOf(opened)||null):null)} hitSlop={8} style={({hovered}:any)=>({alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,marginBottom:2,opacity:hovered?1:0.8})}><Text style={{color:c.accent,fontSize:13,fontWeight:'600'}}>{'‹ '+(()=>{const up=parentOf(opened);const b=up?books.find(x=>x.id===up):null;return b?(b.emoji||'📁')+' '+(b.name||'Sem título'):(title||'Notas');})()}</Text></Pressable></View>:null}
-    {opened?<Text numberOfLines={1} style={{fontSize:24,fontWeight:'700',color:c.text}}>{(opened.emoji||'📁')+' '+(opened.name||'Sem título')}</Text>
+    {opened?<View style={{flexDirection:'row',alignItems:'center',gap:6}}>{!opened.root?<Pressable accessibilityRole="button" accessibilityLabel="Trocar ícone da pasta" onPress={()=>{setEmojiBook(opened.id);setEmoji(opened.emoji||'');}} hitSlop={6} style={({hovered}:any)=>({borderRadius:8,paddingHorizontal:2,backgroundColor:hovered?c.input:'transparent'})}><Text style={{fontSize:24,lineHeight:32}}>{opened.emoji||'📁'}</Text></Pressable>:<Text style={{fontSize:24,lineHeight:32}}>{opened.emoji||'📝'}</Text>}<Text numberOfLines={1} style={{flex:1,fontSize:24,fontWeight:'700',color:c.text}}>{opened.name||'Sem título'}</Text></View>
      :<TextInput accessibilityLabel="Título do bloco de notas" value={title} onChangeText={setTitle} onEndEditing={commitTitle} onBlur={commitTitle} blurOnSubmit returnKeyType="done" style={{fontSize:24,fontWeight:'700',color:c.text,paddingVertical:0}}/>}
     <Text style={{color:c.muted,fontSize:12}}>{opened?opened.pages.length+(opened.pages.length===1?' nota':' notas'):foldersIn('').length+(foldersIn('').length===1?' pasta':' pastas')+' · '+total+(total===1?' nota':' notas')}</Text>
    </View>
    {!opened&&onDelete?<Pressable accessibilityRole="button" accessibilityLabel="Opções do bloco de notas" onPress={(e:any)=>{if(!desktop){setBlockMenu(true);return;}const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.right-220:0,r?r.bottom+4:0,[{label:'Remover bloco de notas',icon:'trash',danger:true,run:()=>onDelete?.()}]);}} hitSlop={8} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'700',fontSize:16,lineHeight:22}}>⋯</Text></Pressable>:null}
-   {opened&&!opened.root?<Pressable accessibilityRole="button" accessibilityLabel="Opções da pasta" onPress={(e:any)=>{if(!desktop){setFolderMenu(opened.id);return;}const r=e?.currentTarget?.getBoundingClientRect?.(),b=opened;openContextMenu(r?r.right-220:0,r?r.bottom+4:0,[{label:'Renomear',icon:'edit',run:()=>{setEditingBook(b.id);setNewName(b.name);setCreate(true);}},{label:'Trocar ícone',icon:'sparkle',run:()=>{setEmojiBook(b.id);setEmoji(b.emoji||'');}},{label:'Excluir pasta',icon:'trash',danger:true,run:()=>removeBook(b.id)}]);}} hitSlop={8} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'700',fontSize:16,lineHeight:22}}>⋯</Text></Pressable>:null}
+   {opened&&!opened.root?<Pressable accessibilityRole="button" accessibilityLabel="Opções da pasta" onPress={(e:any)=>{if(!desktop){setFolderMenu(opened.id);return;}const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.right-220:0,r?r.bottom+4:0,folderItems(opened));}} hitSlop={8} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'700',fontSize:16,lineHeight:22}}>⋯</Text></Pressable>:null}
    {!opened||!opened.root?<Pressable accessibilityRole="button" accessibilityLabel={opened?'Nova pasta dentro desta':'Nova pasta'} onPress={()=>{setEditingBook(null);setNewName('');setCreate(true);}} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'600',fontSize:12}}>＋ Pasta</Text></Pressable>:null}
    <Pressable accessibilityRole="button" accessibilityLabel="Nova nota" onPress={()=>addLeaf()} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'600',fontSize:12}}>＋ Nota</Text></Pressable>
   </View>
@@ -230,8 +254,11 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
    {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:foldersIn('').length?4:0}}>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
    {!foldersIn('').length&&!rootNotes.length?<Pressable onPress={()=>addLeaf()} style={{flex:1,borderRadius:18,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:28}}>📝</Text><Text style={{color:c.muted,fontSize:13,textAlign:'center'}}>{tap('Nenhuma nota ainda. Toque para criar a primeira nota (ou use ＋ Pasta).')}</Text></Pressable>:null}
   </View>}
-  {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>{tap('Segure uma nota ou pasta e arraste para mudar a ordem, para dentro de outra pasta ou para fora dela.')}</Text>:null}
-  {drag?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:0,zIndex:50,elevation:8,transform:ghost.getTranslateTransform(),backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.accent,paddingHorizontal:14,paddingVertical:10,maxWidth:240}}>
+  {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>{mouse?'Arraste uma nota ou pasta para mudar a ordem, para dentro de outra pasta, para fora dela ou para a lixeira.':tap('Segure uma nota ou pasta e arraste para mudar a ordem, para dentro de outra pasta, para fora dela ou para a lixeira.')}</Text>:null}
+  {drag?<View ref={r=>{targets.current['__trash__']=r;}} testID="notes-trash" collapsable={false} {...({dataSet:{notesTrash:'1'}} as any)} style={{position:'sticky' as any,bottom:16,zIndex:45,alignSelf:'center',flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:20,paddingVertical:12,borderRadius:99,borderWidth:2,borderStyle:'dashed',borderColor:hover==='__trash__'?c.danger:c.line,backgroundColor:hover==='__trash__'?c.danger+'26':c.surface,shadowColor:'#000',shadowOpacity:0.25,shadowRadius:14,shadowOffset:{width:0,height:6}}}>
+   <Icon name="trash" size={18} color={hover==='__trash__'?c.danger:c.muted}/><Text style={{color:hover==='__trash__'?c.danger:c.muted,fontWeight:'600'}}>{drag.kind==='folder'?'Solte aqui para excluir a pasta':'Solte aqui para excluir a nota'}</Text>
+  </View>:null}
+  {drag&&!webDrag.current?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:0,zIndex:50,elevation:8,transform:ghost.getTranslateTransform(),backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.accent,paddingHorizontal:14,paddingVertical:10,maxWidth:240}}>
    <Text numberOfLines={1} style={{color:c.text,fontWeight:'600'}}>{drag.label}</Text>
   </Animated.View>:null}
   {/* 0.3.230: remover o bloco fica no ⋯ do topo do bloco (antes: segure aqui) */}
@@ -246,7 +273,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
    <Pressable onPress={()=>{if(folderMenu)removeBook(folderMenu);}} style={{paddingVertical:20}}><Text style={{color:c.danger}}>Excluir pasta</Text></Pressable>
   </Sheet>
   <Sheet visible={!!emojiBook} onClose={()=>setEmojiBook(null)}><Text style={{fontSize:20,fontWeight:'600',color:c.text}}>Ícone da pasta</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:10,marginVertical:14}}>{EMOJIS.map(e=><Pressable key={e} onPress={()=>setEmoji(e)} style={{padding:10,borderRadius:12,backgroundColor:emoji===e?c.accentSoft:c.input}}><Text style={{fontSize:28}}>{e}</Text></Pressable>)}</View><TextInput accessibilityLabel="Emoji da pasta" value={emoji} onChangeText={setEmoji} maxLength={16} placeholder="Ou digite um emoji" placeholderTextColor={c.muted} style={{color:c.text,padding:12,fontSize:24}}/><Button title="Salvar ícone" onPress={()=>{update(next=>{next.find(b=>b.id===emojiBook)!.emoji=emoji;});setEmojiBook(null);}}/></Sheet>
-  <MotionModal visible={!!leaf} animationType="slide" onRequestClose={()=>{setLeafId(null);setBookId(null);}}><SafeAreaView style={{flex:1,backgroundColor:c.bg}}><KeyboardViewport><View testID="notebook-top-bar" style={{zIndex:10,elevation:10,backgroundColor:c.surface,minHeight:56,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderColor:c.line}}><IconButton name="back" label="Voltar às notas" onPress={()=>{setLeafId(null);setBookId(null);}}/><View style={{flex:1}}><Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'500'}}>{leaf?.title||'Sem título'}</Text>{book?<Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{(book.emoji||'📁')+' '+(book.name||'Sem título')}</Text>:null}</View><IconButton name="more" label="Ações da nota" onPress={(e?:any)=>{if(book&&leaf)openNoteMenu(book.id,leaf.id,e,true);}}/></View>{leaf?<LeafEditor key={leaf.id} leaf={leaf} onChange={changeLeaf} titleRef={leafTitle}/>:null}</KeyboardViewport></SafeAreaView></MotionModal>
+  <MotionModal visible={!!leaf} animationType="slide" onRequestClose={()=>{setLeafId(null);setBookId(null);}}><SafeAreaView style={{flex:1,backgroundColor:c.bg}}><KeyboardViewport><View testID="notebook-top-bar" style={{zIndex:10,elevation:10,backgroundColor:c.surface,minHeight:56,flexDirection:'row',alignItems:'center',paddingHorizontal:8,borderBottomWidth:1,borderColor:c.line}}><IconButton name="back" label="Voltar às notas" onPress={()=>{setLeafId(null);setBookId(null);}}/><View style={{flex:1}}><Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'500'}}>{leaf?.title||'Sem título'}</Text>{book?<Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{(book.emoji||'📁')+' '+(book.name||'Sem título')}</Text>:null}</View><IconButton name="more" label="Ações da nota" onPress={(e?:any)=>{if(book&&leaf)openNoteMenu(book.id,leaf.id,e,true);}}/></View>{leaf?<LeafEditor key={leaf.id} leaf={leaf} onChange={changeLeaf} titleRef={leafTitle} pageId={pageId}/>:null}</KeyboardViewport></SafeAreaView></MotionModal>
   {/* 05/11/2026 (Pedro: "janela mal feita e fora da identidade"): lista compacta com icones, igual ao menu do computador */}
   <Sheet visible={menu} onClose={()=>setMenu(false)}>{(()=>{const t=menuNote,b0=t&&books.find(x=>x.id===t.book),p0=b0&&b0.pages.find(x=>x.id===t.leaf);if(!t||!b0||!p0)return null;const inEditor=leafId===p0.id;return <View testID="note-menu-sheet">
    <Text numberOfLines={1} style={{color:c.muted,fontSize:12,fontWeight:'600',marginBottom:6}}>{p0.title||'Sem título'}</Text>

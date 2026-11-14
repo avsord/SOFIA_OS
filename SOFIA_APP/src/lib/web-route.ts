@@ -26,3 +26,7 @@ export function routeTitle(r: Route, unread = 0): string { if (r.tab === 'pages'
 /** 0.3.267: endereço de cada página (/paginas/<id>) para copiar link, F5 e voltar do navegador. */
 export function pageIdFromPath(path: string): string { const m = /^\/paginas\/([A-Za-z0-9_-]{6,})\/?$/.exec(path || ''); return m ? m[1] : ''; }
 export function pageUrlPath(id: string): string { return id ? '/paginas/' + id : '/paginas'; }
+/** 13/11/2026 (Pedro: "quando clica voltar, volta, mas volta atualizando a pagina"): abrir outra pagina vira um passo do
+ * historico (/paginas/<id>), entao o voltar do navegador troca de pagina dentro do site, sem recarregar.
+ * fromPop: a troca veio do proprio voltar/avancar (nao empilha de novo); pushedAt: hora do ultimo passo de tela (/paginas). */
+export const routeMeta = {pushedAt: 0, fromPop: false};

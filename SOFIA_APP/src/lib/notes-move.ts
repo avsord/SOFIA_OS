@@ -29,7 +29,10 @@ export function addLooseNote(books:NoteBook[],folderId:string|null|undefined,not
 
 /** Qual alvo esta embaixo do ponteiro. Pasta arrastada: bordas esquerda/direita = reordenar, meio = entrar. */
 export function hitTarget(rects:NoteRect[],item:NoteDragItem|null,x:number,y:number):string|null{
+ // 13/11/2026 (Pedro: "arrastar nota ou pasta, aparece lixeira tambem pra remover"): a lixeira fica por cima de tudo
+ for(const r of rects)if(r.id==='__trash__'&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return '__trash__';
  for(const r of rects){
+  if(r.id==='__trash__')continue;
   if(!(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))continue;
   if(r.id==='__up__'||r.id==='__back__')return '__up__';
   if(r.id.startsWith('note:')){if(!item||item.kind!=='note'||r.id.endsWith(':'+item.id))continue;return r.id+(y>r.y+r.h/2?'|after':'|before');}
@@ -138,3 +141,8 @@ export async function moveNoteToPage(noteId:string,fromPageId:string,toPageId:st
  const cur=src!,after=takeNoteFromBlocks(blocksOf(cur),noteId);
  if(after.note)await api!.saveEntity({id:cur.id,revision:cur.revision,data:{...(cur.data||{}),blocks_json:JSON.stringify(after.blocks)}},cur);
 }
+
+// ---------- abrir uma nota especifica ao abrir a pagina (lista "Notas editadas recentemente" em Paginas) ----------
+const pendingOpen=new Map<string,string>();
+export function requestOpenNote(pageId:string,noteId:string){if(pageId&&noteId)pendingOpen.set(pageId,noteId);}
+export function takeOpenNote(pageId:string|undefined):string|null{if(!pageId)return null;const n=pendingOpen.get(pageId)||null;pendingOpen.delete(pageId);return n;}

@@ -19,6 +19,12 @@ export function installSpellcheckFocus(doc:any=typeof document!=='undefined'?doc
  const inn=(e:any)=>spellWhileEditing(e.target,true),out=(e:any)=>spellWhileEditing(e.target,false);
  doc.addEventListener('focusin',inn,true);doc.addEventListener('focusout',out,true);
  // campos que já nasceram com a correção ligada e ainda não ganharam foco
- try{for(const el of Array.from(doc.querySelectorAll?.('textarea,input[type="text"],input:not([type]),[contenteditable="true"]')||[]) as any[])if(el!==doc.activeElement)spellWhileEditing(el,false);}catch{/* sem DOM */}
- return()=>{doc.removeEventListener('focusin',inn,true);doc.removeEventListener('focusout',out,true);};
+ const SEL='textarea,input[type="text"],input:not([type]),[contenteditable="true"]';
+ const quiet=(root:any)=>{try{if(root?.matches?.(SEL)&&root!==doc.activeElement)spellWhileEditing(root,false);for(const el of Array.from(root?.querySelectorAll?.(SEL)||[]) as any[])if(el!==doc.activeElement)spellWhileEditing(el,false);}catch{/* sem DOM */}};
+ quiet(doc);
+ // 13/11/2026 (Mimic Kaizen: corretor ligado em 2 titulos fora da edicao): campos que aparecem DEPOIS (abrir uma pagina,
+ // uma nota, um cartao) nasciam com a correcao ligada ate ganhar e perder o foco. Agora ja nascem sem.
+ let mo:any=null;const MO=(globalThis as any).MutationObserver;
+ if(MO&&doc.body){mo=new MO((list:any[])=>{for(const m of list)for(const n of Array.from(m.addedNodes||[]) as any[])if(n&&n.nodeType===1)quiet(n);});try{mo.observe(doc.body,{childList:true,subtree:true});}catch{mo=null;}}
+ return()=>{doc.removeEventListener('focusin',inn,true);doc.removeEventListener('focusout',out,true);try{mo?.disconnect();}catch{/* ja saiu */}};
 }

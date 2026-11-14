@@ -15,7 +15,10 @@ import {leftAfterBills, spendControl, looseSpending} from './finance-left';
  * marcadas como feitas. Gasto lancado ja pago (sem paid_at) nao entra: nunca foi conta a pagar. */
 export function timelineMoney(txs: Tx[], cards: Card[], today = todayISO(), days = 4): Due[] {
   const open = upcoming(txs, cards, today, days).filter(x => !x.paid), from = addDays(today, -31), until = addDays(today, days), ids = new Set(open.map(x => x.id));
-  const paid: Due[] = txs.filter(t => t.paid && !!t.paidAt && !t.virtual && !t.cardId && (t.kind === 'expense' || t.kind === 'income') && t.date >= from && t.date <= until && !ids.has(t.id))
+  // 13/11/2026 (Mimic Kaizen: conta paga pelo "Paguei" sumia da linha do tempo): conta atrasada ha mais de 31 dias aparecia
+  // (pendente nao tem limite para tras) e, paga, saia da janela. Paga nos ultimos 2 dias fica no lugar, ticada.
+  const recentPay = addDays(today, -2);
+  const paid: Due[] = txs.filter(t => t.paid && !!t.paidAt && !t.virtual && !t.cardId && (t.kind === 'expense' || t.kind === 'income') && (t.date >= from || String(t.paidAt).slice(0, 10) >= recentPay) && t.date <= until && !ids.has(t.id))
     .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: t.kind === 'income' ? 'receber' as const : 'pagar' as const, late: false, paid: true, tx: t}));
   for (const c of cards) if (!c.archived) for (const i of cardInvoices(c, txs, today)) {
     if (i.total > 0 && (i.status === 'paga' || i.total <= i.paid) && i.due >= from && i.due <= until) paid.push({id: 'fatura:' + c.id + ':' + i.month, title: 'Fatura ' + c.name, amount: i.total, date: i.due, kind: 'fatura', late: false, paid: true, invoice: i});
