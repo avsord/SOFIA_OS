@@ -430,10 +430,10 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | Caps Lock: em vez da linha que empurrava o botão, sinal ⇪ dentro do campo de senha, à direita (`CapsBadge`), login e página trancada | tsc ok; testes ok; não conferido no navegador |
-| 2026-11-14 | (sem APK) | Página não se mexe mais ao digitar: altura dos campos (páginas, notas, tabelas) medida numa cópia invisível (`lib/fit-textarea.ts`), o campo nunca encolhe a 0 | tsc ok; testes ok (061 só sem Java); medida conferida no navegador (rolagem 380→380); não conferido na Sofia logada |
 | 2026-11-14 | (sem APK) | Biblioteca de capas: toda capa enviada fica guardada ("Suas capas" na Galeria, PC e celular); trocar/remover/excluir página não apaga mais; só sai pelo × (confirma "Tirar?"), recusa se em uso. Rotas GET/DELETE /api/covers | tsc ok; testes de capa reescritos ok; demais falhas iguais às de antes; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seletor de cor enxuto (pedido do Pedro): só barras de cor e luz, pequeno, abre junto da bolinha (portal no body; antes ficava longe e cortado) | tsc ok; teste do seletor ok; não conferido no navegador |
+$L
+$L
 $L
 $L
 

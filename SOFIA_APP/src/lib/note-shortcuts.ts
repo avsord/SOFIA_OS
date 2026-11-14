@@ -93,6 +93,7 @@ export function toggleSubShortcut(data:Record<string,any>,id:string,kind:'note'|
  return {...data,subshortcuts:cur.some(x=>x?.id===id)?cur.filter(x=>x?.id!==id):[...cur,{kind,id}]};
 }
 export function pageSubShortcuts(p:Entity|null|undefined):NoteShortcut[]{
+ const pre=p?.data?.note_subshortcuts;if(Array.isArray(pre)&&!p?.data?.blocks_json)return pre as NoteShortcut[];
  let bl:any;try{bl=JSON.parse(String(p?.data?.blocks_json||'[]'));}catch{return [];}
  if(!Array.isArray(bl))return [];const out:NoteShortcut[]=[];
  for(const b of bl)if(b?.type==='collection'&&Array.isArray(b.data?.notebooks)&&Array.isArray(b.data?.subshortcuts))out.push(...resolveShortcuts({...b.data,shortcuts:b.data.subshortcuts}));

@@ -63,7 +63,7 @@ function usePageDirectory(api:SofiaApi){
     const stale=complete?staleTrash(seen):[]; // so com a lista inteira (ver staleTrash)
      if(live&&!trashSwept){trashSwept=true;for(const x of stale.slice(0,5))void api.deleteEntity(x.id).catch(()=>{/* tenta na proxima abertura */});} // lixeira com mais de 30 dias
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
-    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x)}})));
+    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x),note_subshortcuts:pageSubShortcuts(x)}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
   void load();
