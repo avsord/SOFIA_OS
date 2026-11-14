@@ -1,7 +1,7 @@
 // 14/11/2026 (Pedro): ponto ao lado do Início quando chega a hora de um item da linha do tempo.
-// Fica enquanto o item que chegou não for feito; evento (sem "feito") sai 5 min depois do fim.
+// Fica enquanto o item que chegou não for feito; evento (sem "feito") sai 5 min depois de começar.
 // Quando chega outro item, o ponto passa a valer para ele.
-export type Arrival = {at: number; until: number; title: string};
+export type Arrival = {at: number; until: number; title: string; color?: string};
 let items: Arrival[] = [];
 const subs = new Set<() => void>();
 
