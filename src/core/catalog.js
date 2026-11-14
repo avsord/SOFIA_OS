@@ -947,7 +947,10 @@ const CATALOG={
       {"key":"parent_id","label":"Página pai","type":"text"},
       {"key":"node_type","label":"Tipo de nó","type":"select","options":["space","page"]},
       {"key":"blocks_json","label":"Conteúdo em blocos","type":"textarea","max":250000},
-      {"key":"lock_json","label":"Conteúdo trancado (cifrado no navegador)","type":"textarea","max":400000,"developerOnly":true}
+      {"key":"lock_json","label":"Conteúdo trancado (cifrado no navegador)","type":"textarea","max":400000,"developerOnly":true},
+      {"key":"sidebar_sub","label":"Subatalho na barra lateral","type":"flag","developerOnly":true},
+      {"key":"sidebar_color","label":"Cor do ponto na barra lateral","type":"text","max":20,"developerOnly":true},
+      {"key":"sidebar_colors","label":"Cores dos pontos das notas na barra lateral","type":"colormap","developerOnly":true}
     ],
     "description": "Espaço ou página personalizável do usuário. Espaços raiz aparecem em Seus Espaços; páginas podem ficar aninhadas dentro deles.",
     "defaultPrivacy": "private"

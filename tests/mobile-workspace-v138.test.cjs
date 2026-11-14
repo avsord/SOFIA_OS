@@ -57,3 +57,13 @@ test('native conversation: same owner web conversation is visible and continues 
  assert.equal(r.body.conversation_id,c.id);assert.equal(f.store.messages(c.id).length,2);
  const list=await f.request('/conversations',undefined,'GET',token);assert.ok(list.body.items.some(i=>i.id===c.id));
 });
+test('barra lateral igual em todo navegador: subatalho e cores dos pontos ficam na conta',async t=>{
+ const f=await setup(t),token=await f.login();const r=await f.request('/workspace/entities',{kind:'user_page',title:'Pai',area:'Pessoal',privacy:'private',data:{}},'POST',token);
+ assert.equal(r.status,201,JSON.stringify(r.body));const id=r.body.id;
+ assert.equal(f.workspace.get(id).data.sidebar_sub,undefined,'sem escolha, o campo não existe (o site sobe o que estava só no navegador)');
+ const p=await f.request('/workspace/entities/'+id,{revision:r.body.revision,data:{...r.body.data,sidebar_sub:true,sidebar_color:'#87d900',sidebar_colors:{nota1:'#005ed9'}}},'PATCH',token);
+ assert.equal(p.status,200,JSON.stringify(p.body));const d=f.workspace.get(id).data;
+ assert.equal(d.sidebar_sub,true);assert.equal(d.sidebar_color,'#87d900');assert.deepEqual(d.sidebar_colors,{nota1:'#005ed9'});
+ const bad=await f.request('/workspace/entities/'+id,{revision:p.body.revision,data:{...d,sidebar_colors:{x:'url(javascript:1)'}}},'PATCH',token);
+ assert.equal(bad.status,400);
+});

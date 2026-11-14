@@ -46,7 +46,10 @@ class Workspace {
    let privacy=input.privacy||old?.privacy||def.defaultPrivacy||(def.group==='study'||def.group==='library'?'shared':'private');if(privacy==='public')privacy='shared';if(!PRIV.includes(privacy))throw new AppError('BAD_PRIVACY','Privacidade inválida.');if(def.private&&privacy==='shared')throw new AppError('PRIVATE_RECORD','Esse tipo de registro deve permanecer privado ou local.');
    const raw=input.data===undefined?(old?.data||{}):input.data;if(!raw||Array.isArray(raw)||typeof raw!=='object')throw new AppError('BAD_DATA','Campos inválidos.');
    const data={};const permitted=new Set(def.fields.map(f=>f.key));for(const k of Object.keys(raw))if(!permitted.has(k))throw new AppError('BAD_FIELD','Campo não previsto: '+k);
-   for(const f of def.fields){let v=raw[f.key];if(v===undefined||v===null||v===''){data[f.key]=f.type==='checkbox'?false:'';continue;}
+   for(const f of def.fields){let v=raw[f.key];if((f.type==='flag'||f.type==='colormap')&&(v===undefined||v===null||v===''))continue;if(v===undefined||v===null||v===''){data[f.key]=f.type==='checkbox'?false:'';continue;}
+     // 14/11/2026 (Pedro: barra lateral diferente em cada navegador): subatalho (sim/não, ausente = nunca escolhido) e cores dos pontos da barra lateral ficam na conta
+     if(f.type==='flag'){if(typeof v!=='boolean')throw new AppError('BAD_FIELD',f.label+': use sim ou não.');data[f.key]=v;continue;}
+     if(f.type==='colormap'){if(typeof v!=='object'||Array.isArray(v)||Object.keys(v).length>300)throw new AppError('BAD_FIELD',f.label+': cores inválidas.');const m={};for(const [k,c] of Object.entries(v)){if(k.length>120||typeof c!=='string'||!/^#[0-9a-f]{3,8}$/i.test(c))throw new AppError('BAD_FIELD',f.label+': cor inválida.');m[k]=c;}data[f.key]=m;continue;}
      if(f.type==='checkbox'){if(typeof v!=='boolean')throw new AppError('BAD_FIELD',f.label+': marque sim ou não.');}
      else if(f.type==='number'){if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1e10)throw new AppError('BAD_FIELD',f.label+': use um número positivo.');}
      else if(f.type==='date')v=dateISO(v,f.label);
