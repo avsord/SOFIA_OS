@@ -269,7 +269,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  const quickEditNow=async(r:DayRecord,ch:QuickEdit)=>{const o:any=r.original;if(!o)return;const iso=ch.at.toISOString(),moved=Math.abs(ch.at.getTime()-new Date(r.date).getTime())>=60000;
   if(r.isTask){const id=String(o.id||r.id.replace(/^task:/,'')),task=tasks.find(x=>x.id===id);if(!task)return;const shift=moved&&task.due_at&&task.end_at&&Date.parse(task.end_at)>Date.parse(task.due_at)?{end_at:new Date(ch.at.getTime()+Date.parse(task.end_at)-Date.parse(task.due_at)).toISOString()}:{};
    const undoTask=optimistic({...task,title:ch.title,priority_level:ch.priority} as Task,task.state);
-   const res=await api.saveTask({...task,title:ch.title,priority_level:ch.priority,...(ch.description!==(task.description||'')?{description:ch.description,...(task.description_document?{description_document:{version:1,text:ch.description,marks:[]}}:{})}:{}) /* texto mudou no mini editor: a formatacao antiga nao vale mais */,...(moved&&task.due_at?{due_at:iso,...shift,timeline_move:false}:{})} as any).catch(e=>{undoTask();throw e;});setTasks(prev=>prev.map(x=>x.id===id?res.item:x));refreshAgenda();return;}
+   const res=await api.saveTask({...task,title:ch.title,priority_level:ch.priority,...(ch.description!==(task.description||'')?{description:ch.description,...(task.description_document?{description_document:{version:1,text:ch.description,marks:[]}}:{})}:{}) /* texto mudou no mini editor: a formatacao antiga nao vale mais */,...(moved&&task.due_at?{due_at:iso,...shift,timeline_move:false}:{}),...(ch.end!==undefined?{end_at:ch.end}:{})} as any).catch(e=>{undoTask();throw e;});setTasks(prev=>prev.map(x=>x.id===id?res.item:x));refreshAgenda();return;}
   const raw:any=rawEvent(o),from=String(o.data?.sofia_moved_from||new Date(r.date).toISOString());
   // 05/11/2026 (Pedro): lembrete com outras datas (grupo) pergunta se a mudanca vale so para esta data ou para todas
   const grp=(raw.tags||[]).find((t:string)=>String(t).startsWith('sofia-rgroup-v1:')),textChanged=ch.title!==raw.title||ch.description!==String(raw.content||'')||ch.priority!==String(raw.data?.priority_level||'');
@@ -281,7 +281,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
   setTimeout(unpatch,20000);
   try{
   if(all)for(const sb of sibs as any[])await api.saveEntity({...sb,title:ch.title,content:ch.description,data:{...(sb.data||{}),priority_level:ch.priority},revision:sb.revision});
-  await api.saveEntity({...raw,title:ch.title,content:ch.description,data:{...(raw.data||{}),priority_level:ch.priority,...(raw.data?.description!==undefined?{description:ch.description}:{})},...(moved?{tags:withMove(raw.tags,from,iso)}:{}),revision:raw.revision});
+  await api.saveEntity({...raw,title:ch.title,content:ch.description,data:{...(raw.data||{}),priority_level:ch.priority,...(ch.end!==undefined?{end_at:ch.end}:{}),...(raw.data?.description!==undefined?{description:ch.description}:{})},...(moved?{tags:withMove(raw.tags,from,iso)}:{}),revision:raw.revision});
   }catch(e){unpatch();throw e;}
   refreshAgenda();setTimeout(unpatch,4000);};
  // 05/11/2026 (Pedro: X na linha do tempo): tarefa sai so da linha (fica sem horario, em Tarefas) ou e excluida; compromisso/lembrete excluido

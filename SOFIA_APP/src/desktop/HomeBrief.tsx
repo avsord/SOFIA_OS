@@ -346,7 +346,7 @@ const recMute = (r: DayRecord) => {const o: any = r.original || {}, tags: string
 const MARK_COLOR: Record<TimeMark['kind'], string> = {bill: '#E8B04A', income: '#7ED6A5', invoice: '#B49AE6', package: '#F0956A', routine: '#5FD3C6'};
 /** 0.3.313 (Pedro): a previa e um cartao de verdade - da para agir nele (concluir tarefa, Paguei, Recebi, Tomei) e editar;
  * fica aberta enquanto o mouse esta nela; clicar na marca fixa o cartao. Rotina na cor do tipo (como em Rotina). */
-export type QuickEdit = {title: string; at: Date; priority: string; description: string};
+export type QuickEdit = {title: string; at: Date; priority: string; description: string; end?: string /* 14/11/2026: undefined = fim nao mudou; vazio = sem fim */};
 export type TimelineActions = {onAskAt?: (at: Date) => void; onEdit: (r: DayRecord) => void; onQuickEdit?: (r: DayRecord, ch: QuickEdit) => Promise<void>; onRemove?: (r: DayRecord, mode: 'timeline' | 'all') => Promise<void>; onHideMark?: (m: TimeMark) => void; onToggleTask?: (r: DayRecord) => void; onMarkAction?: (m: TimeMark) => void; onMarkOpen?: (m: TimeMark) => void; onMove?: (moves: Move[]) => void; onAddAt?: (kind: AddKind, at: Date) => void; sofia?: SofiaBridge};
 /** 0.3.317 (Pedro): arrastar na linha do tempo muda so aquela vez (compromisso, lembrete, tarefa ou dose da Rotina). */
 export type MoveTarget = MuteTarget | {mark: TimeMark};
@@ -1007,16 +1007,17 @@ function QuickEditor({r, color, kind, priority, description, onSave, onCancel, o
   // girar o scroll dentro da janelinha (ex.: descricao comprida) nao pode mexer a linha do tempo por baixo
   const rootRef = useRef<any>(null);
   useEffect(() => {const n = rootRef.current; if (!n || typeof n.addEventListener !== 'function') return; const stop = (e: any) => e.stopPropagation(); n.addEventListener('wheel', stop, {passive: true}); return () => n.removeEventListener('wheel', stop);}, []);
+  const end0 = endOfRec(r), [end, setEnd] = useState(end0);
   const cancel = () => {QUICK_DRAFTS.delete(r.id); onCancel();};
   const ok = !!title.trim() && Number.isFinite(Date.parse(at)) && !busy;
   const save = async () => {if (!ok) return; setBusy(true); setErr('');
-    try {await onSave({title: title.trim(), at: new Date(at), priority: prio, description: desc}); QUICK_DRAFTS.delete(r.id);} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
+    try {await onSave({title: title.trim(), at: new Date(at), priority: prio, description: desc, ...(end !== end0 ? {end} : {})}); QUICK_DRAFTS.delete(r.id);} catch (e: any) {setErr(String(e?.message || 'Não foi possível salvar.')); setBusy(false);}};
   const field = {borderRadius: 10, backgroundColor: c.input, color: c.text, paddingHorizontal: 11, fontSize: 14, outlineStyle: 'none'} as any;
   return <View ref={rootRef} style={{padding: 12, gap: 9}}>
     <Text style={{fontSize: 11, color: c.muted}}>Editar {kind.toLowerCase()}</Text>
     <TextInput value={title} onChangeText={setTitle} autoFocus onSubmitEditing={() => void save()} {...({onKeyPress: (e: any) => {if (e.nativeEvent?.key === 'Escape') {e.preventDefault?.(); cancel();}}} as any)} placeholder="Nome" placeholderTextColor={c.muted} style={[field, {height: 36}]} />
     <TextInput value={desc} onChangeText={setDesc} multiline placeholder="Descrição" placeholderTextColor={c.muted} accessibilityLabel="Descrição" style={[field, {minHeight: 96, maxHeight: 220, paddingVertical: 8, fontSize: 13, lineHeight: 19, textAlignVertical: 'top'}]} />
-    <DateTimeField label="Data e horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} />
+    <DateTimeField label="Data e horário" compact allowClear={false} value={at} onChange={v => v && setAt(v)} end={end} onEndChange={setEnd} />
     <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6}}>{TASK_PRIORITIES.map(o => {const on = prio === o.value, col = o.color || c.muted;
       return <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{checked: on}} onPress={() => setPrio(o.value)} style={({hovered}: any) => ({flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 10, borderRadius: 9, backgroundColor: on ? tint(col, 0.2) : hovered ? c.line : c.input})}>
         <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: col}} /><Text style={{fontSize: 12, color: on ? (o.color || c.text) : c.text}}>{o.label}</Text></Pressable>;})}</View>

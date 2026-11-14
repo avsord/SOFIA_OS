@@ -55,8 +55,8 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
       <TextInput autoFocus accessibilityLabel="Título do compromisso" value={title} onChangeText={setTitle} placeholder="Nome do compromisso" placeholderTextColor={c.muted} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input}]}/>
      </View>
      <TaskLinkPanel api={api} value={taskLink} onChange={setTaskLink} onPick={(t,task)=>{setTitle(t);if(task?.description&&!description.trim())setDescription(task.description);if(task?.priority_level&&task.priority_level!=='none')setPriority(task.priority_level);}}/>
-     <DateTimeField label={type==='task'?'Dia e horário':'Início'} value={start} onChange={setStart} allowClear={false}/>
-     {type==='commitment'?<DateTimeField label="Fim" value={end} onChange={setEnd}/>:null}
+     <DateTimeField label={type==='task'?'Dia e horário':'Data e horário'} value={start} onChange={setStart} allowClear={false} {...(type==='commitment'?{end,onEndChange:setEnd}:{})}/>
+     
      <Choice label="Prioridade do compromisso" value={priority} options={TASK_PRIORITIES.map(p=>({value:p.value,label:p.label}))} onChange={setPriority}/>
      <Choice label="Área do compromisso" creatable value={area} options={[...new Set([area,...areas].filter(Boolean))].map(value=>({value,label:value}))} onChange={setArea}/>
      <View><Text style={[forms.label,{color:c.muted}]}>Descrição</Text>
