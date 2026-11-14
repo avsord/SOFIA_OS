@@ -762,6 +762,18 @@ function makeMobileApi(runtime, deps) {
       return send({items: await require('../services/library-search').librarySearch(String(b.q || ''), {prefer: String(b.prefer || '')})});
     }
     // 0.3.269 (Financas no site): arrastar/colar a nota no campo de lancar - a Sofia le e devolve para conferir (nada e salvo aqui)
+    // 14/11/2026 (Pedro: "a correção aparece no layout da Sofia, não no do navegador"): o navegador não entrega as sugestões dele ao site
+    if (p === '/api/mobile/spell' && m === 'POST') {
+      rate(session, 'spell', 120); const b = await bodyJson(req, 16 * 1024);
+      const word = String(b.word || '').trim().slice(0, 60), context = String(b.context || '').slice(0, 300);
+      if (!word || /\s/.test(word)) return send({suggestions: []});
+      const schema = {type: 'object', additionalProperties: false, required: ['ok', 'suggestions'], properties: {ok: {type: 'boolean'}, suggestions: {type: 'array', items: {type: 'string'}}}};
+      const instructions = 'Corretor ortográfico de português do Brasil. Diga se a palavra está escrita certo (ok) e, se não estiver, até 4 correções de grafia (a mais provável primeiro), mantendo maiúsculas/minúsculas da original. Use a frase só para escolher a palavra certa; não troque por sinônimos.';
+      const r = await runtime.routing.respondStructured('private', {instructions, input: [{role: 'user', content: [{type: 'input_text', text: 'Palavra: ' + word + ' | Frase: ' + context}]}], schema, name: 'spell', maxOutputTokens: 120});
+      const out = r && r.data !== undefined ? r.data : r || {};
+      const sug = out.ok ? [] : (Array.isArray(out.suggestions) ? out.suggestions : []).map(x => String(x).trim()).filter(x => x && x !== word && !/\s{2}/.test(x)).slice(0, 4);
+      return send({suggestions: sug});
+    }
     if (p === '/api/mobile/finance/read-receipt' && m === 'POST') {
       rate(session, 'receipt', 30); const b = await bodyJson(req, 8 * 1024 * 1024);
       const mime = /^image\/(png|jpe?g|webp|gif)$/.test(String(b.mime)) ? String(b.mime) : 'image/jpeg', data = String(b.base64 || '').replace(/^data:[^,]*,/, '');

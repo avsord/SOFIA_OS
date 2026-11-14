@@ -448,6 +448,7 @@ export class SofiaApi {
   // 08/11/2026 (Quadro): anexos de um e-mail encontrado (buscados so quando pedidos) e copia de um deles para a pagina (Drive)
   mailAttachments(hitId: string) { return this.request<{items: {part: string; name: string; mime: string; bytes: number}[]}>('/mail/hits/' + encodeURIComponent(hitId) + '/attachments', undefined, 'GET', 40000); }
   mailAttachmentToPage(hitId: string, page: string, part: string) { return this.request<{id: string; name: string; mime: string; bytes: number}>('/mail/hits/' + encodeURIComponent(hitId) + '/attachments/to-page', {page, part}, 'POST', 120000); }
+  spell(word: string, context: string) { return this.request<{suggestions: string[]}>('/spell', {word, context}, 'POST', 15000); }
   linkPreview(url: string) { return this.request<LinkPreview>('/link/preview', {url}, 'POST', 15000); }
   profilePhoto() { return this.request<{photo: ProfilePhoto | null}>('/profile/photo'); }
   saveProfilePhoto(mime: string, base64: string) { return this.request<{ok: boolean; updated_at: string}>('/profile/photo', {mime, base64}, 'POST', 60000); }

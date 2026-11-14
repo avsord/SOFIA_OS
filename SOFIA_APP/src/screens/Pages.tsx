@@ -411,6 +411,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </View>;
  }
  // 0.3.267 (computador): barra que aparece ao selecionar texto, como no Notion (print do Pedro)
+ const [spell,setSpell]=useState<{word:string;list:string[]|null}|null>(null);
  const [bar,setBar]=useState<{id:string;x:number;y:number;bottom:number;text:string}|null>(null),[barMenu,setBarMenu]=useState<'type'|'color'|'link'|null>(null),[linkUrl,setLinkUrl]=useState('');
  const barRange=useRef<any>(null),barRef=useRef<any>(null);
  useEffect(()=>{if(!webKeys||!active)return;const d=(globalThis as any).document;if(!d)return;
@@ -418,7 +419,20 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(!sel||sel.isCollapsed||!sel.rangeCount){setBar(null);setBarMenu(null);return;}const host=(sel.anchorNode?.nodeType===1?sel.anchorNode:sel.anchorNode?.parentElement)?.closest?.('[data-testid^="page-rich-"]');
    if(!host||!host.contains(sel.focusNode)){setBar(null);return;}const r=sel.getRangeAt(0).getBoundingClientRect();barRange.current=sel.getRangeAt(0).cloneRange();
    setBar({id:String(host.getAttribute('data-testid')).replace('page-rich-',''),x:r.left+r.width/2,y:r.top,bottom:r.bottom,text:sel.toString()});};
-  d.addEventListener('selectionchange',on);return()=>d.removeEventListener('selectionchange',on);},[webKeys,active,barMenu]);
+  // 14/11/2026 (Pedro: "a correção aparece no layout da Sofia e não no do navegador"): clique direito no texto abre só o menu da Sofia,
+  // com a palavra selecionada e as correções no topo (o navegador não entrega as sugestões dele ao site)
+  const ctx=(e:any)=>{const host=e.target?.closest?.('[data-testid^="page-rich-"]');if(!host||e.shiftKey)return;e.preventDefault();const sel=d.getSelection();if(!sel)return;
+   const inside=sel.rangeCount&&!sel.isCollapsed&&host.contains(sel.anchorNode);
+   if(!inside){const pos=d.caretRangeFromPoint?.(e.clientX,e.clientY);if(pos){sel.removeAllRanges();sel.addRange(pos);}sel.modify?.('move','backward','word');sel.modify?.('extend','forward','word');}
+   const raw=sel.toString(),word=raw.trim().replace(/[.,;:!?…"“”'()\[\]]+$/,'');
+   if(sel.rangeCount&&raw!==raw.trimEnd()){const r=sel.getRangeAt(0);try{r.setEnd(r.endContainer,Math.max(r.startOffset,r.endOffset-(raw.length-raw.trimEnd().length)));sel.removeAllRanges();sel.addRange(r);}catch{}}
+   if(!word||/\s/.test(word)||!/\p{L}/u.test(word)){setSpell(null);return;}
+   const context=String(host.textContent||'').slice(0,300);setSpell({word,list:null});
+   api.spell(word,context).then(r=>setSpell(s=>s&&s.word===word?{word,list:r?.suggestions||[]}:s)).catch(()=>setSpell(s=>s&&s.word===word?{word,list:[]}:s));};
+  d.addEventListener('selectionchange',on);d.addEventListener('contextmenu',ctx);return()=>{d.removeEventListener('selectionchange',on);d.removeEventListener('contextmenu',ctx);};},[webKeys,active,barMenu]);
+ useEffect(()=>{if(!bar)setSpell(null);else if(spell&&bar.text.trim().replace(/[.,;:!?…"“”'()\[\]]+$/,'')!==spell.word)setSpell(null);},[bar]);
+ function applySpell(fix:string){const d=(globalThis as any).document,sel=d?.getSelection();if(!sel)return;if(barRange.current){sel.removeAllRanges();sel.addRange(barRange.current);}
+  const t=sel.toString(),end=t.slice(t.trimEnd().replace(/[.,;:!?…"“”'()\[\]]+$/,'').length);d.execCommand('insertText',false,fix+end);setSpell(null);setBar(null);}
  function keepSelection(node:any){barRef.current=node;if(!node||node.__keep)return;node.__keep=true;node.addEventListener('mousedown',(e:MouseEvent)=>{const t=e.target as HTMLElement;if(t?.tagName!=='INPUT')e.preventDefault();});}
  function restoreBarRange(){const d=(globalThis as any).document,r=barRange.current;if(!d||!r)return;const sel=d.getSelection();sel.removeAllRanges();sel.addRange(r);}
  function fmt(cmd:string,value?:string){const d=(globalThis as any).document;if(!d)return;restoreBarRange();if(cmd==='foreColor'||cmd==='hiliteColor')d.execCommand('styleWithCSS',false,true);
@@ -447,6 +461,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   const typeLabel=(slashMatches('').find(x=>x.type===b.type)?.label)||'Texto';
   return <View ref={keepSelection} testID="page-format-bar" style={{position:'fixed' as any,left,...(above?{bottom:vh-bar.y+8}:{top:bar.bottom+8}),width:W,maxHeight:maxH,zIndex:9500,borderRadius:12,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,shadowColor:'#000',shadowOpacity:0.32,shadowRadius:22,shadowOffset:{width:0,height:10},overflow:'hidden'}}>
    <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:maxH}} contentContainerStyle={{padding:6,gap:4}}>
+   {spell?<View testID="page-spell" style={{gap:2,paddingBottom:4,borderBottomWidth:1,borderColor:c.line}}>
+    <Text style={{color:c.muted,fontSize:11,paddingHorizontal:8,paddingTop:2}}>Correção</Text>
+    {spell.list===null?<Text style={{color:c.muted,fontSize:13,paddingHorizontal:8,paddingVertical:6}}>Procurando…</Text>
+     :spell.list.length?spell.list.map(s=><Pressable key={s} accessibilityRole="button" accessibilityLabel={'Corrigir para '+s} onPress={()=>applySpell(s)} style={({hovered}:any)=>({paddingHorizontal:8,paddingVertical:6,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{s}</Text></Pressable>)
+     :<Text style={{color:c.muted,fontSize:13,paddingHorizontal:8,paddingVertical:6}}>Escrita certa</Text>}
+   </View>:null}
    <Pressable accessibilityRole="button" accessibilityLabel="Transformar em" onPress={()=>setBarMenu(m=>m==='type'?null:'type')} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,height:32,paddingHorizontal:8,borderRadius:6,backgroundColor:hovered||barMenu==='type'?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:13,fontWeight:'600',width:16}}>T</Text><Text style={{flex:1,color:c.text,fontSize:13}}>{typeLabel==='Texto'?'Texto normal':typeLabel}</Text><Text style={{color:c.muted,fontSize:13}}>›</Text></Pressable>
    {barMenu==='type'?<View style={{borderTopWidth:1,borderBottomWidth:1,borderColor:c.line,paddingVertical:4}}>{slashMatches('').filter(x=>TEXT_BLOCKS.has(x.type)).map(x=><Pressable key={x.type} onPress={()=>{updateBlock(b,{type:x.type});setBarMenu(null);}} style={({hovered}:any)=>({flexDirection:'row',gap:8,paddingHorizontal:8,paddingVertical:5,borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text numberOfLines={1} style={{width:28,color:c.muted,fontSize:12,fontWeight:'600'}}>{x.icon}</Text><Text style={{color:c.text,fontSize:13}}>{x.label}</Text></Pressable>)}</View>:null}
    <View style={{height:1,backgroundColor:c.line}}/>
