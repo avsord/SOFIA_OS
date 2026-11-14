@@ -21,7 +21,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-14 (~07:20, Brasília), no **Claude Code** (PEDRO). Últimas (site, sem APK, não conferidas na Sofia logada): biblioteca de capas; página não se mexe ao digitar (fit-textarea); sinal ⇪ do Caps Lock dentro do campo. Próximo: Pedro confere as três.
+- **Atualizado em:** 2026-11-14 (~07:20, Brasília), no **Claude Code** (PEDRO). Últimas (site, sem APK, não conferidas na Sofia logada): seção Atalhos do topo removida (só subatalhos); biblioteca de capas; página não se mexe ao digitar (fit-textarea); sinal ⇪ do Caps Lock dentro do campo. Próximo: Pedro confere as três.
 - **14/11 ~06:00 (Claude Code), só site, SEM APK:** seletor de cor do atalho e do SUBATALHO refeito (`desktop/ColorPicker.tsx`): depois enxugado a pedido: só barras de cor e luz, pequeno, abre junto da bolinha; Esc cancela, clique fora guarda. Próximo: Pedro confere no site; teste `notas-atalho-14-11` já falhava antes (a corrigir).
 - **14/11 ~05:20 (Claude Code), só site, SEM APK:** SUBATALHO (só se ativar: "Virar subatalho" na página ou na nota) fica embaixo da página principal na árvore, mesmo fechada; atalhos da barra lateral mostram só "nome / página principal" (sem pasta nem cadeia); clicar na bolinha abre seletor de cor em gradiente contínuo (quadrado + barra de matiz, `desktop/ColorPicker.tsx`); cor de atalho de página fica no navegador (`shortcutPageColors`). tsc ok, testes ok (061 só sem Java).
 - **14/11 ~05:05 (Claude Code), só site, SEM APK:** página trancada: Ctrl+A fora do campo (ex.: depois de "Senha incorreta") selecionava a página inteira; agora seleciona a senha (`LockFrame` em `PageLock.tsx`). Conferido no laboratório.
@@ -180,6 +180,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   guarda rotas da Home; o restante hidrata por `api.hydrate()`.
 
 ## 7. Decisões fechadas
+- 14/11/2026 (Pedro): sem seção Atalhos no topo da barra lateral; só subatalhos na árvore.
 - 14/11/2026 (Pedro): capas enviadas ficam numa biblioteca; remover da página não apaga; só sai tirando da biblioteca (substitui a limpeza automática de capas antigas).
 - **(13/11/2026, Pedro) Mimic Kaizen aplicada à Sofia gera "outra Sofia", profissional como o Notion:** muda a estrutura (layout, componentes, painéis, edição, movimento), mantém cor e identidade; começa por Páginas, desenho antes do código.
 - **(13/11/2026) Salvar como o Notion:** calado; nada no topo enquanto digita; "Salvando…" só se a gravação demorar. "Só a estrutura" mantém os títulos de seção do modelo e esvazia o resto.
@@ -328,7 +329,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
-- 14/11: teste `SOFIA_APP/tests/notas-atalho-14-11.test.cjs` falha ("barra lateral mostra os atalhos como subpaginas") desde as rodadas de subatalho; ajustar o teste ou o código. Pedro conferir o seletor de cor novo no site.
+- 14/11: Pedro conferir no site: seletor de cor, biblioteca de capas, página sem pular ao digitar, sinal ⇪ do Caps Lock, barra sem a seção Atalhos.
 - **(14/11 03:40)** Pedro confere no site: alça ⋮⋮ para mover a foto na nota, linha depois da foto, 4 cantos de escala, painel lateral esticando pela borda, pastas 2×2; e explica o "tá ficando travado nisso" do print (não deu para saber o que trava).
 - **(13/11 22h)** Pedro confere no site: Ctrl+Z com anexo, copiar texto+anexo, arrastar a subpágina do topo, Tab, editor/barra das Notas e o "agora" da linha do tempo (lista no §0). Editor rico das Notas é só no site; no celular a nota segue com a barra do teclado.
 - **(13/11 noite)** Pedro confere no site os 13 pedidos das Anotações/Páginas e as 5 correções da Mimic (lista no §0); tudo passou no robô `notas-lab` e nos testes, mas não foi visto com os dados dele. "Paguei" que sumia: causa provável (conta atrasada >31 dias), não reproduzida com os dados da Mimic.
@@ -430,11 +431,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
 & 2026-11-14 & (sem APK) & Seletor de cor de atalho&subatalho refeito: 10 cores prontas, barras de matiz e tom, prévia + código da cor, botão Padrão, Esc cancela, clique fora&Enter guarda, abre para cima se não couber & tsc ok; testes ok (061 só sem Java; notas-atalho-14-11 já falhava antes); não conferido no navegador &
+| 2026-11-14 | (sem APK) | Seção "Atalhos" do topo da barra lateral removida, com os menus "Virar atalho" (página e nota); ficam só os subatalhos na árvore | tsc ok; testes ok (teste dos atalhos reescrito; 061 só sem Java); não conferido no navegador |
 | 2026-11-14 | (sem APK) | Caps Lock: em vez da linha que empurrava o botão, sinal ⇪ dentro do campo de senha, à direita (`CapsBadge`), login e página trancada | tsc ok; testes ok; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Página não se mexe mais ao digitar: altura dos campos (páginas, notas, tabelas) medida numa cópia invisível (`lib/fit-textarea.ts`), o campo nunca encolhe a 0 | tsc ok; testes ok (061 só sem Java); medida conferida no navegador (rolagem 380→380); não conferido na Sofia logada |
 | 2026-11-14 | (sem APK) | Biblioteca de capas: toda capa enviada fica guardada ("Suas capas" na Galeria, PC e celular); trocar/remover/excluir página não apaga mais; só sai pelo × (confirma "Tirar?"), recusa se em uso. Rotas GET/DELETE /api/covers | tsc ok; testes de capa reescritos ok; demais falhas iguais às de antes; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seletor de cor enxuto (pedido do Pedro): só barras de cor e luz, pequeno, abre junto da bolinha (portal no body; antes ficava longe e cortado) | tsc ok; teste do seletor ok; não conferido no navegador |
-| 2026-11-14 | (sem APK) | Seletor de cor de atalho/subatalho refeito: 10 cores prontas, barras de matiz e tom, prévia + código da cor, Padrão, Esc cancela, clique fora/Enter guarda, abre para cima se não couber | tsc ok; testes ok (061 só sem Java; notas-atalho-14-11 já falhava antes); não conferido no navegador |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

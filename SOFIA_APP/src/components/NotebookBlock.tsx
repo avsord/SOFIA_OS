@@ -179,7 +179,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
    ...(inEditor?[]:[{label:'Abrir',icon:'note' as const,run:()=>{setBookId(bid);setLeafId(pid);}}]),
    {label:'Renomear',icon:'edit',run:()=>{setBookId(bid);setLeafId(pid);setTimeout(()=>leafTitle.current?.focus(),inEditor?60:320);}},
    {label:'Duplicar',icon:'copy',run:()=>duplicateNote(bid,pid,inEditor)},
-   shortcutItem('note',pid),
+   
    subItem(pid),
    {label:'Mover para outra pasta',icon:'move',run:()=>{const dests=moveDests(bid);if(where&&dests.length){openContextMenu(where.x,where.y,dests.map(d=>({label:d.label,run:()=>moveNoteTo(bid,pid,d.id)})));return;}setMenuNote({book:bid,leaf:pid});setMoving(true);}},
    {label:'Excluir nota',icon:'trash',danger:true,run:()=>deleteNote(bid,pid)},
@@ -198,7 +198,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   ...(withOpen?[{label:'Abrir',icon:'note' as const,run:()=>setOpenBook(b.id)}]:[]),
   {label:'Renomear',icon:'edit',run:()=>{setEditingBook(b.id);setNewName(b.name);setCreate(true);}},
   {label:'Trocar ícone',icon:'sparkle',run:()=>{setEmojiBook(b.id);setEmoji(b.emoji||'');}},
-  shortcutItem('folder',b.id),
+  
   subItem(b.id,'folder'),
   {label:'Excluir pasta',icon:'trash',danger:true,run:()=>removeBook(b.id)}];}
  const commitTitle=()=>{const t=title.trim()||'Notas';setTitle(t);if(t!==String(data.title||'Notas'))onChange({...data,mode:'notebooks',title:t,notebooks:books},'notebook-title');};
