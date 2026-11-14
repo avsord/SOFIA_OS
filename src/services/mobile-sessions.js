@@ -2,7 +2,8 @@
 const crypto = require('node:crypto');
 const { AppError } = require('../core/util');
 const sha = value => crypto.createHash('sha256').update(String(value)).digest('hex');
-const TTL = 12 * 60 * 60 * 1000;
+// 14/11/2026 (Pedro: o site deslogava sozinho): sessão vale 30 dias, não mais 12 h
+const TTL = 30 * 24 * 60 * 60 * 1000;
 // Single-owner sessions. Store only the digest of the bearer token.
 class MobileSessions {
   constructor(store, auth, config) {

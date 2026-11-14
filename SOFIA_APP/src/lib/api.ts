@@ -86,7 +86,7 @@ const secureOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVIC
 export async function readAuth(): Promise<Auth | null> {
   const raw = await takeStartupAuth(()=>SecureStore.getItemAsync(AUTH_KEY));
   if (!raw) return null;
-  try { const a = JSON.parse(raw); if (typeof a.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(a.token) || !Number.isFinite(Date.parse(a.expires_at)) || !a.profile) { await forgetAuth(); return null; } return a as Auth; }
+  try { const a = JSON.parse(raw); if (typeof a.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(a.token) || !Number.isFinite(Date.parse(a.expires_at)) || Date.parse(a.expires_at) <= Date.now() || !a.profile) { await forgetAuth(); return null; } return a as Auth; }
   catch { await forgetAuth(); return null; }
 }
 export function saveAuth(auth: Auth) { invalidateStartupAuth(); return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }

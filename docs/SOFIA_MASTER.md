@@ -20,7 +20,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
 - 2026-11-14, Claude Code (PC PEDRO). Pronto, só site (sem APK): (1) clique direito numa palavra das Páginas abre só o menu da Sofia com "Correção" no topo (sugestões pela IA, rota `/api/mobile/spell`; Shift+clique direito ainda abre o menu do navegador); (2) Diário: linha editada 10 min ou mais depois de criada guarda `edited_at` (src/core/block-stamps.js) e mostra "editado HH:MM" / "editado dd/mm HH:MM" no fim da linha (Páginas e Notas); (3b) correção no menu da Sofia GENERALIZADA: todo campo de texto do site (Notas, Quadro, buscas, formulários) por `src/lib/web-spell-menu.ts` (+ Recortar/Copiar/Colar); bolinhas da barra lateral redondas; (3) imagem: cantos de escala aparecem com o mouse em cima (CSS) e, selecionada, Delete/Backspace apaga.
 - Também: seletor de data/hora novo no padrão Notion (desenho aprovado 14/11): início e fim digitáveis, lista de 15 em 15 min, "Horário final" que desliga (sem fim = só o ponto), sem "Confirmar"; Google: fim automático (duração padrão) vira sem fim (`src/services/google.js`).
-- Próximo passo: Pedro confere o ponto ao lado do Início (sai de lá, espera um item da linha do tempo chegar) e o texto menor das Notas no monitor grande.
+- Próximo passo: Pedro entra de novo uma vez (sessões antigas ainda vencem em 12 h) e confere que não desloga mais; confere o ponto do Início (cor do item, evento sai 5 min depois de começar).
 
 ## 1. O dono e a forma de trabalhar
 
@@ -379,11 +379,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | (este) | Modelo Diário nas Notas (por nota; converte linhas com a hora real pelas versões) + servidor guarda created_at de cada bloco de página e nota | tsc ok, testes novos ok, site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Notas: Backspace no começo da linha apaga a linha vazia/junta com a de cima; setas ↑/↓ passam de linha; Início: auréola do "agora" centrada no ponto em tela maior | tsc ok, testes ok, site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Clique direito no texto: só o menu da Sofia, com "Correção" no topo (servidor /api/mobile/spell pela IA). Diário: linha mudada 10 min+ depois ganha edited_at e mostra "editado HH:MM" (ou dd/mm) nas Páginas e Notas | testes da mudança verdes; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Notas: no monitor grande (janela ≥1600 px) o texto fica um pouco menor e igual em todas (corpo 15, títulos 26/22/18, título da nota 29); abaixo disso nada muda. | tsc ok; testes ok (só o 061 falha por falta de Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Ponto ao lado do Início (e no ícone, barra recolhida; centro do Ctrl+K) quando chega um item da linha do tempo: na cor do item; fica até ser feito, evento até 5 min depois de começar, passa ao próximo que chegar; nome no mouse em cima (`src/lib/timeline-arrivals.ts`). | tsc ok; testes ok (só o 061 falha: sem Java no PC) |
+| 2026-11-14 | (sem APK) | (este) | Login: sessão do servidor vale 30 dias (antes vencia 12 h depois do login, mesmo em uso, e o site deslogava sozinho); login guardado já vencido abre direto no login, sem mostrar o conteúdo por 1 s. | testes auth do servidor ok; tsc e testes do app ok |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
