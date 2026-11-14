@@ -151,8 +151,10 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},...((shortcutsFor(p,liveScRef.current).length?[{label:scOpen.has(p.id)?'Ocultar atalhos':'Atalhos',icon:'link',run:()=>setScOpen(prev=>{const n=new Set(prev);if(n.has(p.id))n.delete(p.id);else n.add(p.id);return n;})}]:[]) as MenuItem[]),{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
+ // 14/11/2026 (Pedro: opcao Atalhos no menu da pagina): mostra os atalhos dela mesmo com a seta fechada
+ const [scOpen,setScOpen]=useState<Set<string>>(new Set()),liveScRef=useRef<any>(null);
  // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
  // fechada abre as subpaginas; soltar move a nota (lib/notes-move) e Ctrl+Z devolve
  const [noteOver,setNoteOver]=useState<string|null>(null),treeRef=useRef<any>(null),expandedRef=useRef(expanded);expandedRef.current=expanded;
@@ -178,12 +180,12 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
- const liveSc=useLiveShortcuts();
+ const liveSc=useLiveShortcuts();liveScRef.current=liveSc;
  const rows:React.ReactNode[]=[];
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id),sc=shortcutsFor(p,liveSc);
   rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0||sc.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
   // 14/11/2026 (Pedro): atalho de nota/pasta ligado no menu dela aparece como subpagina; clicar abre a pagina com ela aberta
-  if(open)for(const s of sc){const colors=():MenuItem[]=>SHORTCUT_COLORS.map(k=>({label:k.name,swatch:k.hex,run:()=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},k.hex,api).then(saved=>{if(saved)setDir(list=>list.map(x=>x.id===saved.id?saved:x));systemChanged(api);}).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));}}));
+  if(open||scOpen.has(p.id))for(const s of sc){const colors=():MenuItem[]=>SHORTCUT_COLORS.map(k=>({label:k.name,swatch:k.hex,run:()=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},k.hex,api).then(saved=>{if(saved)setDir(list=>list.map(x=>x.id===saved.id?saved:x));systemChanged(api);}).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));}}));
    rows.push(<Row key={'sc-'+p.id+'-'+s.kind+'-'+s.id} testID={'sidebar-shortcut-'+s.kind+'-'+s.id} depth={depth+1} small dot={s.color||DEFAULT_SHORTCUT_COLOR} onDot={(e:any)=>{const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.left:(e?.nativeEvent?.pageX??0),r?r.bottom+4:(e?.nativeEvent?.pageY??0),colors());}} menu={colors} label={s.label} selected={false} onPress={()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpen(p.id);}}/>);}
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas

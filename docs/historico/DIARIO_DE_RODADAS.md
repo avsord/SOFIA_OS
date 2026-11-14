@@ -36,3 +36,4 @@
 - 14/11/2026: Páginas e tabelas: a tela não pula mais ao digitar ou apertar Enter (a rolagem é guardada ao medir o campo). Testes ok, exceto o 061 que precisa do Java (ambiente).
 - 14/11/2026: caminho no topo clicável (abre a página/pasta clicada).
 - 14/11/2026: aviso Caps Lock nos campos de senha (login e páginas trancadas).
+- 14/11/2026: opção Atalhos no menu da página (barra lateral).
