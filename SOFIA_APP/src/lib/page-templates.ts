@@ -171,3 +171,11 @@ export function diaryDays(blocks:readonly PageBlock[]):{id:string;key:string;lab
  for(const b of blocks){const k=diaryDayKey(b);if(k){const [y,m,d]=k.split('-');out.push({id:b.id,key:k,label:`${d}/${m} · ${WEEKDAYS[new Date(+y,+m-1,+d).getDay()].slice(0,3)}`,count:0,collapsed:!!b.data?.collapsed});}else if(out.length&&isDiaryEntry(b))out[out.length-1].count++;}
  return out;
 }
+/** 14/11/2026 (Pedro: "atualizar uma nota em horário ou dia diferente precisa ser registrado"): rótulo discreto da última edição
+ * de um registro do Diário ("editado 08:10" no mesmo dia; "editado 15/11 08:10" em outro dia). Vazio se não foi editado depois. */
+export function diaryEditedLabel(b:{created_at?:unknown;edited_at?:unknown}):string{
+ const e=typeof b.edited_at==='string'?new Date(b.edited_at):null;if(!e||isNaN(+e))return '';
+ const c=typeof b.created_at==='string'?new Date(b.created_at):null,p=(n:number)=>String(n).padStart(2,'0'),h=`${p(e.getHours())}:${p(e.getMinutes())}`;
+ const same=c&&!isNaN(+c)&&c.toDateString()===e.toDateString();
+ return 'editado '+(same?h:`${p(e.getDate())}/${p(e.getMonth()+1)} ${h}`);
+}
