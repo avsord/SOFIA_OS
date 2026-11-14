@@ -49,3 +49,4 @@
 | 2026-11-14 | (sem APK) | Página não se mexe mais ao digitar: altura dos campos (páginas, notas, tabelas) medida numa cópia invisível (`lib/fit-textarea.ts`), o campo nunca encolhe a 0 | tsc ok; testes ok (061 só sem Java); medida conferida no navegador (rolagem 380→380); não conferido na Sofia logada |
 | 2026-11-14 | (sem APK) | Caps Lock: em vez da linha que empurrava o botão, sinal ⇪ dentro do campo de senha, à direita (`CapsBadge`), login e página trancada | tsc ok; testes ok; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seção "Atalhos" do topo da barra lateral removida, com os menus "Virar atalho" (página e nota); ficam só os subatalhos na árvore | tsc ok; testes ok (teste dos atalhos reescrito; 061 só sem Java); não conferido no navegador |
+| 2026-11-14 | (sem APK) | Barra lateral: fundo de seleção/foco da seta (›) com cantos arredondados e o da bolinha de cor redondo, no formato da bolinha | tsc ok, teste da barra ok, site recompilado |

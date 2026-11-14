@@ -430,12 +430,12 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-& 2026-11-14 & (sem APK) & Seletor de cor de atalho&subatalho refeito: 10 cores prontas, barras de matiz e tom, prévia + código da cor, botão Padrão, Esc cancela, clique fora&Enter guarda, abre para cima se não couber & tsc ok; testes ok (061 só sem Java; notas-atalho-14-11 já falhava antes); não conferido no navegador &
 | 2026-11-14 | (sem APK) | Seção "Atalhos" do topo da barra lateral removida, com os menus "Virar atalho" (página e nota); ficam só os subatalhos na árvore | tsc ok; testes ok (teste dos atalhos reescrito; 061 só sem Java); não conferido no navegador |
 | 2026-11-14 | (sem APK) | Caps Lock: em vez da linha que empurrava o botão, sinal ⇪ dentro do campo de senha, à direita (`CapsBadge`), login e página trancada | tsc ok; testes ok; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Página não se mexe mais ao digitar: altura dos campos (páginas, notas, tabelas) medida numa cópia invisível (`lib/fit-textarea.ts`), o campo nunca encolhe a 0 | tsc ok; testes ok (061 só sem Java); medida conferida no navegador (rolagem 380→380); não conferido na Sofia logada |
 | 2026-11-14 | (sem APK) | Biblioteca de capas: toda capa enviada fica guardada ("Suas capas" na Galeria, PC e celular); trocar/remover/excluir página não apaga mais; só sai pelo × (confirma "Tirar?"), recusa se em uso. Rotas GET/DELETE /api/covers | tsc ok; testes de capa reescritos ok; demais falhas iguais às de antes; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seletor de cor enxuto (pedido do Pedro): só barras de cor e luz, pequeno, abre junto da bolinha (portal no body; antes ficava longe e cortado) | tsc ok; teste do seletor ok; não conferido no navegador |
+$L
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
