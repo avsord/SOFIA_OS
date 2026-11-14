@@ -10,6 +10,24 @@ export function openUrl(url:string){try{if(typeof window!=='undefined')window.op
 export function LinkHoverCard({pop,onEnter,onLeave,onRemove,onClose}:{pop:LinkPop;onEnter:()=>void;onLeave:()=>void;onRemove:()=>void;onClose:()=>void}){
  const c=useTheme(),[copied,setCopied]=React.useState(false);
  React.useEffect(()=>setCopied(false),[pop?.url]);
+ // 14/11/2026 (Pedro: "fica travado nisso"): o cartao so fechava no mouseout do link; se o texto era redesenhado
+ // (digitando/salvando), a pagina rolava ou o clique ia para outro lugar, o mouseout nunca chegava e o cartao ficava
+ // parado em cima da linha. Agora ele mesmo vigia: mouse longe do cartao e de qualquer link fecha em 300 ms;
+ // tecla, rolagem, clique fora ou janela sem foco fecham na hora.
+ const closeRef=React.useRef(onClose);closeRef.current=onClose;
+ React.useEffect(()=>{
+  if(!pop||typeof document==='undefined')return;
+  let t:any=null;const close=()=>{if(t)clearTimeout(t);t=null;closeRef.current();};
+  const card=(n:any)=>!!n?.closest?.('[data-testid="link-hover-card"]');
+  const near=(n:any)=>card(n)||!!n?.closest?.('a[href]');
+  const move=(e:any)=>{if(near(e.target)){if(t)clearTimeout(t);t=null;}else if(!t)t=setTimeout(close,300);};
+  const down=(e:any)=>{if(!card(e.target))close();};
+  const scroll=(e:any)=>{if(!card(e.target))close();};
+  document.addEventListener('mousemove',move,true);document.addEventListener('mousedown',down,true);
+  document.addEventListener('keydown',close,true);document.addEventListener('scroll',scroll,true);window.addEventListener('blur',close);
+  return()=>{if(t)clearTimeout(t);document.removeEventListener('mousemove',move,true);document.removeEventListener('mousedown',down,true);
+   document.removeEventListener('keydown',close,true);document.removeEventListener('scroll',scroll,true);window.removeEventListener('blur',close);};
+ },[pop?.url,pop?.x,pop?.y]);
  if(!pop)return null;
  const vw=typeof window!=='undefined'?window.innerWidth:1200,W=360,left=Math.max(8,Math.min(pop.x,vw-W-8));
  const btn=(label:string,icon:any,run:()=>void,danger=false)=><Pressable accessibilityRole="button" accessibilityLabel={label} onPress={run} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:6,height:28,paddingHorizontal:8,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name={icon} size={14} color={danger?c.danger:c.muted}/><Text style={{color:danger?c.danger:c.text,fontSize:12}}>{label}</Text></Pressable>;
