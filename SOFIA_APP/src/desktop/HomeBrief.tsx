@@ -978,10 +978,10 @@ function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
   const c = useTheme(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
-    {/* aureola */}
-    <View style={[{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: 0.35, transform: [{scale: 0.4}]}, WEB ? NOW_PULSE.halo : null /* 14/11/2026: pulsa mesmo com 'efeitos de animacao' desligado no Windows (Pedro: tem que ficar pulsando) */]} />
+    {/* aureola: 14/11/2026 (Pedro: "centralizar a pulsação") aureola e ponto ancorados no MESMO ponto e recuados pela metade do proprio tamanho (o recuo escalado pela tela maior tirava a aureola do centro) */}
+    <View style={[{position: 'absolute', left: at(0), top, marginLeft: -14, marginTop: -14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: 0.35, transform: [{scale: 0.4}]}, WEB ? NOW_PULSE.halo : null /* 14/11/2026: pulsa mesmo com 'efeitos de animacao' desligado no Windows (Pedro: tem que ficar pulsando) */]} />
     {/* ponto */}
-    <View style={{position: 'absolute', left: at(6), top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
+    <View style={{position: 'absolute', left: at(0), top, marginLeft: -6, marginTop: -6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
     {/* fio ate a escala */}
     <View style={{position: 'absolute', left: at(0.5), top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
     {/* etiqueta com a hora, na altura da escala */}

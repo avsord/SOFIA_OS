@@ -84,6 +84,18 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
  // (cada linha vira um registro com a hora em que foi escrita); Enter no fim de um registro já põe a hora; dias recolhíveis;
  // índice preso com "Hoje"; a nota abre no fim. Mesmo desenho do Diário das Páginas (page-templates.ts).
  const [diaryBusy,setDiaryBusy]=useState(false);
+ // 14/11/2026 (Pedro: "em anotações não tá apagando esses espaços extras com o backspace"): como no Notion, Backspace no começo
+ // de uma linha vazia apaga a linha e volta ao fim da anterior; no começo de uma linha com texto, junta com a anterior.
+ // 14/11/2026 (Pedro: "e nem subindo com as setas"): seta para cima na 1a linha (ou para baixo na última) passa para a linha vizinha da nota.
+ const arrowAt=(id:string,dir:number)=>{const n:any=inputs.current.get(id);if(!n||n.selectionStart!==n.selectionEnd)return false;
+  try{const sel=document.getSelection(),box=n.getBoundingClientRect();let edge=true;if(sel&&sel.rangeCount&&n.textContent){const rc=sel.getRangeAt(0).getBoundingClientRect(),lh=parseFloat(getComputedStyle(n).lineHeight)||24;if(rc.height)edge=dir<0?rc.top-box.top<lh*0.8:box.bottom-rc.bottom<lh*0.8;}if(!edge)return false;}catch{return false;}
+  const cur=latest.current;let i=cur.findIndex(x=>x.id===id)+dir;while(i>=0&&i<cur.length&&(!isTextBlock(cur[i])||dHidden.has(cur[i].id)))i+=dir;const t=cur[i];if(!t)return false;
+  setActive(t.id);if(dir<0)focusEnd(t.id);else{const p:any=inputs.current.get(t.id);try{p?.focus?.({preventScroll:false});p?.setSelectionRange?.(0,0);}catch{}}return true;};
+ const backspaceAt=(id:string)=>{const n:any=inputs.current.get(id),cur=latest.current,i=cur.findIndex(x=>x.id===id),me=cur[i];if(!n||i<=0||!me||n.selectionStart!==0||n.selectionEnd!==0)return false;
+  const prev=cur[i-1];if(!isTextBlock(prev)||prev.type==='code'){if(me.text)return false;save(cur.filter(x=>x.id!==id));return true;}
+  const at=prev.text.length,merged={...prev,text:prev.text+me.text,marks:[...(prev.marks||[]),...(me.marks||[]).map(m=>({...m,start:m.start+at,end:m.end+at}))]};
+  save(cur.filter(x=>x.id!==id).map(x=>x.id===prev.id?merged:x));setActive(prev.id);
+  setTimeout(()=>{const p:any=inputs.current.get(prev.id);try{p?.focus?.({preventScroll:true});p?.setSelectionRange?.(at,at);}catch{focusEnd(prev.id);}},40);return true;};
  const diaryEnterAt=(id:string)=>{const n:any=inputs.current.get(id),cur=latest.current.find(x=>x.id===id);if(!n||!cur||n.selectionStart!==n.selectionEnd||Number(n.selectionEnd)<cur.text.length)return false;
   const r=leafDiaryEnter(latest.current,id);if(!r)return false;save(r.blocks);setActive(r.focus);setTimeout(()=>focusEnd(r.focus),60);return true;};
  async function setDiary(on:boolean){if(!on){onChange({diary:false});return;}if(diaryBusy)return;setDiaryBusy(true);let times=new Map<string,string>();
@@ -139,6 +151,8 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
   onFocus={()=>{setActive(b.id);setTypingIn(b.id);}} onBlur={()=>setTypingIn(t=>t===b.id?null:t)} onUndo={(redo:boolean)=>undo(redo)}
   onKeyPress={(e:any)=>{const ne=e?.nativeEvent||{};
    // Enter continua quebrando a linha dentro do mesmo bloco, como no campo antigo da nota
+   if((ne.key==='ArrowUp'||ne.key==='ArrowDown')&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&arrowAt(b.id,ne.key==='ArrowUp'?-1:1)){e.preventDefault?.();return;}
+   if(ne.key==='Backspace'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&backspaceAt(b.id)){e.preventDefault?.();return;}
    if(ne.key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&leaf.diary&&diaryEnterAt(b.id)){e.preventDefault?.();return;}
    if(ne.key==='Enter'&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey){e.preventDefault?.();(globalThis as any).document?.execCommand?.('insertLineBreak');return;}
    if(ne.key!=='Tab'||ne.ctrlKey||ne.metaKey||ne.altKey)return;e.preventDefault?.();if(!ne.shiftKey)(globalThis as any).document?.execCommand?.('insertText',false,'\t');}}
