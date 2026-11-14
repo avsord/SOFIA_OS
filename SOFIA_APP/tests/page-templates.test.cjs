@@ -109,3 +109,16 @@ test('Diário aplicado em página com texto reorganiza datas e horas sem perder 
  assert.equal(diaryFromBlocks([{id:'x',type:'text',text:'só texto'}]),null);
  assert.equal(JSON.stringify(diaryFromBlocks(r).map(x=>x.text)),JSON.stringify(r.map(x=>x.text)));
 });
+
+test('Diário age na página: Enter com hora, dia novo, recolher e índice',()=>{
+ const T=load('src/lib/page-templates.ts');
+ const page=T.diaryFromBlocks([{id:'a',type:'text',text:'07/11/2026\n19:30 - um\n14/11/2026\n04:30 - dois\n05:29 - tres'}]);
+ const e1=page[4].id,now=new Date(2026,10,14,7,52);
+ let r=T.diaryEnter(page,e1,now);assert.equal(r.blocks.length,page.length+1);assert.equal(r.blocks[5].text,'07:52  ');assert.equal(r.focus,r.blocks[5].id);assert.equal(r.caret,7);
+ r=T.diaryEnter(page,page.at(-1).id,new Date(2026,10,15,0,5));assert.equal(r.blocks.slice(-3).map(x=>x.type).join('|'),'divider|heading3|text');assert.equal(r.blocks.at(-2).text,'15/11/2026 · domingo');
+ assert.equal(T.diaryEnter(page,r.blocks.at(-1).id,now),null);
+ assert.equal(T.diaryEnter([{id:'x',type:'text',text:'07:00  sem dia'}],'x',now),null);
+ const days=T.diaryDays(page);assert.equal(days.map(d=>d.label+'='+d.count).join(','),'07/11 · sáb=1,14/11 · sáb=2');
+ const col=page.map(b=>b.id===days[0].id?{...b,data:{collapsed:true}}:b),h=T.diaryHidden(col);
+ assert.equal(h.size,1);assert.ok(h.has(page[1].id));assert.ok(!h.has(page[2].id));
+});

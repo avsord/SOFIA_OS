@@ -141,3 +141,33 @@ export function insertTemplateBlocks(existing:readonly PageBlock[],incoming:read
  const added=JSON.parse(JSON.stringify(incoming)) as PageBlock[];
  return blank?added:[...existing,...added];
 }
+
+// 14/11/2026 (Pedro: "esse template não faz nada além de deixar hora grifado"): o Diário passa a agir na página.
+const DAY_RE=/^(\d{2})\/(\d{2})\/(\d{4}) · /,ENTRY_RE=/^\d{2}:\d{2}\s\s/;
+/** Data (AAAA-MM-DD) do título de dia do Diário, ou '' se o bloco não for um. */
+export function diaryDayKey(b:PageBlock|undefined):string{const m=b&&b.type==='heading3'?DAY_RE.exec(String(b.text||'')):null;return m?`${m[3]}-${m[2]}-${m[1]}`:'';}
+export const isDiaryEntry=(b:PageBlock|undefined)=>!!b&&b.type==='text'&&ENTRY_RE.test(String(b.text||''));
+export const isDiaryPage=(blocks:readonly PageBlock[])=>blocks.some(b=>!!diaryDayKey(b));
+const keyOf=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+/** Enter no fim de um registro: a linha nova já nasce com a hora de agora; se o dia virou, o título do dia novo entra
+ * no fim da página antes dela. Registro vazio (só a hora) segue o Enter comum. */
+export function diaryEnter(blocks:readonly PageBlock[],id:string,now=new Date()):{blocks:PageBlock[];focus:string;caret:number}|null{
+ const i=blocks.findIndex(b=>b.id===id),b=blocks[i];
+ if(i<0||!isDiaryEntry(b)||!String(b.text||'').replace(ENTRY_RE,'').trim()||!isDiaryPage(blocks))return null;
+ const time=`${pad(now.getHours())}:${pad(now.getMinutes())}`,entry=diaryEntryBlock(time,''),next=blocks.slice();
+ let lastDay='';for(const x of blocks){const k=diaryDayKey(x);if(k)lastDay=k;}
+ if(lastDay!==keyOf(now))next.push(block('divider'),block('heading3',diaryDayTitle(now)),entry);else next.splice(i+1,0,entry);
+ return {blocks:next,focus:entry.id,caret:time.length+2};
+}
+/** Blocos escondidos pelos dias recolhidos (título do dia com data.collapsed) até o próximo dia. */
+export function diaryHidden(blocks:readonly PageBlock[]):Set<string>{
+ const out=new Set<string>();let hide=false;
+ blocks.forEach((b,i)=>{if(diaryDayKey(b)){hide=!!b.data?.collapsed;return;}if(hide&&!(b.type==='divider'&&diaryDayKey(blocks[i+1])))out.add(b.id);});
+ return out;
+}
+/** Dias do Diário na ordem da página, com quantos registros cada um tem (para o índice e o contador). */
+export function diaryDays(blocks:readonly PageBlock[]):{id:string;key:string;label:string;count:number;collapsed:boolean}[]{
+ const out:{id:string;key:string;label:string;count:number;collapsed:boolean}[]=[];
+ for(const b of blocks){const k=diaryDayKey(b);if(k){const [y,m,d]=k.split('-');out.push({id:b.id,key:k,label:`${d}/${m} · ${WEEKDAYS[new Date(+y,+m-1,+d).getDay()].slice(0,3)}`,count:0,collapsed:!!b.data?.collapsed});}else if(out.length&&isDiaryEntry(b))out[out.length-1].count++;}
+ return out;
+}
