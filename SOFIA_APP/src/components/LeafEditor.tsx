@@ -3,7 +3,7 @@ import {PALETTE} from '../lib/palette';
 import {KeyboardToolbar} from './KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
 import React,{useLayoutEffect,useRef,useState} from 'react';
-import {Keyboard,Platform,Pressable,Text,TextInput,View} from 'react-native';
+import {Keyboard,Platform,Pressable,Text,TextInput,View,useWindowDimensions} from 'react-native';
 import {useDesktop} from '../lib/desktop';
 // 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
 import {RevealScrollView as ScrollView} from './RevealScroll';
@@ -27,7 +27,7 @@ const RICH_WEB=Platform.OS==='web';
 export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(patch:Partial<Leaf>)=>void;titleRef:React.RefObject<TextInput|null>;pageId?:string}){
  const keyboard=useKeyboardVisible();
  const c=useTheme(),blocks=leafBlocks(leaf),[active,setActive]=useState(blocks[0].id),[selection,setSelection]=useState({start:0,end:0}),[typing,setTyping]=useState<Partial<Mark>>({}),[format,setFormat]=useState(false),[property,setProperty]=useState(false),[propName,setPropName]=useState(''),[propValue,setPropValue]=useState('');
- const desktop=useDesktop(),titleNode=useRef<any>(null);
+ const desktop=useDesktop(),big=useWindowDimensions().width>=1600&&desktop/* 14/11/2026: monitor grande = texto da nota um pouco menor */,titleNode=useRef<any>(null);
  const inputs=useRef(new Map<string,TextInput>()),past=useRef<LeafBlock[][]>([]),future=useRef<LeafBlock[][]>([]),latest=useRef(blocks);latest.current=blocks;
  function save(next:LeafBlock[],history=true){if(history){past.current.push(JSON.parse(JSON.stringify(latest.current)));past.current=past.current.slice(-100);future.current=[];}latest.current=next;onChange({blocks:next,content:next.map(b=>b.text).join('\n\n')});}
  function patch(change:Partial<LeafBlock>){save(blocks.map(b=>b.id===active?{...b,...change}:b));}
@@ -163,7 +163,7 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
  // 05/11/2026 (Pedro: links como no Notion): no site o campo da linha e um textarea (sem link clicavel). Quando a linha
  // tem endereco, uma camada por cima desenha o mesmo texto com o link sublinhado e clicavel; o textarea continua
  // embaixo para digitar (texto transparente, cursor visivel). Passar o mouse no link abre Copiar / Remover link.
- const blockFont=(b:LeafBlock):any=>({fontSize:b.type==='heading1'?29:b.type==='heading2'?24:b.type==='heading3'?20:16,lineHeight:b.type.startsWith('heading')?36:26,fontWeight:b.type.startsWith('heading')?'700':'400',fontFamily:b.type==='code'?'monospace':undefined,textAlign:b.align||'left',textDecorationLine:b.checked?'line-through':'none'});
+ const blockFont=(b:LeafBlock):any=>({fontSize:b.type==='heading1'?(big?26:29):b.type==='heading2'?(big?22:24):b.type==='heading3'?(big?18:20):(big?15:16),lineHeight:b.type.startsWith('heading')?(big?32:36):(big?24:26),fontWeight:b.type.startsWith('heading')?'700':'400',fontFamily:b.type==='code'?'monospace':undefined,textAlign:b.align||'left',textDecorationLine:b.checked?'line-through':'none'});
  // 06/11/2026 (Pedro: cursor fora do lugar): a camada de links so aparece na linha que NAO esta sendo digitada; na linha em
  // edicao fica o texto normal do campo, com o cursor no lugar certo.
  const [typingIn,setTypingIn]=useState<string|null>(null);
@@ -180,7 +180,7 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
    return <Text key={start} accessibilityRole="link" {...({href:l.url,hrefAttrs:{target:'_blank',rel:'noopener noreferrer'},onMouseEnter:(e:any)=>{popKeep();const rc=e?.currentTarget?.getBoundingClientRect?.();if(rc)setLinkPop({url:l.url,x:rc.left,y:rc.bottom,block:b.id,start:l.start,end:l.end});},onMouseLeave:popLeave} as any)} onPress={(e:any)=>{e?.preventDefault?.();openUrl(l.url);}} style={{...base,pointerEvents:'auto',cursor:'pointer',textDecorationLine:'underline',textDecorationColor:c.muted} as any}>{t}</Text>;})}</Text>;
  }
  return <View ref={rootRef} style={{flex:1}}><ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={desktop?{paddingHorizontal:48,paddingTop:28,paddingBottom:80,width:'100%',maxWidth:820,alignSelf:'center'}:{padding:24,paddingBottom:80}}>
- <TextInput scrollEnabled={false} ref={(n:any)=>{(titleRef as any).current=n;titleNode.current=n;}} {...(Platform.OS==='web'?({numberOfLines:1} as any):{})} accessibilityLabel="Título da nota" value={leaf.title} onChangeText={title=>onChange({title})} multiline placeholder="Sem título" placeholderTextColor={c.muted+'88'} style={{fontSize:32,fontWeight:'700',color:c.text,padding:0,marginBottom:desktop?10:22}}/>
+ <TextInput scrollEnabled={false} ref={(n:any)=>{(titleRef as any).current=n;titleNode.current=n;}} {...(Platform.OS==='web'?({numberOfLines:1} as any):{})} accessibilityLabel="Título da nota" value={leaf.title} onChangeText={title=>onChange({title})} multiline placeholder="Sem título" placeholderTextColor={c.muted+'88'} style={{fontSize:big?29:32,fontWeight:'700',color:c.text,padding:0,marginBottom:desktop?10:22}}/>
  <View style={{marginBottom:desktop?4:16}}><DateTimeField compact allowClear={false} label="Criado em" value={leaf.created_at||''} emptyLabel="Ao começar a escrever" onChange={created_at=>onChange({created_at})}/></View>
  {(leaf.properties||[]).map(p=><View key={p.id} style={{flexDirection:'row',gap:14,marginVertical:4}}><Text style={{color:c.muted,width:120,paddingVertical:8}}>{p.name}</Text><TextInput accessibilityLabel={'Propriedade '+p.name} value={p.value} onChangeText={value=>onChange({properties:leaf.properties!.map(x=>x.id===p.id?{...x,value}:x)})} style={{flex:1,color:c.text,paddingVertical:8}}/></View>)}
  <Pressable accessibilityLabel="Adicionar propriedade" onPress={()=>{setPropName('');setPropValue('');setProperty(true);}} style={({hovered}:any)=>({paddingVertical:desktop?6:12,paddingHorizontal:desktop?6:0,marginLeft:desktop?-6:0,alignSelf:'flex-start',borderRadius:6,backgroundColor:hovered?c.input:'transparent'})}><Text style={{color:c.muted,fontSize:desktop?13:undefined}}>＋ Adicionar propriedade</Text></Pressable>{diaryButton}<View style={{height:1,backgroundColor:c.line,marginTop:desktop?8:14,marginBottom:desktop?16:24}}/>
