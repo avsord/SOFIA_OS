@@ -425,11 +425,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-14 | (sem APK) | Aviso "Caps Lock ligado" nos campos de senha (login e página trancada) | tsc ok |
 | 2026-11-14 | (sem APK) | Caminho no topo (Páginas / AVSORD / Anotações): cada nome clicável abre a página | tsc ok |
 | 2026-11-14 | (sem APK) | Páginas e tabelas: a tela não pula mais ao digitar ou apertar Enter (rolagem guardada ao medir o campo) | tsc ok, testes ok (061 precisa de Java) |
 | 2026-11-14 | (sem APK) | Página trancada: Ctrl+A seleciona a senha, não a página inteira | site recompilado; conferido no laboratório |
 | 2026-11-14 | (sem APK) | Cartão do link não trava mais; atalhos de nota/pasta como subpágina na barra lateral (menu Virar atalho) | robô 9/9, testes da mudança 79/79 |
-| 2026-11-14 | (sem APK) | Notas (print do Pedro): alça ⋮⋮ move foto/linhas, linha para digitar depois da foto, 4 cantos de escala como no Quadro, painel lateral estica pela borda, pastas em fileiras equilibradas | site recompilado; notas-lab 45/45; "travado" a esclarecer |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

@@ -6,12 +6,14 @@ import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
 import {OverAll} from '../lib/over-all';
 import type {LockLevel} from '../lib/page-lock';
+import {CAPS_MESSAGE, useCapsLock} from '../lib/caps-lock';
 
 export function Field({value, onChange, placeholder, onSubmit, testID, autoFocus}: {value: string; onChange: (v: string) => void; placeholder: string; onSubmit?: () => void; testID?: string; autoFocus?: boolean}) {
-  const c = useTheme(), [f, setF] = useState(false);
-  return <TextInput testID={testID} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry autoFocus={autoFocus} autoCapitalize="none" autoCorrect={false}
+  const c = useTheme(), [f, setF] = useState(false), caps = useCapsLock(f);
+  return <View><TextInput testID={testID} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry autoFocus={autoFocus} autoCapitalize="none" autoCorrect={false}
     onFocus={() => setF(true)} onBlur={() => setF(false)} onSubmitEditing={onSubmit} accessibilityLabel={placeholder}
-    style={{height: 40, borderRadius: 9, borderWidth: 1, borderColor: f ? c.accent : c.line, backgroundColor: c.input, color: c.text, paddingHorizontal: 12, fontSize: 14, outlineStyle: 'none'} as any} />;
+    style={{height: 40, borderRadius: 9, borderWidth: 1, borderColor: f ? c.accent : c.line, backgroundColor: c.input, color: c.text, paddingHorizontal: 12, fontSize: 14, outlineStyle: 'none'} as any} />
+    {caps ? <Text testID="caps-lock-warning" style={{color: c.danger, fontSize: 12, marginTop: 4}}>⇪ {CAPS_MESSAGE}</Text> : null}</View>;
 }
 export function Btn({title, onPress, primary, danger, busy, disabled, testID}: {title: string; onPress: () => void; primary?: boolean; danger?: boolean; busy?: boolean; disabled?: boolean; testID?: string}) {
   const c = useTheme();
