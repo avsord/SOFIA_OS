@@ -95,7 +95,7 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
 export const DIARY_TIME_COLOR='#8b67d5';
 const WEEKDAYS=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 const pad=(n:number)=>String(n).padStart(2,'0');
-const escapeHtml=(t:string)=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escapeHtml=(t:string)=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 export function diaryDayTitle(d:Date){return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} · ${WEEKDAYS[d.getDay()]}`;}
 export function diaryEntryBlock(time:string,text:string):PageBlock{
  const t=time.trim(),body=text.trim();
@@ -103,6 +103,29 @@ export function diaryEntryBlock(time:string,text:string):PageBlock{
 }
 export function diaryBlocks(now=new Date()):PageBlock[]{
  return [block('heading3',diaryDayTitle(now)),diaryEntryBlock(`${pad(now.getHours())}:${pad(now.getMinutes())}`,'')];
+}
+
+const TEXTY=new Set(['text','heading1','heading2','heading3','quote','callout','bullet','number']);
+/** Aplicar o Diário numa página que já tem texto reorganiza o que existe: linha só com data (07/11/2026) vira o título do
+ * dia, linha que começa com hora (19:30 - ...) vira um registro com a hora em destaque; linhas seguintes sem hora entram
+ * no mesmo registro. Imagens, arquivos e outros blocos ficam onde estavam. Devolve null se não achar nenhuma data ou hora. */
+export function diaryFromBlocks(existing:readonly PageBlock[]):PageBlock[]|null{
+ const out:PageBlock[]=[];let days=0,hits=0,cur:{time:string;lines:string[]}|null=null;
+ const close=()=>{if(cur){out.push(diaryEntryBlock(cur.time,cur.lines.join('\n')));cur=null;}};
+ for(const b of existing){
+  if(b.type==='divider')continue;
+  if(!TEXTY.has(b.type)){close();out.push(b);continue;}
+  for(const raw of String(b.text||'').replace(/ /g,' ').split(/\r?\n/)){
+   const line=raw.trim();if(!line)continue;
+   const d=/^(\d{1,2})\/(\d{1,2})\/(\d{4})(\s*·\s*\S+)?$/.exec(line);
+   if(d){close();if(days++)out.push(block('divider'));out.push(block('heading3',diaryDayTitle(new Date(+d[3],+d[2]-1,+d[1]))));hits++;continue;}
+   const t=/^(\d{1,2})[:h](\d{2})\s*(?:[-–—:]\s*)?([\s\S]*)$/.exec(line);
+   if(t&&+t[1]<24&&+t[2]<60){close();cur={time:`${pad(+t[1])}:${t[2]}`,lines:t[3]?[t[3]]:[]};hits++;continue;}
+   if(cur)cur.lines.push(line);else out.push(block('text',line));
+  }
+ }
+ close();
+ return hits?out:null;
 }
 
 export function freshTemplate(template:PageTemplate):PageTemplate{

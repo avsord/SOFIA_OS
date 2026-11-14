@@ -59,7 +59,7 @@ import type {PageDrop} from '../lib/page-order';
 import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
 import {DatabaseView} from '../components/DatabaseView';
-import {PAGE_TEMPLATES,freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
+import {PAGE_TEMPLATES,freshTemplate,insertTemplateBlocks,diaryFromBlocks} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
@@ -631,7 +631,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   }});
   if(!mounted.current)return;mutationEpoch.current++;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
- function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:insertTemplateBlocks(d.blocks,preset.blocks)}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
+ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:(template.id==='diary'&&diaryFromBlocks(d.blocks))||insertTemplateBlocks(d.blocks,preset.blocks)}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
  function confirmRemoveBlock(b:PageBlock){appAlert(b.type==='collection'?'Excluir esta base de dados?':'Excluir bloco?',b.type==='collection'?'Os itens dela saem desta página. Ctrl+Z traz de volta.':'Ctrl+Z traz de volta.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>removeBlock(b.id)}]);}
  function removeBlock(id:string){edit(d=>{const blocks=d.blocks.filter(b=>b.id!==id);return {...d,blocks:blocks.length?blocks:[newBlock()]};});setFocus(null);}

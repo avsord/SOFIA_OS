@@ -97,3 +97,15 @@ test('Diário: dia como título e hora em destaque na frente do texto',()=>{
  assert.equal(diaryDayTitle(new Date(2026,10,14)),'14/11/2026 · sábado');
  const e=diaryEntryBlock('05:29','a <b> & c');assert.equal(e.text,'05:29  a <b> & c');assert.ok(e.html.includes('<b>05:29</b>'));assert.ok(e.html.includes('a &lt;b&gt; &amp; c'));
 });
+
+test('Diário aplicado em página com texto reorganiza datas e horas sem perder nada',()=>{
+ const {diaryFromBlocks}=load('src/lib/page-templates.ts');
+ const src=[{id:'a',type:'text',text:'07/11/2026\n19:30 - Perder você\n\n20:12 - Se eu tivesse\ncontinua aqui\n14/11/2026\n 4:30 - Não quero ruído'},{id:'img',type:'image',text:'',data:{u:1}},{id:'b',type:'text',text:'06:13 - Eu amo a vida. (bye-Altare>Eternal Rest)'}];
+ const r=diaryFromBlocks(src);
+ assert.equal(r.map(x=>x.type).join('|'),'heading3|text|text|divider|heading3|text|image|text');
+ assert.equal(r[0].text,'07/11/2026 · sábado');assert.equal(r[4].text,'14/11/2026 · sábado');
+ assert.equal(r[2].text,'20:12  Se eu tivesse\ncontinua aqui');assert.ok(r[2].html.includes('<br>'));
+ assert.equal(r[5].text,'04:30  Não quero ruído');assert.ok(r[7].html.includes('bye-Altare&gt;Eternal Rest'));
+ assert.equal(diaryFromBlocks([{id:'x',type:'text',text:'só texto'}]),null);
+ assert.equal(JSON.stringify(diaryFromBlocks(r).map(x=>x.text)),JSON.stringify(r.map(x=>x.text)));
+});
