@@ -38,7 +38,7 @@ import type {SofiaApi} from '../lib/api';
 import {watchWebVersion} from '../lib/web-version';
 import type {Entity,Tab} from '../lib/types';
 import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,setPageFlagSink,setPageList,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
-import {arrivedSince,markHomeSeen,readSeenAt} from '../lib/timeline-arrivals';
+import {currentArrival,onTimelineTimes} from '../lib/timeline-arrivals';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -311,9 +311,9 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
 
 export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onOpenPage,onCreatePage,children}:Props){
  const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[sideW,setSideW]=useSidebarWidth(),[palette,setPalette]=useState(false);
- // 14/11/2026: ponto ao lado do Início quando um horário da linha do tempo chega com a pessoa fora do Início; some ao abrir o Início
- const [arrived,setArrived]=useState(false);
- useEffect(()=>{const tick=()=>{if(tab==='home'){markHomeSeen();setArrived(false);}else setArrived(arrivedSince(readSeenAt()));};tick();const id=setInterval(tick,15000);return ()=>clearInterval(id);},[tab]);
+ // 14/11/2026: ponto ao lado do Início: fica enquanto o último item que chegou não for feito (evento: até 5 min depois do fim)
+ const [arrived,setArrived]=useState<{title:string;at:number}|null>(null);
+ useEffect(()=>{const tick=()=>setArrived(currentArrival());tick();const off=onTimelineTimes(tick),id=setInterval(tick,15000);return ()=>{off();clearInterval(id);};},[]);
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
@@ -365,7 +365,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     <Row icon="search" label="Buscar" hint="Ctrl+K" collapsed={collapsed} onPress={()=>setPalette(true)}/>
     <View style={{height:8}}/>
     {/* 0.3.267: Páginas e Apps já aparecem nas seções de baixo e o Perfil abre pela foto no topo */}
-    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><Row key={t} testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text testID="desktop-home-arrived" accessibilityLabel="Chegou um item da linha do tempo" style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",color:c.accent,fontSize:12}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>)}
+    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><Row key={t} testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text testID="desktop-home-arrived" accessibilityLabel={"Chegou: "+arrived.title} ref={(n:any)=>{const tip=arrived.title+" · "+new Date(arrived.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});n?.setAttribute?.("title",tip);}} style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",color:c.accent,fontSize:12}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>)}
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)} onAuxOpen={()=>openTab(routeToPath({tab:'apps',module:a.id}))}/>)}</Section>
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}
