@@ -47,9 +47,9 @@ test('trocar de página vira um passo do voltar (sem recarregar o site)',()=>{
  const p=read('src/screens/Pages.tsx');assert.ok(p.includes("else w.history?.pushState?.({tab:'pages',module:''},'',next);"));
  const app=read('App.tsx');assert.ok(app.includes('routeMeta.fromPop=true;'));
 });
-test('nota: colar imagem pergunta anexo ou print e guarda como bloco de arquivo da página',()=>{
+test('nota: colar imagem entra na hora mostrando a foto (sem perguntar) e guarda como bloco de arquivo da página',()=>{
  const s=read('src/components/LeafEditor.tsx');
- assert.ok(s.includes("appAlert('Colar imagem','Como a imagem deve aparecer na nota?'"));
+ assert.ok(!s.includes("appAlert('Colar imagem'"),'14/11: o Notion não pergunta; a troca Arquivo | Imagem fica no bloco');assert.ok(s.includes("go('preview');"));
  assert.ok(s.includes("b.type==='file'?fileBlock(b)"));
  assert.ok(s.includes('if(sc&&sc.scrollTop!==top)sc.scrollTop=top;'),'medir o campo não puxa a rolagem (nota longa)');
  const f=read('src/components/PageFiles.tsx');assert.ok(f.includes('o anexo pode ser apenas o nome.jpeg'));

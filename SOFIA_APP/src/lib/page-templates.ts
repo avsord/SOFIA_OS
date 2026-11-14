@@ -1,6 +1,6 @@
 import type {PageBlock} from './page-editor';
 
-export type TemplateId='tasks_personal'|'notes_hub'|'playlist_links';
+export type TemplateId='tasks_personal'|'content_kanban'|'notes_hub'|'playlist_links';
 export type PageTemplate={
  id:TemplateId;title:string;description:string;icon:string;
  blocks:PageBlock[];
@@ -32,24 +32,60 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
   })]
  },
  {
-  id:'notes_hub',title:'Notas',description:'Pastas com notas e edição livre.',icon:'📝',
-  blocks:[block('collection','',{title:'Notas',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Notas',type:'pages'}],active_view:'notebooks',rows:[]})]
+  // 14/11/2026 (Pedro, item 14: "Kanban avançado" baseado no "Planejamento de conteúdo Kanban" do Notion; o Kanban simples fica).
+  id:'content_kanban',title:'Kanban avançado',description:'Planejamento de conteúdo: status, plataformas, prioridade, calendário e próximos.',icon:'◫',
+  blocks:[block('collection','',{
+   title:'',show_title:false,
+   properties:[
+    {key:'name',label:'Título',type:'text',options:[]},
+    {key:'status',label:'Status',type:'status',options:['Ideia','Projetando','Elaboração','Aprovado','Programado','Publicado'],
+     option_colors:{'Ideia':'gray','Projetando':'purple','Elaboração':'orange','Aprovado':'blue','Programado':'yellow','Publicado':'green'}},
+    {key:'priority',label:'Prioridade',type:'select',options:['Alta','Média','Baixa'],option_colors:{'Alta':'red','Média':'yellow','Baixa':'green'}},
+    {key:'kind',label:'Tipo de conteúdo',type:'select',options:['Post','Vídeo','Reels','Story','Artigo','Newsletter'],option_colors:{'Post':'blue','Vídeo':'red','Reels':'pink','Story':'orange','Artigo':'teal','Newsletter':'purple'}},
+    {key:'platforms',label:'Plataforma',type:'multi_select',options:['Instagram','YouTube','TikTok','LinkedIn','Blog'],option_colors:{'Instagram':'pink','YouTube':'red','TikTok':'gray','LinkedIn':'blue','Blog':'teal'}},
+    {key:'owner',label:'Responsável',type:'person',options:[]},
+    {key:'publish',label:'Data de publicação',type:'date',options:[]},
+    {key:'words',label:'Contagem de palavras',type:'number',number_format:'bar',options:[]},
+    {key:'notes',label:'Notas',type:'text',options:[]}
+   ],
+   views:[
+    {id:'flow',label:'Fluxo de status',type:'board',group_by:'status',filters:[],sorts:[],hidden:['notes']},
+    {id:'platform',label:'Plataforma',type:'board',group_by:'platforms',filters:[],sorts:[],hidden:['notes']},
+    {id:'priority',label:'Prioridade',type:'board',group_by:'priority',filters:[],sorts:[],hidden:['notes']},
+    {id:'calendar',label:'Calendário',type:'calendar',date_key:'publish',filters:[],sorts:[]},
+    {id:'next',label:'Próximos',type:'table',filters:[{key:'publish',op:'future'}],sorts:[{key:'publish',dir:'asc'}],hidden:['notes','words']},
+    {id:'all',label:'Tabela',type:'table',filters:[],sorts:[]}
+   ],
+   active_view:'flow',rows:[]
+  })]
  },
  {
-  id:'playlist_links',title:'Formulário',description:'Campos livres para organizar o que você quiser.',icon:'📋',
-  blocks:[
-   block('collection','',{
-    title:'',show_title:false,
-    properties:[
-     {key:'name',label:'Nome',type:'text',options:[]},
-          {key:'category',label:'Categoria',type:'text',placeholder:'Adicionar…'},
-     {key:'description',label:'Descrição',type:'text',placeholder:'Adicionar…'},
-     {key:'created',label:'Criado em',type:'date',options:[]}
-    ],
-    views:[{id:'links',label:'Formulário',type:'table',group_by:'',filter_key:'',filter_value:'',sort_by:'created',sort_dir:'desc'}],
-    active_view:'links',rows:[]
-   })
-  ]
+  // 14/11/2026 (Pedro, item 13: "modelo de tabela igual ao Notion"): substitui o Formulário. As tabelas já criadas seguem iguais
+  // (mesmo id e mesmo formato); "Formulário" agora é uma opção do botão Nova.
+  id:'playlist_links',title:'Tabela',description:'Base de dados com colunas de vários tipos, filtros, ordenação e visões.',icon:'▤',
+  blocks:[block('collection','',{
+   title:'',show_title:false,
+   properties:[
+    {key:'name',label:'Nome',type:'text',options:[]},
+    {key:'status',label:'Status',type:'status',options:['Não iniciado','Em andamento','Concluído'],option_colors:{'Não iniciado':'gray','Em andamento':'blue','Concluído':'green'}},
+    {key:'category',label:'Categoria',type:'multi_select',options:[],option_colors:{}},
+    {key:'url',label:'URL',type:'url',options:[]},
+    {key:'created',label:'Criado em',type:'created',options:[]},
+    {key:'description',label:'Texto',type:'text',options:[]},
+    {key:'date',label:'Data',type:'date',options:[]},
+    {key:'number',label:'Número',type:'number',options:[]},
+    {key:'done',label:'Caixa',type:'checkbox',options:[]}
+   ],
+   views:[
+    {id:'links',label:'Tabela',type:'table',group_by:'',filters:[],sorts:[]},
+    {id:'board',label:'Quadro',type:'board',group_by:'status',filters:[],sorts:[],hidden:['description','created']}
+   ],
+   active_view:'links',rows:[]
+  })]
+ },
+ {
+  id:'notes_hub',title:'Notas',description:'Pastas com notas e edição livre.',icon:'📝',
+  blocks:[block('collection','',{title:'Notas',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Notas',type:'pages'}],active_view:'notebooks',rows:[]})]
  }
 ];
 

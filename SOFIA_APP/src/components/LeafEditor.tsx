@@ -63,7 +63,9 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
    uploadPageFile(api,pageId,new File([f],name,{type:f.type})).then(up=>save(latest.current.map(x=>x.id===blk.id?{...x,data:{...up,view}}:x),false))
     .catch((e:any)=>{save(latest.current.filter(x=>x.id!==blk.id),false);appAlert('Não deu para colar a imagem',String(e?.message||e));});
   };
-  appAlert('Colar imagem','Como a imagem deve aparecer na nota?',[{text:'Cancelar',style:'cancel'},{text:'Só o anexo ('+name+')',onPress:()=>go('attach')},{text:'Mostrar o print',onPress:()=>go('preview')}]);
+  // 14/11/2026 (Pedro: "quando cola uma coisa em nota aparece só o print ou anexo, isso não é o tipo de nome que o notion colocaria"):
+  // como no Notion, a imagem entra na hora mostrando a foto; para ver só como arquivo, a barra do bloco tem Arquivo | Imagem.
+  go('preview');
  };
  React.useEffect(()=>{if(Platform.OS!=='web')return;const el=rootRef.current;if(!el?.addEventListener)return;
   const onPaste=(e:any)=>{const items=[...(e.clipboardData?.items||[])] as any[];const f=items.find(x=>x.kind==='file'&&/^image\//.test(x.type))?.getAsFile?.();if(!f)return;e.preventDefault();e.stopPropagation();pasteRef.current(f);};
