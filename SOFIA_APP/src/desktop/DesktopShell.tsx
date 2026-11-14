@@ -2,6 +2,7 @@ import {EMBED} from '../lib/embed'; // 08/11/2026: pagina dentro do Quadro (sem 
 import {DRIVE_APP} from '../lib/features';
 import {DriveWindowHost,openDriveWindow,closeDriveWindow,useDriveWindowOpen} from '../components/DriveWindow';
 import {uiScale} from '../web/desktop-scale';
+import {ColorPicker} from './ColorPicker';
 import {LoadingLines} from '../components/Loading';
 // 0.3.250: moldura do app no computador (estilo Notion). So e usada no navegador com tela larga
 import {PALETTE} from '../lib/palette';
@@ -34,7 +35,7 @@ import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -109,15 +110,16 @@ const NOTE_MIME='application/x-sofia-note';
 // 14/11/2026 (Pedro: "so esse tipo de atalho... nome/nome/nome"): todos os atalhos (pagina, nota, pasta) numa secao so, no topo;
 // o texto mostra de onde vem: atalho / pagina de origem / pasta (paginas: atalho / pagina-mae / ...)
 function ShortcutsSection({pages,ids,openPageId,onOpenPage,api}:{pages:Entity[];ids:string[];openPageId:string;onOpenPage:(id:string)=>void;api:SofiaApi}){
- const live=useLiveShortcuts(),byId=new Map(pages.map(p=>[p.id,p]));
- const rows:{key:string;label:string;color:string;run:()=>void;menu:()=>MenuItem[];selected:boolean}[]=[];
+ const live=useLiveShortcuts(),pcolors=useStore(shortcutPageColors),[picker,setPicker]=useState<{key:string;x:number;y:number;live?:string}|null>(null),byId=new Map(pages.map(p=>[p.id,p]));
+ const rows:{key:string;label:string;color:string;pick:(c:string)=>void;run:()=>void;menu:()=>MenuItem[];selected:boolean}[]=[];
  for(const id of ids){const p=byId.get(id);if(!p)continue;const names:string[]=[];let cur:Entity|undefined=p;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&names.length<12){seen.add(cur.id);names.push(cur.title||'Sem título');cur=byId.get(String(cur.data?.parent_id||''));}
-  rows.push({key:'pg-'+id,label:names.join(' / '),color:DEFAULT_SHORTCUT_COLOR,run:()=>onOpenPage(id),selected:openPageId===id,menu:()=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpenPage(id)},{label:'Tirar dos atalhos',icon:'link',run:()=>toggleShortcutPage(id)}]});}
+  rows.push({key:'pg-'+id,label:names.length>1?names[0]+' / '+names[names.length-1]:names[0],color:pcolors[id]||DEFAULT_SHORTCUT_COLOR,pick:c=>setShortcutPageColor(id,c),run:()=>onOpenPage(id),selected:openPageId===id,menu:()=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpenPage(id)},{label:'Tirar dos atalhos',icon:'link',run:()=>toggleShortcutPage(id)}]});}
  for(const p of pages)for(const s of shortcutsFor(p,live)){
-  const colors=():MenuItem[]=>SHORTCUT_COLORS.map(k=>({label:k.name,swatch:k.hex,run:()=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},k.hex,api).then(()=>systemChanged(api)).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));}}));
-  rows.push({key:'sc-'+p.id+'-'+s.kind+'-'+s.id,label:[s.label,p.title||'Sem título',s.folder].filter(Boolean).join(' / '),color:s.color||DEFAULT_SHORTCUT_COLOR,run:()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpenPage(p.id);},selected:false,menu:colors});}
+  const pick=(hex:string)=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},hex,api).then(()=>systemChanged(api)).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));};
+  const colors=():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpenPage(p.id);}}];
+  rows.push({key:'sc-'+p.id+'-'+s.kind+'-'+s.id,label:s.label+' / '+(p.title||'Sem título'),color:s.color||DEFAULT_SHORTCUT_COLOR,pick,run:()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpenPage(p.id);},selected:false,menu:colors});}
  if(!rows.length)return null;
- return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(b?b.left:(e?.nativeEvent?.pageX??0),b?b.bottom+4:(e?.nativeEvent?.pageY??0),r.menu());}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}</Section>;
+ return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={picker?.key===r.key&&picker.live?picker.live:r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();setPicker({key:r.key,x:b?b.left:(e?.nativeEvent?.pageX??0),y:b?b.bottom+4:(e?.nativeEvent?.pageY??0)});}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}{picker?(()=>{const r=rows.find(q=>q.key===picker.key);return r?<ColorPicker color={r.color} x={picker.x} y={picker.y} onLive={c=>setPicker(q=>q?{...q,live:c}:q)} onCommit={c=>r.pick(c)} onClose={()=>setPicker(null)}/>:null;})():null}</Section>;
 }
 function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
