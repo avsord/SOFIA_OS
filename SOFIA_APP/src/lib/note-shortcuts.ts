@@ -6,7 +6,7 @@ import type {Entity} from './types';
  * (data.shortcuts = [{kind,id}]) e aparece como subpagina da pagina na barra lateral e no topo da pagina; clicar abre a
  * pagina ja com aquela nota/pasta aberta. Por padrao a lista e vazia (nada aparece). */
 export type ShortcutRef={kind:'note'|'folder';id:string;color?:string};
-export type NoteShortcut=ShortcutRef&{label:string;emoji:string};
+export type NoteShortcut=ShortcutRef&{label:string;emoji:string;folder?:string};
 /** 14/11/2026 (Pedro: "atalhos viraram sub do sub... um bullet que voce pode mudar a cor e o nome menor"): o atalho aparece
  * na barra como um ponto colorido + nome menor (nao como pagina do mesmo tamanho). A cor fica no proprio atalho. */
 export const SHORTCUT_COLORS:{name:string;hex:string}[]=[{name:'Cinza',hex:'#9B9A97'},{name:'Marrom',hex:'#A27763'},{name:'Laranja',hex:'#E0883C'},{name:'Amarelo',hex:'#D9B23A'},{name:'Verde',hex:'#4F9E6B'},{name:'Azul',hex:'#4A88D0'},{name:'Roxo',hex:'#9065C7'},{name:'Rosa',hex:'#D3609B'},{name:'Vermelho',hex:'#D9534F'}];
@@ -30,7 +30,7 @@ export function resolveShortcuts(data:Record<string,any>|null|undefined):NoteSho
  const books:any[]=Array.isArray(data?.notebooks)?data!.notebooks:[];const out:NoteShortcut[]=[];
  for(const r of shortcutRefs(data)){
   if(r.kind==='folder'){const b=books.find(k=>k?.id===r.id&&!k.root);if(b)out.push({...r,label:String(b.name||'Sem título'),emoji:String(b.emoji||'📁')});}
-  else for(const b of books){const n=(b?.pages||[]).find((p:any)=>p?.id===r.id);if(n){out.push({...r,label:String(n.title||'Sem título'),emoji:'📝'});break;}}
+  else for(const b of books){const n=(b?.pages||[]).find((p:any)=>p?.id===r.id);if(n){out.push({...r,label:String(n.title||'Sem título'),emoji:'📝',...(b.root?{}:{folder:String(b.name||'Sem título')})});break;}}
  }
  return out;
 }

@@ -106,6 +106,19 @@ const EXPANDED_KEY='sofia.desktop.tree.expanded';
 function readExpanded():Set<string>{try{return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY)||'[]'));}catch{return new Set();}}
 
 const NOTE_MIME='application/x-sofia-note';
+// 14/11/2026 (Pedro: "so esse tipo de atalho... nome/nome/nome"): todos os atalhos (pagina, nota, pasta) numa secao so, no topo;
+// o texto mostra de onde vem: atalho / pagina de origem / pasta (paginas: atalho / pagina-mae / ...)
+function ShortcutsSection({pages,ids,openPageId,onOpenPage,api}:{pages:Entity[];ids:string[];openPageId:string;onOpenPage:(id:string)=>void;api:SofiaApi}){
+ const live=useLiveShortcuts(),byId=new Map(pages.map(p=>[p.id,p]));
+ const rows:{key:string;label:string;color:string;run:()=>void;menu:()=>MenuItem[];selected:boolean}[]=[];
+ for(const id of ids){const p=byId.get(id);if(!p)continue;const names:string[]=[];let cur:Entity|undefined=p;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&names.length<12){seen.add(cur.id);names.push(cur.title||'Sem título');cur=byId.get(String(cur.data?.parent_id||''));}
+  rows.push({key:'pg-'+id,label:names.join(' / '),color:DEFAULT_SHORTCUT_COLOR,run:()=>onOpenPage(id),selected:openPageId===id,menu:()=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpenPage(id)},{label:'Tirar dos atalhos',icon:'link',run:()=>toggleShortcutPage(id)}]});}
+ for(const p of pages)for(const s of shortcutsFor(p,live)){
+  const colors=():MenuItem[]=>SHORTCUT_COLORS.map(k=>({label:k.name,swatch:k.hex,run:()=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},k.hex,api).then(()=>systemChanged(api)).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));}}));
+  rows.push({key:'sc-'+p.id+'-'+s.kind+'-'+s.id,label:[s.label,p.title||'Sem título',s.folder].filter(Boolean).join(' / '),color:s.color||DEFAULT_SHORTCUT_COLOR,run:()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpenPage(p.id);},selected:false,menu:colors});}
+ if(!rows.length)return null;
+ return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(b?b.left:(e?.nativeEvent?.pageX??0),b?b.bottom+4:(e?.nativeEvent?.pageY??0),r.menu());}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}</Section>;
+}
 function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
  const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
@@ -151,10 +164,9 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:shortcutPages.get().includes(p.id)?'Tirar dos atalhos':'Virar atalho',icon:'link',run:()=>toggleShortcutPage(p.id)},...((shortcutsFor(p,liveScRef.current).length?[{label:scOpen.has(p.id)?'Ocultar atalhos':'Atalhos',icon:'link',run:()=>setScOpen(prev=>{const n=new Set(prev);if(n.has(p.id))n.delete(p.id);else n.add(p.id);return n;})}]:[]) as MenuItem[]),{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:shortcutPages.get().includes(p.id)?'Tirar dos atalhos':'Virar atalho',icon:'link',run:()=>toggleShortcutPage(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  // 14/11/2026 (Pedro: opcao Atalhos no menu da pagina): mostra os atalhos dela mesmo com a seta fechada
- const [scOpen,setScOpen]=useState<Set<string>>(new Set()),liveScRef=useRef<any>(null);
  // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
  // fechada abre as subpaginas; soltar move a nota (lib/notes-move) e Ctrl+Z devolve
  const [noteOver,setNoteOver]=useState<string|null>(null),treeRef=useRef<any>(null),expandedRef=useRef(expanded);expandedRef.current=expanded;
@@ -180,13 +192,11 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  const toggle=(id:string)=>setExpanded(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
- const liveSc=useLiveShortcuts();liveScRef.current=liveSc;
+
  const rows:React.ReactNode[]=[];
- const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id),sc=shortcutsFor(p,liveSc);
-  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0||sc.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
-  // 14/11/2026 (Pedro): atalho de nota/pasta ligado no menu dela aparece como subpagina; clicar abre a pagina com ela aberta
-  if(open||scOpen.has(p.id))for(const s of sc){const colors=():MenuItem[]=>SHORTCUT_COLORS.map(k=>({label:k.name,swatch:k.hex,run:()=>{void requestShortcutColor(p.id,{kind:s.kind,id:s.id},k.hex,api).then(saved=>{if(saved)setDir(list=>list.map(x=>x.id===saved.id?saved:x));systemChanged(api);}).catch(e=>appAlert('Não foi possível trocar a cor',e instanceof Error?e.message:String(e)));}}));
-   rows.push(<Row key={'sc-'+p.id+'-'+s.kind+'-'+s.id} testID={'sidebar-shortcut-'+s.kind+'-'+s.id} depth={depth+1} small dot={s.color||DEFAULT_SHORTCUT_COLOR} onDot={(e:any)=>{const r=e?.currentTarget?.getBoundingClientRect?.();openContextMenu(r?r.left:(e?.nativeEvent?.pageX??0),r?r.bottom+4:(e?.nativeEvent?.pageY??0),colors());}} menu={colors} label={s.label} selected={false} onPress={()=>{requestOpenShortcut(p.id,{kind:s.kind,id:s.id});onOpen(p.id);}}/>);}
+ const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
+  rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
+  // 14/11/2026 (Pedro): atalhos de nota/pasta NAO ficam mais como subpagina; todos vao para a secao Atalhos do topo
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
@@ -315,7 +325,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)}/>)}</Section>
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}
      <UpcomingEvents api={api} onOpen={()=>onNavigate('agenda')}/>
-     {shortcutIds.length&&pages?<Section title="Atalhos">{shortcutIds.map(id=>pages.find(p=>p.id===id)).filter(Boolean).map(p=><Row key={'pgsc-'+p!.id} testID={'sidebar-pgshortcut-'+p!.id} small dot={DEFAULT_SHORTCUT_COLOR} menu={()=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpenPage(p!.id)},{label:'Tirar dos atalhos',icon:'link',run:()=>toggleShortcutPage(p!.id)}]} label={p!.title||'Sem título'} selected={openPageId===p!.id} onPress={()=>onOpenPage(p!.id)}/>)}</Section>:null}
+     {pages?<ShortcutsSection pages={pages} ids={shortcutIds} openPageId={openPageId} onOpenPage={onOpenPage} api={api}/>:null}
      {favorites.length&&pages?<Section title="Favoritos">{favorites.map(id=>pages.find(p=>p.id===id)).filter(Boolean).map(p=><Row key={'fav-'+p!.id} testID={'sidebar-fav-'+p!.id} emoji={isEmoji(p!.data?.icon)?String(p!.data?.icon):undefined} icon={isEmoji(p!.data?.icon)?undefined:'star'} label={p!.title||'Sem título'} selected={openPageId===p!.id} onPress={()=>onOpenPage(p!.id)}/>)}</Section>:null}
      <Section title="Páginas" onTitle={()=>onNavigate('pages')} action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={createRootPage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>
       {pages===null?<View style={{paddingHorizontal:12}}><LoadingLines rows={3}/></View> /* 04/11/2026 (Pedro): esqueleto so se a lista ainda nao chegou; ela e pedida ja no carregamento (assets/early.js) */:pages.length?<View style={pagesLate.current?SIDE_FADE.in:undefined}><PageTree pages={pages} openId={openPageId} onOpen={onOpenPage} api={api} toast={toast} undoNow={undoNow}/></View>:<Text style={{color:c.muted,fontSize:12,paddingHorizontal:16,paddingVertical:6}}>Nenhuma página ainda.</Text>}

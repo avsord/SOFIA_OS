@@ -425,11 +425,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-14 | (sem APK) | Atalhos de nota/pasta saem da árvore e vão para a seção Atalhos do topo; texto mostra origem (atalho / página / pasta) | tsc ok |
 | 2026-11-14 | (sem APK) | Páginas viram atalho (menu da barra lateral): seção Atalhos no topo, ponto colorido | tsc ok |
 | 2026-11-14 | (sem APK) | Menu da página na barra lateral ganha "Atalhos": mostra os atalhos com a seta fechada | tsc ok |
 | 2026-11-14 | (sem APK) | Aviso "Caps Lock ligado" nos campos de senha (login e página trancada) | tsc ok |
 | 2026-11-14 | (sem APK) | Caminho no topo (Páginas / AVSORD / Anotações): cada nome clicável abre a página | tsc ok |
-| 2026-11-14 | (sem APK) | Páginas e tabelas: a tela não pula mais ao digitar ou apertar Enter (rolagem guardada ao medir o campo) | tsc ok, testes ok (061 precisa de Java) |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
