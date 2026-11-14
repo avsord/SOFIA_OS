@@ -50,3 +50,4 @@
 | 2026-11-14 | (sem APK) | Caps Lock: em vez da linha que empurrava o botão, sinal ⇪ dentro do campo de senha, à direita (`CapsBadge`), login e página trancada | tsc ok; testes ok; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seção "Atalhos" do topo da barra lateral removida, com os menus "Virar atalho" (página e nota); ficam só os subatalhos na árvore | tsc ok; testes ok (teste dos atalhos reescrito; 061 só sem Java); não conferido no navegador |
 | 2026-11-14 | (sem APK) | Barra lateral: fundo de seleção/foco da seta (›) com cantos arredondados e o da bolinha de cor redondo, no formato da bolinha | tsc ok, teste da barra ok, site recompilado |
+| 2026-11-14 | (sem APK) | Páginas com tabela, quadro ou anotações ficam mais largas no computador (até 1480 px em vez de 960), como no Notion; páginas de texto seguem em 960 | tsc ok, site recompilado |

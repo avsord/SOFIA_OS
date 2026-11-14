@@ -770,7 +770,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
       <Pressable testID="page-cover-save-position" accessibilityRole="button" accessibilityLabel="Salvar posição da capa" onPress={saveCoverMove} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontSize:12,fontWeight:'600'}}>Salvar posição</Text></Pressable>
      </View></>:null}
    </View>
-   <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
+   <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:(draft.blocks||[]).some((x:any)=>x?.type==='collection')?1480:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
     {/* 0.3.267 (computador): como no Notion, sem ícone não aparece o 📄; "Adicionar ícone" e "Adicionar capa" surgem ao passar o mouse */}
     {desktop?<Pressable accessible={false} testID="page-header" onHoverIn={headHover.enter} onHoverOut={headHover.leave}>{()=><>
      {draft.appearance.icon?<Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({width:82,height:82,marginLeft:-4,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:56,lineHeight:78,color:c.text}}>{String(draft.appearance.icon)}</Text></Pressable>:<View style={{height:hasCover?50:24}}/>}
