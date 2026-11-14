@@ -299,7 +299,8 @@ class Workspace {
    return this.s.tx(()=>{
      this.db.prepare('DELETE FROM observations WHERE monitor_id=?').run(entityId);
      this.db.prepare('DELETE FROM jobs WHERE entity_id=?').run(entityId);
-     this.db.prepare('DELETE FROM attachments WHERE entity_id=?').run(entityId);
+     // 14/11/2026 (Pedro: "capa desapareceu"): excluir uma pagina nao leva junto o arquivo que outra pagina ainda usa (capa de copia/duplicata)
+     this.db.prepare("DELETE FROM attachments WHERE entity_id=? AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.id!=? AND instr(e.data,attachments.id)>0)").run(entityId,entityId);
      this.db.prepare('DELETE FROM notifications WHERE entity_id=?').run(entityId);
      this.db.prepare('DELETE FROM events WHERE entity_type=? AND entity_id=?').run('entity',entityId);
      this.db.prepare('DELETE FROM annotations WHERE entity_type=? AND entity_id=?').run('entity',entityId);

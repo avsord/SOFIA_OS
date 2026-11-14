@@ -38,3 +38,4 @@
 - 14/11/2026: aviso Caps Lock nos campos de senha (login e páginas trancadas).
 - 14/11/2026: opção Atalhos no menu da página (barra lateral).
 - 14/11/2026: página vira atalho (seção Atalhos no topo da barra lateral).
+- 14/11/2026: excluir página não apaga mais arquivo (capa) que outra página ainda usa; capa de PESSOAL já estava perdida no servidor (404), não recuperável de lá.
