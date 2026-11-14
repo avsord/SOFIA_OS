@@ -6,6 +6,7 @@
 // - Tabela: tipo por coluna, menu da coluna, largura e ordem arrastando, "+" coluna, edição direto na célula, rodapé com
 //   contagem e soma; cada linha abre no painel lateral (entra pela direita em 0,2 s, setas anterior/próximo, ESC fecha).
 // - Nada pergunta o óbvio: excluir faz na hora e oferece Desfazer.
+import {fitTextarea} from '../lib/fit-textarea';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import type {PageBlock} from '../lib/page-editor';
@@ -488,7 +489,7 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
  useLayoutEffect(()=>{if(!peek){setPeekIn(false);return;}setPeekIn(false);const t=requestAnimationFrame(()=>requestAnimationFrame(()=>setPeekIn(true)));return()=>cancelAnimationFrame(t);},[peek?.mode,!!peek]);
  const [peekW,setPeekW]=useState(()=>{try{return Number(localStorage.getItem('sofia.peekWidth'))||0;}catch{return 0;}});
  const titleRef=useRef<HTMLTextAreaElement|null>(null),notesRef=useRef<HTMLTextAreaElement|null>(null);
- const grow=(el:HTMLTextAreaElement|null)=>{if(!el)return;let sc:any=el.parentElement;while(sc&&sc!==document.body){const o=getComputedStyle(sc).overflowY;if((o==='auto'||o==='scroll')&&sc.scrollHeight>sc.clientHeight)break;sc=sc.parentElement;}const top=sc&&sc!==document.body?sc.scrollTop:0;el.style.height='0px';el.style.height=el.scrollHeight+'px';if(sc&&sc!==document.body&&sc.scrollTop!==top)sc.scrollTop=top;};
+ const grow=(el:HTMLTextAreaElement|null)=>{if(el)fitTextarea(el);};
  useLayoutEffect(()=>{grow(titleRef.current);grow(notesRef.current);});
  const peekPanel=()=>{
   if(!peek||!peekRow)return null;const r=peekRow,idx=rows.findIndex(x=>x.id===r.id);

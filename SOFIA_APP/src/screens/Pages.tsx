@@ -70,6 +70,7 @@ import {ContentWidth,DESK_LEFT,dpx} from '../lib/content-width';
 import {LOCK_TAG,b64,createLock,entered,forget,isLocked,isOpen,left,lockHeader,hasPlain,needsOpen,onLockChange,openBlocks,plainOf,rawKey,recoverWith,rewrap,seal,unlock,viewOf,type LockLevel} from '../lib/page-lock';
 import {PageLockDialog,PageLockScreen,SecretAsk} from '../components/PageLock';
 import {SECRET_OK_TAG} from '../lib/page-editor';
+import {fitTextarea} from '../lib/fit-textarea';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
@@ -296,9 +297,9 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   // 14/11/2026 (Pedro: pagina se move ao escrever/Enter): encolher o campo a 0 faz o navegador puxar a rolagem; guarda e devolve
   const d0=(globalThis as any).document;let sc0:any=null;{let p:any=(titleRef.current as any)?.parentElement;while(p&&p!==d0?.body){const o=getComputedStyle(p).overflowY;if((o==='auto'||o==='scroll')&&p.scrollHeight>p.clientHeight){sc0=p;break;}p=p.parentElement;}}const top0=sc0?sc0.scrollTop:0;
   // 05/11/2026 (Pedro: titulo cortado com barrinha de rolagem): o titulo tambem tem a altura do texto, sem rolagem propria
-  {const t=titleRef.current as HTMLTextAreaElement&{__size?:string}|null;if(t?.style&&t.tagName==='TEXTAREA'){t.style.overflow='hidden';const key=t.value+'|'+t.clientWidth+'|'+getComputedStyle(t).fontSize;if(t.__size!==key){t.__size=key;t.style.height='0px';t.style.height=t.scrollHeight+'px';}}}
+  {const t=titleRef.current as HTMLTextAreaElement&{__size?:string}|null;if(t?.style&&t.tagName==='TEXTAREA'){t.style.overflow='hidden';const key=t.value+'|'+t.clientWidth+'|'+getComputedStyle(t).fontSize;if(t.__size!==key){t.__size=key;fitTextarea(t);}}}
   for(const ref of inputRefs.current.values()){const n=ref as unknown as HTMLTextAreaElement&{__size?:string};if(!n?.style||n.tagName!=='TEXTAREA')continue;
-  if(n.dataset?.pageBlock==='collapsed'){n.__size='';n.style.height='0px';continue;}const key=n.value+'|'+n.clientWidth;if(n.__size===key)continue;n.__size=key;n.style.height='0px';n.style.height=n.scrollHeight+'px';}
+  if(n.dataset?.pageBlock==='collapsed'){n.__size='';n.style.height='0px';continue;}const key=n.value+'|'+n.clientWidth;if(n.__size===key)continue;n.__size=key;fitTextarea(n);}
   if(sc0&&sc0.scrollTop!==top0)sc0.scrollTop=top0;});
  const currentBlocks=()=>(selectedId&&store.get(selectedId)?.draft.blocks)||[];
  const domInput=(id:string)=>inputRefs.current.get(id) as unknown as (HTMLTextAreaElement&{setSelectionRange?:(a:number,b:number)=>void})|undefined;

@@ -20,6 +20,7 @@ import {appAlert} from '../lib/app-alert';
 import {PageRichInput} from './PageRichInput';
 import {htmlToLeaf,leafToHtml} from '../lib/leaf-rich';
 import {NoteFormatBar} from './NoteFormatBar';
+import {fitTextarea} from '../lib/fit-textarea';
 const RICH_WEB=Platform.OS==='web';
 export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(patch:Partial<Leaf>)=>void;titleRef:React.RefObject<TextInput|null>;pageId?:string}){
  const keyboard=useKeyboardVisible();
@@ -38,7 +39,7 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
  // encolhia ele a 0 por um instante e o navegador puxava a rolagem para cima a cada tecla. Agora guarda e devolve a rolagem
  // de quem rola, e so mexe na altura quando ela muda de fato.
  const scrollerOf=(n:any)=>{let p=n?.parentElement;while(p&&p!==document.body){const o=getComputedStyle(p).overflowY;if((o==='auto'||o==='scroll')&&p.scrollHeight>p.clientHeight)return p;p=p.parentElement;}return null;};
- const sizeField=(n:any)=>{if(!n?.style||n.tagName!=='TEXTAREA')return;const sc=scrollerOf(n),top=sc?sc.scrollTop:0,before=n.style.height;n.style.overflow='hidden';n.style.height='0px';const want=n.scrollHeight+'px';n.style.height=want;if(sc&&sc.scrollTop!==top)sc.scrollTop=top;return before!==want;};
+ const sizeField=(n:any)=>fitTextarea(n);
  useLayoutEffect(()=>{if(Platform.OS!=='web')return;sizeField(titleNode.current);for(const n of inputs.current.values())sizeField(n);});
  // 06/11/2026 (Pedro: "erro novamente e nao consigo descer"): a janela da nota entra deslizando e muda de largura depois do
  // primeiro desenho; a linha que passa a quebrar em duas ficava com altura de uma (cortada, sem rolagem). Mede de novo
