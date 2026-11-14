@@ -655,9 +655,11 @@ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset
  const [peek,setPeek]=useState<{id:string;x:number;y:number}|null>(null),peekTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  function peekIn(id:string,e:any){if(!desktop)return;prefetchPageCover(api,byId.get(id)?.data);const t=e?.currentTarget;let r:any=null;try{r=t?.getBoundingClientRect?.();}catch{}if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=setTimeout(()=>setPeek({id,x:r?r.left:0,y:r?r.bottom+6:0}),420);}
  function peekOut(){if(peekTimer.current)clearTimeout(peekTimer.current);peekTimer.current=null;setPeek(null);}
- function pageLinkView(page:Entity,key:string,b?:PageBlock){
+ /** 14/11/2026 (Pedro): clique com a rodinha abre a página numa guia nova, como nos sites. */
+const auxPage=(id:string)=>({onAuxClick:(e:any)=>{if((e?.button??e?.nativeEvent?.button)===1){e.preventDefault?.();try{(globalThis as any).open?.('/paginas/'+encodeURIComponent(id),'_blank','noopener');}catch{/* bloqueado */}}},onMouseDown:(e:any)=>{if((e?.button??e?.nativeEvent?.button)===1)e.preventDefault?.();}}) as any;
+function pageLinkView(page:Entity,key:string,b?:PageBlock){
   const icon=String(page.data?.icon||'');
-  return <Pressable key={key} testID={'page-link-'+page.id} accessibilityRole="link" accessibilityLabel={'Abrir '+(page.title||'Sem título')} onPress={()=>{peekOut();open(page);}} onHoverIn={e=>peekIn(page.id,e)} onHoverOut={peekOut}
+  return <Pressable key={key} testID={'page-link-'+page.id} accessibilityRole="link" accessibilityLabel={'Abrir '+(page.title||'Sem título')} {...auxPage(page.id)} onPress={()=>{peekOut();open(page);}} onHoverIn={e=>peekIn(page.id,e)} onHoverOut={peekOut}
    style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,alignSelf:'flex-start',paddingVertical:4,paddingHorizontal:2,borderRadius:4,backgroundColor:hovered?c.input:'transparent'})}>
    {icon?<Text style={{fontSize:18,lineHeight:24}}>{icon}</Text>:<Icon name="note" size={18} color={c.muted}/>}
    <Text style={{color:c.text,fontSize:16,lineHeight:24,fontWeight:'600',textDecorationLine:'underline',textDecorationColor:c.muted+'80'} as any}>{page.title||'Sem título'}</Text>
@@ -829,7 +831,7 @@ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset
       fazendo e um clique); a arvore completa continua logo abaixo, com titulo de secao. */}
   {desktop&&orderReady&&recentPages.length?<View testID="pages-recent" style={{paddingHorizontal:dpx(DESK_LEFT) as any /* 07/11/2026 (revisao): mesma borda do titulo (eram 3 bordas na tela) */,paddingBottom:18,gap:10}}>
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Recentes</Text>
-   <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} onPress={()=>open(p)} style={({hovered}:any)=>({width:228,minHeight:58,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:10,flexDirection:'row',alignItems:'center'})} /* 07/11/2026 (revisao + desenho 'cartoezinhos pequenos'): cartao baixo, icone ao lado (era 216x112 com um vao no meio) */>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} {...auxPage(p.id)} onPress={()=>open(p)} style={({hovered}:any)=>({width:228,minHeight:58,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:10,flexDirection:'row',alignItems:'center'})} /* 07/11/2026 (revisao + desenho 'cartoezinhos pequenos'): cartao baixo, icone ao lado (era 216x112 com um vao no meio) */>
     {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
     <View style={{gap:2,flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
    </Pressable>)}</View>
@@ -848,7 +850,7 @@ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset
       rola de lado) e o rotulo "Todas as paginas" em cima da arvore. Recusado: cartao grande "abriu por ultimo". */}
   {!desktop&&orderReady&&recentPages.length>1?<View testID="pages-recent-phone" style={{paddingBottom:6}}>
    <Text style={{paddingHorizontal:16,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.5,paddingBottom:8}}>RECENTES</Text>
-   <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:16,gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir recente '+(p.title||'Sem título')} onPress={()=>open(p)} style={({pressed}:any)=>({width:120,padding:12,borderRadius:14,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:8,opacity:pressed?0.7:1})}>
+   <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:16,gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir recente '+(p.title||'Sem título')} {...auxPage(p.id)} onPress={()=>open(p)} style={({pressed}:any)=>({width:120,padding:12,borderRadius:14,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:8,opacity:pressed?0.7:1})}>
     {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
     <Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:13,lineHeight:17}}>{p.title||'Sem título'}</Text>
    </Pressable>)}</ScrollView>
