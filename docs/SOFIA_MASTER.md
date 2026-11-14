@@ -298,6 +298,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Abrir uma página nunca mostra o esqueleto de outra tela (09/11/2026, Pedro, 15ª vez):** abrindo uma página específica, só o fundo até ela entrar; o esqueleto da lista de Páginas é só para a lista.
 - **Só web por enquanto (14/11/2026, Pedro):** "tira a versão celular no lugar agora, só web". O padrão Notion (base de dados, painel, avisos) é feito só no site do computador; celular e app Android ficam com o que já existe e saem da lista de prioridades até ele pedir.
 - **14/11/2026 (Pedro):** pontos da linha do tempo do Início que ficam juntos/sobrepostos fazem parte da ideia (viram grupo). O achado "botões em cima de outros" da Mimic no /inicio não é defeito.
+- 2026-11-14 (Pedro: "para de ficar tentando corrigir o apk, depois atualizamos ele, isso está gastando token"): em ajustes rápidos, só o site; APK e testes que já falhavam ficam para quando ele pedir.
 
 ## 8. Regras que não se quebram
 - **Drive (07/11):** antes de mexer no Drive e depois de publicar, ler `[drive-teste]` e `[drive]` no registro do Railway; defeito que aparecer ali se corrige sem esperar o Pedro relatar.
@@ -430,8 +431,8 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | Biblioteca de capas: toda capa enviada fica guardada ("Suas capas" na Galeria, PC e celular); trocar/remover/excluir página não apaga mais; só sai pelo × (confirma "Tirar?"), recusa se em uso. Rotas GET/DELETE /api/covers | tsc ok; testes de capa reescritos ok; demais falhas iguais às de antes; não conferido no navegador |
 | 2026-11-14 | (sem APK) | Seletor de cor enxuto (pedido do Pedro): só barras de cor e luz, pequeno, abre junto da bolinha (portal no body; antes ficava longe e cortado) | tsc ok; teste do seletor ok; não conferido no navegador |
+$L
 $L
 $L
 $L

@@ -53,3 +53,4 @@
 | 2026-11-14 | (sem APK) | Páginas com tabela, quadro ou anotações ficam mais largas no computador (até 1480 px em vez de 960), como no Notion; páginas de texto seguem em 960 | tsc ok, site recompilado |
 | 2026-11-14 | (sem APK) | Subatalhos aparecem na hora: a cópia rápida da barra lateral passa a guardar também os subatalhos (antes só vinham com a lista completa do servidor) | tsc ok, site recompilado |
 | 2026-11-14 | (sem APK) | Nota: clicar abaixo do texto não volta mais ao topo; o cursor vai para o fim sem a página pular (foco sem rolagem + só o necessário) | tsc ok, não conferido logado |
+| 2026-11-14 | (sem APK) | Página: clicar abaixo do texto não volta mais ao topo; o cursor vai ao fim do último bloco e a rolagem fica onde estava (reproduzido no Chrome: ia a 0) | tsc ok |
