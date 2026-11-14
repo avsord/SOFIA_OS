@@ -28,12 +28,13 @@ test('a capa enviada fica reduzida no servidor (1600 px), e outros arquivos nao 
  const outro=w.attach(page.id,{name:'foto.jpg',mime:'image/jpeg',base64:photo().toString('base64')});
  assert.equal(jpeg.decode(Buffer.from(w.attachment(outro.id).blob)).width,3000,'so "capa.*" e reduzida');
 });
-test('trocar a capa apaga a antiga; tirar a capa apaga a atual; arquivo de outra pagina/registro nao e apagado',t=>{
+test('a capa antiga fica nas versoes recentes (desfazer volta a abrir); sem versoes ela e apagada; arquivo de outra pagina/registro nao e apagado',t=>{
  const {w,page,up,setCover}=setup(t);
  const a=up(),b=up();
  setCover(a.id);assert.ok(w.attachment(a.id),'a primeira capa fica');
- setCover(b.id);assert.throws(()=>w.attachment(a.id),/n.o encontrado/i,'a antiga foi apagada');assert.ok(w.attachment(b.id),'a nova fica');
- setCover('', 'gradient');assert.throws(()=>w.attachment(b.id),/n.o encontrado/i,'tirar a capa apaga o arquivo');
+ setCover(b.id);assert.ok(w.attachment(a.id),'a antiga fica: esta nas versoes recentes e o desfazer precisa dela');assert.ok(w.attachment(b.id),'a nova fica');
+ setCover('', 'gradient');assert.ok(w.attachment(b.id),'tirar a capa tambem guarda o arquivo para o desfazer');
+ w.db.prepare('DELETE FROM entity_versions WHERE entity_id=?').run(page.id);assert.equal(w.dropOldCover(page.id,a.id),true);assert.throws(()=>w.attachment(a.id),/n.o encontrado/i,'sem versoes que a citem, a antiga e apagada');
  // compartilhada: outra pagina aponta para o mesmo arquivo -> nao apaga
  const c=up(),other=w.save({kind:'user_page',title:'Outra',area:'Pessoal',data:{cover_type:'attachment',cover_value:'',cover_attachment_id:c.id}});
  setCover(c.id);setCover('', 'gradient');assert.ok(w.attachment(c.id),'a outra pagina ainda usa: fica');

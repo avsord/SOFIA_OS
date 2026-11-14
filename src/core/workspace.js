@@ -206,6 +206,8 @@ class Workspace {
   if(!a||a.entity_id!==pageId||!/^capa\./.test(String(a.name||'')))return false;
   const used=this.db.prepare("SELECT 1 AS x FROM entities WHERE id!=? AND instr(data,?)>0 LIMIT 1").get(pageId,attId);
   if(used)return false;
+  // 14/11/2026 (Pedro: "capa desapareceu" / cancelar capa nao volta como estava): a capa antiga fica enquanto estiver nas ultimas 20 versoes da pagina, para desfazer/versoes anteriores voltarem a abrir
+  try{if(this.db.prepare('SELECT snapshot FROM entity_versions WHERE entity_id=? ORDER BY revision DESC LIMIT 20').all(pageId).some(r=>String(r.snapshot).includes(attId)))return false;}catch{/* sem versoes: segue */}
   this.dropAttachment(attId);return true;
  }
  /** Capas que sobraram de trocas antigas: anexo "capa.*" de uma pagina que nao e mais a capa atual dela. Ignora

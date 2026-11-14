@@ -40,3 +40,4 @@
 - 14/11/2026: página vira atalho (seção Atalhos no topo da barra lateral).
 - 14/11/2026: excluir página não apaga mais arquivo (capa) que outra página ainda usa; capa de PESSOAL já estava perdida no servidor (404), não recuperável de lá.
 - 14/11/2026: seção Atalhos única no topo (página, nota, pasta) com origem no nome; sub-linhas na árvore removidas.
+- 14/11/2026: capa antiga só é apagada quando sai das últimas 20 versões da página (desfazer/versões anteriores voltam a abrir; causa provável do 'capa desapareceu').
