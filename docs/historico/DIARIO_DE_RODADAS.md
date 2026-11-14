@@ -55,3 +55,4 @@
 | 2026-11-14 | (sem APK) | Nota: clicar abaixo do texto não volta mais ao topo; o cursor vai para o fim sem a página pular (foco sem rolagem + só o necessário) | tsc ok, não conferido logado |
 | 2026-11-14 | (sem APK) | Página: clicar abaixo do texto não volta mais ao topo; o cursor vai ao fim do último bloco e a rolagem fica onde estava (reproduzido no Chrome: ia a 0) | tsc ok |
 | 2026-11-14 | (sem APK) | Cor dos pontos e subatalho de página ficam na conta (dados da página: sidebar_color/sidebar_sub; cor de nota em sidebar_colors da página dona), iguais em todo navegador; o que estava só no navegador sobe uma vez | tsc ok, não conferido |
+| 2026-11-14 | (sem APK) | 22af537 | Modelo Diário nas páginas (dia como título com dia da semana, hora roxa em negrito na frente de cada registro, divisor entre dias); aplicado numa página com texto, reorganiza datas e horas | testes 12/12, site no ar; devaneios tem senha: Pedro aplica no navegador dele |
