@@ -975,11 +975,11 @@ function PeriodIcon({kind}: {kind: string}) {
 // 14/11/2026 (Pedro: "o ponto de hora parou de pulsar, tem que ficar pulsando"): volta o pulso, só em CSS (o navegador anima, a página não redesenha)
 const NOW_PULSE = StyleSheet.create({halo: {animationKeyframes: {'0%': {opacity: 0.5, transform: 'scale(0.4)'}, '70%': {opacity: 0, transform: 'scale(1)'}, '100%': {opacity: 0, transform: 'scale(1)'}}, animationDuration: '2400ms', animationTimingFunction: 'ease-out', animationIterationCount: 'infinite'} as any});
 function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
-  const c = useTheme(), reduced = useReducedMotion(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
+  const c = useTheme(); /* 03/11/2026: no celular o "agora" fica parado (bateria; o Android nunca via a tela parada) */
   const now = new Date(), label = hhmm(now), pct = x * 100, at = (off: number) => (WEB ? `calc(${pct}% - ${dpx(off)})` : x * lw - off) as any, red = '#F57A8C';
   return <View pointerEvents="none" style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4}}>
     {/* aureola */}
-    <View style={[{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: 0.35, transform: [{scale: 0.4}]}, WEB && !reduced ? NOW_PULSE.halo : null]} />
+    <View style={[{position: 'absolute', left: at(14), top: top - 14, width: 28, height: 28, borderRadius: 14, backgroundColor: red, opacity: 0.35, transform: [{scale: 0.4}]}, WEB ? NOW_PULSE.halo : null /* 14/11/2026: pulsa mesmo com 'efeitos de animacao' desligado no Windows (Pedro: tem que ficar pulsando) */]} />
     {/* ponto */}
     <View style={{position: 'absolute', left: at(6), top: top - 6, width: 12, height: 12, borderRadius: 6, backgroundColor: red, borderWidth: 2, borderColor: c.surface, boxShadow: '0 0 0 3px ' + tint(red, 0.25) + ', 0 0 12px ' + tint(red, 0.6)} as any} />
     {/* fio ate a escala */}

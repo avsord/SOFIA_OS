@@ -35,6 +35,7 @@ import {refreshSharedPages} from '../components/PageSharePanel';
 import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
+import {watchWebVersion} from '../lib/web-version';
 import type {Entity,Tab} from '../lib/types';
 import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,setPageFlagSink,setPageList,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
@@ -68,9 +69,14 @@ function usePageDirectory(api:SofiaApi){
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
   void load();
-  const focus=()=>void load();
-  if(typeof window!=='undefined')window.addEventListener('focus',focus);
-  return()=>{live=false;if(typeof window!=='undefined')window.removeEventListener('focus',focus);};
+  // 14/11/2026 (Pedro: "na tela maior varias coisas nao sincronizam com o outro navegador"): com duas janelas lado a lado
+  // a que nao tem foco nunca recebia 'focus' e a barra lateral ficava parada. Agora tambem busca a cada 15 s enquanto a
+  // aba esta visivel (com ou sem foco), quando volta a ficar visivel e confere se ha versao nova do site.
+  const focus=()=>void load(),vis=()=>{if(typeof document==='undefined'||document.visibilityState==='visible')void load();};
+  const tick=setInterval(vis,15000);
+  if(typeof window!=='undefined'){window.addEventListener('focus',focus);document.addEventListener('visibilitychange',vis);}
+  const stopVersion=watchWebVersion();
+  return()=>{live=false;clearInterval(tick);stopVersion();if(typeof window!=='undefined'){window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',vis);}};
  },[api]);
  return pages;
 }
