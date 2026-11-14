@@ -38,6 +38,7 @@ import {Icon, type IconName} from '../components/Icon';
 import Svg, {Path, Circle} from 'react-native-svg';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
 import {HoverPressable} from '../components/HoverPressable';
+import {setTimelineTimes} from '../lib/timeline-arrivals';
 
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const brl = (v: number) => v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: v >= 1000 ? 0 : 2});
@@ -238,6 +239,7 @@ export function HomeBrief(p: HomeBriefProps) {
     return out.filter(m => !hiddenMarks[m.id]).sort((x, y) => x.at.getTime() - y.at.getTime());
   }, [p.data, p.masked, markMoves, hiddenMarks]);
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
+  useEffect(() => {setTimelineTimes([...timelineItems.map(r => Date.parse(r.date)), ...timeMarks.map(m => m.at.getTime())]);}, [timelineItems, timeMarks]); // ponto ao lado do Início (lib/timeline-arrivals)
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any) && !isDoneEv(r)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
   // 05/11/2026 (Pedro: "em Agenda proximos coloca o que vai vir so um dia depois... nao de hoje, pro usuario ficar atento"):
