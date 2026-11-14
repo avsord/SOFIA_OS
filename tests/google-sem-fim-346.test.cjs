@@ -16,5 +16,15 @@ test('0.3.346: compromisso sem fim continua sem fim na volta do Google (so muda 
  const changed=svc.saveFromGoogle(ev(2*3600000),'primary',false,f.core.workspace.get(local.id),report);
  assert.equal(changed.data.end_at,new Date(Date.parse(start)+2*3600000).toISOString(),'fim posto no Google vale');
  const fresh=svc.saveFromGoogle({id:'ev2',status:'confirmed',summary:'Reuniao',start:{dateTime:start},end:{dateTime:new Date(Date.parse(start)+3600000).toISOString()}},'primary',false,null,report);
- assert.ok(fresh.data.end_at,'evento novo vindo do Google mantem o fim dele');
+ // 14/11/2026 (Pedro: "so fica o simbolo de fim se o usuario pos um horario final; o Google ja da um final automatico")
+ assert.equal(fresh.data.end_at,'','evento novo do Google com o fim automatico (duracao padrao, 60 min) fica so com o ponto');
+ assert.equal(fresh.data.end_rule_v,1,'a regra fica gravada (nao reprocessa a cada sincronia)');
+ const longo=svc.saveFromGoogle({id:'ev3',status:'confirmed',summary:'Aula',start:{dateTime:start},end:{dateTime:new Date(Date.parse(start)+90*60000).toISOString()}},'primary',false,null,report);
+ assert.ok(longo.data.end_at,'fim escolhido no Google (diferente do padrao) vale');
+ svc.autoEventMinutes=30;
+ const meia=svc.saveFromGoogle({id:'ev4',status:'confirmed',summary:'Call',start:{dateTime:start},end:{dateTime:new Date(Date.parse(start)+30*60000).toISOString()}},'primary',false,null,report);
+ assert.equal(meia.data.end_at,'','padrao da agenda de 30 min tambem conta como automatico');
+ const marcado=svc.saveFromGoogle({id:'ev5',status:'confirmed',summary:'Da Sofia',extendedProperties:{private:{sofia_no_end:'1'}},start:{dateTime:start},end:{dateTime:new Date(Date.parse(start)+3600000).toISOString()}},'primary',false,null,report);
+ assert.equal(marcado.data.end_at,'','evento sem fim enviado pela Sofia (marcado) volta sem fim');
+ assert.equal(svc.eventBody(local).extendedProperties.private.sofia_no_end,'1');
 });

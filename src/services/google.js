@@ -382,8 +382,15 @@ class GoogleService {
     // fim, entao ao enviar um compromisso sem fim mandamos inicio + 1 h (eventBody). Na volta, se o compromisso daqui nao
     // tinha fim e o do Google e exatamente esse +1 h, continua SEM fim (fica so o ponto na linha do tempo). Se a pessoa
     // mudar o fim no Google para outro horario, vale o que ela pos.
-    if (existing && !String(existing.data?.end_at || '') && data.start_at && data.end_at && !data.calendar_all_day
-      && Date.parse(data.end_at) - Date.parse(data.start_at) === 3600000) data.end_at = '';
+    // 14/11/2026 (Pedro: "só fica com o símbolo de fim se o usuário adicionou de fato um horário final; o Google já dá um
+    // final automático"): sem fim também quando (a) a Sofia mandou o evento marcado sofia_no_end e o fim ainda é o +1 h dela,
+    // ou (b) o evento foi criado no Google e o fim é exatamente a duração padrão da agenda (defaultEventLength, o fim
+    // automático do Google). Fim diferente desses = a pessoa escolheu, e vale.
+    const span = data.start_at && data.end_at && !data.calendar_all_day ? Date.parse(data.end_at) - Date.parse(data.start_at) : NaN;
+    const sofiaNoEnd = ev.extendedProperties?.private?.sofia_no_end === '1';
+    if (span === 3600000 && (sofiaNoEnd || (existing && !String(existing.data?.end_at || '') && !existing.data?.end_rule_v))) data.end_at = '';
+    else if (!sofiaNoEnd && span === (Number(this.autoEventMinutes) || 60) * 60000) data.end_at = '';
+    data.end_rule_v = 1;
     let title = String(ev.summary || '(sem título)').slice(0, 240), content = String(ev.description || '').replace(/<[^>]+>/g, ' ').slice(0, 15000);
     const state = ev.status === 'tentative' ? 'pending' : 'confirmed';
     const attempt = (t, c) => existing
@@ -400,7 +407,12 @@ class GoogleService {
   }
   async importCalendar(cal, readonly, map, report, link) {
     const state = (link.sync || {})[cal.id] || {};
-    const full = !state.at || !state.full_at || Date.now() - Date.parse(state.full_at) > FULL_EVERY_MS;
+    // 14/11/2026: duração padrão de evento no Google (o fim automático), lida 1x a cada 6 h; sem resposta vale 60 min
+    if (!this.autoEventAt || Date.now() - this.autoEventAt > 6 * 3600000) {
+      try { const s = await this.call('GET', CAL + '/users/me/settings/defaultEventLength'); const n = Number(s && s.value); if (n > 0) this.autoEventMinutes = n; } catch { /* fica o último ou 60 */ }
+      this.autoEventAt = Date.now();
+    }
+    const full =!state.at || !state.full_at || Date.now() - Date.parse(state.full_at) > FULL_EVERY_MS;
     const started = new Date().toISOString();
     let pageToken = '';
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -415,7 +427,7 @@ class GoogleService {
         if (report.imported % YIELD_EVERY === 0) await breathe();
         const key = cal.id + '|' + ev.id, existing = map.get(key);
         // Nada mudou no Google e nada mudou na Sofia: não regrava.
-        if (existing && ev.etag && ev.etag === existing.data.google_etag && existing.revision <= (Number(existing.data.google_rev) || 0)) continue;
+        if (existing && ev.etag && ev.etag === existing.data.google_etag && existing.revision <= (Number(existing.data.google_rev) || 0) && existing.data.end_rule_v === 1) continue;
         if (existing && !readonly) {
           const localChanged = existing.revision > (Number(existing.data.google_rev) || 0);
           if (localChanged && ev.etag && ev.etag !== existing.data.google_etag) { report.conflicts.push({id: existing.id, reason: 'Alterado no Google e na Sofia: "' + existing.title.slice(0, 60) + '"'}); continue; }
@@ -451,7 +463,9 @@ class GoogleService {
         // PATCH mescla objetos: mandar só {useDefault:true} num evento que JÁ tem lembretes próprios
         // vira "useDefault + overrides" e o Google recusa ("Cannot specify both default reminders and
         // overrides"). Mandar overrides vazio limpa os próprios e deixa só o padrão.
-        : {useDefault: true, overrides: []})};
+        : {useDefault: true, overrides: []}),
+      // 14/11/2026: marca o evento sem fim escolhido (o Google exige um fim; mandamos +1 h), para a volta saber que não tem fim
+      extendedProperties: {private: {sofia_no_end: !allDay && !(Number.isFinite(endMs) && endMs > startMs) ? '1' : ''}}};
   }
   /** 0.3.201: tarefa programada (com data) da Sofia vira evento no Google Agenda, com os lembretes dela.
    * Concluida, cancelada, sem data ou apagada: sai do Google. A Sofia continua sendo a dona da tarefa. */

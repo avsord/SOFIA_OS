@@ -67,3 +67,4 @@
 | 2026-11-14 | (sem APK) | (este) | Imagem nas Páginas/Notas: cantos de escala com o mouse em cima (hover por CSS) e Delete/Backspace apaga a imagem selecionada | testes da mudança verdes; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Aba do site só recarrega sozinha com versão nova quando está ESCONDIDA (2 conferências); visível sem foco (print, janela ao lado) não recarrega mais | teste verde; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Correção ortográfica no menu da Sofia em todo campo de texto do site (web-spell-menu.ts, com Recortar/Copiar/Colar); bolinhas de cor da barra lateral não achatam mais | testes da mudança verdes; site recompilado |
+| 2026-11-14 | (sem APK) | (este) | Agenda: evento do Google com fim automático (duração padrão da agenda, lida em defaultEventLength) ou enviado pela Sofia sem fim (marca sofia_no_end) fica só com o ponto; fim escolhido vale | testes Google verdes (29) |

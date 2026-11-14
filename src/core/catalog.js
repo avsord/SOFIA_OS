@@ -99,6 +99,7 @@ const CATALOG={
       {"key": "google_rev", "label": "Revisão sincronizada", "type": "number", "developerOnly": true},
       {"key": "google_recurring_id", "label": "Série no Google", "type": "text", "max": 200, "developerOnly": true},
       {"key": "google_readonly", "label": "Somente leitura no Google", "type": "checkbox", "developerOnly": true},
+      {"key": "end_rule_v", "label": "Regra do fim (Google)", "type": "number", "developerOnly": true},
       {
         "key": "start_at",
         "label": "Início",
