@@ -20,7 +20,7 @@ import {NOTE_DRAG_TYPE,ROOT_BOOK,addLooseNote,applyDrop,hitTarget,registerLiveNo
 import type {NoteBook,NoteDragItem,NoteRect} from '../lib/notes-move';
 import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
 import {useWebBackDepth} from '../lib/web-panels';
-import {hasShortcut,listenOpenShortcut,publishShortcuts,resolveShortcuts,toggleShortcut} from '../lib/note-shortcuts';
+import {hasShortcut,listenOpenShortcut,listenShortcutColor,publishShortcuts,resolveShortcuts,setShortcutColor,toggleShortcut} from '../lib/note-shortcuts';
 
 /** 0.3.201: Notas reestruturadas - pastas em cartoes, notas com previa e data, busca que acha com letra
  * errada, e acoes claras. Os dados continuam no mesmo formato (nenhuma nota antiga se perde). */
@@ -161,6 +161,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  const shortcutOwner=useRef({}).current;
  useEffect(()=>{if(pageId)publishShortcuts(pageId,shortcutOwner,resolveShortcuts(data));},[pageId,data,shortcutOwner]);
  useEffect(()=>listenOpenShortcut(pageId,r=>{if(r.kind==='folder'){if(booksRef.current.some(b=>b.id===r.id&&!b.root)){setLeafId(null);setBookId(null);setOpenBook(r.id);}return;}const b=booksRef.current.find(k=>k.pages.some(p=>p.id===r.id));if(b){setBookId(b.id);setLeafId(r.id);}}),[pageId]);
+ useEffect(()=>listenShortcutColor(pageId,(r,color)=>onChangeRef.current(setShortcutColor({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},r.kind,r.id,color),'notebook-shortcut')),[pageId]);
  function flipShortcut(kind:'note'|'folder',id:string){onChangeRef.current(toggleShortcut({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},kind,id),'notebook-shortcut');}
  const shortcutItem=(kind:'note'|'folder',id:string):MenuItem=>hasShortcut(data,kind,id)?{label:'Tirar atalho',icon:'link',run:()=>flipShortcut(kind,id)}:{label:'Virar atalho',icon:'link',run:()=>flipShortcut(kind,id)};
  useEffect(()=>{const n=takeOpenNote(pageId);if(!n)return;const b=booksRef.current.find(k=>k.pages.some(p=>p.id===n));if(b){setBookId(b.id);setLeafId(n);}},[pageId]);

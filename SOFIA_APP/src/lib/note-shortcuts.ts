@@ -5,8 +5,16 @@ import type {Entity} from './types';
  * atalho". O atalho NAO move nem copia nada: a nota/pasta continua no bloco de Notas. Ele fica guardado no proprio bloco
  * (data.shortcuts = [{kind,id}]) e aparece como subpagina da pagina na barra lateral e no topo da pagina; clicar abre a
  * pagina ja com aquela nota/pasta aberta. Por padrao a lista e vazia (nada aparece). */
-export type ShortcutRef={kind:'note'|'folder';id:string};
+export type ShortcutRef={kind:'note'|'folder';id:string;color?:string};
 export type NoteShortcut=ShortcutRef&{label:string;emoji:string};
+/** 14/11/2026 (Pedro: "atalhos viraram sub do sub... um bullet que voce pode mudar a cor e o nome menor"): o atalho aparece
+ * na barra como um ponto colorido + nome menor (nao como pagina do mesmo tamanho). A cor fica no proprio atalho. */
+export const SHORTCUT_COLORS:{name:string;hex:string}[]=[{name:'Cinza',hex:'#9B9A97'},{name:'Marrom',hex:'#A27763'},{name:'Laranja',hex:'#E0883C'},{name:'Amarelo',hex:'#D9B23A'},{name:'Verde',hex:'#4F9E6B'},{name:'Azul',hex:'#4A88D0'},{name:'Roxo',hex:'#9065C7'},{name:'Rosa',hex:'#D3609B'},{name:'Vermelho',hex:'#D9534F'}];
+export const DEFAULT_SHORTCUT_COLOR='#D9534F';
+/** Troca a cor de um atalho; devolve os dados novos do bloco (nada mais muda). */
+export function setShortcutColor(data:Record<string,any>,kind:ShortcutRef['kind'],id:string,color:string):Record<string,any>{
+ return {...data,shortcuts:shortcutRefs(data).map(x=>x.kind===kind&&x.id===id?{...x,color}:x)};
+}
 
 export function shortcutRefs(data:Record<string,any>|null|undefined):ShortcutRef[]{
  const s=data?.shortcuts;return Array.isArray(s)?s.filter((x:any)=>x&&(x.kind==='note'||x.kind==='folder')&&typeof x.id==='string'&&x.id):[];
@@ -57,4 +65,22 @@ export function listenOpenShortcut(pageId:string|undefined,f:(r:ShortcutRef)=>vo
  if(!pageId)return ()=>{};const p=pending.get(pageId);if(p){pending.delete(pageId);f(p);}
  let s=openers.get(pageId);if(!s){s=new Set();openers.set(pageId,s);}s.add(f);
  return ()=>{const t=openers.get(pageId);if(!t)return;t.delete(f);if(!t.size)openers.delete(pageId);};
+}
+
+// ---------- trocar a cor do atalho pela barra lateral (pagina aberta: o bloco grava; fechada: grava direto) ----------
+const colorers=new Map<string,Set<(r:ShortcutRef,color:string)=>void>>();
+export function listenShortcutColor(pageId:string|undefined,f:(r:ShortcutRef,color:string)=>void):()=>void{
+ if(!pageId)return ()=>{};let s=colorers.get(pageId);if(!s){s=new Set();colorers.set(pageId,s);}s.add(f);
+ return ()=>{const t=colorers.get(pageId);if(!t)return;t.delete(f);if(!t.size)colorers.delete(pageId);};
+}
+type ColorApi={entityFresh(id:string):Promise<Entity>;saveEntity(input:Partial<Entity>,base?:Partial<Entity>):Promise<Entity>};
+export async function requestShortcutColor(pageId:string,r:ShortcutRef,color:string,api?:ColorApi|null):Promise<Entity|null>{
+ const now=colorers.get(pageId);if(now&&now.size){now.forEach(f=>f(r,color));return null;}
+ if(!api)throw new Error('Sem conexão para trocar a cor.');
+ const pg=await api.entityFresh(pageId);if(String(pg.data?.lock_json||''))throw new Error('Página trancada: abra a página para trocar a cor.');
+ let bl:any;try{bl=JSON.parse(String(pg.data?.blocks_json||'[]'));}catch{throw new Error('Não deu para ler o conteúdo da página.');}
+ if(!Array.isArray(bl))throw new Error('Não deu para ler o conteúdo da página.');
+ let hit=false;const next=bl.map((b:any)=>{if(b?.type==='collection'&&hasShortcut(b.data,r.kind,r.id)){hit=true;return {...b,data:setShortcutColor(b.data,r.kind,r.id,color)};}return b;});
+ if(!hit)return null;
+ return await api.saveEntity({id:pg.id,revision:pg.revision,data:{...(pg.data||{}),blocks_json:JSON.stringify(next)}},pg);
 }

@@ -5,7 +5,7 @@ import {Icon, type IconName} from './Icon';
 import {OverAll} from '../lib/over-all';
 /** 0.3.263 (computador): menu do botao direito (Editar, Duplicar, Apagar...) aberto junto do ponteiro. No celular nao existe:
  * la essas acoes continuam no "segurar" e nos botoes de cada tela. */
-export type MenuItem = {label: string; icon?: IconName; danger?: boolean; run: () => void};
+export type MenuItem = {label: string; icon?: IconName; danger?: boolean; run: () => void; swatch?: string};
 type Open = {x: number; y: number; items: MenuItem[]} | null;
 let setter: ((v: Open) => void) | null = null;
 export function openContextMenu(x: number, y: number, items: MenuItem[]) { if (setter && items.length) setter({x, y, items}); }
@@ -39,7 +39,7 @@ export function ContextMenuHost() {
     <Pressable accessibilityLabel="Fechar menu" onPress={() => setOpen(null)} {...({onContextMenu: (e: any) => { e.preventDefault(); setOpen(null); }} as any)} style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} />
     <Animated.View testID={open ? 'context-menu' : 'context-menu-closing'} accessibilityRole="menu" style={{opacity: anim, transform: [{scale: anim.interpolate({inputRange: [0, 1], outputRange: [0.96, 1]})}, {translateY: anim.interpolate({inputRange: [0, 1], outputRange: [-4, 0]})}], position: 'absolute', left, top, width: W, paddingVertical: 6, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, boxShadow: '0 10px 30px rgba(20,14,40,0.18)'} as any}>
       {shown.items.map((it, i) => <Pressable key={i} accessibilityRole="menuitem" onPress={() => { setOpen(null); setTimeout(it.run, 0); }} style={{flexDirection: 'row', alignItems: 'center', gap: 10, height: 38, paddingHorizontal: 12, marginHorizontal: 4, borderRadius: 8}}>
-        {it.icon ? <Icon name={it.icon} size={16} color={it.danger ? c.danger : c.muted} /> : <View style={{width: 16}} />}
+        {it.swatch ? <View style={{width: 16, alignItems: 'center'}}><View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: it.swatch}} /></View> : it.icon ? <Icon name={it.icon} size={16} color={it.danger ? c.danger : c.muted} /> : <View style={{width: 16}} />}
         <Text style={{color: it.danger ? c.danger : c.text, fontSize: 14}}>{it.label}</Text>
       </Pressable>)}
     </Animated.View>
