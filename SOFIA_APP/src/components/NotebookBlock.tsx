@@ -164,7 +164,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
  useEffect(()=>listenOpenShortcut(pageId,r=>{if(r.kind==='folder'){if(booksRef.current.some(b=>b.id===r.id&&!b.root)){setLeafId(null);setBookId(null);setOpenBook(r.id);}return;}const b=booksRef.current.find(k=>k.pages.some(p=>p.id===r.id));if(b){setBookId(b.id);setLeafId(r.id);}}),[pageId]);
  useEffect(()=>listenShortcutColor(pageId,(r,color)=>onChangeRef.current(setShortcutColor({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},r.kind,r.id,color),'notebook-shortcut')),[pageId]);
  function flipShortcut(kind:'note'|'folder',id:string){onChangeRef.current(toggleShortcut({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},kind,id),'notebook-shortcut');}
- const subItem=(id:string):MenuItem=>({label:hasSubShortcut(data,id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>onChangeRef.current(toggleSubShortcut({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},id),'notebook-shortcut')});
+ const subItem=(id:string,kind:'note'|'folder'='note'):MenuItem=>({label:hasSubShortcut(data,id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>onChangeRef.current(toggleSubShortcut({...dataRef.current,mode:'notebooks',notebooks:booksRef.current},id,kind),'notebook-shortcut')});
  const shortcutItem=(kind:'note'|'folder',id:string):MenuItem=>hasShortcut(data,kind,id)?{label:'Tirar atalho',icon:'link',run:()=>flipShortcut(kind,id)}:{label:'Virar atalho',icon:'link',run:()=>flipShortcut(kind,id)};
  useEffect(()=>{const n=takeOpenNote(pageId);if(!n)return;const b=booksRef.current.find(k=>k.pages.some(p=>p.id===n));if(b){setBookId(b.id);setLeafId(n);}},[pageId]);
  useEffect(()=>pageId?registerLiveNotes(pageId,{find:id=>liveRef.current.find(id),remove:id=>liveRef.current.remove(id),addLoose:n=>liveRef.current.addLoose(n)}):undefined,[pageId]);
@@ -199,6 +199,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   {label:'Renomear',icon:'edit',run:()=>{setEditingBook(b.id);setNewName(b.name);setCreate(true);}},
   {label:'Trocar ícone',icon:'sparkle',run:()=>{setEmojiBook(b.id);setEmoji(b.emoji||'');}},
   shortcutItem('folder',b.id),
+  subItem(b.id,'folder'),
   {label:'Excluir pasta',icon:'trash',danger:true,run:()=>removeBook(b.id)}];}
  const commitTitle=()=>{const t=title.trim()||'Notas';setTitle(t);if(t!==String(data.title||'Notas'))onChange({...data,mode:'notebooks',title:t,notebooks:books},'notebook-title');};
  // 0.3.251 (computador): pastas em cartoes de tamanho fixo, quantos couberem na linha (no celular, 2 por linha)

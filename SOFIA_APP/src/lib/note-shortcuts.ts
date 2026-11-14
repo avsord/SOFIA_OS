@@ -88,9 +88,9 @@ export async function requestShortcutColor(pageId:string,r:ShortcutRef,color:str
 // 14/11/2026 (Pedro): SUBATALHO = outra coisa que o atalho: so existe se a pessoa ativar, fica logo abaixo da pagina principal na arvore (mesmo com a pagina fechada).
 // Nota: guardado no bloco (data.subshortcuts); pagina: ver desktop.ts (subShortcutPages).
 export function hasSubShortcut(data:Record<string,any>|null|undefined,id:string){return Array.isArray(data?.subshortcuts)&&data!.subshortcuts.some((x:any)=>x?.id===id);}
-export function toggleSubShortcut(data:Record<string,any>,id:string):Record<string,any>{
+export function toggleSubShortcut(data:Record<string,any>,id:string,kind:'note'|'folder'='note'):Record<string,any>{
  const cur:any[]=Array.isArray(data?.subshortcuts)?data.subshortcuts:[];
- return {...data,subshortcuts:cur.some(x=>x?.id===id)?cur.filter(x=>x?.id!==id):[...cur,{kind:'note',id}]};
+ return {...data,subshortcuts:cur.some(x=>x?.id===id)?cur.filter(x=>x?.id!==id):[...cur,{kind,id}]};
 }
 export function pageSubShortcuts(p:Entity|null|undefined):NoteShortcut[]{
  let bl:any;try{bl=JSON.parse(String(p?.data?.blocks_json||'[]'));}catch{return [];}
