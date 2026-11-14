@@ -94,6 +94,10 @@ const SCC_KEY='sofia.desktop.shortcut-page-colors';
 function readSc():Record<string,string>{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(SCC_KEY)||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}}
 export const shortcutPageColors=store<Record<string,string>>(readSc());
 export function setShortcutPageColor(id:string,c:string){const n={...shortcutPageColors.get(),[id]:c};shortcutPageColors.set(n);try{(globalThis as any).localStorage?.setItem(SCC_KEY,JSON.stringify(n));}catch{/* modo privado */}}
+const SUB_KEY='sofia.desktop.subshortcut-pages';
+function readSub():string[]{try{const v=JSON.parse((globalThis as any).localStorage?.getItem(SUB_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}catch{return [];}}
+export const subShortcutPages=store<string[]>(readSub());
+export function toggleSubShortcutPage(id:string){const now=subShortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];subShortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SUB_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function toggleShortcutPage(id:string){const now=shortcutPages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];shortcutPages.set(next);try{(globalThis as any).localStorage?.setItem(SC_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function toggleFavoritePage(id:string){const now=favoritePages.get(),next=now.includes(id)?now.filter(x=>x!==id):[...now,id];favoritePages.set(next);try{(globalThis as any).localStorage?.setItem(FAV_KEY,JSON.stringify(next));}catch{/* modo privado */}}
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}

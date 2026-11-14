@@ -21,7 +21,7 @@ import {clonePageTree,cloneOrder,type CloneMode} from '../lib/page-clone';
 import {pageUndo,pageSpot,type PageSpot} from '../lib/page-undo'; // 13/11/2026: Ctrl+Z na barra das Paginas
 import {trashPageTree,restorePageTree,staleTrash} from '../lib/page-trash';
 import {moveNoteToPage} from '../lib/notes-move';
-import {DEFAULT_SHORTCUT_COLOR,SHORTCUT_COLORS,pageShortcuts,requestOpenShortcut,requestShortcutColor,shortcutsFor,useLiveShortcuts} from '../lib/note-shortcuts'; // 14/11/2026: atalhos de nota/pasta // 13/11/2026: nota arrastada para uma pagina da barra
+import {DEFAULT_SHORTCUT_COLOR,SHORTCUT_COLORS,pageShortcuts,pageSubShortcuts,requestOpenShortcut,requestShortcutColor,shortcutsFor,useLiveShortcuts} from '../lib/note-shortcuts'; // 14/11/2026: atalhos de nota/pasta // 13/11/2026: nota arrastada para uma pagina da barra
 import {useToast} from '../components/AppKit';
 import {openContextMenu,contextMenu} from '../components/ContextMenu';
 import type {MenuItem} from '../components/ContextMenu';
@@ -35,7 +35,7 @@ import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -121,7 +121,7 @@ function ShortcutsSection({pages,ids,openPageId,onOpenPage,api}:{pages:Entity[];
  if(!rows.length)return null;
  return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={picker?.key===r.key&&picker.live?picker.live:r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();setPicker({key:r.key,x:b?b.left:(e?.nativeEvent?.pageX??0),y:b?b.bottom+4:(e?.nativeEvent?.pageY??0)});}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}{picker?(()=>{const r=rows.find(q=>q.key===picker.key);return r?<ColorPicker color={r.color} x={picker.x} y={picker.y} onLive={c=>setPicker(q=>q?{...q,live:c}:q)} onCommit={c=>r.pick(c)} onClose={()=>setPicker(null)}/>:null;})():null}</Section>;
 }
-function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){ const liveSc=useLiveShortcuts();
+function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){ const subs=useStore(subShortcutPages);
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
  const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
@@ -166,7 +166,7 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:shortcutPages.get().includes(p.id)?'Tirar dos atalhos':'Virar atalho',icon:'link',run:()=>toggleShortcutPage(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:subShortcutPages.get().includes(p.id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>toggleSubShortcutPage(p.id)},{label:shortcutPages.get().includes(p.id)?'Tirar dos atalhos':'Virar atalho',icon:'link',run:()=>toggleShortcutPage(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  // 14/11/2026 (Pedro: opcao Atalhos no menu da pagina): mostra os atalhos dela mesmo com a seta fechada
  // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
@@ -199,7 +199,8 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const walk=(parent:string,depth:number)=>{for(const p of children.get(parent)||[]){const kids=children.get(p.id)||[],open=expanded.has(p.id);
   rows.push(<Row key={p.id} trailing={(p.tags||[]).includes('sofia-lock-v1')?'🔒':shared.includes(p.id)?'🌐':undefined} /* 06/11/2026: pagina com senha ganha 🔒 */ testID={'sidebar-page-'+p.id} depth={depth} emoji={isEmoji(p.data?.icon)?String(p.data?.icon):undefined} icon={isEmoji(p.data?.icon)?undefined:'book'} label={p.title||'Sem título'} selected={openId===p.id} onPress={(e:any)=>{if(justDragged.current)return;const ne=e?.nativeEvent||e;if(ne?.ctrlKey||ne?.metaKey){newTab(p);return;}onOpen(p.id);}} onAuxOpen={()=>newTab(p)} onHover={()=>prefetchPageCover(api,p.data)} onToggle={()=>toggle(p.id)} expanded={open} hasChildren={kids.length>0} menu={menuFor(p)} onAdd={()=>void newChild(p)} dragRef={bindDrag(p)} drop={target?.id===p.id?target.kind:noteOver===p.id?'inside':null} dimmed={drag?.id===p.id}/>);
   // 14/11/2026 (Pedro: sub atalho embaixo da propria pagina, mesmo fechada): atalhos de nota/pasta ficam abaixo da pagina, alem da secao Atalhos
-  for(const sc of shortcutsFor(p,liveSc))rows.push(<Row key={'sub-'+p.id+sc.kind+sc.id} small dot={sc.color||DEFAULT_SHORTCUT_COLOR} depth={depth+1} testID={'sidebar-subshortcut-'+p.id+'-'+sc.id} label={sc.label} onPress={()=>{requestOpenShortcut(p.id,{kind:sc.kind,id:sc.id});onOpen(p.id);}}/>);
+  for(const sc of pageSubShortcuts(p))rows.push(<Row key={'sub-'+p.id+sc.kind+sc.id} small dot={sc.color||DEFAULT_SHORTCUT_COLOR} depth={depth+1} testID={'sidebar-subshortcut-'+p.id+'-'+sc.id} label={sc.label} onPress={()=>{requestOpenShortcut(p.id,{kind:sc.kind,id:sc.id});onOpen(p.id);}}/>);
+  if(!open)for(const k of kids)if(subs.includes(k.id))rows.push(<Row key={'subpg-'+k.id} small dot={DEFAULT_SHORTCUT_COLOR} depth={depth+1} testID={'sidebar-subshortcut-'+k.id} label={k.title||'Sem título'} selected={openId===k.id} onPress={()=>onOpen(k.id)}/>);
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
