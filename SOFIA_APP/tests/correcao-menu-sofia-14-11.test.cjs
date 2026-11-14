@@ -28,3 +28,10 @@ test('linha do Diário editada depois mostra "editado" com a hora (e o dia, se f
  assert.ok(read('src/screens/Pages.tsx').includes("testID={'page-edited-'+b.id}")&&read('src/components/LeafEditor.tsx').includes("testID={'leaf-edited-'+b.id}"));
  assert.ok(read('src/lib/page-templates.ts').includes("'editado '+(same?h:"));
 });
+
+// 14/11/2026 (Pedro: "botões de escalar só aparecem se clicar"; "clicar e apertar Delete apaga a imagem")
+test('cantos da imagem aparecem com o mouse por CSS e Delete apaga a imagem selecionada',()=>{
+ const s=read('src/components/PageFiles.tsx');
+ assert.ok(s.includes('.sofia-file-hover:hover .sofia-file-corner{opacity:1!important}')&&s.includes("className: 'sofia-file-corner'")&&s.includes("className: 'sofia-file-hover'"));
+ assert.ok(s.includes("e.key !== 'Delete' && e.key !== 'Backspace'")&&s.includes('latest.current.onRemove()')&&s.includes('a.isContentEditable'));
+});

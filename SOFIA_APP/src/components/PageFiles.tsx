@@ -33,6 +33,7 @@ function askBoard(f: {id: string; name: string; mime: string; pageId?: string}):
 }
 
 const WEB = Platform.OS === 'web';
+if (WEB && typeof document !== 'undefined' && !document.getElementById('sofia-file-hover-css')) {const st = document.createElement('style'); st.id = 'sofia-file-hover-css'; st.textContent = '.sofia-file-hover:hover .sofia-file-corner{opacity:1!important}'; document.head.appendChild(st);}
 const h = React.createElement as any;
 export const FILE_MAX = 25 * 1024 * 1024;
 export type PageFileData = {attachment_id?: string; name?: string; mime?: string; size?: number; view?: 'attach' | 'preview'; scale?: number; uploading?: boolean; progress?: string; gif_loop?: boolean};
@@ -275,7 +276,7 @@ function DownloadButton({api, id}: {api: SofiaApi; id: string}) {
 // ---------------- Bloco da pagina ----------------
 /** Arquivo dentro da pagina: linha (anexo) ou visualizacao com escala. Barra ao passar o mouse. */
 export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, onRemove}: {api: SofiaApi; data: PageFileData; pageId?: string; selected: boolean; onSelect: () => void; onChange: (d: PageFileData) => void; onRemove: () => void}) {
-  const latest = useRef({data, onChange}); latest.current = {data, onChange};
+  const latest = useRef({data, onChange, onRemove}); latest.current = {data, onChange, onRemove};
   const c = useTheme(), [hover, setHover] = useState(false), k = fileKind(data.mime, data.name), meta = KIND[k], id = data.attachment_id || '';
   const view = data.view || defaultView(k), preview = view === 'preview' && inlineCapable(k) && !!id, scale = Math.max(15, Math.min(100, data.scale || (k === 'image' ? 70 : 100)));
   const wrap = useRef<any>(null), floating = useWins().some(w => w.id === id && !!id);
@@ -294,7 +295,7 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
   const resize = (corner: string) => (e: any) => {e.preventDefault(); e.stopPropagation(); const el = wrap.current as HTMLElement | null, col = el?.parentElement?.getBoundingClientRect?.(); if (!el || !col) return; const sx = e.clientX, w0 = el.getBoundingClientRect().width, dir = corner.includes('w') ? -1 : 1; setResizing(true);
     const mv = (ev: PointerEvent) => latest.current.onChange({...latest.current.data, scale: Math.round(Math.max(15, Math.min(100, (w0 + dir * (ev.clientX - sx)) / col.width * 100)))});
     const up = () => {setResizing(false); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);}; window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);};
-  const corner = (cn: string, css: any) => h('div', {key: cn, 'data-testid': 'page-file-corner-' + cn, onPointerDown: resize(cn), 'aria-label': 'Arraste para mudar o tamanho', title: 'Arraste para mudar o tamanho',
+  const corner = (cn: string, css: any) => h('div', {key: cn, 'data-testid': 'page-file-corner-' + cn, className: 'sofia-file-corner', onPointerDown: resize(cn), 'aria-label': 'Arraste para mudar o tamanho', title: 'Arraste para mudar o tamanho',
     style: {position: 'absolute', width: 12, height: 12, borderRadius: 3, background: c.surface, border: '2px solid ' + c.accent, boxShadow: '0 1px 3px rgba(0,0,0,.35)', cursor: cn === 'nw' || cn === 'se' ? 'nwse-resize' : 'nesw-resize', zIndex: 4, opacity: hover || selected || resizing ? 1 : 0, transition: 'opacity .12s', ...css}});
   const tool = (icon: any, label: string, run: () => void, on = false) => <Pressable key={label} accessibilityLabel={label} onPress={(e: any) => {e?.stopPropagation?.(); run();}} style={({hovered}: any) => ({height: 26, minWidth: 26, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: on ? c.accentSoft : hovered ? c.line : 'transparent'})}><Icon name={icon} size={14} color={on ? c.accent : c.muted} /></Pressable>;
   const seg = (label: string, v: 'attach' | 'preview') => <Pressable key={v} accessibilityRole="radio" accessibilityState={{checked: view === v}} onPress={(e: any) => {e?.stopPropagation?.(); onChange({...data, view: v});}} style={({hovered}: any) => ({height: 24, paddingHorizontal: 9, borderRadius: 6, justifyContent: 'center', backgroundColor: view === v ? c.surface : hovered ? c.line : 'transparent', boxShadow: view === v ? '0 1px 2px rgba(0,0,0,.12)' : undefined} as any)}><Text style={{fontSize: 11, fontWeight: view === v ? '600' : '500', color: view === v ? c.text : c.muted}}>{label}</Text></Pressable>;
@@ -305,7 +306,12 @@ export function PageFileBlock({api, data, pageId, selected, onSelect, onChange, 
     {preview ? <>{tool('zoomOut', 'Diminuir', () => onChange({...data, scale: Math.max(15, scale - 10)}))}<Text style={{color: c.muted, fontSize: 11, minWidth: 32, textAlign: 'center'}}>{scale}%</Text>{tool('zoomIn', 'Aumentar', () => onChange({...data, scale: Math.min(100, scale + 10)}))}</> : null}
     {windowCapable(k, data.name || '') ? tool('external', 'Abrir em janela separada (fora da Sofia)', () => {detachFile(api, file);}) : null /* 07/11/2026 (Pedro): sem a opcao da janela dentro da pagina aqui */}{tool(copied ? 'check' : 'copy', copied ? 'Copiado: cole no Drive ou em outra página (Ctrl+V)' : 'Copiar (para colar no Drive ou em outra página)', copy, copied)}{tool('download', 'Baixar', () => void downloadPageFile(api, id))}{tool('trash', 'Remover arquivo', onRemove)}
   </View> : null;
-  const hoverDiv = (child: React.ReactNode) => h('div', {onMouseEnter: () => setHover(true), onMouseMove: () => {if (!hover) setHover(true);}, onMouseLeave: () => setHover(false), style: {position: 'relative', width: '100%', alignSelf: 'stretch', display: 'flex', flexDirection: 'column'}}, child);
+  // 14/11/2026 (Pedro: "os botões de escalar só aparecem se clicar na imagem e não se passar o mouse"): o hover vem também do CSS, sem depender do estado
+  // 14/11/2026 (Pedro: "clicar e apertar Delete apaga a imagem"): selecionada e sem campo de texto em foco, Delete/Backspace tira o arquivo
+  useEffect(() => {if (!selected || !WEB) return; const d: any = (globalThis as any).document; if (!d) return;
+    const key = (e: any) => {if (e.key !== 'Delete' && e.key !== 'Backspace') return; const a: any = d.activeElement; if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return; e.preventDefault(); latest.current.onRemove();};
+    d.addEventListener('keydown', key); return () => d.removeEventListener('keydown', key);}, [selected]);
+  const hoverDiv = (child: React.ReactNode) => h('div', {className: 'sofia-file-hover', onMouseEnter: () => setHover(true), onMouseMove: () => {if (!hover) setHover(true);}, onMouseLeave: () => setHover(false), style: {position: 'relative', width: '100%', alignSelf: 'stretch', display: 'flex', flexDirection: 'column'}}, child);
   if (!preview) return hoverDiv(<Pressable testID="page-file-row" accessibilityRole="button" accessibilityLabel={'Abrir ' + (data.name || 'arquivo')} onPress={() => {onSelect(); open();}}
     // 13/11/2026 (Pedro: "o anexo pode ser apenas o nome.jpeg, aqui em todas"): linha curta so com o icone e o nome
     style={({hovered}: any) => ({marginVertical: 3, minHeight: 38, borderRadius: 8, borderWidth: selected ? 2 : 1, borderColor: selected ? c.accent : c.line, backgroundColor: hovered ? c.input : c.surface, flexDirection: 'row', alignItems: 'center', gap: 9, paddingLeft: 9, paddingRight: 12, position: 'relative', alignSelf: 'flex-start', maxWidth: '100%'})}>

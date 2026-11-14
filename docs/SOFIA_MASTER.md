@@ -18,7 +18,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
-- 2026-11-14, Claude Code (PC PEDRO). Pronto, só site (sem APK): (1) clique direito numa palavra das Páginas abre só o menu da Sofia com "Correção" no topo (sugestões pela IA, rota `/api/mobile/spell`; Shift+clique direito ainda abre o menu do navegador); (2) Diário: linha editada 10 min ou mais depois de criada guarda `edited_at` (src/core/block-stamps.js) e mostra "editado HH:MM" / "editado dd/mm HH:MM" no fim da linha (Páginas e Notas).
+- 2026-11-14, Claude Code (PC PEDRO). Pronto, só site (sem APK): (1) clique direito numa palavra das Páginas abre só o menu da Sofia com "Correção" no topo (sugestões pela IA, rota `/api/mobile/spell`; Shift+clique direito ainda abre o menu do navegador); (2) Diário: linha editada 10 min ou mais depois de criada guarda `edited_at` (src/core/block-stamps.js) e mostra "editado HH:MM" / "editado dd/mm HH:MM" no fim da linha (Páginas e Notas); (3) imagem: cantos de escala aparecem com o mouse em cima (CSS) e, selecionada, Delete/Backspace apaga.
 - Próximo passo: Pedro confere no site (clique direito em palavra errada; editar uma linha antiga do Diário). Linhas editadas ANTES desta versão não têm registro (só valem as edições daqui pra frente).
 
 ## 1. O dono e a forma de trabalhar

@@ -64,3 +64,4 @@
 | 2026-11-14 | (sem APK) | (este) | Modelo Diário nas Notas (por nota; converte linhas com a hora real pelas versões) + servidor guarda created_at de cada bloco de página e nota | tsc ok, testes novos ok, site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Notas: Backspace no começo da linha apaga a linha vazia/junta com a de cima; setas ↑/↓ passam de linha; Início: auréola do "agora" centrada no ponto em tela maior | tsc ok, testes ok, site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Clique direito no texto: só o menu da Sofia, com "Correção" no topo (servidor /api/mobile/spell pela IA). Diário: linha mudada 10 min+ depois ganha edited_at e mostra "editado HH:MM" (ou dd/mm) nas Páginas e Notas | testes da mudança verdes; site recompilado |
+| 2026-11-14 | (sem APK) | (este) | Imagem nas Páginas/Notas: cantos de escala com o mouse em cima (hover por CSS) e Delete/Backspace apaga a imagem selecionada | testes da mudança verdes; site recompilado |
