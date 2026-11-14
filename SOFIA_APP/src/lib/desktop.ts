@@ -102,6 +102,17 @@ export function useSidebarCollapsed():[boolean,(v:boolean)=>void]{
  return [value,save];
 }
 
+/** 13/11/2026 (Mimic Kaizen, item 11 do Notion "igual"): a largura da barra lateral muda arrastando a borda
+ * e fica lembrada neste navegador. Dois cliques na borda voltam ao padrão. */
+const WIDTH_KEY='sofia.desktop.sidebar.width';
+export const SIDEBAR_MIN=200,SIDEBAR_MAX=420;
+export const clampSidebar=(n:number)=>Math.round(Math.min(SIDEBAR_MAX,Math.max(SIDEBAR_MIN,Number.isFinite(n)?n:SIDEBAR_WIDTH)));
+export function useSidebarWidth():[number,(v:number,persist?:boolean)=>void]{
+ const [value,setValue]=useState(()=>{try{const s=typeof localStorage!=='undefined'?localStorage.getItem(WIDTH_KEY):null;return s?clampSidebar(Number(s)):SIDEBAR_WIDTH;}catch{return SIDEBAR_WIDTH;}});
+ const save=(v:number,persist=true)=>{const n=clampSidebar(v);setValue(n);if(persist){try{localStorage.setItem(WIDTH_KEY,String(n));}catch{/* modo privado */}}};
+ return [value,save];
+}
+
 /** CSS de computador: cursor de clique, hover, foco por teclado e barras de rolagem finas.
  * O react-native-web desenha botoes como div com tabindex; o hover vem daqui, sem mudar cada tela. */
 export function useDesktopCss(on:boolean,colors:{line:string;muted:string;accent:string;bg:string}){
@@ -138,7 +149,8 @@ export function useDesktopKeys(on:boolean,keys:DesktopKeys){
   if(!on||typeof document==='undefined')return;
   const handler=(e:KeyboardEvent)=>{
    const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-   if(mod&&k==='k'){e.preventDefault();keys.palette();return;}
+   // 13/11/2026 (Mimic Kaizen, item 5): Ctrl+P também abre a busca, como no Notion (em vez de imprimir a página)
+   if(mod&&(k==='k'||(k==='p'&&!e.shiftKey&&!e.altKey))){e.preventDefault();keys.palette();return;}
    if(mod&&(k==='\\'||e.code==='Backslash')){e.preventDefault();keys.sidebar();return;}
    // 03/11/2026: Alt+numero digitando num campo e do teclado (Option+numero no Mac escreve caracteres); nao troca de aba
    const typing=(()=>{const t=e.target as any;return !!t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||'')||t.isContentEditable);})();

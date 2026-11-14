@@ -986,7 +986,7 @@ function NowBeacon({x, top, lw = 0}: {x: number; top: number; lw?: number}) {
     <View style={{position: 'absolute', left: at(0.5), top: top + 7, width: 1, height: 9, backgroundColor: tint(red, 0.7)}} />
     {/* etiqueta com a hora, na altura da escala */}
     <View style={{position: 'absolute', left: (WEB ? `clamp(0px, calc(${pct}% - ${dpx(24)}), calc(100% - ${dpx(48)}))` : Math.max(0, Math.min(lw - 48, x * lw - 24))) as any, top: top + 13, width: 48, alignItems: 'center'}}>
-      <Text style={{fontSize: 11, fontWeight: '700', color: '#fff', backgroundColor: red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
+      <Text style={{fontSize: 11, fontWeight: '700', color: '#2B0B14', backgroundColor: red, /* 13/11/2026 Mimic item 21: branco no rosa dava 2,6:1; escuro dá 7:1 */ borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', fontVariant: ['tabular-nums']}}>{label}</Text>
     </View>
   </View>;
 }

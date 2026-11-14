@@ -20,7 +20,10 @@ test('moldura: barra lateral recolhivel, arvore de paginas, caminho, busca Ctrl+
   const s=read('src/desktop/DesktopShell.tsx'),d=read('src/lib/desktop.ts');
   for(const id of ['desktop-sidebar','desktop-topbar','desktop-breadcrumb','desktop-search','desktop-sidebar-toggle','command-palette-input'])assert.ok(s.includes(id),id);
   assert.ok(s.includes('<NotificationBell onViewAll='));assert.ok(s.includes('function PageTree('));
-  assert.ok(d.includes("if(mod&&k==='k')")&&d.includes("e.code==='Backslash'")&&d.includes('e.altKey&&!mod&&!typing&&/^[1-6]$/'));
+  assert.ok(d.includes("if(mod&&(k==='k'||(k==='p'&&!e.shiftKey&&!e.altKey)))")&&d.includes("e.code==='Backslash'")&&d.includes('e.altKey&&!mod&&!typing&&/^[1-6]$/'));
+  // 13/11/2026 (Mimic Kaizen, itens 5 e 11): Ctrl+P abre a busca; borda da lateral estica, lembrada, dois cliques voltam ao padrão
+  assert.ok(s.includes('testID="desktop-sidebar-resizer"')&&s.includes('if(ne?.detail>=2){onChange(SIDEBAR_WIDTH,true);return;}')&&s.includes('(collapsed?SIDEBAR_COLLAPSED:sideW)'));
+  assert.ok(d.includes("const WIDTH_KEY='sofia.desktop.sidebar.width'")&&d.includes('SIDEBAR_MIN=200,SIDEBAR_MAX=420'));
 });
 test('telas: Paginas abre pela barra lateral; Inicio em colunas; folhas viram janela central',()=>{
   const p=read('src/screens/Pages.tsx');assert.ok(p.includes('openPageKey=0,openPageId=')&&p.includes('pagesDirectory.set(displayPages)')&&p.includes('pagePath.set(trail)'));

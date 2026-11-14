@@ -9,7 +9,7 @@ import type {Task} from '../lib/types';
 // (ver lib/desktop.ts). Barra lateral fixa e recolhivel, barra de cima com caminho, busca e avisos,
 // busca global (Ctrl+K) e atalhos de teclado. As telas sao as mesmas do celular.
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {Modal,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon,type IconName} from '../components/Icon';
 import {NotificationBell} from '../components/NotificationCenter';
@@ -33,7 +33,7 @@ import {eventStart,expandForHome} from '../lib/agenda-recurrence';
 import {TAB_ORDER} from '../lib/tab-navigation';
 import type {SofiaApi} from '../lib/api';
 import type {Entity,Tab} from '../lib/types';
-import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,appModuleTitle,createdPage,favoritePages,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
+import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -251,7 +251,7 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
 }
 
 export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onOpenPage,onCreatePage,children}:Props){
- const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[palette,setPalette]=useState(false);
+ const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[sideW,setSideW]=useSidebarWidth(),[palette,setPalette]=useState(false);
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
  useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
@@ -290,9 +290,10 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   ...(pages||[]).map(p=>({id:'page:'+p.id,label:p.title||'Sem título',group:'Páginas',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined,icon:(isEmoji(p.data?.icon)?undefined:'book') as IconName|undefined,run:()=>onOpenPage(p.id)})),
  ],[pages,paletteTasks,collapsed,onNavigate,onOpenModule,onOpenPage,onCreatePage]);
  const crumbs=[TAB_LABELS[tab]?.label||'Sofia',...(tab==='pages'?path.map(p=>p.title||'Sem título'):tab==='apps'&&moduleTitle?[moduleTitle]:[])];
- const width=Math.round((collapsed?SIDEBAR_COLLAPSED:SIDEBAR_WIDTH)*uiScale()); // 0.3.278: lateral na escala da tela
+ const width=Math.round((collapsed?SIDEBAR_COLLAPSED:sideW)*uiScale()); // 0.3.278: lateral na escala da tela
  return <View testID="desktop-shell" style={{flex:1,flexDirection:'row',backgroundColor:c.bg}}>
   <View testID="desktop-sidebar" style={{width,flexShrink:0,backgroundColor:c.surface,borderRightWidth:1,borderColor:c.line,...(EMBED?{display:'none'}:{})}}>
+   {collapsed||EMBED?null:<SidebarResizer width={sideW} onChange={setSideW} color={c.accent}/>}
    <View style={{flexDirection:'row',alignItems:'center',gap:10,height:56,paddingHorizontal:collapsed?0:16,justifyContent:collapsed?'center':'flex-start'}}>
     {collapsed?null:<><View style={{width:26,height:26,borderRadius:8,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:16}}>S</Text></View>
     <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'600',fontSize:16}}>Sofia OS</Text></>}
@@ -341,3 +342,28 @@ function DriveFloatButton({api}:{api:SofiaApi}){
   style={({hovered}:any)=>({width:34,height:34,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:on?c.accentSoft:hovered?c.input:'transparent'})}><Icon name="drive" size={18} color={on?c.accent:c.muted}/></Pressable>
   <DriveWindowHost api={api}/></>;
 }
+
+/** 13/11/2026 (Mimic Kaizen, item 11 do Notion "igual"): borda da barra lateral que estica arrastando.
+ * Cursor de esticar ao passar; linha acesa só arrastando ou com o mouse em cima; dois cliques voltam ao padrão. */
+function SidebarResizer({width,onChange,color}:{width:number;onChange:(v:number,persist?:boolean)=>void;color:string}){
+ const [on,setOn]=useState(false),[drag,setDrag]=useState(false);
+ const down=(e:any)=>{
+  const ne=e?.nativeEvent||e;if(ne?.button!==undefined&&ne.button!==0)return;
+  ne?.preventDefault?.();
+  if(ne?.detail>=2){onChange(SIDEBAR_WIDTH,true);return;} // dois cliques: volta ao padrão (o react-native-web não repassa onDoubleClick)
+  const x0=ne.clientX,w0=width,f=uiScale()||1;let last=w0;setDrag(true);
+  const prevSel=document.body.style.userSelect,prevCur=document.body.style.cursor;
+  document.body.style.userSelect='none';document.body.style.cursor='col-resize';
+  const move=(m:MouseEvent)=>{last=w0+(m.clientX-x0)/f;onChange(last,false);};
+  const up=()=>{document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);
+   document.body.style.userSelect=prevSel;document.body.style.cursor=prevCur;setDrag(false);onChange(last,true);};
+  document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);
+ };
+ if(Platform.OS!=='web')return null;
+ return <View testID="desktop-sidebar-resizer" accessibilityLabel="Arraste para mudar a largura da barra lateral"
+  {...({onMouseDown:down,onMouseEnter:()=>setOn(true),onMouseLeave:()=>setOn(false)} as any)}
+  style={{position:'absolute',top:0,bottom:0,right:-4,width:8,zIndex:20,cursor:'col-resize',alignItems:'center'} as any}>
+  <View style={{width:2,height:'100%',backgroundColor:on||drag?color:'transparent',opacity:drag?0.9:0.5}}/>
+ </View>;
+}
+
