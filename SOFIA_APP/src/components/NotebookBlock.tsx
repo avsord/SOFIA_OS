@@ -61,8 +61,9 @@ export function leafStamp(p:Dated):string{
 const stampOf=(p:Leaf)=>String((p as Dated).updated_at||p.created_at||'');
 const lastEdited=(b:Book)=>[...b.pages].sort((x,y)=>stampOf(y).localeCompare(stampOf(x)))[0];
 
+let lastGridW=0; // 14/11/2026 (Pedro: estrutura das anotações se mexe ao entrar): lembra a largura da grade e esconde até medir, sem pulo de tamanho dos cartões
 export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId}:{data:Record<string,any>;onChange:(data:Record<string,any>,group?:string)=>void;onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;pageId?:string}){
- const [gridW,setGridW]=useState(0);
+ const [gridW,setGridW]=useState(lastGridW);
  const leafTitle=useRef<TextInput>(null);
  const c=useTheme(),books:Book[]=Array.isArray(data.notebooks)?data.notebooks:(data.rows||[]).map((r:any)=>({id:r.id,name:String(r.values?.name||''),emoji:'',expanded:false,pages:r.page_content?[{id:r.id+'-leaf',title:'',content:r.page_content}]:[]}));
  const [openBook,setOpenBook]=useState<string|null>(null),[query,setQuery]=useState(''),[title,setTitle]=useState(String(data.title||'Notas'));
@@ -211,7 +212,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   // linhas equilibradas: 4 pastas num espaco de 3 viram 2x2 (nada de uma pasta sozinha na ultima linha); cartao entre 190 e 320 px
   const tileFor=(n:number)=>{if(!(gridW>0)||n<1)return 224;const max=Math.max(1,Math.floor((gridW+10)/(190+10))),rows=Math.ceil(n/max),cols=Math.max(1,Math.ceil(n/rows));return Math.min(320,Math.floor((gridW-10*(cols-1))/cols)-0.5);};
   const tileW=tileFor(opened?foldersIn(opened.id).length:foldersIn('').length);
-  const gridLayout=(e:any)=>{const w=Math.round(e?.nativeEvent?.layout?.width||0);if(w&&Math.abs(w-gridW)>1)setGridW(w);};
+  const gridLayout=(e:any)=>{const w=Math.round(e?.nativeEvent?.layout?.width||0);if(w&&Math.abs(w-gridW)>1){lastGridW=w;setGridW(w);}};
   const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id,item:DragItem={kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},bar=(side:string)=>hover==='folder:'+b.id+'|'+side?<View pointerEvents="none" style={{position:'absolute',top:6,bottom:6,width:3,borderRadius:2,backgroundColor:c.accent,[side==='before'?'left':'right']:3}}/>:null;
   return <View key={b.id} ref={r=>{targets.current[b.id]=r;bindDom(r,dragProps(item));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===b.id?'1':'0'}} as any)} style={{width:desktop?tileW:'48%',position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir pasta '+(b.name||'Sem título')} accessibilityHint="Segure e arraste para mover" onPress={()=>{if(!dragRef.current)setOpenBook(b.id);}} delayLongPress={300}
@@ -260,14 +261,14 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   {query.trim()?<View style={{gap:10}}>
    {results.length?results.slice(0,30).map(r=>noteCard(r.b,r.p,true)):<Text style={{color:c.muted,fontSize:13,paddingVertical:8}}>Nenhuma nota encontrada para “{query.trim()}”.</Text>}
   </View>:opened?<View style={{gap:10}}>
-   {foldersIn(opened.id).length?<View testID="notes-folder-grid" onLayout={gridLayout} style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{foldersIn(opened.id).map(folderTile)}</View>:null}
+   {foldersIn(opened.id).length?<View testID="notes-folder-grid" onLayout={gridLayout} style={{flexDirection:'row',flexWrap:'wrap',gap:10,opacity:gridW>0?1:0}}>{foldersIn(opened.id).map(folderTile)}</View>:null}
    {opened.pages.length?opened.pages.map(p=>noteCard(opened,p)):
     <Pressable onPress={()=>addLeaf(opened.id)} style={{borderRadius:16,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:24}}>📝</Text><Text style={{color:c.muted,fontSize:13}}>{tap('Pasta vazia. Toque para criar a primeira nota.')}</Text></Pressable>}
    {/* 05/11/2026: a faixa de tirar da pasta fica embaixo; no topo ela empurrava a lista e roubava o soltar para reordenar */}
    {drag?<View ref={r=>{targets.current['__up__']=r;}} collapsable={false} style={{borderRadius:14,borderWidth:2,borderStyle:'dashed',borderColor:hover==='__up__'?c.accent:c.line,backgroundColor:hover==='__up__'?c.accentSoft:'transparent',paddingVertical:14,alignItems:'center'}}>
     <Text style={{color:hover==='__up__'?c.accent:c.muted,fontWeight:'600'}}>{'↑ Tirar desta pasta'+(parentOf(opened)?'':' (fica fora de pastas)')}</Text>
    </View>:null}
-  </View>:<View testID="notes-folder-grid" onLayout={gridLayout} style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
+  </View>:<View testID="notes-folder-grid" onLayout={gridLayout} style={{flexDirection:'row',flexWrap:'wrap',gap:10,opacity:gridW>0?1:0}}>
    {foldersIn('').map(folderTile)}
    {/* 13/11/2026 (Pedro): na raiz, pastas e notas soltas juntas (a nota solta é um cartão, sem pasta "Geral") */}
    {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:foldersIn('').length?4:0}}>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
