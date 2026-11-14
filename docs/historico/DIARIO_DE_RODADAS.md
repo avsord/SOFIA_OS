@@ -66,3 +66,4 @@
 | 2026-11-14 | (sem APK) | (este) | Clique direito no texto: só o menu da Sofia, com "Correção" no topo (servidor /api/mobile/spell pela IA). Diário: linha mudada 10 min+ depois ganha edited_at e mostra "editado HH:MM" (ou dd/mm) nas Páginas e Notas | testes da mudança verdes; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Imagem nas Páginas/Notas: cantos de escala com o mouse em cima (hover por CSS) e Delete/Backspace apaga a imagem selecionada | testes da mudança verdes; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Aba do site só recarrega sozinha com versão nova quando está ESCONDIDA (2 conferências); visível sem foco (print, janela ao lado) não recarrega mais | teste verde; site recompilado |
+| 2026-11-14 | (sem APK) | (este) | Correção ortográfica no menu da Sofia em todo campo de texto do site (web-spell-menu.ts, com Recortar/Copiar/Colar); bolinhas de cor da barra lateral não achatam mais | testes da mudança verdes; site recompilado |

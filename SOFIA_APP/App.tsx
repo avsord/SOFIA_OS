@@ -47,6 +47,7 @@ import {appAlert,AppAlertHost} from './src/lib/app-alert';
 import {isWeb,pathToRoute,routeTitle,routeToPath,pageIdFromPath,routeMeta} from './src/lib/web-route';
 import {installEscStack,pushEsc,ESC_LEVEL} from './src/lib/esc-stack'; // 13/11/2026: Esc volta um nivel em todo o site
 import {installSpellcheckFocus} from './src/lib/web-spellcheck'; // 13/11/2026: sublinhado vermelho so no campo em edicao
+import {installSpellMenu} from './src/lib/web-spell-menu';
 import {installWebPage} from './src/lib/web-page';
 import {ContextMenuHost} from './src/components/ContextMenu';
 import {TabletSite,isTabletSize} from './src/components/TabletSite';
@@ -249,7 +250,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
   if(current.tab!=='home'&&auth){switchTab('home');return true;}return false;
  },[auth,switchTab]);
  // 13/11/2026 (Pedro: "Esc volta um nivel, sempre"): um Esc central no site; o ultimo nivel volta para a tela anterior.
- useEffect(()=>{if(!isWeb())return;const offEsc=installEscStack(),offSpell=installSpellcheckFocus();return()=>{offEsc();offSpell();};},[]);
+ useEffect(()=>{if(!isWeb())return;const offEsc=installEscStack(),offSpell=installSpellcheckFocus(),offMenu=installSpellMenu(api);return()=>{offEsc();offSpell();offMenu();};},[api]);
  useEffect(()=>isWeb()?pushEsc(()=>navigation.current.locked?false:goBack(),ESC_LEVEL.route):undefined,[goBack]);
  // Android back gestures never traverse the main-menu visit history.
  // Inner page/workspace handlers still own their explicit hierarchy.

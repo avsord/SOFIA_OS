@@ -35,3 +35,12 @@ test('cantos da imagem aparecem com o mouse por CSS e Delete apaga a imagem sele
  assert.ok(s.includes('.sofia-file-hover:hover .sofia-file-corner{opacity:1!important}')&&s.includes("className: 'sofia-file-corner'")&&s.includes("className: 'sofia-file-hover'"));
  assert.ok(s.includes("e.key !== 'Delete' && e.key !== 'Backspace'")&&s.includes('latest.current.onRemove()')&&s.includes('a.isContentEditable'));
 });
+
+// 14/11/2026 (Pedro: "em todos os lugares do site a correção tem que ser o layout da Sofia - generalizar"; "bolinhas achatadas")
+test('correção no menu da Sofia em todo campo de texto do site e bolinha redonda na barra lateral',()=>{
+ const {wordAt,cleanWord,isWord}=require('../src/lib/web-spell-word.ts');
+ const v='os pedaços estilhassados, pelo';assert.deepEqual(wordAt(v,15),[11,24]);assert.equal(cleanWord('casa,'),'casa');assert.equal(isWord('duas palavras'),false);
+ const app=read('App.tsx');assert.ok(app.includes('installSpellMenu(api)'));
+ const s=read('src/lib/web-spell-menu.ts');assert.ok(s.includes("closest('textarea,input')")&&s.includes("execCommand('insertText',false,s)")&&s.includes('[data-testid^="page-rich-"]'));
+ assert.ok(read('src/desktop/DesktopShell.tsx').includes('aspectRatio:1,borderRadius:999,backgroundColor:dot'));
+});
