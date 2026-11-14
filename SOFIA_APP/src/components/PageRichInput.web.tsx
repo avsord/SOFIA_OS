@@ -125,6 +125,7 @@ function toCss(style:any):Record<string,any>{
  for(const k of ['fontSize','lineHeight','color','fontWeight','fontFamily','paddingTop','paddingBottom','paddingLeft','paddingRight','marginTop','marginBottom','backgroundColor','borderRadius','borderLeftWidth','borderLeftColor','minHeight','textDecorationLine']){
   const v=s[k];if(v==null||v==='')continue;if(k==='textDecorationLine'){out.textDecoration=v;continue;}out[k]=typeof v==='number'&&CSS_PX.has(k)?v+'px':v;}
  if(out.borderLeftWidth)out.borderLeftStyle='solid';
+ if(typeof s.paddingLeft==='string')out.paddingLeft=s.paddingLeft;if(typeof flat.textIndent==='string')out.textIndent=flat.textIndent;
  return out;
 }
 
