@@ -21,7 +21,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 O Pedro alterna entre o **Claude Code** (no computador, pasta `C:\Projetos\sofiaos`) e o **chat do claude.ai**. Quem terminar uma sessão reescreve esta seção; quem começar lê esta seção primeiro. No chat, o Claude clona a branch `sofia-app-android` (repositório público) e lê daqui.
 
-- **Atualizado em:** 2026-11-14 (~07:50, Brasília), no **Claude Code** (PEDRO). Último: **modelo Diário** (`lib/page-templates.ts`: `diaryFromBlocks`, aplicado em `Pages.tsx applyTemplate`), site no ar 22af537, sem APK. A página devaneios é trancada (texto cifrado), por isso não deu para converter pelo servidor: o Pedro abre a página destrancada → Modelos → Diário. Antes (07:20): Atalhos do topo removida, biblioteca de capas, fit-textarea, Caps Lock — Pedro confere.
+- **Atualizado em:** 2026-11-14 (~07:50, Brasília), no **Claude Code** (PEDRO). Último: **modelo Diário** (`lib/page-templates.ts`: diaryFromBlocks/diaryEnter/diaryHidden/diaryDays; `Pages.tsx` applyTemplate, Enter, setinha e índice `diary-index`), site no ar 28c69b8, sem APK. A página devaneios é trancada (texto cifrado), por isso não deu para converter pelo servidor: o Pedro abre a página destrancada → Modelos → Diário. Antes (07:20): Atalhos do topo removida, biblioteca de capas, fit-textarea, Caps Lock — Pedro confere.
 - **14/11 ~06:00 (Claude Code), só site, SEM APK:** seletor de cor do atalho e do SUBATALHO refeito (`desktop/ColorPicker.tsx`): depois enxugado a pedido: só barras de cor e luz, pequeno, abre junto da bolinha; Esc cancela, clique fora guarda. Próximo: Pedro confere no site; teste `notas-atalho-14-11` já falhava antes (a corrigir).
 - **14/11 ~05:20 (Claude Code), só site, SEM APK:** SUBATALHO (só se ativar: "Virar subatalho" na página ou na nota) fica embaixo da página principal na árvore, mesmo fechada; atalhos da barra lateral mostram só "nome / página principal" (sem pasta nem cadeia); clicar na bolinha abre seletor de cor em gradiente contínuo (quadrado + barra de matiz, `desktop/ColorPicker.tsx`); cor de atalho de página fica no navegador (`shortcutPageColors`). tsc ok, testes ok (061 só sem Java).
 - **14/11 ~05:05 (Claude Code), só site, SEM APK:** página trancada: Ctrl+A fora do campo (ex.: depois de "Senha incorreta") selecionava a página inteira; agora seleciona a senha (`LockFrame` em `PageLock.tsx`). Conferido no laboratório.
@@ -432,7 +432,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
 | 2026-11-14 | (sem APK) | 22af537 | Modelo Diário nas páginas (dia como título com dia da semana, hora roxa em negrito na frente de cada registro, divisor entre dias); aplicado numa página com texto, reorganiza datas e horas | testes 12/12, site no ar; devaneios tem senha: Pedro aplica no navegador dele |
-$L
+| 2026-11-14 | (sem APK) | 28c69b8 | Diário age na página: Enter no fim de um registro já põe a hora (e o título do dia novo se o dia virou); dias recolhíveis (setinha + nº de registros); índice de dias no topo | testes 13/13; conferido no site com página de teste (apagada) |
 $L
 $L
 $L
