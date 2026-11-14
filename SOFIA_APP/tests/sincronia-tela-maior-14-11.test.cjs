@@ -14,8 +14,8 @@ test('aba com codigo velho recarrega so escondida ou sem foco',()=>{
  assert.equal(bundleOf('<script src="/_expo/static/js/web/index-abc123.js" defer></script>'),'index-abc123.js');
  assert.equal(shouldReload('index-a.js','index-a.js',true,5),false);
  assert.equal(shouldReload('index-a.js','index-b.js',false,0),false,'com foco espera');
- assert.equal(shouldReload('index-a.js','index-b.js',true,0),true);
- assert.equal(shouldReload('index-a.js','index-b.js',false,2),true);
+ assert.equal(shouldReload('index-a.js','index-b.js',true,2),true,'escondida 2 vezes recarrega');assert.equal(shouldReload('index-a.js','index-b.js',true,1),false);
+ assert.equal(shouldReload('index-a.js','index-b.js',false,9),false,'visivel sem foco (print, janela ao lado) nao recarrega');
  assert.equal(shouldReload('index-a.js','',true,9),false,'sem resposta do servidor nao recarrega');
 });
 test('ponto do agora pulsa sem depender do movimento reduzido',()=>{
