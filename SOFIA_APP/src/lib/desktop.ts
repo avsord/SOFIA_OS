@@ -103,7 +103,7 @@ export function toggleFavoritePage(id:string){const now=favoritePages.get(),next
 export function useStore<T>(s:{get:()=>T;subscribe:(f:()=>void)=>()=>void}):T{return useSyncExternalStore(s.subscribe,s.get,s.get);}
 export function samePages(a:Entity[]|null,b:Entity[]):boolean{
  if(!a||a.length!==b.length)return false;
- for(let i=0;i<a.length;i++){const x=a[i],y=b[i];if(x.id!==y.id||x.title!==y.title||x.data?.parent_id!==y.data?.parent_id||x.data?.icon!==y.data?.icon||x.data?.sort_order!==y.data?.sort_order||(x.tags||[]).includes('sofia-lock-v1')!==(y.tags||[]).includes('sofia-lock-v1'))return false;} /* 06/11/2026: trancar/tirar senha atualiza o 🔒 da lateral na hora */
+ for(let i=0;i<a.length;i++){const x=a[i],y=b[i];if(x.id!==y.id||x.revision!==y.revision||x.title!==y.title||x.data?.parent_id!==y.data?.parent_id||x.data?.icon!==y.data?.icon||x.data?.sort_order!==y.data?.sort_order||(x.tags||[]).includes('sofia-lock-v1')!==(y.tags||[]).includes('sofia-lock-v1'))return false;} /* 06/11/2026: trancar/tirar senha atualiza o 🔒 da lateral na hora */
  return true;
 }
 

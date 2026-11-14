@@ -63,7 +63,7 @@ function usePageDirectory(api:SofiaApi){
     const stale=complete?staleTrash(seen):[]; // so com a lista inteira (ver staleTrash)
      if(live&&!trashSwept){trashSwept=true;for(const x of stale.slice(0,5))void api.deleteEntity(x.id).catch(()=>{/* tenta na proxima abertura */});} // lixeira com mais de 30 dias
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
-    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x),note_subshortcuts:pageSubShortcuts(x)}})));
+    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x),note_subshortcuts:pageSubShortcuts(x),sidebar_color:x.data?.sidebar_color,sidebar_colors:x.data?.sidebar_colors,sidebar_sub:x.data?.sidebar_sub}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
   void load();
@@ -121,7 +121,20 @@ function ShortcutsSection({pages,ids,openPageId,onOpenPage,api}:{pages:Entity[];
  if(!rows.length)return null;
  return <Section title="Atalhos">{rows.map(r=><Row key={r.key} testID={'sidebar-shortcut-'+r.key} small dot={picker?.key===r.key&&picker.live?picker.live:r.color} onDot={(e:any)=>{const b=e?.currentTarget?.getBoundingClientRect?.();setPicker({key:r.key,x:(e?.nativeEvent?.clientX??(b?b.left:0))+14,y:(e?.nativeEvent?.clientY??(b?b.top:0))-22});}} menu={r.menu} label={r.label} selected={r.selected} onPress={r.run}/>)}{picker?(()=>{const r=rows.find(q=>q.key===picker.key);return r?<ColorPicker color={r.color} x={picker.x} y={picker.y} onLive={c=>setPicker(q=>q?{...q,live:c}:q)} onCommit={c=>r.pick(c)} defaultColor={DEFAULT_SHORTCUT_COLOR} onClose={()=>setPicker(null)}/>:null;})():null}</Section>;
 }
-function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){ const subs=useStore(subShortcutPages); const pcolors=useStore(shortcutPageColors),[subPicker,setSubPicker]=useState<{id:string;x:number;y:number;live?:string}|null>(null);
+function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId:string;onOpen:(id:string)=>void;api:SofiaApi;toast:(text:string,actions?:{label:string;run:()=>void}[])=>void;undoNow:()=>void}){ const localSubs=useStore(subShortcutPages),localColors=useStore(shortcutPageColors);
+ // 14/11/2026 (Pedro: "em um navegador e outro as cores dos pontos estao diferentes"): cor do ponto e subatalho de pagina ficam na conta (dados da pagina: sidebar_color, sidebar_sub; cor de nota: sidebar_colors da pagina dona); o navegador so guarda a copia
+ const subs=useMemo(()=>{const off=new Set<string>(),on:string[]=[];for(const p of pages){const v=p.data?.sidebar_sub;if(v===true)on.push(p.id);else if(v===false)off.add(p.id);}return [...new Set([...localSubs.filter(id=>!off.has(id)),...on])];},[pages,localSubs]);
+ const pcolors=useMemo(()=>{const m:Record<string,string>={...localColors};for(const p of pages){const o=p.data?.sidebar_colors;if(o&&typeof o==='object')for(const k of Object.keys(o))if(typeof o[k]==='string')m[k]=o[k];if(typeof p.data?.sidebar_color==='string'&&p.data.sidebar_color)m[p.id]=p.data.sidebar_color;}return m;},[pages,localColors]);
+ const patchPage=async(id:string,f:(d:Record<string,any>)=>Record<string,any>)=>{const pg=await api.entityFresh(id);const saved=await api.saveEntity({id:pg.id,revision:pg.revision,data:f({...(pg.data||{})})},pg);const all=pagesDirectory.get();if(all)pagesDirectory.set(all.map(x=>x.id===saved.id?saved:x));};
+ const ownerOf=(id:string)=>pages.find(p=>pageSubShortcuts(p).some(s=>s.id===id));
+ const saveColor=(id:string,c:string)=>{setShortcutPageColor(id,c);const isPage=pages.some(p=>p.id===id),owner=isPage?null:ownerOf(id);const t=isPage?id:owner?.id;if(!t)return;void patchPage(t,d=>isPage?{...d,sidebar_color:c}:{...d,sidebar_colors:{...(d.sidebar_colors||{}),[id]:c}}).catch(()=>{/* fica a copia do navegador */});};
+ const toggleSub=(id:string)=>{const was=subs.includes(id);if(was!==localSubs.includes(id)){if(!was)toggleSubShortcutPage(id);}else toggleSubShortcutPage(id);void patchPage(id,d=>({...d,sidebar_sub:!was})).catch(()=>{/* fica a copia do navegador */});};
+ const migrated=useRef(false);
+ useEffect(()=>{if(migrated.current||!pages.length)return;migrated.current=true;let n=0;for(const id of localSubs){const p=pages.find(x=>x.id===id);if(p&&p.data?.sidebar_sub===undefined&&n++<20)void patchPage(id,d=>d.sidebar_sub===undefined?{...d,sidebar_sub:true}:d).catch(()=>{});}
+  for(const id of Object.keys(localColors)){const c=localColors[id];const p=pages.find(x=>x.id===id);if(p){if(!p.data?.sidebar_color&&n++<40)void patchPage(id,d=>d.sidebar_color?d:{...d,sidebar_color:c}).catch(()=>{});}else{const o=ownerOf(id);if(o&&!(o.data?.sidebar_colors||{})[id]&&n++<40)void patchPage(o.id,d=>(d.sidebar_colors||{})[id]?d:{...d,sidebar_colors:{...(d.sidebar_colors||{}),[id]:c}}).catch(()=>{});}}
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[pages]);
+ const[subPicker,setSubPicker]=useState<{id:string;x:number;y:number;live?:string}|null>(null);
  // 06/11/2026: paginas publicadas na web ganham um 🌐 na lateral (nada fica publico sem a pessoa ver)
  const shared=useStore(sharedPages);useEffect(()=>{refreshSharedPages(api);},[api]);
  // 0.3.267: ⋯ / botão direito e + na página da barra lateral, como no Notion
@@ -166,7 +179,7 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>{try{window.open('/paginas/'+encodeURIComponent(p.id),'_blank','noopener');}catch{/* bloqueado pelo navegador */}};
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:subShortcutPages.get().includes(p.id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>toggleSubShortcutPage(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:subShortcutPages.get().includes(p.id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>toggleSub(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  // 14/11/2026 (Pedro: opcao Atalhos no menu da pagina): mostra os atalhos dela mesmo com a seta fechada
  // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
@@ -209,7 +222,7 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} onToggle={()=>{}} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)}/>);
  const c=useTheme();
- return <View ref={treeRef} testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{subPicker?<ColorPicker color={pcolors[subPicker.id]||DEFAULT_SHORTCUT_COLOR} x={subPicker.x} y={subPicker.y} onLive={c=>setSubPicker(q=>q?{...q,live:c}:q)} onCommit={c=>setShortcutPageColor(subPicker.id,c)} defaultColor={DEFAULT_SHORTCUT_COLOR} onClose={()=>setSubPicker(null)}/>:null}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
+ return <View ref={treeRef} testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{subPicker?<ColorPicker color={pcolors[subPicker.id]||DEFAULT_SHORTCUT_COLOR} x={subPicker.x} y={subPicker.y} onLive={c=>setSubPicker(q=>q?{...q,live:c}:q)} onCommit={c=>saveColor(subPicker.id,c)} defaultColor={DEFAULT_SHORTCUT_COLOR} onClose={()=>setSubPicker(null)}/>:null}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
   {drag.emoji?<Text style={{fontSize:14}}>{drag.emoji}</Text>:<Icon name="book" size={14} color={c.muted}/>}<Text style={{color:c.text,fontSize:13}}>{drag.title}</Text></View>:null}</View>;
 }
 

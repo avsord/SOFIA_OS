@@ -431,7 +431,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | Seletor de cor enxuto (pedido do Pedro): só barras de cor e luz, pequeno, abre junto da bolinha (portal no body; antes ficava longe e cortado) | tsc ok; teste do seletor ok; não conferido no navegador |
+$L
 $L
 $L
 $L
