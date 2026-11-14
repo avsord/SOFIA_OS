@@ -562,7 +562,7 @@ function makeMobileApi(runtime, deps) {
       if (lm && m === 'GET') { rate(session, 'file-link', 600); const a = workspace.attachment(validId(lm[1])); return send({url: fileLink(a.id), name: a.name, mime: a.mime, bytes: a.bytes}); } }
     if (p.startsWith('/api/mobile/workspace/')) {
       const suffix = p.slice('/api/mobile/workspace/'.length);
-      const allowed = /^(?:catalog|areas|panorama|pages\/shared|pages\/lock-(?:key|recover)|pages\/[\w-]+\/share|ui\/(?:home|pages)|entities(?:\/[\w-]+(?:\/(?:versions|observations|attachments|calendar|action))?)?|attachments\/[\w-]+|relations|timeline|integrations|vault\/(?:status|setup|confirm|unlock|recover|lock|entries|chat|discuss))$/;
+      const allowed = /^(?:catalog|covers(?:\/[\w-]+)?|areas|panorama|pages\/shared|pages\/lock-(?:key|recover)|pages\/[\w-]+\/share|ui\/(?:home|pages)|entities(?:\/[\w-]+(?:\/(?:versions|observations|attachments|calendar|action))?)?|attachments\/[\w-]+|relations|timeline|integrations|vault\/(?:status|setup|confirm|unlock|recover|lock|entries|chat|discuss))$/;
       if (!allowed.test(suffix)) fail('NOT_FOUND', 'Esta operação não está disponível no app.', 404);
       if (m !== 'GET') rate(session, 'workspace-write', 60);
       if (suffix.startsWith('vault/')) {

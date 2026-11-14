@@ -28,30 +28,19 @@ test('a capa enviada fica reduzida no servidor (1600 px), e outros arquivos nao 
  const outro=w.attach(page.id,{name:'foto.jpg',mime:'image/jpeg',base64:photo().toString('base64')});
  assert.equal(jpeg.decode(Buffer.from(w.attachment(outro.id).blob)).width,3000,'so "capa.*" e reduzida');
 });
-test('a capa antiga fica nas versoes recentes (desfazer volta a abrir); sem versoes ela e apagada; arquivo de outra pagina/registro nao e apagado',t=>{
+test('14/11/2026 biblioteca de capas: trocar ou remover a capa nunca apaga o arquivo; so sai tirando da biblioteca',t=>{
  const {w,page,up,setCover}=setup(t);
  const a=up(),b=up();
- setCover(a.id);assert.ok(w.attachment(a.id),'a primeira capa fica');
- setCover(b.id);assert.ok(w.attachment(a.id),'a antiga fica: esta nas versoes recentes e o desfazer precisa dela');assert.ok(w.attachment(b.id),'a nova fica');
- setCover('', 'gradient');assert.ok(w.attachment(b.id),'tirar a capa tambem guarda o arquivo para o desfazer');
- w.db.prepare('DELETE FROM entity_versions WHERE entity_id=?').run(page.id);assert.equal(w.dropOldCover(page.id,a.id),true);assert.throws(()=>w.attachment(a.id),/n.o encontrado/i,'sem versoes que a citem, a antiga e apagada');
- // compartilhada: outra pagina aponta para o mesmo arquivo -> nao apaga
- const c=up(),other=w.save({kind:'user_page',title:'Outra',area:'Pessoal',data:{cover_type:'attachment',cover_value:'',cover_attachment_id:c.id}});
- setCover(c.id);setCover('', 'gradient');assert.ok(w.attachment(c.id),'a outra pagina ainda usa: fica');
- // anexo comum da pagina (nao e capa) nunca e apagado por troca de capa
+ setCover(a.id);setCover(b.id);setCover('', 'gradient');
+ w.db.prepare('DELETE FROM entity_versions WHERE entity_id=?').run(page.id);
+ assert.equal(w.dropOldCover(page.id,a.id),false,'troca nao apaga');assert.ok(w.attachment(a.id));assert.ok(w.attachment(b.id));
+ const ids=w.coverLibrary().map(x=>x.id);assert.ok(ids.includes(a.id)&&ids.includes(b.id),'as duas estao na biblioteca');
+ const old=new Date(Date.now()-3*3600*1000).toISOString();w.db.prepare('UPDATE attachments SET created_at=?').run(old);
+ assert.equal(w.cleanupOrphanCovers().removed,0,'a faxina nao apaga capas da biblioteca');
+ setCover(a.id);assert.throws(()=>w.removeCover(a.id),/em uso/,'capa em uso nao sai');
+ assert.deepEqual(w.removeCover(b.id),{removed:b.id});assert.throws(()=>w.attachment(b.id));assert.ok(!w.coverLibrary().some(x=>x.id===b.id));
  const doc=w.attach(page.id,{name:'contrato.pdf',mime:'application/pdf',base64:Buffer.from('x').toString('base64')});
- const d=up();setCover(d.id);setCover('', 'gradient');assert.ok(w.attachment(doc.id));
-});
-test('faxina das capas que sobraram de trocas antigas (so as com mais de 1 hora)',t=>{
- const {w,page,up,setCover}=setup(t);
- const velha=up(),atual=up(),recente=up();
- setCover(atual.id);
- const old=new Date(Date.now()-3*3600*1000).toISOString();
- w.db.prepare('UPDATE attachments SET created_at=? WHERE id IN (?,?)').run(old,velha.id,atual.id);
- const r=w.cleanupOrphanCovers();
- assert.equal(r.removed,1,'so a velha');assert.throws(()=>w.attachment(velha.id));
- assert.ok(w.attachment(atual.id),'a capa atual fica');assert.ok(w.attachment(recente.id),'a recente fica (o app ainda pode estar salvando a pagina)');
- assert.equal(w.cleanupOrphanCovers().removed,0,'rodar de novo nao muda nada');
+ assert.throws(()=>w.removeCover(doc.id),/n.o encontrada/,'anexo comum nao e capa');assert.ok(!w.coverLibrary().some(x=>x.id===doc.id));
 });
 test('o servico do Google apaga tambem a copia da capa no Drive',()=>{
  const fs=require('node:fs'),path=require('node:path');

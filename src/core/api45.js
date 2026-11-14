@@ -63,6 +63,9 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
     throw new AppError('BAD_ACTION','Ação não disponível.');
   }
  }
+ // 14/11/2026: biblioteca de capas
+ if(m==='GET'&&p==='/api/covers')return send({items:w.coverLibrary()});
+ {const cm=p.match(/^\/api\/covers\/([\w-]+)$/);if(cm&&m==='DELETE')return send(w.removeCover(validId(cm[1])));}
  match=p.match(/^\/api\/attachments\/([\w-]+)$/);
  // 0.3.199: ?thumb=1 entrega a miniatura minuscula (o chat mostra desfocada sem baixar a foto do Drive)
  if(m==='GET'&&match&&url.searchParams.get('thumb')==='1'){const {makeThumb}=require('../services/thumb');try{w.db.prepare('ALTER TABLE attachments ADD COLUMN thumb BLOB').run();}catch{}

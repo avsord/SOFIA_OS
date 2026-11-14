@@ -202,6 +202,8 @@ class Workspace {
  dropAttachment(attId){let a;try{a=this.db.prepare('SELECT id,entity_id,drive_id FROM attachments WHERE id=?').get(attId);}catch{a=this.db.prepare('SELECT id,entity_id FROM attachments WHERE id=?').get(attId);}if(!a)return null;this.db.prepare('DELETE FROM attachments WHERE id=?').run(attId);return a;}
  /** So apaga se for mesmo uma capa DESTA pagina e nenhuma outra pagina/registro usar o mesmo arquivo. */
  dropOldCover(pageId,attId){
+  // 14/11/2026 (Pedro: "as capas que foram subidas ficam salvas em uma biblioteca de capas, e mesmo se remover so sai se remover da biblioteca"): trocar/remover a capa nunca apaga o arquivo; so removeCover apaga
+  if(pageId!==null)return false;
   const a=this.db.prepare('SELECT id,entity_id,name FROM attachments WHERE id=?').get(attId);
   if(!a||a.entity_id!==pageId||!/^capa\./.test(String(a.name||'')))return false;
   const used=this.db.prepare("SELECT 1 AS x FROM entities WHERE id!=? AND instr(data,?)>0 LIMIT 1").get(pageId,attId);
@@ -210,6 +212,12 @@ class Workspace {
   try{if(this.db.prepare('SELECT snapshot FROM entity_versions WHERE entity_id=? ORDER BY revision DESC LIMIT 20').all(pageId).some(r=>String(r.snapshot).includes(attId)))return false;}catch{/* sem versoes: segue */}
   this.dropAttachment(attId);return true;
  }
+ /** 14/11/2026: biblioteca de capas = todo anexo "capa.*" enviado (de qualquer pagina, mesmo excluida). */
+ coverLibrary(){return this.db.prepare("SELECT id,entity_id,name,mime,bytes,created_at FROM attachments WHERE name LIKE 'capa.%' AND mime LIKE 'image/%' ORDER BY created_at DESC LIMIT 200").all();}
+ /** Tira a capa da biblioteca (apaga o arquivo). Recusa se alguma pagina ainda usa a capa. */
+ removeCover(attId){const a=this.db.prepare("SELECT id,name FROM attachments WHERE id=?").get(attId);if(!a||!/^capa./.test(String(a.name||'')))throw new AppError('NOT_FOUND','Capa não encontrada na biblioteca.',404);
+  const used=this.db.prepare("SELECT title FROM entities WHERE instr(data,?)>0 LIMIT 1").get(attId);if(used)throw new AppError('COVER_IN_USE','Esta capa está em uso na página “'+(used.title||'Sem título')+'”. Troque a capa dela antes de tirar da biblioteca.',409);
+  this.dropAttachment(attId);return {removed:attId};}
  /** Capas que sobraram de trocas antigas: anexo "capa.*" de uma pagina que nao e mais a capa atual dela. Ignora
   * o que tem menos de 1 hora (o app envia a capa e so depois salva a pagina). */
  cleanupOrphanCovers(){
@@ -302,7 +310,7 @@ class Workspace {
      this.db.prepare('DELETE FROM observations WHERE monitor_id=?').run(entityId);
      this.db.prepare('DELETE FROM jobs WHERE entity_id=?').run(entityId);
      // 14/11/2026 (Pedro: "capa desapareceu"): excluir uma pagina nao leva junto o arquivo que outra pagina ainda usa (capa de copia/duplicata)
-     this.db.prepare("DELETE FROM attachments WHERE entity_id=? AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.id!=? AND instr(e.data,attachments.id)>0)").run(entityId,entityId);
+     this.db.prepare("DELETE FROM attachments WHERE entity_id=? AND name NOT LIKE 'capa.%' AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.id!=? AND instr(e.data,attachments.id)>0)").run(entityId,entityId);
      this.db.prepare('DELETE FROM notifications WHERE entity_id=?').run(entityId);
      this.db.prepare('DELETE FROM events WHERE entity_type=? AND entity_id=?').run('entity',entityId);
      this.db.prepare('DELETE FROM annotations WHERE entity_type=? AND entity_id=?').run('entity',entityId);

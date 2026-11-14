@@ -165,6 +165,20 @@ export function PageCover({data,api,repositioning=false,onPosition}:{data:Record
  // 0.3.267: id único por capa (no site todas as miniaturas usavam o 1º degradê com o mesmo id "cover")
  return <Svg width="100%" height="100%"><Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill={'url(#'+gradientId+')'}/></Svg>;
 }
+// 14/11/2026 (Pedro): biblioteca de capas. Toda capa enviada fica aqui; trocar/remover da pagina nao apaga. O x tira da biblioteca (com confirmacao).
+function CoverLibrary({api,width,busy,onPick,onError}:{api:SofiaApi;width:number;busy:boolean;onPick:(id:string)=>void;onError:(m:string)=>void}){
+ const c=useTheme(),[items,setItems]=useState<{id:string}[]|null>(null),[confirm,setConfirm]=useState('');
+ useEffect(()=>{let live=true;api.coverLibrary().then(r=>{if(live)setItems(r.items||[]);}).catch(()=>{if(live)setItems([]);});return()=>{live=false;};},[api]);
+ if(!items||!items.length)return null;
+ async function remove(id:string){if(confirm!==id){setConfirm(id);return;}setConfirm('');try{await api.removeCover(id);setItems(l=>(l||[]).filter(x=>x.id!==id));}catch(e){onError(e instanceof Error?e.message:'Não foi possível tirar a capa da biblioteca.');}}
+ return <View style={{gap:8,marginBottom:4}}>
+  <Text style={{color:c.muted,fontSize:12,fontWeight:'500'}}>Suas capas</Text>
+  <View testID="cover-library" style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{items.map(it=><View key={it.id} style={{width,height:56}}>
+   <Pressable disabled={busy} accessibilityLabel="Usar esta capa" onPress={()=>onPick(it.id)} style={({hovered}:any)=>({flex:1,borderRadius:6,overflow:'hidden',opacity:hovered?0.85:1})}><PageCover api={api} data={{cover_type:'attachment',cover_attachment_id:it.id}}/></Pressable>
+   <Pressable testID={'cover-library-remove-'+it.id} accessibilityLabel={confirm===it.id?'Confirmar: tirar da biblioteca':'Tirar da biblioteca'} onPress={()=>void remove(it.id)} hitSlop={4} style={({hovered}:any)=>({position:'absolute',top:3,right:3,height:18,minWidth:18,paddingHorizontal:confirm===it.id?6:0,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:confirm===it.id?'#D9534F':hovered?'rgba(0,0,0,.75)':'rgba(0,0,0,.45)'})}><Text style={{color:'#fff',fontSize:confirm===it.id?10:12,lineHeight:14}}>{confirm===it.id?'Tirar?':'×'}</Text></Pressable>
+  </View>)}</View>
+ </View>;
+}
 export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:{kind:'icon'|'cover';pageId:string;api:SofiaApi;onApply:(patch:Record<string,any>)=>void;onClose:()=>void;anchor?:{x:number;y:number}|null;current?:Record<string,any>}){
  const desktop=useDesktop(),[tab,setTab]=useState<'gallery'|'upload'>('gallery'),[query,setQuery]=useState('');
  const c=useTheme(),[mode,setMode]=useState<'emoji'|'icon'>('emoji'),[custom,setCustom]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),alive=useRef(true),recovering=useRef(false);
@@ -243,7 +257,7 @@ export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:
       </View></ScrollView>
      </View>
      :tab==='gallery'?<ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:380}} contentContainerStyle={{padding:12,gap:8}}>
-      <Text style={{color:c.muted,fontSize:12,fontWeight:'500'}}>Cores e degradês</Text>
+      <CoverLibrary api={api} width={(W-24-24)/4} busy={busy} onPick={id=>choose({cover_type:'attachment',cover_value:'',cover_attachment_id:id,cover_local_uri:''})} onError={setError}/><Text style={{color:c.muted,fontSize:12,fontWeight:'500'}}>Cores e degradês</Text>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{PAGE_COVERS.map(([name,value])=><Pressable key={name} disabled={busy} accessibilityLabel={'Capa '+name} onPress={()=>choose({cover_type:'preset',cover_value:value,cover_attachment_id:'',cover_local_uri:''})} style={({hovered}:any)=>({width:(W-24-24)/4,gap:4,opacity:hovered?0.85:1})}><View style={{height:56,borderRadius:6,overflow:'hidden'}}><PageCover api={api} data={{cover_type:'preset',cover_value:value}}/></View><Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{name}</Text></Pressable>)}</View>
      </ScrollView>
      :<View style={{padding:16,gap:12}}>
@@ -269,7 +283,7 @@ export function PageAppearance({kind,pageId,api,onApply,onClose,anchor,current}:
      <View style={{flexDirection:'row',gap:8,alignItems:'center',marginVertical:14}}><TextInput value={custom} onChangeText={setCustom} maxLength={32} placeholder="Outro emoji ou símbolo" placeholderTextColor={c.muted} accessibilityLabel="Emoji personalizado" style={{flex:1,minHeight:46,borderRadius:12,backgroundColor:c.input,color:c.text,paddingHorizontal:12}}/><IconButton name="check" label="Aplicar ícone" filled disabled={!custom.trim()} onPress={()=>choose({icon:custom.trim(),icon_mode:mode})}/></View>
      <Button title="Usar ícone padrão" secondary onPress={()=>choose({icon:'',icon_mode:'default'})}/>
     </>:<>
-     <View style={{flexDirection:'row',flexWrap:'wrap',gap:10,marginBottom:18}}>{PAGE_COVERS.map(([name,value])=><Pressable key={name} disabled={busy} accessibilityLabel={'Capa '+name} onPress={()=>choose({cover_type:'preset',cover_value:value,cover_attachment_id:'',cover_local_uri:''})} style={{width:'47%',height:65,borderRadius:12,overflow:'hidden'}}><PageCover api={api} data={{cover_type:'preset',cover_value:value}}/></Pressable>)}</View>
+     <CoverLibrary api={api} width={96} busy={busy} onPick={id=>choose({cover_type:'attachment',cover_value:'',cover_attachment_id:id,cover_local_uri:''})} onError={setError}/><View style={{flexDirection:'row',flexWrap:'wrap',gap:10,marginBottom:18}}>{PAGE_COVERS.map(([name,value])=><Pressable key={name} disabled={busy} accessibilityLabel={'Capa '+name} onPress={()=>choose({cover_type:'preset',cover_value:value,cover_attachment_id:'',cover_local_uri:''})} style={{width:'47%',height:65,borderRadius:12,overflow:'hidden'}}><PageCover api={api} data={{cover_type:'preset',cover_value:value}}/></Pressable>)}</View>
      {busy?<View style={{padding:18,alignItems:'center',gap:8}}><ActivityIndicator color={c.accent}/><Text style={{color:c.muted}}>Enviando capa…</Text></View>:<View style={{gap:10}}><Button title="Escolher foto do aparelho" onPress={()=>void upload()}/><Button title="Remover capa" secondary onPress={()=>choose({cover_type:'',cover_value:'',cover_attachment_id:'',cover_local_uri:''})}/></View>}
     </>}
    </Pressable>

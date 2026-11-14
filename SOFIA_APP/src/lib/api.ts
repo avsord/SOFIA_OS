@@ -489,6 +489,9 @@ export class SofiaApi {
     for(let attempt=0;;attempt++){try{saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');break;}
       catch(e){const m=/Campo não previsto: ([a-z_]+)/.exec(String((e as Error)?.message||''));const data=(body as {data?: Record<string, unknown>}).data;if(!m||attempt>=6||!data||!(m[1] in data))throw e;const next={...data};delete next[m[1]];body={...(body as object),data:next} as typeof body;}}if(['commitment','reminder'].includes(saved.kind))agendaChanged(this);systemChanged(this);return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }
   async deleteEntity(id: string) { const result=await this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE');recordRemoved(this,id);agendaChanged(this);systemChanged(this);return result; }
+  // 14/11/2026: biblioteca de capas (toda capa enviada fica guardada; so sai daqui)
+  coverLibrary() { return this.request<{items:{id:string;entity_id:string;created_at:string}[]}>('/workspace/covers'); }
+  removeCover(id:string) { return this.request<{removed:string}>('/workspace/covers/'+encodeURIComponent(id),undefined,'DELETE'); }
   uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
   /** 0.3.199: miniatura minuscula da foto (o chat mostra desfocada sem baixar o original do Drive). */
   attachmentThumb(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?thumb=1',headers:{Authorization:'Bearer '+this.token}}; }

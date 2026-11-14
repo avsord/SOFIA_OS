@@ -232,7 +232,7 @@ test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura b
  assert.ok(!g.driveFiles.some(f=>f.id===row.drive_id),'apagou no Drive também');
 });
 
-test('0.3.200: trocar a capa apaga a antiga tambem no Drive; a faxina limpa capas antigas que ja estavam la',async t=>{
+test('14/11/2026: trocar a capa guarda a antiga (biblioteca); tirar da biblioteca apaga tambem no Drive',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
  const page=w.save({kind:'user_page',title:'Capa',area:'Pessoal',data:{cover_type:'gradient',cover_value:'',cover_attachment_id:''}});
  const a=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('CAPA-A').toString('base64')});
@@ -241,12 +241,9 @@ test('0.3.200: trocar a capa apaga a antiga tambem no Drive; a faxina limpa capa
  const da=w.attachment(a.id).drive_id,db=w.attachment(b.id).drive_id;assert.ok(da&&db);
  const set=id=>{const cur=w.get(page.id);return w.save({...cur,data:{...cur.data,cover_type:'attachment',cover_attachment_id:id}},page.id);};
  set(a.id);set(b.id);await new Promise(r=>setTimeout(r,20));
- assert.ok(!g.driveFiles.some(f=>f.id===da),'a capa antiga saiu do Drive');assert.ok(g.driveFiles.some(f=>f.id===db),'a atual continua la');
- // capa velha que sobrou de antes desta versao (ja no Drive): a faxina apaga dos dois lados
- const c=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('CAPA-C').toString('base64')});await svc.offloadAttachments();
- const dc=w.attachment(c.id).drive_id;w.db.prepare('UPDATE attachments SET created_at=? WHERE id=?').run(new Date(Date.now()-5*3600*1000).toISOString(),c.id);
- assert.equal(w.cleanupOrphanCovers().removed,1);await new Promise(r=>setTimeout(r,20));
- assert.ok(!g.driveFiles.some(f=>f.id===dc),'a sobra saiu do Drive');assert.ok(g.driveFiles.some(f=>f.id===db),'a capa atual continua');
+ assert.ok(g.driveFiles.some(f=>f.id===da),'a capa antiga continua (biblioteca)');
+ w.removeCover(a.id);await new Promise(r=>setTimeout(r,20));
+ assert.ok(!g.driveFiles.some(f=>f.id===da),'tirada da biblioteca: saiu do Drive');assert.ok(g.driveFiles.some(f=>f.id===db),'a atual continua');
 });
 
 test('0.3.200: capas largas que ja estao no Drive sao reduzidas no proprio arquivo (sem criar outro)',async t=>{
