@@ -1,9 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),load=require('./load-ts.cjs');
-const {PAGE_TEMPLATES,STATUS_COLORS}=load('src/lib/page-templates.ts');
+const {PAGE_TEMPLATES,STATUS_COLORS,freshTemplate,diaryEntryBlock,diaryDayTitle}=load('src/lib/page-templates.ts');
 test('the official page templates are exposed (Kanban simples fica; Tabela substitui o Formulário)',()=>{
- assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|content_kanban|playlist_links|notes_hub');
- assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Kanban|Kanban avançado|Tabela|Notas');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|content_kanban|playlist_links|notes_hub|diary');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Kanban|Kanban avançado|Tabela|Notas|Diário');
 });
 test('tasks template has editable status columns with colors',()=>{
  const t=PAGE_TEMPLATES[0],collection=t.blocks.find(x=>x.type==='collection');
@@ -89,4 +89,11 @@ test('page cover uses local preview and an authenticated downloaded file instead
  assert.equal(cover.coverMime('/9j/AAAA','image/png'),'image/jpeg');
  assert.equal(cover.coverMime('iVBORw0KGgoAAAA','image/jpeg'),'image/png');
  assert.equal(cover.coverName('image/webp'),'capa.webp');
+});
+
+test('Diário: dia como título e hora em destaque na frente do texto',()=>{
+ const t=freshTemplate(PAGE_TEMPLATES.find(x=>x.id==='diary'));
+ assert.equal(t.blocks[0].type,'heading3');assert.match(t.blocks[0].text,/^\d\d\/\d\d\/\d{4} · /);assert.equal(t.blocks[1].type,'text');
+ assert.equal(diaryDayTitle(new Date(2026,10,14)),'14/11/2026 · sábado');
+ const e=diaryEntryBlock('05:29','a <b> & c');assert.equal(e.text,'05:29  a <b> & c');assert.ok(e.html.includes('<b>05:29</b>'));assert.ok(e.html.includes('a &lt;b&gt; &amp; c'));
 });

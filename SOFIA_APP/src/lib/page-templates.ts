@@ -1,6 +1,6 @@
 import type {PageBlock} from './page-editor';
 
-export type TemplateId='tasks_personal'|'content_kanban'|'notes_hub'|'playlist_links';
+export type TemplateId='tasks_personal'|'content_kanban'|'notes_hub'|'playlist_links'|'diary';
 export type PageTemplate={
  id:TemplateId;title:string;description:string;icon:string;
  blocks:PageBlock[];
@@ -86,10 +86,27 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
  {
   id:'notes_hub',title:'Notas',description:'Pastas com notas e edição livre.',icon:'📝',
   blocks:[block('collection','',{title:'Notas',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Notas',type:'pages'}],active_view:'notebooks',rows:[]})]
- }
+ },
+ {id:'diary',title:'Diário',description:'Dias com data e registros com a hora em destaque, como um diário.',icon:'✎',blocks:[]}
 ];
 
+// 14/11/2026 (Pedro, página "devaneios"): Diário = dia como título (data · dia da semana) e cada registro com a hora em
+// destaque na frente do texto; divisor entre os dias. Usa só blocos que já existem (título 3, texto e divisor).
+export const DIARY_TIME_COLOR='#8b67d5';
+const WEEKDAYS=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+const pad=(n:number)=>String(n).padStart(2,'0');
+const escapeHtml=(t:string)=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+export function diaryDayTitle(d:Date){return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} · ${WEEKDAYS[d.getDay()]}`;}
+export function diaryEntryBlock(time:string,text:string):PageBlock{
+ const t=time.trim(),body=text.trim();
+ return {...block('text',`${t}  ${body}`),html:`<span style="color:${DIARY_TIME_COLOR}"><b>${escapeHtml(t)}</b></span>&nbsp;&nbsp;${escapeHtml(body)}`} as PageBlock;
+}
+export function diaryBlocks(now=new Date()):PageBlock[]{
+ return [block('heading3',diaryDayTitle(now)),diaryEntryBlock(`${pad(now.getHours())}:${pad(now.getMinutes())}`,'')];
+}
+
 export function freshTemplate(template:PageTemplate):PageTemplate{
+ if(template.id==='diary')return {...template,blocks:diaryBlocks()};
  const clone=JSON.parse(JSON.stringify(template)) as PageTemplate;
  clone.blocks=clone.blocks.map(b=>({...b,id:id(),data:{...(b.data||{}),rows:Array.isArray(b.data?.rows)?b.data.rows.map((r:any)=>({...r,id:id()})):b.data?.rows}}));
  return clone;
