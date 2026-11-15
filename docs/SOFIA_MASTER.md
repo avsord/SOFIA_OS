@@ -382,6 +382,7 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
+| 2026-11-15 | (site) | Barra lateral: seta das seções (Apps etc.) alinhada às letras (subiu 1,5 px) | medido 4x no laboratório; tsc ok; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Ponto ao lado do Início (e no ícone, barra recolhida; centro do Ctrl+K) quando chega um item da linha do tempo: na cor do item; fica até ser feito, evento até 5 min depois de começar, passa ao próximo que chegar; nome no mouse em cima (`src/lib/timeline-arrivals.ts`). | tsc ok; testes ok (só o 061 falha: sem Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Login: sessão do servidor vale 30 dias (antes vencia 12 h depois do login, mesmo em uso, e o site deslogava sozinho); login guardado já vencido abre direto no login, sem mostrar o conteúdo por 1 s. | testes auth do servidor ok; tsc e testes do app ok |
 | 2026-11-15 | (sem APK) | (este) | Início: ponto menor; embaixo do Início, em L, o item atual da linha do tempo (título · hora · tipo), com texto que passa na horizontal quando não cabe | tsc ok; testes ok (só o 061 falha neste PC, falta Java); site recompilado; não conferido na tela |
