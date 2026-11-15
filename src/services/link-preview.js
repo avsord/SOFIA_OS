@@ -26,7 +26,7 @@ async function fetchHtml(address,{resolve=dns.lookup,hops=0}={}){
   const req=lib.get(u,{timeout:8000,headers:{'User-Agent':'Mozilla/5.0 (compatible; SofiaOS-LinkPreview/1.0)','Accept':'text/html,application/xhtml+xml','Accept-Language':'pt-BR,pt;q=0.9'},lookup:(h,o,cb)=>o?.all?cb(null,[chosen]):cb(null,chosen.address,chosen.family)},res=>{
    if([301,302,303,307,308].includes(res.statusCode)&&res.headers.location&&hops<3){res.resume();finish(null,fetchHtml(new URL(res.headers.location,u).toString(),{resolve,hops:hops+1}));return;}
    if(res.statusCode!==200){res.resume();return finish(Object.assign(new Error('O site respondeu '+res.statusCode+'.'),{code:'LINK_HTTP'}));}
-   if(!/html/i.test(res.headers['content-type']||'')){res.resume();return finish(null,{url:u.toString(),html:'',type:String(res.headers['content-type']||'')});}
+   if(!/html|json/i.test(res.headers['content-type']||'')){res.resume();return finish(null,{url:u.toString(),html:'',type:String(res.headers['content-type']||'')});}
    res.on('data',b=>{total+=b.length;if(total>1.5*1024*1024){req.destroy();return finish(null,{url:u.toString(),html:Buffer.concat(chunks).toString('utf8')});}chunks.push(b);});
    res.on('end',()=>finish(null,{url:u.toString(),html:Buffer.concat(chunks).toString('utf8')}));
   });
@@ -34,8 +34,21 @@ async function fetchHtml(address,{resolve=dns.lookup,hops=0}={}){
  });
 }
 /** Nunca falha: sem leitura, devolve titulo pelo endereco e o nome do site (o item e salvo com o link). */
+/** 15/11/2026: id do video do YouTube (watch?v=, youtu.be/, shorts/, embed/, live/); '' se nao for. */
+function youtubeId(address){
+ let u;try{u=new URL(String(address));}catch{return '';}
+ const h=u.hostname.replace(/^(www\.|m\.|music\.)/,''),ok=id=>id&&/^[\w-]{11}$/.test(id)?id:'';
+ if(h==='youtu.be')return ok(u.pathname.split('/')[1]);
+ if(h!=='youtube.com')return '';
+ if(u.pathname==='/watch')return ok(u.searchParams.get('v'));
+ const m=u.pathname.match(/^\/(shorts|embed|live)\/([^/]+)/);return m?ok(m[2]):'';
+}
 async function linkPreview(address,opts={}){
  const base={url:String(address||''),title:'',site:siteName(address),image:'',price:null,description:'',read:false};
+ // 15/11/2026: video do YouTube -> titulo e canal pelo oEmbed publico, capa pelo id (a pagina nao traz o canal)
+ const yt=youtubeId(address);
+ if(yt){try{const r=await fetchHtml('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+yt),opts);const j=JSON.parse(r.html||'{}');
+  if(j.title)return {...base,title:String(j.title).slice(0,200),site:'YouTube',author:String(j.author_name||'').slice(0,120),image:`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`,type:'video',read:true};}catch{}}
  try{
   const r=await fetchHtml(address,opts);const html=r.html||'';
   const title=meta(html,['og:title','twitter:title'])||decode((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||'');
@@ -43,4 +56,4 @@ async function linkPreview(address,opts={}){
   return {...base,url:r.url||base.url,title:(title||slugTitle(address)).slice(0,200),site:meta(html,['og:site_name'])||base.site,image:/^https?:\/\//.test(image)?image:'',price:priceFrom(html),description:meta(html,['og:description','description']).slice(0,400),type:meta(html,['og:type']),read:!!title};
  }catch{return {...base,title:slugTitle(address)};}
 }
-module.exports={linkPreview,priceFrom,slugTitle,siteName,host};
+module.exports={linkPreview,youtubeId,priceFrom,slugTitle,siteName,host};

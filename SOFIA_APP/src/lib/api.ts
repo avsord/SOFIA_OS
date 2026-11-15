@@ -114,7 +114,7 @@ let activeApi: SofiaApi | null = null;
 export function currentApi() { return activeApi; }
 export type ProfilePhoto = {mime: string; base64: string; updated_at: string};
 export type CatalogHit = {type: string; title: string; year: number | null; creator: string; cover: string; genre: string; source: string};
-export type LinkPreview = {url: string; title: string; site: string; image: string; price: number | null; description: string; type?: string; read: boolean};
+export type LinkPreview = {url: string; title: string; site: string; image: string; price: number | null; description: string; type?: string; author?: string; read: boolean};
 export type SdItem = {id: string; name: string; mime: string; folder: boolean; size: number | null; modified: string; shortcut?: boolean; thumb?: boolean; starred?: boolean; shared?: boolean; web?: string; where?: string};
 export type SdListing = {connected?: boolean; code?: string; reason?: string; folder: {id: string; name: string}; path: {id: string; name: string}[]; items: SdItem[]; shared?: boolean};
 export class SofiaApi {
