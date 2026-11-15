@@ -118,7 +118,7 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
  // Menu como no Notion: preso ao botão que abriu (alinha pela direita quando não cabe), abre para baixo e rola por dentro;
  // só sobe para cima do botão se embaixo não couber e em cima houver mais espaço. Nunca cobre o botão.
  const menuRef=useRef<HTMLDivElement>(null),anchorRef=useRef<DOMRect|null>(null);
- useLayoutEffect(()=>{const el=menuRef.current;if(!el||!menu)return;el.style.margin='0';el.style.maxHeight='';const r=el.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight,a=anchorRef.current;
+ useLayoutEffect(()=>{const el=menuRef.current;if(!el||!menu)return;el.style.margin='0';el.style.maxHeight='';const r=el.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight-(window.innerHeight>=screen.height-2?48:0),a=anchorRef.current;// tela cheia (F11): a barra do Windows cobre os 48 px de baixo
   let dx=0,dy=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;let mh=0;
   if(r.bottom>H-8){if(a){const below=H-8-r.top,above=a.top-4-8;if(above>below&&below<Math.min(r.height,240)){const h=Math.min(r.height,above);dy=a.top-4-h-r.top;if(h<r.height)mh=h;}else mh=below;}else dy=Math.max(8-r.top,H-8-r.bottom);}
   if(dx||dy)el.style.margin=`${dy}px 0 0 ${dx}px`;if(mh)el.style.maxHeight=Math.max(120,mh)+'px';},[menu]);
