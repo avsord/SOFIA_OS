@@ -590,6 +590,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   if(key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&b.type!=='code'){e.preventDefault();if(start===end&&end===text.length){const dr=diaryEnter(currentBlocks(),b.id);if(dr){applyCaret(dr);return;}}const r=splitBlock(currentBlocks(),b.id,start,end);const halves=b.html&&r?(node as any)?.__splitHtml?.(start,end):null;
    if(r&&halves){const i=r.blocks.findIndex(x=>x.id===b.id),nx=r.blocks[i+1];if(i>=0&&r.focus!==b.id&&nx){r.blocks[i]={...r.blocks[i],html:r.blocks[i].text?halves[0]:''};r.blocks[i+1]={...nx,html:nx.text?halves[1]:''};}}
    applyCaret(r);return;}
+  // 15/11/2026 (Pedro: Tab recua e apagar nao voltava): no comeco da linha, apagar primeiro desfaz o recuo, como no Notion
+  if(key==='Backspace'&&start===0&&end===0&&(Number(b.indent)||0)>0){e.preventDefault();const lv=Math.max(0,(Number(b.indent)||0)-1);updateBlock(b,{indent:lv||undefined},'indent:'+b.id);return;}
   if(key==='Backspace'&&start===0&&end===0){const blocks=currentBlocks(),r=backspaceAtStart(blocks,b.id);if(r){e.preventDefault();applyCaret(keepHtmlOnMerge(blocks,r,b.id));}return;}
   if(key==='Delete'&&start===text.length&&end===text.length){const blocks=currentBlocks(),r=deleteAtEnd(blocks,b.id);if(r){e.preventDefault();const i=blocks.findIndex(x=>x.id===b.id),nx=blocks[i+1];if(nx&&(b.html||nx.html)){const j=r.blocks.findIndex(x=>x.id===b.id);if(j>=0)r.blocks[j]={...r.blocks[j],html:htmlOfBlock(b)+htmlOfBlock(nx)};}applyCaret(r);}return;}
   if(ne.shiftKey||ne.altKey||ne.ctrlKey||ne.metaKey||start!==end)return;
