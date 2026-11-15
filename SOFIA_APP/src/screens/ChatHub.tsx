@@ -18,6 +18,8 @@ import {attachmentBase64,attachmentSize} from '../lib/attachment-read';
 import {LinkBubbleCard,LinkDraftCard} from '../components/LinkCard';
 import {firstUrl} from '../lib/link-info';
 import {FileWindowHost,InlineMedia,defaultView,fileKind,openFileWindow} from '../components/PageFiles';
+import {changeNoteBlocks,noteChats,parseNoteChatId,setNoteMain} from '../lib/note-chat';
+import {requestOpenNote} from '../lib/notes-move';
 import {appendBlocks,bubblesOf,chatFileBlock,chatLists,chatTextBlocks,editBubble,inMain,lastLine,listTime,pageBlocks,removeBubble,toggleTodo,type Bubble} from '../lib/page-chat';
 
 type ChatProps=React.ComponentProps<typeof Chat>;
@@ -47,13 +49,14 @@ function Hub(props:Props){
  useEffect(()=>{if(active)void load();},[active,load]);
  useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api,load]);
 
- const byId=useMemo(()=>new Map(pages.map(p=>[p.id,p])),[pages]);
+ const notes=useMemo(()=>noteChats(pages),[pages]),all=useMemo(()=>[...pages,...notes],[pages,notes]);
+ const byId=useMemo(()=>new Map(all.map(p=>[p.id,p])),[all]);
  const page=sel==='sofia'?undefined:byId.get(sel);
- const lists=useMemo(()=>chatLists(pages,q),[pages,q]);
+ const lists=useMemo(()=>chatLists(all,q),[all,q]);
  const kids=useMemo(()=>page?pages.filter(p=>pageParentId(p)===page.id):[],[pages,page]);
 
  /** Grava na página: mostra na hora e salva em fila, sempre em cima da versão mais nova do servidor. */
- const mutate=useCallback((id:string,change:(blocks:PageBlock[])=>PageBlock[])=>{
+ const mutatePage=useCallback((id:string,change:(blocks:PageBlock[])=>PageBlock[])=>{
   pending.current++;setError('');
   setPages(old=>old.map(p=>p.id===id?{...p,updated_at:new Date().toISOString(),data:{...p.data,blocks_json:JSON.stringify(change(pageBlocks(p)))}}:p));
   queue.current=queue.current.then(async()=>{
@@ -64,12 +67,15 @@ function Hub(props:Props){
    finally{pending.current--;if(!pending.current){systemChanged(api);}}
   });
  },[api]);
+ // nota da pagina: a conversa grava dentro da nota, na pagina dona
+ const mutate=useCallback((id:string,change:(blocks:PageBlock[])=>PageBlock[])=>{const n=parseNoteChatId(id);if(n)mutatePage(n.pageId,b=>changeNoteBlocks(b,n.leafId,change));else mutatePage(id,change);},[mutatePage]);
  const setMain=useCallback(async(p:Entity,on:boolean)=>{
+  {const n=parseNoteChatId(p.id);if(n){mutatePage(n.pageId,b=>setNoteMain(b,n.leafId,on));return;}}
   setPages(old=>old.map(x=>x.id===p.id?{...x,data:{...x.data,chat_main:on}}:x));
   try{const base=await api.entityFresh(p.id);const saved=await api.saveEntity({id:base.id,revision:base.revision,data:{...base.data,chat_main:on}},base);
    if(alive.current)setPages(old=>old.map(x=>x.id===p.id?saved:x));}
   catch(e:any){if(alive.current){setError('Não deu para mover a conversa.');void load();}}
- },[api,load]);
+ },[api,load,mutatePage]);
  const create=useCallback(async()=>{
   const title=name.trim();if(!title||!naming)return;const parent=naming.parent?byId.get(naming.parent):undefined;setNaming(null);setName('');
   try{const saved=await api.saveEntity({kind:'user_page',title,content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
@@ -134,6 +140,7 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
  api:SofiaApi;page:Entity;kids:Entity[];parent?:Entity;enterToSend:boolean;autoSendVoice:boolean;mutate:(id:string,change:(b:PageBlock[])=>PageBlock[])=>void;
  onOpenPage?:(id:string)=>void;onSelect:(id:string)=>void;onFail:(m:string)=>void;onToggleMain:()=>void;naming:boolean;name:string;onName:(v:string)=>void;onStartSub:()=>void;onCancelSub:()=>void;onCreateSub:()=>void}){
  const c=useTheme(),scroll=useRef<ScrollView>(null);
+ const isNote=!!page.data?.note_of,home=String(page.data?.note_of||page.id),openPage=()=>{if(isNote)requestOpenNote(home,String(page.data?.note_id||''));onOpenPage?.(home);};
  const blocks=useMemo(()=>pageBlocks(page),[page]),bubbles=useMemo(()=>bubblesOf(blocks),[blocks]);
  const [typed,setTyped]=useState(''),[shut,setShut]=useState(''),typedUrl=firstUrl(typed);
  const [picked,setPicked]=useState(''),[editing,setEditing]=useState(''),[draft,setDraft]=useState(''),[sending,setSending]=useState(0);
@@ -142,7 +149,7 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
  const sendOnce=useCallback((text:string)=>{const t=text.trim();if(!t)return;const now=new Date();let made:PageBlock[]|null=null;
   mutate(page.id,b=>{made=made||chatTextBlocks(b,t,now);return appendBlocks(b,made);});},[mutate,page.id]);
  const sendFile=useCallback(async(uri:string,nameIn:string,mimeIn:string,sizeIn:number)=>{
-  const base64=await attachmentBase64(uri),up=await api.uploadAttachment(page.id,{name:nameIn,mime:mimeIn,base64});
+  const base64=await attachmentBase64(uri),up=await api.uploadAttachment(home,{name:nameIn,mime:mimeIn,base64});
   const blk=chatFileBlock({attachment_id:up.id,name:nameIn,mime:mimeIn,size:sizeIn,view:defaultView(fileKind(mimeIn,nameIn))});
   mutate(page.id,b=>appendBlocks(b,[blk]));
  },[api,mutate,page.id]);
@@ -174,9 +181,9 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
      <Text selectable style={{color:c.text,fontSize:14.5,lineHeight:20,fontWeight:b.heading?'700':'400',textDecorationLine:b.todo&&b.checked?'line-through':'none',flexShrink:1}}>{b.text}</Text>{time}</View></View>;
   else if(b.kind==='file'){const kind=fileKind(b.mime,b.name),media=kind==='image'||kind==='video'||kind==='audio';
    body=<View style={{gap:4}}>{media?<View style={{width:kind==='audio'?300:320,maxWidth:'100%',borderRadius:8,overflow:'hidden'}}><InlineMedia api={api} id={b.attachmentId} kind={kind} name={b.name}/></View>
-    :<Pressable accessibilityRole="button" accessibilityLabel={'Abrir '+b.name} onPress={()=>openFileWindow(api,{id:b.attachmentId,name:b.name,mime:b.mime,pageId:page.id})} style={{flexDirection:'row',alignItems:'center',gap:8}}><Icon name="file" size={18} color={c.accent}/><Text numberOfLines={1} style={{color:c.text,fontSize:14,maxWidth:300}}>{b.name}</Text></Pressable>}
+    :<Pressable accessibilityRole="button" accessibilityLabel={'Abrir '+b.name} onPress={()=>openFileWindow(api,{id:b.attachmentId,name:b.name,mime:b.mime,pageId:home})} style={{flexDirection:'row',alignItems:'center',gap:8}}><Icon name="file" size={18} color={c.accent}/><Text numberOfLines={1} style={{color:c.text,fontSize:14,maxWidth:300}}>{b.name}</Text></Pressable>}
     {time?<View style={{alignSelf:'flex-end'}}>{time}</View>:null}</View>;}
-  else body=<Pressable accessibilityRole="button" accessibilityLabel={b.label+': abrir na página'} onPress={()=>onOpenPage?.(page.id)} style={{flexDirection:'row',alignItems:'center',gap:8}}><Icon name="external" size={15} color={c.accent}/><Text style={{color:c.text,fontSize:14}}>{b.label}</Text><Text style={{color:c.muted,fontSize:12}}>abrir na página</Text></Pressable>;
+  else body=<Pressable accessibilityRole="button" accessibilityLabel={b.label+': abrir na página'} onPress={openPage} style={{flexDirection:'row',alignItems:'center',gap:8}}><Icon name="external" size={15} color={c.accent}/><Text style={{color:c.text,fontSize:14}}>{b.label}</Text><Text style={{color:c.muted,fontSize:12}}>abrir na página</Text></Pressable>;
   return <View key={b.id} style={{alignSelf:'flex-end',maxWidth:'78%',marginBottom:5,alignItems:'flex-end'}}>
    <Pressable onPress={()=>{if(editing!==b.id)setPicked(on?'':b.id);}} style={{backgroundColor:c.bubble,borderRadius:12,borderTopRightRadius:on?12:4,paddingVertical:7,paddingHorizontal:11,borderWidth:on?1:0,borderColor:c.accent}}>{body}</Pressable>
    {on&&editing!==b.id?<View style={{flexDirection:'row',gap:14,marginTop:3,marginRight:4}}>
@@ -188,7 +195,7 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
   <View style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:10,paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:c.line,backgroundColor:c.surface}}>
    <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'700'}}>{page.title||'Sem título'}</Text>
     {parent?<Pressable onPress={()=>onSelect(parent.id)}><Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>em {parent.title}</Text></Pressable>:null}</View>
-   {head('Subpágina','plus',onStartSub)}{onOpenPage?head('Abrir página','external',()=>onOpenPage(page.id)):null}{head(inMain(page)?'Arquivar':'Trazer para a principal',inMain(page)?'box':'pin',onToggleMain)}
+   {isNote?null:head('Subpágina','plus',onStartSub)}{onOpenPage?head(isNote?'Abrir nota':'Abrir página','external',openPage):null}{head(inMain(page)?'Arquivar':'Trazer para a principal',inMain(page)?'box':'pin',onToggleMain)}
   </View>
   {naming?<View style={{paddingTop:10,backgroundColor:c.surface,borderBottomWidth:1,borderBottomColor:c.line}}><NameBox value={name} onChange={onName} onOk={onCreateSub} onCancel={onCancelSub} label={'Nome da subpágina de '+page.title}/></View>:null}
   <ScrollView ref={scroll} style={{flex:1}} contentContainerStyle={{paddingVertical:12,paddingHorizontal:20}}>

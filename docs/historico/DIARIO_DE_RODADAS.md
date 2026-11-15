@@ -78,3 +78,4 @@
 | 2026-11-15 | (sem APK) | (este) | Prévia de link: cartão baixo com miniatura à esquerda (tamanho WhatsApp); título/canal do YouTube pelo servidor (oEmbed) e site passa a mostrar imagens https externas | testes ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Notas com Diário: hora do registro fixa (escrever não apaga os minutos nem pinta o texto de roxo; "20:Poder…" volta a "20:06  Poder…") | teste novo ok; 4 falhas antigas de notas seguem |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: recolher subatalhos das páginas não faz mais o topo descer (espaço no fim segura a posição e some ao rolar para cima) | teste ok; não conferido na tela |
+| 2026-11-15 | (sem APK) | (este) | Conversa no site: notas dos blocos de Notas viram conversas ("em <página>", Arquivadas até puxar); escrever/áudio/anexo grava dentro da nota (Diário com hora roxa); "Abrir nota" | testes ok; não conferido na tela |
