@@ -38,7 +38,7 @@ import {Icon, type IconName} from '../components/Icon';
 import Svg, {Path, Circle} from 'react-native-svg';
 import {DISPLAY_ITALIC} from '../lib/sofia-font';
 import {HoverPressable} from '../components/HoverPressable';
-import {setTimelineTimes} from '../lib/timeline-arrivals';
+import {setTimelineTimes, takeArrivalOpen, onArrivalOpen} from '../lib/timeline-arrivals';
 
 const hhmm = (d: Date) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 const brl = (v: number) => v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: v >= 1000 ? 0 : 2});
@@ -239,7 +239,7 @@ export function HomeBrief(p: HomeBriefProps) {
     return out.filter(m => !hiddenMarks[m.id]).sort((x, y) => x.at.getTime() - y.at.getTime());
   }, [p.data, p.masked, markMoves, hiddenMarks]);
   const timelineItems = useMemo(() => {const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => timed(r) && !isHoliday((r.original || {}) as any) && !seen.has(r.id + r.date) && (seen.add(r.id + r.date), true)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));}, [p.today, p.all]);
-  useEffect(() => {const M = 5 * 60000; setTimelineTimes([...timelineItems.map(r => {const at = Date.parse(r.date), done = ["done", "completed"].includes(String((r.original as any)?.state || "")); return {at, title: r.title, color: r.kind === "reminder" ? REMIND : colorOf(r, ""), info: r.kind === "reminder" ? "Lembrete" : r.isTask ? "Tarefa" : "Evento", until: done ? 0 : r.isTask ? Infinity : at + M};}), ...timeMarks.map(m => ({at: m.at.getTime(), title: m.title, color: markColor(m, "#E5484D"), info: m.sub, until: m.done || m.check ? 0 : Infinity}))]);}, [timelineItems, timeMarks]); // ponto ao lado do Início (lib/timeline-arrivals): evento sai 5 min depois de começar; tarefa/conta/dose fica até feita
+  useEffect(() => {const M = 5 * 60000; setTimelineTimes([...timelineItems.map(r => {const at = Date.parse(r.date), done = ["done", "completed"].includes(String((r.original as any)?.state || "")); return {at, title: r.title, color: r.kind === "reminder" ? REMIND : colorOf(r, ""), info: r.kind === "reminder" ? "Lembrete" : r.isTask ? "Tarefa" : "Evento", ref: "r" + r.id, until: done ? 0 : r.isTask ? Infinity : at + M};}), ...timeMarks.map(m => ({at: m.at.getTime(), title: m.title, color: markColor(m, "#E5484D"), info: m.sub, ref: markKey(m), until: m.done || m.check ? 0 : Infinity}))]);}, [timelineItems, timeMarks]); // ponto ao lado do Início (lib/timeline-arrivals): evento sai 5 min depois de começar; tarefa/conta/dose fica até feita
   // proximos: o resto de hoje e, se acabar, os dos dias seguintes (0.3.293: antes ficava vazio a noite)
   const nextItems = useMemo(() => {const t0 = now.getTime() - 5 * 60000, todayKey = now.toDateString(); const seen = new Set<string>(); return [...p.today, ...p.all].filter(r => !isHoliday((r.original || {}) as any) && !isDoneEv(r)).filter(r => {const k = r.title.trim().toLowerCase() + '|' + r.date; if (seen.has(k)) return false; seen.add(k); return true;}).filter(r => {const d = new Date(r.date); return timed(r) ? d.getTime() >= t0 : d.toDateString() !== todayKey && d.getTime() > t0;}).sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).slice(0, 80);}, [p.today, p.all, now.getHours(), now.getMinutes()]);
   // 05/11/2026 (Pedro: "em Agenda proximos coloca o que vai vir so um dia depois... nao de hoje, pro usuario ficar atento"):
@@ -471,6 +471,9 @@ function Timeline({items, next, marks = [], op, actions, nav, onDay}: {items: Da
   // marca colada num compromisso (ex.: conta das 9h e tarefa das 9h) anda um pouco para o lado, para as duas poderem ser tocadas
   if (wS) for (const mp of mpoints) {let tries = 0; while (tries++ < 4 && [...points, ...mpoints].some(o => o !== mp && Math.abs(o.x - mp.x) * wS < 20)) mp.x += 22 / wS;}
   const all = [...points, ...mpoints];
+  // 15/11/2026 (Pedro): clicar no item embaixo do Início abre o balão dele aqui
+  const arrRef = useRef(all); arrRef.current = all;
+  useEffect(() => {const go = () => {const ref = takeArrivalOpen(); if (!ref) return; const hit = arrRef.current.find(q => q.recs.some(r => 'r' + r.id === ref) || q.marks.some(m => markKey(m) === ref)); if (hit) {manualAt.current = Date.now(); setPin(hit.key);}}; const t = setTimeout(go, 0); const off = onArrivalOpen(() => setTimeout(go, 0)); return () => {clearTimeout(t); off();};}, []);
   allRef.current = all;
   const nearPoint = (fx: number) => {const W0 = wS || w || 1; let best: Point | null = null, bd = 15; /* 06/11/2026 (Pedro): no vao entre as bolinhas tem que aparecer o horario + criar; so gruda na bolinha bem perto dela */ for (const q of all) {if (q.x < -0.01 || q.x > 1.01) continue; const dpx = Math.abs(q.x - fx) * W0; if (dpx < bd) {bd = dpx; best = q;}} return best;};
   useEffect(() => {setSettle(o => {const keys = Object.keys(o); if (!keys.length) return o; let ch = false; const n = {...o};

@@ -38,7 +38,7 @@ import type {SofiaApi} from '../lib/api';
 import {watchWebVersion} from '../lib/web-version';
 import type {Entity,Tab} from '../lib/types';
 import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleTitle,createdPage,favoritePages,shortcutPages,toggleShortcutPage,subShortcutPages,toggleSubShortcutPage,setPageFlagSink,setPageList,shortcutPageColors,setShortcutPageColor,sharedPages,pagePath,pagesDirectory,samePages,useDesktopCss,useDesktopKeys,useSidebarCollapsed,useStore} from '../lib/desktop';
-import {currentArrival,onTimelineTimes} from '../lib/timeline-arrivals';
+import {currentArrival,onTimelineTimes,requestArrivalOpen} from '../lib/timeline-arrivals';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
 const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
@@ -53,9 +53,9 @@ type Props={
 const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
 // 15/11/2026 (Pedro: "embaixo de inicio cria um outro nome com o nome da tarefa atual indicando em L... pode ir passando na horizontal"): item atual da linha do tempo embaixo do Início, ligado por um L; se não couber, o texto passa na horizontal
 const NOW_RUN=StyleSheet.create({go:{animationKeyframes:{'0%':{transform:[{translateX:'0%'}]},'100%':{transform:[{translateX:'-50%'}]}},animationTimingFunction:'linear',animationIterationCount:'infinite'} as any});
-function HomeNow({a,onPress}:{a:{title:string;at:number;color?:string;info?:string};onPress:()=>void}){
+function HomeNow({a,onPress}:{a:{title:string;at:number;color?:string;info?:string;ref?:string};onPress:()=>void}){
  const c=useTheme(),[w,setW]=useState(0),[box,setBox]=useState(0),run=box>0&&w>box;
- const text=[a.title,new Date(a.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),a.info].filter(Boolean).join(' · ');
+ const hm=new Date(a.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),text=[a.title,hm,a.info!==hm?a.info:''].filter(Boolean).join(' · ');
  const ts={color:c.muted,fontSize:12.5,flexShrink:0,paddingRight:run?36:0,...({whiteSpace:'nowrap'} as any)};
  return <Pressable testID="desktop-home-now" accessibilityRole="button" accessibilityLabel={'Agora: '+text} onPress={onPress} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:7,minHeight:24,paddingLeft:16,paddingRight:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}>
   <View pointerEvents="none" style={{width:10,height:11,marginTop:-9,flexShrink:0,borderLeftWidth:1.5,borderBottomWidth:1.5,borderColor:c.muted,borderBottomLeftRadius:5,opacity:0.6}}/>
@@ -121,12 +121,16 @@ function Row({dot,onDot,small,onAuxOpen,icon,emoji,label,selected,onPress,depth=
  </Pressable>;
 }
 
-function Section({title,children,action,onTitle}:{title:string;children:React.ReactNode;action?:React.ReactNode;onTitle?:()=>void}){
+function Section({title,children,action,onTitle,fold}:{title:string;children:React.ReactNode;action?:React.ReactNode;onTitle?:()=>void;fold?:string}){
  const c=useTheme(),label=title.charAt(0)+title.slice(1).toLowerCase();
+ // 15/11/2026 (Pedro: "Apps ter a seta igual a do subgrupo"): seta que recolhe a secao; fica guardada
+ const [shut,setShut]=useState(()=>{try{return !!fold&&localStorage.getItem('sofia.desktop.fold.'+fold)==='1';}catch{return false;}});
+ const toggle=()=>setShut(v=>{try{localStorage.setItem('sofia.desktop.fold.'+fold,v?'0':'1');}catch{}return !v;});
+ const arrow=fold?<Pressable testID={'sidebar-fold-'+fold} accessibilityRole="button" accessibilityLabel={(shut?'Mostrar ':'Esconder ')+label} hitSlop={4} onPress={toggle} style={({hovered:h}:any)=>({marginLeft:4,width:16,height:16,borderRadius:4,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent'})}><View style={{transform:[{rotate:shut?'-90deg':'90deg'}]}}><Icon name="chevron" size={11} color={c.muted}/></View></Pressable>:null;
  // 13/11/2026 (Pedro: "Paginas ter um link proprio, clicar e la ter os itens"): o titulo da secao vira link (abre /paginas)
  return <View style={{marginTop:18}}>
-  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}>{onTitle?<Pressable accessibilityRole="link" accessibilityLabel={'Abrir '+label} testID={'sidebar-section-'+label} onPress={onTitle} style={({hovered}:any)=>({flex:1,alignSelf:'flex-start',flexDirection:'row'})}>{({hovered}:any)=><Text style={{color:hovered?c.text:c.muted,fontSize:12,fontWeight:'600',textDecorationLine:hovered?'underline':'none'}}>{label}</Text>}</Pressable>:<Text style={{flex:1,color:c.muted,fontSize:12,fontWeight:'600'}}>{label}</Text>}{action}</View>
-  {children}
+  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}>{onTitle?<Pressable accessibilityRole="link" accessibilityLabel={'Abrir '+label} testID={'sidebar-section-'+label} onPress={onTitle} style={({hovered}:any)=>({flex:1,alignSelf:'flex-start',flexDirection:'row'})}>{({hovered}:any)=><Text style={{color:hovered?c.text:c.muted,fontSize:12,fontWeight:'600',textDecorationLine:hovered?'underline':'none'}}>{label}</Text>}</Pressable>:fold?<Pressable onPress={toggle} style={{flex:1,flexDirection:'row',alignItems:'center'}}><Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>{label}</Text>{arrow}</Pressable>:<Text style={{flex:1,color:c.muted,fontSize:12,fontWeight:'600'}}>{label}</Text>}{action}</View>
+  {shut?null:children}
  </View>;
 }
 
@@ -339,7 +343,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   const RO=(globalThis as any).ResizeObserver,ro=RO?new RO(()=>{if(el.scrollTop<sideScroll.top-1&&el.scrollHeight-el.clientHeight>=sideScroll.top-1)el.scrollTop=sideScroll.top;}):null;ro?.observe(el.firstElementChild||el);
   el.addEventListener('scroll',onS,{passive:true});return()=>{el.removeEventListener('scroll',onS);ro?.disconnect();};},[collapsed]);
  // 14/11/2026: ponto ao lado do Início: fica enquanto o último item que chegou não for feito (evento: até 5 min depois do fim)
- const [arrived,setArrived]=useState<{title:string;at:number;color?:string;info?:string}|null>(null);
+ const [arrived,setArrived]=useState<{title:string;at:number;color?:string;info?:string;ref?:string}|null>(null);
  useEffect(()=>{const tick=()=>setArrived(currentArrival());tick();const off=onTimelineTimes(tick),id=setInterval(tick,15000);return ()=>{off();clearInterval(id);};},[]);
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
@@ -392,9 +396,9 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     <Row icon="search" label="Buscar" hint="Ctrl+K" collapsed={collapsed} onPress={()=>setPalette(true)}/>
     <View style={{height:8}}/>
     {/* 0.3.267: Páginas e Apps já aparecem nas seções de baixo e o Perfil abre pela foto no topo */}
-    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><React.Fragment key={t}><Row testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text {...({"data-color":arrived.color} as any)} testID="desktop-home-arrived" accessibilityLabel={"Chegou: "+arrived.title} ref={(n:any)=>{const tip=arrived.title+" · "+new Date(arrived.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});n?.setAttribute?.("title",tip);}} style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",top:"50%",marginTop:-5,lineHeight:10,color:arrived.color||c.accent,fontSize:7}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>{t==='home'&&arrived&&!collapsed?<HomeNow a={arrived} onPress={()=>onNavigate('home')}/>:null}</React.Fragment>)}
+    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><React.Fragment key={t}><Row testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text {...({"data-color":arrived.color} as any)} testID="desktop-home-arrived" accessibilityLabel={"Chegou: "+arrived.title} ref={(n:any)=>{const tip=arrived.title+" · "+new Date(arrived.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});n?.setAttribute?.("title",tip);}} style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",top:"50%",marginTop:-5,lineHeight:10,color:arrived.color||c.accent,fontSize:7}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>{t==='home'&&arrived&&!collapsed?<HomeNow a={arrived} onPress={()=>{onNavigate('home');if(arrived.ref)requestArrivalOpen(arrived.ref);}}/>:null}</React.Fragment>)}
     {collapsed?null:<>
-     <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)} onAuxOpen={()=>openTab(routeToPath({tab:'apps',module:a.id}))}/>)}</Section>
+     <Section title="Apps" fold="apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)} onAuxOpen={()=>openTab(routeToPath({tab:'apps',module:a.id}))}/>)}</Section>
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}
      <UpcomingEvents api={api} onOpen={()=>onNavigate('agenda')}/>
      {/* 14/11/2026 (Pedro: "tira esses atalhos, os outros ja e suficiente"): secao Atalhos do topo removida; ficam os subatalhos da arvore */}
