@@ -338,10 +338,15 @@ const sideScroll={top:0};
 export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onOpenPage,onCreatePage,children}:Props){
  const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[sideW,setSideW]=useSidebarWidth(),[palette,setPalette]=useState(false);
  const sideRef=useRef<any>(null);
- useEffect(()=>{const sv=sideRef.current,el:any=sv?.getScrollableNode?.()||sv;if(!el?.addEventListener)return;let h=el.scrollHeight;if(sideScroll.top)el.scrollTop=sideScroll.top;
-  const onS=()=>{if(el.scrollHeight===h)sideScroll.top=el.scrollTop;else h=el.scrollHeight;};
-  const RO=(globalThis as any).ResizeObserver,ro=RO?new RO(()=>{if(el.scrollTop<sideScroll.top-1&&el.scrollHeight-el.clientHeight>=sideScroll.top-1)el.scrollTop=sideScroll.top;}):null;ro?.observe(el.firstElementChild||el);
-  el.addEventListener('scroll',onS,{passive:true});return()=>{el.removeEventListener('scroll',onS);ro?.disconnect();};},[collapsed]);
+ // 15/11/2026 (Pedro: recolher subatalhos fazia o topo da barra descer): quando a lista encolhe, um espaco no fim segura
+ // a posicao (o que esta em cima fica parado e o de baixo sobe); o espaco some conforme a pessoa rola para cima
+ useEffect(()=>{const sv=sideRef.current,el:any=sv?.getScrollableNode?.()||sv;if(!el?.addEventListener)return;const box:any=el.firstElementChild;let h=el.scrollHeight,spacer=0;
+  const fit=(grow:boolean)=>{if(!box?.style)return;const natural=box.offsetHeight-spacer,need=Math.max(0,Math.ceil(sideScroll.top+el.clientHeight-natural)),next=grow?need:Math.min(spacer,need);
+   if(next!==spacer){spacer=next;box.style.paddingBottom=(24+spacer)+'px';}if(grow&&Math.abs(el.scrollTop-sideScroll.top)>1)el.scrollTop=sideScroll.top;h=el.scrollHeight;};
+  if(sideScroll.top){el.scrollTop=sideScroll.top;}
+  const onS=()=>{if(el.scrollHeight!==h){h=el.scrollHeight;return;}sideScroll.top=el.scrollTop;fit(false);};
+  const RO=(globalThis as any).ResizeObserver,ro=RO?new RO(()=>fit(true)):null;ro?.observe(box||el);
+  el.addEventListener('scroll',onS,{passive:true});return()=>{el.removeEventListener('scroll',onS);ro?.disconnect();if(box?.style)box.style.paddingBottom='';};},[collapsed]);
  // 14/11/2026: ponto ao lado do Início: fica enquanto o último item que chegou não for feito (evento: até 5 min depois do fim)
  const [arrived,setArrived]=useState<{title:string;at:number;color?:string;info?:string;ref?:string}|null>(null);
  useEffect(()=>{const tick=()=>setArrived(currentArrival());tick();const off=onTimelineTimes(tick),id=setInterval(tick,15000);return ()=>{off();clearInterval(id);};},[]);
