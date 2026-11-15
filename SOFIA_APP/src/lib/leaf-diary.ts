@@ -66,3 +66,14 @@ export function leafToDiary(leaf:Leaf,blocks:readonly LeafBlock[],times:Map<stri
   const bc=(b as any).created_at;if(bc){sources.block++;return new Date(bc);}sources.note++;return leaf.created_at?new Date(leaf.created_at):new Date();});
  return {blocks:next,sources};
 }
+/** 15/11/2026 (Pedro: "isso é grave, não pode acontecer"): a hora do registro é fixa. Escrevendo na linha, o texto
+ * nunca entra na hora (roxo/negrito) nem apaga os minutos: "20:Poder…" volta a "20:06  Poder…" com só a hora roxa.
+ * Linha apagada inteira continua podendo sumir. Devolve o texto/marcas certos e quanto o cursor anda. */
+export function guardLeafEntry(prev:LeafBlock,next:{text:string;marks:LeafBlock['marks']}):{text:string;marks:LeafBlock['marks'];shift:number}{
+ const was=String(prev.text||''),m=was.match(/^(\d{2}:\d{2})\s\s/);
+ if(!m||!next.text.trim())return {...next,shift:0};
+ const time=m[1],raw=next.text.startsWith(time)?next.text.slice(time.length):next.text.replace(/^\d{0,2}:?\d{0,2}/,'');
+ const rest=raw.replace(/^[\s ]+/,''),from=next.text.length-rest.length,text=`${time}  ${rest}`,move=time.length+2-from;
+ const body=(next.marks||[]).filter(k=>!(k.bold&&k.color===DIARY_TIME_COLOR)).map(k=>({...k,start:Math.max(k.start,from)+move,end:k.end+move})).filter(k=>k.end>k.start&&k.start>=time.length+2);
+ return {text,marks:[{start:0,end:time.length,bold:true,color:DIARY_TIME_COLOR},...body],shift:text.length-next.text.length};
+}

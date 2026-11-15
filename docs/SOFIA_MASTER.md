@@ -382,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Início: ponto menor; embaixo do Início, em L, o item atual da linha do tempo (título · hora · tipo), com texto que passa na horizontal quando não cabe | tsc ok; testes ok (só o 061 falha neste PC, falta Java); site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Item embaixo do Início: clique abre o balão dele na linha do tempo; hora não repete. "Apps" na barra com seta para recolher (guardada). | tsc ok; testes do delta 180/182 (2 falhas já existiam) |
 | 2026-11-15 | (sem APK) | (este) | Conversa no site vira lista estilo WhatsApp: Sofia como contato e as páginas em balões; escrever, áudio e anexo gravam na página; principal x Arquivadas (`chat_main`, aceito no servidor) | tsc e testes da mudança verdes; site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Conversa no site: link mostra prévia no campo (com X) e no balão; YouTube com capa, título e canal (oEmbed), outros sites pelo leitor do servidor | testes/tsc/site ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Prévia de link: cartão baixo com miniatura à esquerda (tamanho WhatsApp); título/canal do YouTube pelo servidor (oEmbed) e site passa a mostrar imagens https externas | testes ok; não conferido na tela |
+| 2026-11-15 | (sem APK) | (este) | Notas com Diário: hora do registro fixa (escrever não apaga os minutos nem pinta o texto de roxo; "20:Poder…" volta a "20:06  Poder…") | teste novo ok; 4 falhas antigas de notas seguem |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
