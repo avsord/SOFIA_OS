@@ -51,6 +51,22 @@ type Props={
 
 /** Le as paginas para a arvore da barra lateral sem esperar a aba Paginas abrir. */
 const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
+// 15/11/2026 (Pedro: "embaixo de inicio cria um outro nome com o nome da tarefa atual indicando em L... pode ir passando na horizontal"): item atual da linha do tempo embaixo do Início, ligado por um L; se não couber, o texto passa na horizontal
+const NOW_RUN=StyleSheet.create({go:{animationKeyframes:{'0%':{transform:[{translateX:'0%'}]},'100%':{transform:[{translateX:'-50%'}]}},animationTimingFunction:'linear',animationIterationCount:'infinite'} as any});
+function HomeNow({a,onPress}:{a:{title:string;at:number;color?:string;info?:string};onPress:()=>void}){
+ const c=useTheme(),[w,setW]=useState(0),[box,setBox]=useState(0),run=box>0&&w>box;
+ const text=[a.title,new Date(a.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),a.info].filter(Boolean).join(' · ');
+ const ts={color:c.muted,fontSize:12.5,flexShrink:0,paddingRight:run?36:0,...({whiteSpace:'nowrap'} as any)};
+ return <Pressable testID="desktop-home-now" accessibilityRole="button" accessibilityLabel={'Agora: '+text} onPress={onPress} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:7,minHeight:24,paddingLeft:16,paddingRight:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}>
+  <View pointerEvents="none" style={{width:10,height:11,marginTop:-9,flexShrink:0,borderLeftWidth:1.5,borderBottomWidth:1.5,borderColor:c.muted,borderBottomLeftRadius:5,opacity:0.6}}/>
+  <View onLayout={(e:any)=>setBox(e.nativeEvent.layout.width)} style={{flex:1,minWidth:0,overflow:'hidden',flexDirection:'row'}}>
+   <View testID="desktop-home-now-run" style={[{flexDirection:'row',flexShrink:0},run?NOW_RUN.go:null,run?({animationDuration:Math.max(8,Math.round(w/28))+'s'} as any):null]}>
+    <Text onLayout={(e:any)=>setW(e.nativeEvent.layout.width)} style={ts}>{text}</Text>
+    {run?<Text aria-hidden style={ts}>{text}</Text>:null}
+   </View>
+  </View>
+ </Pressable>;
+}
 let trashSwept=false;
 function usePageDirectory(api:SofiaApi){
  const all=useStore(pagesDirectory);
@@ -323,7 +339,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   const RO=(globalThis as any).ResizeObserver,ro=RO?new RO(()=>{if(el.scrollTop<sideScroll.top-1&&el.scrollHeight-el.clientHeight>=sideScroll.top-1)el.scrollTop=sideScroll.top;}):null;ro?.observe(el.firstElementChild||el);
   el.addEventListener('scroll',onS,{passive:true});return()=>{el.removeEventListener('scroll',onS);ro?.disconnect();};},[collapsed]);
  // 14/11/2026: ponto ao lado do Início: fica enquanto o último item que chegou não for feito (evento: até 5 min depois do fim)
- const [arrived,setArrived]=useState<{title:string;at:number;color?:string}|null>(null);
+ const [arrived,setArrived]=useState<{title:string;at:number;color?:string;info?:string}|null>(null);
  useEffect(()=>{const tick=()=>setArrived(currentArrival());tick();const off=onTimelineTimes(tick),id=setInterval(tick,15000);return ()=>{off();clearInterval(id);};},[]);
  // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
  const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
@@ -376,7 +392,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     <Row icon="search" label="Buscar" hint="Ctrl+K" collapsed={collapsed} onPress={()=>setPalette(true)}/>
     <View style={{height:8}}/>
     {/* 0.3.267: Páginas e Apps já aparecem nas seções de baixo e o Perfil abre pela foto no topo */}
-    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><Row key={t} testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text {...({"data-color":arrived.color} as any)} testID="desktop-home-arrived" accessibilityLabel={"Chegou: "+arrived.title} ref={(n:any)=>{const tip=arrived.title+" · "+new Date(arrived.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});n?.setAttribute?.("title",tip);}} style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",color:arrived.color||c.accent,fontSize:12}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>)}
+    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><React.Fragment key={t}><Row testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} trailing={t==='home'&&arrived?<Text {...({"data-color":arrived.color} as any)} testID="desktop-home-arrived" accessibilityLabel={"Chegou: "+arrived.title} ref={(n:any)=>{const tip=arrived.title+" · "+new Date(arrived.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});n?.setAttribute?.("title",tip);}} style={{position:"relative",color:"transparent"}}>Ctrl+K<Text style={{position:"absolute",left:0,right:0,textAlign:"center",top:"50%",marginTop:-5,lineHeight:10,color:arrived.color||c.accent,fontSize:7}}>●</Text></Text>:undefined} collapsed={collapsed} onPress={()=>onNavigate(t)} onAuxOpen={()=>openTab(routeToPath({tab:t,module:''}))}/>{t==='home'&&arrived&&!collapsed?<HomeNow a={arrived} onPress={()=>onNavigate('home')}/>:null}</React.Fragment>)}
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)} onAuxOpen={()=>openTab(routeToPath({tab:'apps',module:a.id}))}/>)}</Section>
      {/* 0.3.267: como no Notion — próximos eventos da agenda e páginas favoritas na barra lateral */}

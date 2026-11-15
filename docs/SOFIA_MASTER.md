@@ -18,6 +18,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
+- 2026-11-15, Claude Code (PC PEDRO). Pronto, só site (sem APK): ponto ao lado do Início menor (7 px); embaixo do Início, ligada por um L, uma linha com o item atual da linha do tempo ("título · hora · Tarefa/Evento/Lembrete ou o detalhe da conta/rotina"), que passa na horizontal quando não cabe e some junto com o ponto (`HomeNow` em `src/desktop/DesktopShell.tsx`, `info` em `src/lib/timeline-arrivals.ts`, teste `tests/tarefa-atual-inicio-15-11.test.cjs`). Próximo passo: Pedro confere no site o tamanho do ponto, o L e a velocidade do texto.
 - 2026-11-14, Claude Code (PC PEDRO). Pronto, só site (sem APK): (1) clique direito numa palavra das Páginas abre só o menu da Sofia com "Correção" no topo (sugestões pela IA, rota `/api/mobile/spell`; Shift+clique direito ainda abre o menu do navegador); (2) Diário: linha editada 10 min ou mais depois de criada guarda `edited_at` (src/core/block-stamps.js) e mostra "editado HH:MM" / "editado dd/mm HH:MM" no fim da linha (Páginas e Notas); (3b) correção no menu da Sofia GENERALIZADA: todo campo de texto do site (Notas, Quadro, buscas, formulários) por `src/lib/web-spell-menu.ts` (+ Recortar/Copiar/Colar); bolinhas da barra lateral redondas; (3) imagem: cantos de escala aparecem com o mouse em cima (CSS) e, selecionada, Delete/Backspace apaga.
 - Também: seletor de data/hora novo no padrão Notion (desenho aprovado 14/11): início e fim digitáveis, lista de 15 em 15 min, "Horário final" que desliga (sem fim = só o ponto), sem "Confirmar"; Google: fim automático (duração padrão) vira sem fim (`src/services/google.js`).
 - Próximo passo: Pedro entra de novo uma vez (sessões antigas ainda vencem em 12 h) e confere que não desloga mais; confere o ponto do Início (cor do item, evento sai 5 min depois de começar).
@@ -276,6 +277,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **(15/11)** Pedro confere no site: ponto do Início menor e a linha em L embaixo do Início com o item atual passando na horizontal (dizer se a velocidade e o tamanho estão bons).
 - **(14/11 tarde)** Pedro liga o "✎ Modelo Diário" na nota "ideias" e confere a hora de cada linha (o aviso diz quantas vieram do histórico e quantas caíram na data de criação da nota); notas avulsas (fora das pastas) guardam a escolha mas não têm histórico de versões por linha.
 - **(14/11 09:00)** Pedro confere a barra lateral igual nos 2 navegadores (recarregar o navegador que tinha as cores sobe para a conta), o ponto do agora pulsando, e o Diário na largura de antes. Decidir: clique com a rodinha abrir página em nova guia (desde 09/11) fica ou sai.
 - 14/11: Pedro conferir no site: seletor de cor, biblioteca de capas, página sem pular ao digitar, sinal ⇪ do Caps Lock, barra sem a seção Atalhos.
@@ -379,11 +381,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | (este) | Notas: Backspace no começo da linha apaga a linha vazia/junta com a de cima; setas ↑/↓ passam de linha; Início: auréola do "agora" centrada no ponto em tela maior | tsc ok, testes ok, site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Clique direito no texto: só o menu da Sofia, com "Correção" no topo (servidor /api/mobile/spell pela IA). Diário: linha mudada 10 min+ depois ganha edited_at e mostra "editado HH:MM" (ou dd/mm) nas Páginas e Notas | testes da mudança verdes; site recompilado |
 | 2026-11-14 | (sem APK) | (este) | Notas: no monitor grande (janela ≥1600 px) o texto fica um pouco menor e igual em todas (corpo 15, títulos 26/22/18, título da nota 29); abaixo disso nada muda. | tsc ok; testes ok (só o 061 falha por falta de Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Ponto ao lado do Início (e no ícone, barra recolhida; centro do Ctrl+K) quando chega um item da linha do tempo: na cor do item; fica até ser feito, evento até 5 min depois de começar, passa ao próximo que chegar; nome no mouse em cima (`src/lib/timeline-arrivals.ts`). | tsc ok; testes ok (só o 061 falha: sem Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Login: sessão do servidor vale 30 dias (antes vencia 12 h depois do login, mesmo em uso, e o site deslogava sozinho); login guardado já vencido abre direto no login, sem mostrar o conteúdo por 1 s. | testes auth do servidor ok; tsc e testes do app ok |
+| 2026-11-15 | (sem APK) | (este) | Início: ponto menor; embaixo do Início, em L, o item atual da linha do tempo (título · hora · tipo), com texto que passa na horizontal quando não cabe | tsc ok; testes ok (só o 061 falha neste PC, falta Java); site recompilado; não conferido na tela |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
