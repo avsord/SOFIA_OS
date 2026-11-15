@@ -313,8 +313,15 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
  </Modal>;
 }
 
+// 15/11/2026 (Pedro: excluir fez a barra lateral subir): a posicao da barra fica guardada; se a lista encolher por um instante (recarregando paginas), volta para onde estava
+const sideScroll={top:0};
 export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onOpenPage,onCreatePage,children}:Props){
  const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[sideW,setSideW]=useSidebarWidth(),[palette,setPalette]=useState(false);
+ const sideRef=useRef<any>(null);
+ useEffect(()=>{const sv=sideRef.current,el:any=sv?.getScrollableNode?.()||sv;if(!el?.addEventListener)return;let h=el.scrollHeight;if(sideScroll.top)el.scrollTop=sideScroll.top;
+  const onS=()=>{if(el.scrollHeight===h)sideScroll.top=el.scrollTop;else h=el.scrollHeight;};
+  const RO=(globalThis as any).ResizeObserver,ro=RO?new RO(()=>{if(el.scrollTop<sideScroll.top-1&&el.scrollHeight-el.clientHeight>=sideScroll.top-1)el.scrollTop=sideScroll.top;}):null;ro?.observe(el.firstElementChild||el);
+  el.addEventListener('scroll',onS,{passive:true});return()=>{el.removeEventListener('scroll',onS);ro?.disconnect();};},[collapsed]);
  // 14/11/2026: ponto ao lado do Início: fica enquanto o último item que chegou não for feito (evento: até 5 min depois do fim)
  const [arrived,setArrived]=useState<{title:string;at:number;color?:string}|null>(null);
  useEffect(()=>{const tick=()=>setArrived(currentArrival());tick();const off=onTimelineTimes(tick),id=setInterval(tick,15000);return ()=>{off();clearInterval(id);};},[]);
@@ -365,7 +372,7 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
     <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'600',fontSize:16}}>Sofia OS</Text></>}
     <Pressable testID="desktop-sidebar-toggle" accessibilityRole="button" accessibilityLabel={collapsed?'Mostrar barra lateral':'Recolher barra lateral'} onPress={()=>setCollapsed(!collapsed)} style={({hovered}:any)=>({padding:6,borderRadius:7,backgroundColor:hovered?c.line:'transparent'})}><Icon name="sidebar" size={18} color={c.muted}/></Pressable>
    </View>
-   <ScrollView testID="desktop-sidebar-scroll" keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>
+   <ScrollView ref={sideRef} testID="desktop-sidebar-scroll" keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>
     <Row icon="search" label="Buscar" hint="Ctrl+K" collapsed={collapsed} onPress={()=>setPalette(true)}/>
     <View style={{height:8}}/>
     {/* 0.3.267: Páginas e Apps já aparecem nas seções de baixo e o Perfil abre pela foto no topo */}
