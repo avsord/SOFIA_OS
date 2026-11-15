@@ -115,6 +115,11 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
  const view=d.views.find(v=>v.id===d.active_view)||d.views[0];
  const [search,setSearch]=useState<string|null>(null);
  const [menu,setMenuRaw]=useState<Menu|null>(null),[menuQ,setMenuQ]=useState('');
+ // Menu sempre inteiro na tela: mede depois de abrir e empurra para dentro (direita e embaixo)
+ const menuRef=useRef<HTMLDivElement>(null);
+ useLayoutEffect(()=>{const el=menuRef.current;if(!el||!menu)return;el.style.margin='0';el.style.maxHeight='';const r=el.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight;
+  let dx=0,dy=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;if(r.bottom>H-8)dy=Math.max(8-r.top,H-8-r.bottom);
+  if(dx||dy)el.style.margin=`${dy}px 0 0 ${dx}px`;const top=r.top+dy;if(top+r.height>H-8)el.style.maxHeight=Math.max(120,H-16-top)+'px';},[menu]);
  const setMenu=(m:Menu|null)=>{setMenuQ('');setMenuRaw(m);};
  const [peek,setPeek]=useState<{id:string;mode:'side'|'center'|'full'}|null>(null);
  const [toast,setToast]=useState<{text:string;undo?:()=>void}|null>(null);
@@ -564,7 +569,7 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
   {!rows.length&&(search||filters.length)?<div style={{color:'var(--m)',fontSize:13,padding:'6px 4px'}}>Nenhum item com {search?'essa busca':'esses filtros'}.</div>:null}
   {typeof document!=='undefined'?createPortal(<div className="sdb sdb-portal">
    {menu?<><div style={{position:'fixed',inset:0,zIndex:3999}} onMouseDown={()=>setMenu(null)} onContextMenu={e=>{e.preventDefault();setMenu(null);}}/>
-    <div className="sdb-menu" style={{left:menu.x,top:menu.y,width:menu.w}} onMouseDown={e=>e.stopPropagation()} role="menu" onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();e.preventDefault();setMenu(null);}}}>{menuBody()}</div></>:null}
+    <div ref={menuRef} className="sdb-menu" style={{left:menu.x,top:menu.y,width:menu.w}} onMouseDown={e=>e.stopPropagation()} role="menu" onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();e.preventDefault();setMenu(null);}}}>{menuBody()}</div></>:null}
    {peekPanel()}
    {toast?<div className="sdb-toast" role="status">{toast.text}{toast.undo?<button onClick={()=>{toast.undo?.();setToast(null);}}>Desfazer</button>:null}<button aria-label="Fechar aviso" onClick={()=>setToast(null)}>×</button></div>:null}
   </div>,document.body):null}
