@@ -18,10 +18,9 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
-- 2026-11-15, Claude Code (PC PEDRO). Pronto, só site (sem APK): ponto ao lado do Início menor (7 px); embaixo do Início, ligada por um L, uma linha com o item atual da linha do tempo ("título · hora · Tarefa/Evento/Lembrete ou o detalhe da conta/rotina"), que passa na horizontal quando não cabe e some junto com o ponto (`HomeNow` em `src/desktop/DesktopShell.tsx`, `info` em `src/lib/timeline-arrivals.ts`, teste `tests/tarefa-atual-inicio-15-11.test.cjs`). Próximo passo: Pedro confere no site o tamanho do ponto, o L e a velocidade do texto.
-- 2026-11-14, Claude Code (PC PEDRO). Pronto, só site (sem APK): (1) clique direito numa palavra das Páginas abre só o menu da Sofia com "Correção" no topo (sugestões pela IA, rota `/api/mobile/spell`; Shift+clique direito ainda abre o menu do navegador); (2) Diário: linha editada 10 min ou mais depois de criada guarda `edited_at` (src/core/block-stamps.js) e mostra "editado HH:MM" / "editado dd/mm HH:MM" no fim da linha (Páginas e Notas); (3b) correção no menu da Sofia GENERALIZADA: todo campo de texto do site (Notas, Quadro, buscas, formulários) por `src/lib/web-spell-menu.ts` (+ Recortar/Copiar/Colar); bolinhas da barra lateral redondas; (3) imagem: cantos de escala aparecem com o mouse em cima (CSS) e, selecionada, Delete/Backspace apaga.
-- Também: seletor de data/hora novo no padrão Notion (desenho aprovado 14/11): início e fim digitáveis, lista de 15 em 15 min, "Horário final" que desliga (sem fim = só o ponto), sem "Confirmar"; Google: fim automático (duração padrão) vira sem fim (`src/services/google.js`).
-- Próximo passo: Pedro entra de novo uma vez (sessões antigas ainda vencem em 12 h) e confere que não desloga mais; confere o ponto do Início (cor do item, evento sai 5 min depois de começar).
+- 2026-11-15 noite, Claude Code (PC PEDRO). Pronto, só site (sem APK): a aba Conversa no computador virou uma lista de conversas estilo WhatsApp (`SOFIA_APP/src/screens/ChatHub.tsx`, regras em `src/lib/page-chat.ts`). A Sofia é a primeira conversa (o chat de sempre); as outras são as páginas, lidas em balões (um por bloco). Escrever, gravar áudio (mic) ou anexar grava na página (texto vira bloco com hora; áudio e arquivo viram bloco de arquivo). Tocar no balão: Editar/Apagar. "+" cria página, "Subpágina" cria filha, "Abrir página" leva à página. Principal x Arquivadas: campo `chat_main` da página (alfinete traz, caixa arquiva); o servidor ganhou esse campo no catálogo (`src/core/catalog.js`). Páginas com senha não entram. Celular/app e tela estreita continuam só com o chat da Sofia.
+- Não conferido na tela (sem login aqui): só testes (`tests/chat-paginas-15-11.test.cjs`), tsc e site recompilado.
+- Próximo passo: Pedro abre Conversa no site, puxa páginas das Arquivadas, escreve, grava áudio e anexa; diz o que ajustar (desenho aprovado no chat em 15/11, quadro simples).
 
 ## 1. O dono e a forma de trabalhar
 
@@ -246,6 +245,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Só web por enquanto (14/11/2026, Pedro):** "tira a versão celular no lugar agora, só web". O padrão Notion (base de dados, painel, avisos) é feito só no site do computador; celular e app Android ficam com o que já existe e saem da lista de prioridades até ele pedir.
 - **14/11/2026 (Pedro):** pontos da linha do tempo do Início que ficam juntos/sobrepostos fazem parte da ideia (viram grupo). O achado "botões em cima de outros" da Mimic no /inicio não é defeito.
 - 2026-11-14 (Pedro: "para de ficar tentando corrigir o apk, depois atualizamos ele, isso está gastando token"): em ajustes rápidos, só o site; APK e testes que já falhavam ficam para quando ele pedir.
+- **15/11 (Pedro): Conversa = lista estilo WhatsApp ligada às páginas.** A Sofia é um contato; cada página é uma conversa (balão = bloco) e o que se escreve ali grava na página. Todas as páginas existem no chat: as que ele puxa ficam na principal, o resto em Arquivadas (arquivar aqui não mexe na barra lateral nem apaga nada). Precisa ter mic e anexos como no WhatsApp.
 
 ## 8. Regras que não se quebram
 - **Drive (07/11):** antes de mexer no Drive e depois de publicar, ler `[drive-teste]` e `[drive]` no registro do Railway; defeito que aparecer ali se corrige sem esperar o Pedro relatar.
@@ -277,6 +277,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **(15/11 noite)** Pedro confere no site a Conversa estilo WhatsApp: lista de páginas, balões, escrever/áudio/anexo gravando na página, Arquivadas x principal, criar página e subpágina. Falta: notas (folhas) dentro da página como conversa; celular/app.
 - **(15/11)** Pedro confere no site: ponto do Início menor e a linha em L embaixo do Início com o item atual passando na horizontal (dizer se a velocidade e o tamanho estão bons).
 - **(14/11 tarde)** Pedro liga o "✎ Modelo Diário" na nota "ideias" e confere a hora de cada linha (o aviso diz quantas vieram do histórico e quantas caíram na data de criação da nota); notas avulsas (fora das pastas) guardam a escolha mas não têm histórico de versões por linha.
 - **(14/11 09:00)** Pedro confere a barra lateral igual nos 2 navegadores (recarregar o navegador que tinha as cores sobe para a conta), o ponto do agora pulsando, e o Diário na largura de antes. Decidir: clique com a rodinha abrir página em nova guia (desde 09/11) fica ou sai.
@@ -381,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-14 | (sem APK) | (este) | Notas: no monitor grande (janela ≥1600 px) o texto fica um pouco menor e igual em todas (corpo 15, títulos 26/22/18, título da nota 29); abaixo disso nada muda. | tsc ok; testes ok (só o 061 falha por falta de Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Ponto ao lado do Início (e no ícone, barra recolhida; centro do Ctrl+K) quando chega um item da linha do tempo: na cor do item; fica até ser feito, evento até 5 min depois de começar, passa ao próximo que chegar; nome no mouse em cima (`src/lib/timeline-arrivals.ts`). | tsc ok; testes ok (só o 061 falha: sem Java no PC) |
 | 2026-11-14 | (sem APK) | (este) | Login: sessão do servidor vale 30 dias (antes vencia 12 h depois do login, mesmo em uso, e o site deslogava sozinho); login guardado já vencido abre direto no login, sem mostrar o conteúdo por 1 s. | testes auth do servidor ok; tsc e testes do app ok |
 | 2026-11-15 | (sem APK) | (este) | Início: ponto menor; embaixo do Início, em L, o item atual da linha do tempo (título · hora · tipo), com texto que passa na horizontal quando não cabe | tsc ok; testes ok (só o 061 falha neste PC, falta Java); site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Item embaixo do Início: clique abre o balão dele na linha do tempo; hora não repete. "Apps" na barra com seta para recolher (guardada). | tsc ok; testes do delta 180/182 (2 falhas já existiam) |
+| 2026-11-15 | (sem APK) | (este) | Conversa no site vira lista estilo WhatsApp: Sofia como contato e as páginas em balões; escrever, áudio e anexo gravam na página; principal x Arquivadas (`chat_main`, aceito no servidor) | tsc e testes da mudança verdes; site recompilado; não conferido na tela |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

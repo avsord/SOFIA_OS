@@ -29,7 +29,7 @@ function lazyScreen(name:string,load:()=>Promise<Screen>):Screen{
 export const loadHomeCommitmentEditor=()=>once('home-commitment-editor',()=>require('../components/HomeCommitmentEditor').HomeCommitmentEditor);
 export const loadHomeTaskDetails=()=>once('home-task-details',()=>require('../components/HomeTaskDetails').HomeTaskDetails);
 export const loadHome=()=>once('home',()=>require('../screens/Home').Home);
-export const loadChat=()=>lazyScreen('chat',()=>import('../screens/Chat').then(m=>m.Chat));
+export const loadChat=()=>lazyScreen('chat',()=>import('../screens/ChatHub').then(m=>m.ChatHub));
 export const loadPages=()=>lazyScreen('pages',()=>import('../screens/Pages').then(m=>m.Pages));
 export const loadAgenda=()=>lazyScreen('agenda',()=>import('../screens/Agenda').then(m=>m.Agenda));
 export const loadWorkspace=()=>lazyScreen('apps',()=>import('../screens/Workspace').then(m=>m.Workspace));

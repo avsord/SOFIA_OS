@@ -953,7 +953,8 @@ const CATALOG={
       {"key":"sidebar_fav","label":"Favorita na barra lateral","type":"flag","developerOnly":true},
       {"key":"sidebar_shortcut","label":"Atalho na barra lateral","type":"flag","developerOnly":true},
       {"key":"sidebar_color","label":"Cor do ponto na barra lateral","type":"text","max":20,"developerOnly":true},
-      {"key":"sidebar_colors","label":"Cores dos pontos das notas na barra lateral","type":"colormap","developerOnly":true}
+      {"key":"sidebar_colors","label":"Cores dos pontos das notas na barra lateral","type":"colormap","developerOnly":true},
+      {"key":"chat_main","label":"Na lista principal da Conversa","type":"flag","developerOnly":true}
     ],
     "description": "Espaço ou página personalizável do usuário. Espaços raiz aparecem em Seus Espaços; páginas podem ficar aninhadas dentro deles.",
     "defaultPrivacy": "private"
