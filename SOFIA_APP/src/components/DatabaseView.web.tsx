@@ -115,11 +115,13 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
  const view=d.views.find(v=>v.id===d.active_view)||d.views[0];
  const [search,setSearch]=useState<string|null>(null);
  const [menu,setMenuRaw]=useState<Menu|null>(null),[menuQ,setMenuQ]=useState('');
- // Menu sempre inteiro na tela: mede depois de abrir e empurra para dentro (direita e embaixo)
- const menuRef=useRef<HTMLDivElement>(null);
- useLayoutEffect(()=>{const el=menuRef.current;if(!el||!menu)return;el.style.margin='0';el.style.maxHeight='';const r=el.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight;
-  let dx=0,dy=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;if(r.bottom>H-8)dy=Math.max(8-r.top,H-8-r.bottom);
-  if(dx||dy)el.style.margin=`${dy}px 0 0 ${dx}px`;const top=r.top+dy;if(top+r.height>H-8)el.style.maxHeight=Math.max(120,H-16-top)+'px';},[menu]);
+ // Menu como no Notion: preso ao botão que abriu (alinha pela direita quando não cabe), abre para baixo e rola por dentro;
+ // só sobe para cima do botão se embaixo não couber e em cima houver mais espaço. Nunca cobre o botão.
+ const menuRef=useRef<HTMLDivElement>(null),anchorRef=useRef<DOMRect|null>(null);
+ useLayoutEffect(()=>{const el=menuRef.current;if(!el||!menu)return;el.style.margin='0';el.style.maxHeight='';const r=el.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight,a=anchorRef.current;
+  let dx=0,dy=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;let mh=0;
+  if(r.bottom>H-8){if(a){const below=H-8-r.top,above=a.top-4-8;if(above>below&&below<Math.min(r.height,240)){const h=Math.min(r.height,above);dy=a.top-4-h-r.top;if(h<r.height)mh=h;}else mh=below;}else dy=Math.max(8-r.top,H-8-r.bottom);}
+  if(dx||dy)el.style.margin=`${dy}px 0 0 ${dx}px`;if(mh)el.style.maxHeight=Math.max(120,mh)+'px';},[menu]);
  const setMenu=(m:Menu|null)=>{setMenuQ('');setMenuRaw(m);};
  const [peek,setPeek]=useState<{id:string;mode:'side'|'center'|'full'}|null>(null);
  const [toast,setToast]=useState<{text:string;undo?:()=>void}|null>(null);
@@ -140,8 +142,8 @@ export function DatabaseView({block,onChange,onDelete,onInteractionChange}:Props
  const duplicateRow=(id:string)=>{const at=latest.current.rows.findIndex(r=>r.id===id);if(at<0)return;const src=latest.current.rows[at];const copy={...clone(src),id:makeId(),created_at:new Date().toISOString()};
   if(copy.values[nameKey])copy.values[nameKey]=String(copy.values[nameKey])+' (cópia)';mutate(x=>{x.rows.splice(at+1,0,copy);});say('Item duplicado');};
  const openMenu=(e:{clientX:number;clientY:number}|null,el:Element|null,kind:string,payload?:any,w=260)=>{
-  let x=0,y=0;if(el){const b=el.getBoundingClientRect();x=b.left;y=b.bottom+4;}else if(e){x=e.clientX;y=e.clientY;}
-  x=Math.max(8,Math.min(x,window.innerWidth-w-12));y=Math.max(8,Math.min(y,window.innerHeight-120));setMenu({x,y,w,kind,payload});};
+  let x=0,y=0;anchorRef.current=null;if(el){const b=el.getBoundingClientRect();anchorRef.current=b;x=b.left+w>window.innerWidth-12?b.right-w:b.left;y=b.bottom+4;}else if(e){x=e.clientX;y=e.clientY;}
+  x=Math.max(8,Math.min(x,window.innerWidth-w-12));y=el?y:Math.max(8,Math.min(y,window.innerHeight-120));setMenu({x,y,w,kind,payload});};
 
  // ESC: fecha um nível por vez (menu, depois painel)
  // (lido por referência e registrado uma vez só: o Esc nunca usa um estado velho)
