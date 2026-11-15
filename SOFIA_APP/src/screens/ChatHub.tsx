@@ -15,6 +15,8 @@ import {pageParentId} from '../lib/page-hierarchy';
 import {isLocked} from '../lib/page-lock';
 import {subscribeSystemChanged,systemChanged} from '../lib/system-events';
 import {attachmentBase64,attachmentSize} from '../lib/attachment-read';
+import {LinkBubbleCard,LinkDraftCard} from '../components/LinkCard';
+import {firstUrl} from '../lib/link-info';
 import {FileWindowHost,InlineMedia,defaultView,fileKind,openFileWindow} from '../components/PageFiles';
 import {appendBlocks,bubblesOf,chatFileBlock,chatLists,chatTextBlocks,editBubble,inMain,lastLine,listTime,pageBlocks,removeBubble,toggleTodo,type Bubble} from '../lib/page-chat';
 
@@ -133,6 +135,7 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
  onOpenPage?:(id:string)=>void;onSelect:(id:string)=>void;onFail:(m:string)=>void;onToggleMain:()=>void;naming:boolean;name:string;onName:(v:string)=>void;onStartSub:()=>void;onCancelSub:()=>void;onCreateSub:()=>void}){
  const c=useTheme(),scroll=useRef<ScrollView>(null);
  const blocks=useMemo(()=>pageBlocks(page),[page]),bubbles=useMemo(()=>bubblesOf(blocks),[blocks]);
+ const [typed,setTyped]=useState(''),[shut,setShut]=useState(''),typedUrl=firstUrl(typed);
  const [picked,setPicked]=useState(''),[editing,setEditing]=useState(''),[draft,setDraft]=useState(''),[sending,setSending]=useState(0);
  useEffect(()=>{const t=setTimeout(()=>scroll.current?.scrollToEnd({animated:false}),30);return()=>clearTimeout(t);},[bubbles.length]);
  // o bloco do texto nasce uma vez so (mesmo id na tela e na gravacao)
@@ -166,9 +169,9 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
    ?<TextInput autoFocus multiline accessibilityLabel="Editar linha" value={draft} onChangeText={setDraft} onBlur={saveEdit}
      onKeyPress={(e:any)=>{const k=e.nativeEvent.key;if(k==='Escape'){setEditing('');setPicked('');}else if(k==='Enter'&&!e.nativeEvent.shiftKey){e.preventDefault?.();saveEdit();}}}
      style={{minWidth:260,color:c.text,fontSize:14.5,lineHeight:20,outlineStyle:'none'} as any}/>
-   :<View style={{flexDirection:'row',flexWrap:'wrap',alignItems:'flex-end'}}>
+   :<View>{firstUrl(b.text)?<LinkBubbleCard api={api} url={firstUrl(b.text)}/>:null}<View style={{flexDirection:'row',flexWrap:'wrap',alignItems:'flex-end'}}>
      {b.todo?<Pressable accessibilityRole="checkbox" accessibilityLabel="Marcar tarefa" onPress={()=>mutate(page.id,x=>toggleTodo(x,b.id))} style={{width:16,height:16,borderRadius:4,borderWidth:1.5,borderColor:c.accent,backgroundColor:b.checked?c.accent:'transparent',marginRight:8,marginBottom:2,alignItems:'center',justifyContent:'center'}}>{b.checked?<Icon name="check" size={11} color={c.onAccent}/>:null}</Pressable>:null}
-     <Text selectable style={{color:c.text,fontSize:14.5,lineHeight:20,fontWeight:b.heading?'700':'400',textDecorationLine:b.todo&&b.checked?'line-through':'none',flexShrink:1}}>{b.text}</Text>{time}</View>;
+     <Text selectable style={{color:c.text,fontSize:14.5,lineHeight:20,fontWeight:b.heading?'700':'400',textDecorationLine:b.todo&&b.checked?'line-through':'none',flexShrink:1}}>{b.text}</Text>{time}</View></View>;
   else if(b.kind==='file'){const kind=fileKind(b.mime,b.name),media=kind==='image'||kind==='video'||kind==='audio';
    body=<View style={{gap:4}}>{media?<View style={{width:kind==='audio'?300:320,maxWidth:'100%',borderRadius:8,overflow:'hidden'}}><InlineMedia api={api} id={b.attachmentId} kind={kind} name={b.name}/></View>
     :<Pressable accessibilityRole="button" accessibilityLabel={'Abrir '+b.name} onPress={()=>openFileWindow(api,{id:b.attachmentId,name:b.name,mime:b.mime,pageId:page.id})} style={{flexDirection:'row',alignItems:'center',gap:8}}><Icon name="file" size={18} color={c.accent}/><Text numberOfLines={1} style={{color:c.text,fontSize:14,maxWidth:300}}>{b.name}</Text></Pressable>}
@@ -196,7 +199,8 @@ function PageTalk({api,page,kids,parent,enterToSend,autoSendVoice,mutate,onOpenP
    {!bubbles.length&&!kids.length?<Text style={{color:c.muted,fontSize:13.5,textAlign:'center',marginTop:40}}>Página vazia. O que você escrever aqui entra nela.</Text>:null}
    {sending?<Text style={{color:c.muted,fontSize:12,alignSelf:'flex-end',marginTop:4}}>Enviando…</Text>:null}
   </ScrollView>
-  <Composer key={page.id} placeholder="Escrever nesta página" disabled={false} enterToSend={enterToSend} autoSendVoice={autoSendVoice} onText={sendOnce} onVoice={onVoice} onAttachments={onAttachments} onActivity={noop} onDraft={noop}/>
+  {typedUrl&&typedUrl!==shut?<LinkDraftCard api={api} url={typedUrl} onClose={()=>setShut(typedUrl)}/>:null}
+  <Composer key={page.id} placeholder="Escrever nesta página" disabled={false} enterToSend={enterToSend} autoSendVoice={autoSendVoice} onText={sendOnce} onVoice={onVoice} onAttachments={onAttachments} onActivity={noop} onDraft={noop} onTextChange={setTyped}/>
  </View>;
 }
 const noop=()=>{};

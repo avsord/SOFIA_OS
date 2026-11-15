@@ -35,7 +35,7 @@ import {appAlert} from '../lib/app-alert';
 export function deleteVoice(uri:string){try{const file=new File(uri);if(file.exists)file.delete();}catch{}}
 // 0.3.268: no site (navegador) Enter envia e Shift+Enter quebra linha; sem depender de Platform (os testes carregam este arquivo sozinho)
 const WEB_KEYS=typeof document!=='undefined'&&typeof window!=='undefined';
-export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft,placeholder}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void;placeholder?:string}){
+export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft,onTextChange,placeholder}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void;onTextChange?:(text:string)=>void;placeholder?:string}){
  const c=useTheme();
  const [files,setFiles]=useState<AttachmentDraft[]>([]),[attachments,setAttachments]=useState(false);
  const [rs,setRs]=useState<RecorderStatus>({durationMillis:0}),[text,setText]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false),[draft,setDraft]=useState<VoiceDraft|null>(null),[cancelReady,setCancelReady]=useState(false);
@@ -52,7 +52,7 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
  }),[cancelX]);
  useEffect(()=>{draftRef.current=draft;},[draft]);
  useEffect(()=>{onActivity(recording||busy);},[recording,busy,onActivity]);
- useEffect(()=>{onDraft(!!draft||text.length>0||files.length>0);},[draft,text,files,onDraft]);
+ useEffect(()=>{onDraft(!!draft||text.length>0||files.length>0);},[draft,text,files,onDraft]);useEffect(()=>{onTextChange?.(text);},[text,onTextChange]);
  useEffect(()=>{const sub=AppState.addEventListener('change',s=>{if(s!=='active'&&recordingRef.current)void stopRef.current(false,false);});return()=>sub.remove();},[]);
  useEffect(()=>{
   // Setup also runs again after a tab is hidden and shown: start idle, never reuse a recorder or draft the cleanup disposed.
