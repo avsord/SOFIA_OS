@@ -382,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Conversa no site: link mostra prévia no campo (com X) e no balão; YouTube com capa, título e canal (oEmbed), outros sites pelo leitor do servidor | testes/tsc/site ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Prévia de link: cartão baixo com miniatura à esquerda (tamanho WhatsApp); título/canal do YouTube pelo servidor (oEmbed) e site passa a mostrar imagens https externas | testes ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Notas com Diário: hora do registro fixa (escrever não apaga os minutos nem pinta o texto de roxo; "20:Poder…" volta a "20:06  Poder…") | teste novo ok; 4 falhas antigas de notas seguem |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: recolher subatalhos das páginas não faz mais o topo descer (espaço no fim segura a posição e some ao rolar para cima) | teste ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Conversa no site: notas dos blocos de Notas viram conversas ("em <página>", Arquivadas até puxar); escrever/áudio/anexo grava dentro da nota (Diário com hora roxa); "Abrir nota" | testes ok; não conferido na tela |
+| 2026-11-15 | (sem APK) | (este) | Barra lateral: criar subpágina abre só o ramo da página-mãe (sub-subpáginas abertas antes ficam fechadas) | tsc ok, site recompilado; não conferido na tela |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
