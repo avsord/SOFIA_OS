@@ -80,3 +80,4 @@
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: recolher subatalhos das páginas não faz mais o topo descer (espaço no fim segura a posição e some ao rolar para cima) | teste ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Conversa no site: notas dos blocos de Notas viram conversas ("em <página>", Arquivadas até puxar); escrever/áudio/anexo grava dentro da nota (Diário com hora roxa); "Abrir nota" | testes ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: criar subpágina abre só o ramo da página-mãe (sub-subpáginas abertas antes ficam fechadas) | tsc ok, site recompilado; não conferido na tela |
+| 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
