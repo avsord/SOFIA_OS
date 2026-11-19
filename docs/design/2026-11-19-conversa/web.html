@@ -58,7 +58,7 @@ svg{flex:none}
 .b{max-width:65%;background:var(--sup);border:1px solid var(--linha);border-radius:0 7.5px 7.5px 7.5px;padding:6px 7px 8px 9px;font-size:14px;line-height:20px;position:relative;box-shadow:0 1px .5px #0b141a21}
 .eu .b{background:var(--minha);border-color:transparent;border-radius:7.5px 0 7.5px 7.5px}
 .seg .b{border-radius:7.5px}
-.b .h{float:right;margin:6px 0 -5px 12px;font-size:11px;line-height:15px;color:var(--mudo);display:flex;gap:4px;align-items:center}
+.b .h{float:right;margin:6px 0 -5px 12px;font-size:12px;line-height:16px;color:var(--mudo);display:flex;gap:4px;align-items:center}
 .eu .b .h{color:#cbbfe6}
 .b .seta{position:absolute;top:7px;right:5px;width:24px;height:18px;border-radius:4px;display:none;align-items:center;justify-content:center;color:var(--txt);background:linear-gradient(90deg,transparent,var(--sup) 40%);cursor:pointer}
 .eu .b .seta{background:linear-gradient(90deg,transparent,var(--minha) 40%)}
@@ -92,8 +92,34 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
 .mic{cursor:pointer;transition:transform var(--t-rapido)}
 .edt{background:var(--sup2)!important;outline:1px solid var(--lil)}
 .aviso{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:20;background:#E8B04A;color:#17122A;font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px}
+/* 19/11 (Pedro): pastas, notas e subpáginas funcionando na Conversa. NÃO medido no WhatsApp: escolha da Sofia (painel lembra "Dados do contato") */
+.info{width:400px;flex:none;background:var(--sup);border-left:1px solid var(--linha);display:none;flex-direction:column;min-height:0}
+.info.on{display:flex;animation:painel var(--t-lento) var(--curva)}@keyframes painel{from{transform:translateX(40px);opacity:0}}
+.icab{height:64px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--linha);font-size:16px}
+.irol{flex:1;overflow-y:auto;padding:4px 0 24px}
+.isec{font-size:11.5px;color:var(--mudo);padding:16px 20px 6px;letter-spacing:.4px;font-weight:600}
+.ir{display:flex;align-items:center;gap:12px;height:58px;padding:0 12px 0 20px;cursor:pointer}.ir:hover{background:var(--sup2)}
+.av2{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--sup2);font-size:17px;flex:none}
+.tx2{flex:1;min-width:0}.tx2 b{display:block;font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx2 span{display:block;font-size:13px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir .hh{font-size:12px;color:var(--mudo)}.ir .pi{width:32px;height:32px;color:var(--mudo)}
+.ph{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 20px;cursor:pointer;font-weight:600;color:var(--txt)}.ph:hover{background:var(--sup2)}
+.ph svg{color:#E8B04A}.ph small{color:var(--mudo);font-weight:400;margin-left:auto}.seta2{display:flex;color:var(--mudo);transition:transform .2s}
+.pasta.fechada .pn{display:none}.pasta.fechada .seta2{transform:rotate(-90deg)}.pn .ir,.pn .nov{padding-left:46px}
+.nov{display:flex;align-items:center;gap:10px;height:44px;padding:0 20px;color:var(--lil);cursor:pointer;font-weight:600;font-size:14px}.nov:hover{background:var(--sup2)}
+.nov.neutro{color:var(--txt);font-weight:500}.nov.neutro svg{color:var(--mudo)}
+.nome{display:flex;gap:8px;padding:6px 16px 6px 20px}.pn .nome{padding-left:46px}
+.nome input{flex:1;height:36px;border-radius:10px;border:1px solid var(--lil);background:var(--bg);color:var(--txt);padding:0 10px;font:inherit;outline:0}
+.nome button{height:36px;padding:0 14px;border:0;border-radius:10px;background:var(--lil);color:#17122A;font:inherit;font-weight:700;cursor:pointer}
+.ccab .nm{cursor:pointer}.ccab .nm span a{color:var(--lil);cursor:pointer}.onde{color:var(--lil)}
+.b.card{min-width:270px}.card .ct{display:flex;gap:10px;align-items:center;padding-right:44px}.card .ci{width:38px;height:38px;border-radius:9px;background:#0003;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+.card .ct b{display:block;font-weight:600}.card .ct small{display:block;color:#cbbfe6;font-size:12.5px;line-height:17px}
+.card .mini{margin-top:8px;border-radius:6px;overflow:hidden;font-size:12.5px;border:1px solid #ffffff1a}.card .mini div{display:flex;justify-content:space-between;padding:4px 8px;border-top:1px solid #ffffff12}.card .mini div:first-child{border:0;color:#cbbfe6}
+.card .ca{margin:8px -7px -8px -9px;padding:8px 0;border-top:1px solid #ffffff1a;text-align:center;color:var(--lil);font-weight:600;cursor:pointer;font-size:13.5px;clear:both}.card .ca:hover{background:#ffffff0d}
+.card .h{position:absolute;top:8px;right:30px;float:none;margin:0}
+.menu .dica{height:auto;padding:6px 12px 4px;font-size:12px;color:var(--mudo);cursor:default;line-height:16px}.menu .dica:hover{background:none}
 </style></head><body>
-<div class="aviso">Desenho para aprovação · passe o mouse nas mensagens, clique na setinha ou com o botão direito · clique em Arquivadas · lupa da conversa</div>
+<div class="aviso">Desenho para aprovação · passe o mouse nas mensagens, clique na setinha ou com o botão direito · clique em Arquivadas · lupa da conversa · abra Casa e clique no nome dela (pastas e notas)</div>
 <div class="app">
  <nav class="side">
   <div class="marca"><i>S</i>Sofia</div>
@@ -111,6 +137,7 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
   <div class="citar" id="citar"><span class="tr"></span><div style="flex:1;min-width:0"><b id="cq"></b><span id="ct"></span></div><button class="bt" id="cx">✕</button></div>
   <div class="comp"><button class="bt" style="font-size:24px">+</button><div class="campo"><input id="campo" placeholder="Digite uma mensagem" value="muda a reunião pra 15h"><button class="bt" id="clip"></button></div><div class="mic" id="mic"></div></div>
  </main>
+ <aside class="info" id="info"></aside>
 </div>
 <div class="menu" id="menu"></div>
 <script>
@@ -147,7 +174,7 @@ function lista(){ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><butto
  $('abreArq').onclick=listaArq;
  document.querySelectorAll('#lista .it[data-c]').forEach(e=>e.onclick=()=>troca(+e.dataset.c));}
 function listaArq(){ const p=document.createElement("div");p.className="painelArq";p.innerHTML=`<div class="cab" style="gap:14px"><button class="bt" id="voltar" title="Voltar">${I.volta}</button><h1 style="font-size:19px">Arquivadas</h1></div>
-<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Conversas guardadas fora da lista principal. (O que acontece quando chega mensagem numa arquivada: a decidir.)</div><div class="rol">${arquivadas.map((x)=>linha(x,-1)).join('')}</div>`;
+<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Conversas guardadas fora da lista principal.</div><div class="rol">${arquivadas.map((x)=>linha(x,-1)).join('')}</div>`;
  $("lista").appendChild(p);$("voltar").onclick=()=>{p.classList.add("sai");setTimeout(()=>p.remove(),200)};}
 let cv=0;const rasc={0:'muda a reunião pra 15h',2:'ver orçamento do pintor'};
 const M=[["dia","17/11/2026"],["e","Quanto gastei esse mês?","09:12"],["s","Até agora R$ 1.240 de R$ 3.000.","09:12"],["e","E com mercado?","09:13",1],["s","R$ 410 em mercado, 33% do total.","09:13"],["e","Anota: comprar ração","19:40"],["s","Anotado na página Casa.","19:40"],["e","Que horas é o dentista?","20:05"],["s","Dia 21 às 9h.","20:05"],["e","Me lembra na véspera","20:06",1],["s","Lembrete criado para 20/11 às 20h.","20:06"],['dia','Ontem'],['s','Bom dia! Quer que eu leia a agenda de hoje?','08:01'],['e','Sim, e me lembra de ligar pro Jota','08:02'],['s','Agenda de hoje: dentista às 9h, almoço com a Lia às 12h30. Lembrete das 17h: ligar pro Jota.','08:02',1],
@@ -155,11 +182,11 @@ const M=[["dia","17/11/2026"],["e","Quanto gastei esse mês?","09:12"],["s","At�
 ['e','Sim','21:41'],['e','e me lembra da reunião às 13h30','21:41',1,'relo']];
 const menu=$("menu");
 const outras=[[['dia','Hoje'],['e','Levar carregador do notebook','09:58'],['e','Reservar hotel até sexta','10:14',1],['e','Comprar adaptador de tomada','10:20',1]],[['dia','Ontem'],['e','Pintor vem na terça','18:02']]];
-const conv=c=>c===0?M:(outras[(c-1)%2]);
+const conv=c=>c===0?M:(typeof MSG!=='undefined'&&MSG[c]?MSG[c]:outras[(c-1)%2]);
 const icone=(m)=>m[0]!=='e'?'':(m[4]==='relo'?I.relo:I.ok);
 function bolha(m,i,seg,nova){const q=m[5]?`<div class="q"><b>${m[5][0]}</b>${m[5][1]}</div>`:'';
  return `<div class="l ${m[0]==='e'?'eu':''} ${seg?'seg':''} ${nova?'nova':''}"><div class="b" data-i="${i}" data-q="${m[0]}">${q}<span class="t">${m[1]}</span><span class="h">${m[2]} ${icone(m)}</span><span class="seta">${I.seta}</span></div></div>`}
-function render(){let ant='';$('msgs').innerHTML=conv(cv).map((m,i)=>{if(m[0]==='dia'){ant='';return `<div class="dia">${m[1]}</div>`}const seg=ant===m[0];ant=m[0];return bolha(m,i,seg)}).join('');$('msgs').scrollTop=1e5;novas=0;desce()}
+function render(){let ant='';$('msgs').innerHTML=(conv(cv).length?'':'<div class="dia">Vazia. O que você escrever aqui entra nela.</div>')+conv(cv).map((m,i)=>{if(m[0]==='card'){ant='';return cartao(m,i)}if(m[0]==='dia'){ant='';return `<div class="dia">${m[1]}</div>`}const seg=ant===m[0];ant=m[0];return bolha(m,i,seg)}).join('');$('msgs').scrollTop=1e5;novas=0;desce()}
 function troca(c){if(c===cv)return;const v=$('campo').value.trim();if(v)rasc[cv]=v;else delete rasc[cv];cv=c;$('campo').value=rasc[c]||'';
  const d=conversas[c];document.querySelector('.ccab .av').style.background=d[1];document.querySelector('.ccab .av').textContent=d[0];document.querySelector('.ccab .nm b').textContent=d[2];document.querySelector('.ccab .nm span').textContent=c===0?'online · lembra do que vocês já conversaram':'conversa da página';
  fechaCitar();render();lista();botao()}
@@ -195,13 +222,13 @@ lista();render();botao();
 let atual=null;
 function abre(b,x,y){ fecha(); atual=b;b.classList.add('foco');
  const eu=b.dataset.q==='e';
- const its=[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['fix','Fixar']];
- menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div data-a="${t[0]}" class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('');
+ const its=b.dataset.q==='card'?[['abrir','Abrir'],['abrp','Abrir na página']]:[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['fix','Fixar']];
+ menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div data-a="${t[0]}" class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('')+(b.dataset.q==='card'?'<div class="dica">Apagar pasta, nota ou tabela: só na página</div>':'');
  menu.classList.remove("sai");menu.classList.add("on");const r=menu.getBoundingClientRect();
  if(y+r.height>innerHeight-70){y=Math.max(8,y-r.height);menu.style.transformOrigin='bottom left'}else menu.style.transformOrigin='top left';
  if(x+r.width>innerWidth-8)x=innerWidth-r.width-8;menu.style.left=x+'px';menu.style.top=y+'px';}
 function fecha(){if(menu.classList.contains("on")){menu.classList.remove("on");menu.classList.add("sai");setTimeout(()=>menu.classList.remove("sai"),300)}if(atual)atual.classList.remove('foco');atual=null}
-$('msgs').addEventListener('click',e=>{const s=e.target.closest('.seta');if(s){const b=s.closest('.b'),r=b.getBoundingClientRect();abre(b,b.dataset.q==='e'?r.right-210:r.left,r.top+28);e.stopPropagation()}});
+$('msgs').addEventListener('click',e=>{const s=e.target.closest('.seta');if(s){const b=s.closest('.b'),r=b.getBoundingClientRect();abre(b,b.dataset.q!=='s'?r.right-210:r.left,r.top+28);e.stopPropagation()}});
 $('msgs').addEventListener('contextmenu',e=>{const b=e.target.closest('.b');if(b){e.preventDefault();abre(b,e.clientX,e.clientY)}});
 document.addEventListener('click',e=>{if(!menu.contains(e.target))fecha()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){fecha();fechaCitar();$('busca').classList.remove('on');marca('')}});
@@ -216,5 +243,86 @@ $('bq').oninput=e=>marca(e.target.value);
 $('bc').onclick=()=>{if(achados.length){pos=(pos-1+achados.length)%achados.length;mostra()}};
 $('bb').onclick=()=>{if(achados.length){pos=(pos+1)%achados.length;mostra()}};
 $('bx').onclick=()=>{$('busca').classList.remove('on');marca('')};
+// ===== 19/11 (Pedro): pastas, notas e subpáginas que funcionam (desenho; não medido no WhatsApp) =====
+Object.assign(I,{pasta:sv('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',18),
+ abrir:sv('<path d="M5 12h14M13 6l6 6-6 6"/>'),abrp:sv('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>')});
+const onde=(p,t)=>`<span class="onde">${p}</span> · ${t}`;
+conversas[9]=['📄','#F5A0AE','[Página] Reforma','em Casa · Orçamento: R$ 2.800','Ontem',''];
+conversas[10]=['📝','#F5A0AE','[Nota] Lista da semana',onde('📁 Mercado · Casa','ração'),'Hoje',''];
+conversas[11]=['📝','#F5A0AE','[Nota] Feira',onde('📁 Mercado · Casa','banana'),'Ontem',''];
+conversas[12]=['📝','#F5A0AE','[Nota] Luz e água',onde('📁 Contas · Casa','vence dia 10'),'12/11/2026',''];
+conversas[13]=['📝','#8fb4ff','[Nota] Lisboa',onde('📁 Roteiro · Viagem','Dia 2: Belém'),'14/11/2026',''];
+var META={9:{pg:2},10:{pg:2,pasta:'Mercado'},11:{pg:2,pasta:'Mercado'},12:{pg:2,pasta:'Contas'},13:{pg:1,pasta:'Roteiro'}};
+var DENTRO={2:{sub:[9],pastas:[['Mercado',[10,11]],['Contas',[12]]]},1:{sub:[],pastas:[['Roteiro',[13]]]}};
+const dentro=pg=>DENTRO[pg]||(DENTRO[pg]={sub:[],pastas:[]});
+var PRINC=new Set([0,1,2,3,4,5,6,7,10]);
+var MSG={2:[['dia','15/11/2026'],['card','notas','Notas','','10:02'],['card','tab','Tabela · Orçamento do pintor','3 linhas','10:05'],['card','link','Página · Reforma','subpágina de Casa','10:06',9],['dia','Ontem'],['e','Pintor vem na terça','18:02'],['e','ver orçamento do pintor','18:03',1]],
+ 9:[['dia','Ontem'],['e','Pintor vem na terça','18:02'],['e','Orçamento: R$ 2.800','18:05',1]],
+ 10:[['dia','Hoje'],['e','arroz','08:10'],['e','café','08:10',1],['e','ração','08:11',1]],11:[['dia','Ontem'],['e','tomate','17:20'],['e','banana','17:21',1]],
+ 12:[['dia','12/11/2026'],['e','Luz vence dia 10','09:00'],['e','Água vence dia 15','09:01',1]],13:[['dia','14/11/2026'],['e','Dia 1: Alfama','21:00'],['e','Dia 2: Belém','21:02',1]]};
+const nome=i=>conversas[i][2].replace(/^\[[^\]]+\] /,'');
+const limpa=s=>String(s).replace(/<[^>]+>/g,'');
+const plural=(n,a,b)=>n+' '+(n===1?a:b);
+function resumo(pg){const D=dentro(pg),n=D.pastas.reduce((s,p)=>s+p[1].length,0),t=[];if(D.pastas.length)t.push(plural(D.pastas.length,'pasta','pastas'),plural(n,'nota','notas'));if(D.sub.length)t.push(plural(D.sub.length,'subpágina','subpáginas'));return t.join(' · ')}
+function sub(c){if(c===0)return 'online · lembra do que vocês já conversaram';const m=META[c];
+ if(m&&m.pasta)return `Nota · 📁 ${m.pasta} · em <a data-ir="${m.pg}">${nome(m.pg)}</a>`;
+ if(m)return `Subpágina · em <a data-ir="${m.pg}">${nome(m.pg)}</a>`;
+ const r=resumo(c);return (r||'nada dentro ainda')+' · clique aqui para ver e criar'}
+function troca(c){if(c===cv)return;const v=$('campo').value.trim();if(v)rasc[cv]=v;else delete rasc[cv];cv=c;$('campo').value=rasc[c]||'';
+ const d=conversas[c],av=document.querySelector('.ccab .av');av.style.background=d[1];av.textContent=d[0];document.querySelector('.ccab .nm b').textContent=d[2];
+ document.querySelector('.ccab .nm span').innerHTML=sub(c);fechaPainel();fechaCitar();render();lista();botao()}
+document.querySelector('.ccab .nm').onclick=e=>{const a=e.target.closest('a[data-ir]');if(a){const pg=+a.dataset.ir;troca(pg);abrePainel(pg);return}
+ if(cv!==0&&!META[cv])$('info').classList.contains('on')?fechaPainel():abrePainel(cv)};
+// lista: Sofia fixa em cima (nunca sai); filtros Tudo / Páginas / Notas
+var filtro='tudo';var ehNota=i=>!!(META[i]&&META[i].pasta);
+var extrasArq=()=>conversas.map((x,i)=>i).filter(i=>i>=9&&conversas[i]&&!PRINC.has(i));
+function lista(){if(!window.PRINC)return;const ok=i=>i===0||filtro==='tudo'||(filtro==='pag'?!ehNota(i):ehNota(i));const ids=[...PRINC].filter(ok).sort((a,b)=>a===0?-1:b===0?1:0);
+ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><button class="bt" title="Nova conversa">${I.nova}</button><button class="bt" title="Mais opções">${I.mais}</button></div>
+<div class="pesq">${I.lupa}<input placeholder="Pesquisar conversas"></div>
+<div class="chips">${[['tudo','Tudo'],['pag','Páginas'],['nota','Notas']].map(([k,t])=>`<span class="chip ${filtro===k?'on':''}" data-f="${k}">${t}</span>`).join('')}</div>
+<div class="rol"><div class="arq" id="abreArq">${I.arq}<span>Arquivadas</span><b>${arquivadas.length+extrasArq().length}</b></div>${ids.map(i=>linha(conversas[i],i)).join('')}</div>`;
+ $('abreArq').onclick=listaArq;document.querySelectorAll('#lista .chip').forEach(e=>e.onclick=()=>{filtro=e.dataset.f;lista()});
+ document.querySelectorAll('#lista .it[data-c]').forEach(e=>e.onclick=()=>troca(+e.dataset.c));}
+function listaArq(){const p=document.createElement("div");p.className="painelArq";p.innerHTML=`<div class="cab" style="gap:14px"><button class="bt" id="voltar" title="Voltar">${I.volta}</button><h1 style="font-size:19px">Arquivadas</h1></div>
+<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Páginas e notas novas chegam aqui e ficam até você tirar (alfinete no painel da página). Não chega mensagem de outra pessoa.</div><div class="rol">${extrasArq().map(i=>linha(conversas[i],i)).join('')}${arquivadas.map(x=>linha(x,-1)).join('')}</div>`;
+ $("lista").appendChild(p);p.querySelectorAll('.it[data-c]').forEach(e=>{if(+e.dataset.c>=0)e.onclick=()=>troca(+e.dataset.c)});$("voltar").onclick=()=>{p.classList.add("sai");setTimeout(()=>p.remove(),200)};}
+function principal(i,on){on?PRINC.add(i):PRINC.delete(i);lista();if(painelDe!=null)abrePainel(painelDe);aviso(on?`“${nome(i)}” na lista principal`:`“${nome(i)}” foi para Arquivadas`,()=>{on?PRINC.delete(i):PRINC.add(i);lista();if(painelDe!=null)abrePainel(painelDe)})}
+// painel "Dentro de <página>": pastas → notas, subpáginas, criar, abrir a página, arquivar
+let painelDe=null;
+function abrePainel(pg){painelDe=pg;const D=dentro(pg),nm=nome(pg),fechadas=[...document.querySelectorAll('#info .pasta.fechada')].map(e=>e.dataset.k);
+ const item=i=>`<div class="ir" data-ir="${i}"><div class="av2">${conversas[i][0]}</div><div class="tx2"><b>${nome(i)}</b><span>${limpa(conversas[i][3]).replace(/^.*· /,'')}</span></div><span class="hh">${conversas[i][4]}</span><button class="bt pi" data-pi="${i}" title="${PRINC.has(i)?'Arquivar':'Trazer para a lista principal'}">${PRINC.has(i)?I.arq:I.pin}</button></div>`;
+ $('info').innerHTML=`<div class="icab"><button class="bt" id="ix" title="Fechar">${I.x}</button><b>Dentro de ${nm}</b></div><div class="irol">
+<div class="isec">PASTAS DE NOTAS</div>${D.pastas.map((p,k)=>`<div class="pasta ${fechadas.includes(String(k))?'fechada':''}" data-k="${k}"><div class="ph">${I.pasta}<span>${p[0]}</span><small>${plural(p[1].length,'nota','notas')}</small><span class="seta2">${I.seta}</span></div><div class="pn">${p[1].map(item).join('')}<div class="nov" data-nov="nota" data-k="${k}">+ Nova nota em ${p[0]}</div></div></div>`).join('')}
+<div class="nov" data-nov="pasta">+ Nova pasta</div>
+<div class="isec">SUBPÁGINAS</div>${D.sub.map(item).join('')}<div class="nov" data-nov="sub">+ Subpágina</div>
+<div class="isec">PÁGINA</div><div class="nov neutro" data-ac="abrp">${I.abrp} Abrir a página ${nm}</div><div class="nov neutro" data-ac="arq">${PRINC.has(pg)?I.arq+' Arquivar conversa':I.pin+' Trazer para a lista principal'}</div></div>`;
+ $('info').classList.add('on')}
+function fechaPainel(){painelDe=null;$('info').classList.remove('on')}
+function criar(tipo,k,txt){const pg=painelDe,D=dentro(pg),i=conversas.length,c=conversas[pg][1];
+ if(tipo==='pasta'){D.pastas.push([txt,[]]);abrePainel(pg);aviso(`Pasta “${txt}” criada em ${nome(pg)}`);return}
+ const pasta=tipo==='nota'?D.pastas[k][0]:null;conversas[i]=[tipo==='nota'?'📝':'📄',c,(tipo==='nota'?'[Nota] ':'[Página] ')+txt,tipo==='nota'?onde(`📁 ${pasta} · ${nome(pg)}`,'vazia'):'em '+nome(pg),'agora',''];
+ META[i]=tipo==='nota'?{pg,pasta}:{pg};MSG[i]=[];tipo==='nota'?D.pastas[k][1].push(i):D.sub.push(i);troca(i);lista();
+ aviso(`${tipo==='nota'?'Nota':'Subpágina'} “${txt}” criada. Fica em Arquivadas até você tirar.`)}
+$('info').addEventListener('click',e=>{const t=e.target;
+ if(t.closest('#ix'))return fechaPainel();
+ const pi=t.closest('[data-pi]');if(pi){e.stopPropagation();return principal(+pi.dataset.pi,!PRINC.has(+pi.dataset.pi))}
+ const ph=t.closest('.ph');if(ph)return ph.parentElement.classList.toggle('fechada');
+ const nv=t.closest('[data-nov]');if(nv){const tipo=nv.dataset.nov,k=+nv.dataset.k,ph2={nota:'Nome da nota',pasta:'Nome da pasta',sub:'Nome da subpágina'}[tipo];
+  nv.outerHTML=`<div class="nome"><input placeholder="${ph2}"><button>Criar</button></div>`;const box=$('info').querySelector('.nome'),inp=box.querySelector('input');inp.focus();
+  const ok=()=>{const v=inp.value.trim();if(v)criar(tipo,k,v)};box.querySelector('button').onclick=ok;
+  inp.onkeydown=ev=>{if(ev.key==='Enter')ok();if(ev.key==='Escape'){ev.stopPropagation();abrePainel(painelDe)}};return}
+ const ac=t.closest('[data-ac]');if(ac){if(ac.dataset.ac==='abrp')return aviso(`Abre a página ${nome(painelDe)} (como hoje)`);return principal(painelDe,!PRINC.has(painelDe))}
+ const ir=t.closest('.ir[data-ir]');if(ir)troca(+ir.dataset.ir)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.classList.contains('on')&&$('info').classList.contains('on')&&!e.target.closest?.('.nome'))fechaPainel()});
+// cartões da página (Notas, Tabela, Link de página): abrem de verdade; não se apagam pelo chat
+function cartao(m,i){const ic={notas:I.pasta,tab:'▦',link:'📄'}[m[1]],sm=m[1]==='notas'?resumo(cv).split(' · ').slice(0,2).join(' · '):m[3];
+ const mini=m[1]==='tab'?'<div class="mini"><div><span>Item</span><span>Valor</span></div><div><span>Sala</span><span>R$ 1.200</span></div><div><span>Quartos</span><span>R$ 1.600</span></div></div>':'';
+ const ca={notas:'Ver pastas e notas',tab:'Abrir na página',link:'Abrir conversa'}[m[1]];
+ return `<div class="l eu"><div class="b card" data-i="${i}" data-q="card"><div class="ct"><span class="ci">${ic}</span><div><b>${m[2]}</b><small>${sm}</small></div></div>${mini}<span class="h">${m[4]}</span><div class="ca">${ca}</div><span class="seta">${I.seta}</span></div></div>`}
+function acaoCartao(m){if(m[1]==='notas')abrePainel(cv);else if(m[1]==='link')troca(m[5]);else aviso(`Abre a página ${nome(cv)} na tabela (como hoje)`)}
+$('msgs').addEventListener('click',e=>{const a=e.target.closest('.ca');if(a){e.stopPropagation();acaoCartao(conv(cv)[+a.closest('.b').dataset.i])}});
+menu.addEventListener('click',e=>{const it=e.target.closest('div[data-a]');if(!it||!atual||atual.dataset.q!=='card')return;const m=conv(cv)[+atual.dataset.i],a=it.dataset.a;
+ if(a==='abrir'){e.stopImmediatePropagation();fecha();acaoCartao(m)}if(a==='abrp'){e.stopImmediatePropagation();fecha();aviso(`Abre a página ${nome(cv)} nesse bloco (como hoje)`)}},true);
+lista();
 </script>
 </body></html>

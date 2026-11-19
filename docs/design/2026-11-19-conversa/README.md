@@ -26,10 +26,26 @@ e funções atuais ficam.
 - **Conversa com a Sofia (decidido 19/11):** mesma identidade visual das outras; ela é um contato como os outros, só que fixo no topo (não arquiva, não sai da lista). Editar vale também nela: a Sofia responde de novo à versão editada (precisa de mudança no servidor e na memória dela).
 
 ## Medido na conversa do WhatsApp Web (19/11, 1440 px)
-Bolha raio 7,5 px com a ponta da cauda reta, padding interno 6 7 8 9 (texto a 7/9/10 px das bordas), letra 14/20 px, sombra fina, hora 11/15 px; setinha 24×18 no canto; data 24 px de altura, raio 6, letra 12/16 peso 600; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula de 52 px, raio 26, padding 5, letra 15 px; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder. Animações medidas: setinha 75 ms deslizando; menu abre em 300 ms (desce 8 px e cresce de 95% com um leve passo de 101%) e fecha em 300 ms encolhendo; caixa de responder sobe 24 px em 300 ms e desce igual ao fechar.
+Bolha raio 7,5 px com a ponta da cauda reta, padding interno 6 7 8 9 (texto a 7/9/10 px das bordas), letra 14/20 px, sombra fina, hora 12/16 px; setinha 24×18 no canto; data 24 px de altura, raio 6, letra 12/16 peso 600; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula de 52 px, raio 26, padding 5, letra 15 px; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder. Animações medidas: setinha 75 ms deslizando; menu abre em 300 ms (desce 8 px e cresce de 95% com um leve passo de 101%) e fecha em 300 ms encolhendo; caixa de responder sobe 24 px em 300 ms e desce igual ao fechar.
 
 ## Não medido no WhatsApp (escolha da Sofia, não cópia)
 ESC sem nada aberto; antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
+
+## Pastas, notas e subpáginas na Conversa (19/11, no web.html; NÃO medido no WhatsApp, escolha da Sofia)
+Pedido do Pedro: "notas, pastas etc. aparecerem de uma forma funcional". Conferido no código atual (`ChatHub.tsx`, `page-chat.ts`, `note-chat.ts`), sem os dados reais dele. Pasta = caderno do bloco de Notas (um nível só); nota = folha.
+
+Hoje não funciona → fica assim:
+- Bloco de Notas aparece como balão "Base de dados · abrir na página" (o rótulo errado: o bloco é do tipo `collection`) e só leva à página → balão "Notas · 2 pastas · 3 notas" com **Ver pastas e notas**, que abre o painel da página.
+- Pastas não aparecem em lugar nenhum da Conversa → painel **Dentro de <página>** (clique no nome da página no topo, como "Dados do contato" no WhatsApp): pastas que abrem e fecham, com as notas dentro, **+ Nova nota em <pasta>** e **+ Nova pasta**.
+- Subpáginas ficam empilhadas no topo da conversa, antes das mensagens → vão para o painel (seção Subpáginas, **+ Subpágina**). O botão "Subpágina" do topo sai dali, a função fica.
+- Notas na lista com o mesmo ícone das páginas e sem dizer de onde são → ícone 📝 e a linha "📁 Mercado · Casa"; filtro **Notas** ao lado de Tudo / Páginas.
+- Conversa de uma nota não tem caminho de volta → topo "Nota · 📁 Mercado · em Casa", e "Casa" abre a página com o painel aberto.
+- **"Apagar" num balão de Notas/Tabela/Quadro apaga o bloco inteiro da página** (todas as pastas e notas), só com uma confirmação → esses balões não têm Apagar no chat: o menu mostra Abrir / Abrir na página e o aviso "Apagar pasta, nota ou tabela: só na página".
+- Tabela e Quadro só dizem "abrir na página" → balão com as 2 primeiras linhas e **Abrir na página**.
+- Link de página leva à página dona, não à página do link → balão **Abrir conversa** daquela página.
+- Abrir a página e Arquivar/Trazer continuam: no fim do painel (e o alfinete em cada nota/subpágina tira ou põe na lista principal).
+
+Arquivadas (decidido 19/11): não chega mensagem de outra pessoa. Páginas e notas novas entram em Arquivadas e ficam lá até o Pedro tirar. Ponto aberto: hoje a página criada pelo "+" da própria Conversa nasce na principal (`chat_main:true` em `ChatHub.tsx`); no desenho, nota e subpágina criadas no painel abrem na hora, mas ficam em Arquivadas.
 
 ## Correções sem desenho (entram junto)
 - O quadro da conversa recarrega de novo 6 s depois de abrir (`Chat.tsx`, `setTimeout(...loadBoard...,6000)`): pode trocar/piscar; recarregar só quando mudar.
