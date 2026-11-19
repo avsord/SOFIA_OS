@@ -53,12 +53,12 @@ svg{flex:none}
 .busca input{flex:1;height:36px;border-radius:10px;border:0;background:var(--sup2);color:var(--txt);padding:0 12px;font:inherit;outline:0}
 .busca span{color:var(--mudo);font-size:12.5px}
 .msgs{flex:1;overflow-y:auto;padding:20px 8% 12px;display:flex;flex-direction:column;gap:2px}
-.dia{align-self:center;font-size:12.5px;line-height:16px;color:var(--mudo);background:var(--sup);border:1px solid var(--linha);padding:4px 12px;border-radius:6px;margin:10px 0;box-shadow:0 1px .5px #0000001f}
+.dia{align-self:center;font-size:12px;line-height:16px;font-weight:600;color:var(--mudo);background:var(--sup);border:1px solid var(--linha);padding:4px 12px;border-radius:6px;margin:10px 0;box-shadow:0 1px .5px #0000001f}
 .l{display:flex;margin-top:8px}.l.seg{margin-top:2px}.l.eu{justify-content:flex-end}
-.b{max-width:65%;background:var(--sup);border:1px solid var(--linha);border-radius:0 7.5px 7.5px 7.5px;padding:6px 7px 8px 9px;font-size:14.2px;line-height:19px;position:relative;box-shadow:0 1px .5px #0b141a21}
+.b{max-width:65%;background:var(--sup);border:1px solid var(--linha);border-radius:0 7.5px 7.5px 7.5px;padding:6px 7px 8px 9px;font-size:14px;line-height:20px;position:relative;box-shadow:0 1px .5px #0b141a21}
 .eu .b{background:var(--minha);border-color:transparent;border-radius:7.5px 0 7.5px 7.5px}
 .seg .b{border-radius:7.5px}
-.b .h{float:right;margin:6px 0 -5px 12px;font-size:12px;line-height:16px;color:var(--mudo);display:flex;gap:4px;align-items:center}
+.b .h{float:right;margin:6px 0 -5px 12px;font-size:11px;line-height:15px;color:var(--mudo);display:flex;gap:4px;align-items:center}
 .eu .b .h{color:#cbbfe6}
 .b .seta{position:absolute;top:7px;right:5px;width:24px;height:18px;border-radius:4px;display:none;align-items:center;justify-content:center;color:var(--txt);background:linear-gradient(90deg,transparent,var(--sup) 40%);cursor:pointer}
 .eu .b .seta{background:linear-gradient(90deg,transparent,var(--minha) 40%)}
@@ -72,7 +72,7 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
 .menu div:hover{background:#ffffff10}.menu .sep{height:1px;padding:0;margin:4px 6px;background:var(--linha)}.menu .perigo{color:var(--ruim)}
 .menu .quer{color:var(--mudo)}.menu .quer em{margin-left:auto;font-style:normal;font-size:10px;background:#E8B04A;color:#17122A;border-radius:5px;padding:1px 5px;font-weight:700}
 .comp{flex:none;min-height:64px;display:flex;align-items:center;gap:0;padding:6px 16px 6px 18px;background:var(--sup)}
-.campo{flex:1;min-height:40px;border-radius:9999px;margin:0 6px;background:var(--sup2);display:flex;align-items:center;padding:0 8px 0 14px}
+.campo{flex:1;min-height:52px;box-sizing:border-box;border-radius:26px;margin:0 6px;background:var(--sup2);display:flex;align-items:center;padding:5px}
 .campo input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:inherit;font-size:15px}
 .mic{width:40px;height:40px;border-radius:9999px;background:var(--lil);display:flex;align-items:center;justify-content:center;color:#17122A}
 .desce{position:absolute;right:24px;bottom:80px;width:42px;height:42px;border-radius:21px;background:var(--sup2);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center}
@@ -139,7 +139,7 @@ const conversas=[
  ['P','#ff9f7a','[Página] Finanças','Fatura vence dia 10','12/11/2026',''],
  ['P','#7fd1e8','[Página] Leituras','Terminar o capítulo 4','09/11/2026','']];
 const arquivadas=[['P','#9aa3b5','[Página] Mudança 2025','Entregar chaves','03/10/2026',''],['P','#9aa3b5','[Página] Curso inglês','Aula 12 feita','21/09/2026',''],['P','#9aa3b5','[Página] Festa Lia','Bolo encomendado','02/08/2026','']];
-const linha=([a,c,n,p,h,dir,fixa,sel,nova],ix)=>`<div class="it ${ix===cv?'sel':''}" data-c="${ix}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${rasc[ix]&&ix!==cv?'<span class="rasc">Rascunho:</span> '+rasc[ix]:p.replace(/<span class="rasc">Rascunho:<\/span> /,'')}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada (quer?)">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
+const linha=([a,c,n,p,h,dir,fixa,sel,nova],ix)=>`<div class="it ${ix===cv?'sel':''}" data-c="${ix}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${rasc[ix]&&ix!==cv?'<span class="rasc">Rascunho:</span> '+rasc[ix]:p.replace(/<span class="rasc">Rascunho:<\/span> /,'')}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
 function lista(){ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><button class="bt" title="Nova conversa">${I.nova}</button><button class="bt" title="Mais opções">${I.mais}</button></div>
 <div class="pesq">${I.lupa}<input placeholder="Pesquisar conversas"></div>
 <div class="chips"><span class="chip on">Tudo</span><span class="chip">Páginas</span></div>
@@ -189,7 +189,7 @@ menu.addEventListener('click',e=>{const it=e.target.closest('div[data-a]');if(!i
  if(a==='ed'){const b=document.querySelector(`.b[data-i="${i}"]`),t=b.querySelector('.t');b.classList.add('edt');t.contentEditable=true;t.focus();document.getSelection().selectAllChildren(t);document.getSelection().collapseToEnd();
   t.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();m[1]=t.textContent;m[2]=m[2].replace(/ · editada$/,'')+' · editada';render()}if(ev.key==='Escape'){ev.stopPropagation();render()}}}
  if(a==='sel')aviso('Abre a seleção que já existe (Responder, Copiar, Excluir)')
- if(a==='rea')aviso('Reagir: opcional (quer?)');if(a==='fix')aviso('Fixar: opcional (quer?)')});
+ if(a==='fix')aviso('Mensagem fixada')});
 lista();render();botao();
 
 let atual=null;

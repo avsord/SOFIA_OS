@@ -47,7 +47,7 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 2px}
 </style></head><body>
 <h1>Nova Conversa · desenho para aprovação</h1>
 <p class="sub"><a href="web.html" style="color:var(--lil);font-weight:700">Versão do computador em tela cheia (web.html) →</a></p>
-<p class="sub">Régua: WhatsApp Web medido em 19/11 (régua de chat; não é o DNA 27/27). Cores e fontes continuam as da Sofia; muda o jeito, não a cara. Nenhuma função atual sai. <span class="tag pend">quer?</span> = item opcional, você decide. Detalhes e decisões em README.md.</p>
+<p class="sub">Régua: WhatsApp Web medido em 19/11 (régua de chat; não é o DNA 27/27). Cores e fontes continuam as da Sofia; muda o jeito, não a cara. Nenhuma função atual sai. Editar e Fixar entram; Reagir e o filtro “Não lidas” saem. Detalhes e decisões em README.md.</p>
 <div class="grade" id="g"></div>
 <script>
 const I={
@@ -88,12 +88,12 @@ const telas=[];
 // 1a menu na resposta da Sofia (app, segurar)
 telas.push(cartao('1a · Menu da mensagem (Sofia) · app','Hoje segurar entra direto na seleção. Novo: segurar abre o menu colado embaixo; “Selecionar várias” leva à seleção de hoje (Responder, Copiar, Excluir). Os itens mudam conforme a mensagem.',
 fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${E('Cria uma tarefa pra amanhã: jogar o lixo','21:06 '+I.ok)}${S('Tarefa “Jogar o lixo” criada para amanhã.','21:07','foco')}
-${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:42px;top:200px')}</div>`+comp())));
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['pag','Fixar na conversa']],'left:42px;top:200px')}</div>`+comp())));
 
 // 1b minha mensagem, site hover + clique direito
 telas.push(cartao('1b · Menu da sua mensagem · site','No site: passar o mouse mostra a setinha ⌄ no canto da bolha; clicar nela ou clique direito abre o mesmo menu. ESC fecha.',
 fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${S('Bom dia! Quer que eu leia a agenda de hoje?','08:01')}<div class="l eu"><div class="b foco">Sim, e me lembra de ligar pro Jota<div class="h">08:02 ${I.ok}</div><span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:#4a3a6e;display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span></div></div>
-${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['ed','Editar (precisa do servidor)','quer']],'right:14px;top:205px')}</div>`+comp())));
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['ed','Editar (precisa do servidor)']],'right:14px;top:205px')}</div>`+comp())));
 
 // 1c linha de página + abre para cima
 telas.push(cartao('1c · Linha de página · última mensagem','Em conversa de página o menu traz Editar, Marcar tarefa e Abrir na página. Na última bolha não cabe embaixo: abre para cima, colado nela (precisa do seu ok).',
@@ -155,7 +155,7 @@ telas.push(cartao('8a · Site no computador · conversa aberta','Igual ao WhatsA
 web(cabLista+listaWeb, cabConv()+`<div class="msgs" style="padding:16px 60px">
 <div style="align-self:center;font-size:11px;color:var(--mudo);padding:3px 10px;border-radius:8px;background:var(--sup);border:1px solid var(--linha)">Hoje</div>
 ${S('Amanhã você tem dentista às 9h e reunião às 14h.','21:40')}<div class="l"><span class="s">S</span><div class="b foco" style="max-width:60%">Quer que eu avise 30 min antes?<div class="h">21:40</div>${seta}</div></div>${E('Sim, e muda a reunião pra 15h','21:41 '+I.ok)}
-${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:330px;top:250px')}</div>`+compWeb),'cartao web'));
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['pag','Fixar na conversa']],'left:330px;top:250px')}</div>`+compWeb),'cartao web'));
 
 telas.push(cartao('8b · Site no computador · Arquivadas e pesquisa','Clicar em “Arquivadas” troca a lista pela das arquivadas, com a seta ← para voltar (não abre janela). A lupa do cabeçalho abre a pesquisa no topo da conversa: setas pulam entre os achados, ESC fecha.',
 web(`<div style="display:flex;align-items:center;gap:14px;padding:18px 14px 14px"><span class="ico" style="color:var(--txt)">${I.volta}</span><div style="font-size:19px;font-weight:700">Arquivadas</div></div><div class="lista">
