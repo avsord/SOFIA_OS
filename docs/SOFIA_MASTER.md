@@ -20,7 +20,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
 - 2026-11-19 tarde, Claude Code (PC PEDRO), frente Atlas `sofia-os · conversa`. Só desenho; app e site intocados.
 - Pronto: remedidos no WhatsApp Web (só leitura, nada enviado) os 4 valores que o advisor apontou e corrigidos em `docs/design/2026-11-19-conversa/` (web.html, README) e na régua `whatsapp.json`: texto da bolha 14/20 px (o 14,2/19 é do contêiner), padding 6 7 8 9 numa div interna (texto a 7/9/10 px), hora 11/15, data 12/16 peso 600, campo pílula 52 px raio 26 padding 5. index.html sem "quer?": Editar e Fixar entram, Reagir sai.
-- Próximo passo: Pedro responde se Editar vale também na conversa com a Sofia (ela responde de novo?) e dá o "aprovado" para implementar só no site (Chat.tsx + ChatHub.tsx), com o Fable na revisão final.
+- Pedro decidiu (19/11): Editar vale na conversa com a Sofia (ela responde de novo), que tem a mesma identidade visual e fica fixa no topo. Próximo passo: o "aprovado" para implementar só no site (Chat.tsx + ChatHub.tsx), com o Fable na revisão final.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -247,7 +247,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - 2026-11-14 (Pedro: "para de ficar tentando corrigir o apk, depois atualizamos ele, isso está gastando token"): em ajustes rápidos, só o site; APK e testes que já falhavam ficam para quando ele pedir.
 - **15/11 (Pedro): Conversa = lista estilo WhatsApp ligada às páginas.** A Sofia é um contato; cada página é uma conversa (balão = bloco) e o que se escreve ali grava na página. Todas as páginas existem no chat: as que ele puxa ficam na principal, o resto em Arquivadas (arquivar aqui não mexe na barra lateral nem apaga nada). Precisa ter mic e anexos como no WhatsApp.
 
-- **(19/11) Conversa nova:** Editar e Fixar entram no menu da mensagem; Reagir e o filtro "Não lidas" saem (as conversas das páginas são só textos do Pedro).
+- **(19/11) Conversa nova:** Editar e Fixar entram no menu da mensagem; Reagir e o filtro "Não lidas" saem (as conversas das páginas são só textos do Pedro). A conversa com a Sofia tem a mesma identidade visual: ela é um contato como os outros, fixo no topo (não sai da lista); Editar vale nela também e a Sofia responde de novo à versão editada (precisa do servidor).
 
 ## 8. Regras que não se quebram
 - **Drive (07/11):** antes de mexer no Drive e depois de publicar, ler `[drive-teste]` e `[drive]` no registro do Railway; defeito que aparecer ali se corrige sem esperar o Pedro relatar.
@@ -280,7 +280,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 - **(19/11 ajustes)** Pedro confere no site: nota solta em cartão com 📝; Diário (hora travada, Enter = novo horário, Shift+Enter quebra linha, T1-T3 só no trecho selecionado); marcador forte; Ctrl+Z; "Ocultar da barra lateral" e o grupo "Ocultas". O registro antigo "05:2" não se corrige sozinho. Decidir se a barra das Páginas também ganha o marcador forte e o tamanho por trecho. Tamanho por trecho ainda não aparece no app do celular (só site).
-- **(19/11)** Desenho da nova Conversa (`docs/design/2026-11-19-conversa/`, medidas conferidas) esperando o "aprovado" do Pedro e a resposta sobre Editar na conversa com a Sofia; depois implementar menu único, Responder, Editar com 'editada', Apagar com Desfazer, contagem no botão de descer, envio sem 'Enviando…', Rascunho na lista, pesquisa dentro da conversa e tirar o recarregar de 6 s do quadro.
+- **(19/11)** Desenho da nova Conversa (`docs/design/2026-11-19-conversa/`, medidas conferidas) esperando o "aprovado" do Pedro (Editar na conversa com a Sofia decidido: sim, ela responde de novo; exige servidor); depois implementar menu único, Responder, Editar com 'editada', Apagar com Desfazer, contagem no botão de descer, envio sem 'Enviando…', Rascunho na lista, pesquisa dentro da conversa e tirar o recarregar de 6 s do quadro.
 - **(15/11 noite)** Pedro confere no site a Conversa estilo WhatsApp: lista de páginas, balões, escrever/áudio/anexo gravando na página, Arquivadas x principal, criar página e subpágina. Falta: notas (folhas) dentro da página como conversa; celular/app.
 - **(15/11)** Pedro confere no site: ponto do Início menor e a linha em L embaixo do Início com o item atual passando na horizontal (dizer se a velocidade e o tamanho estão bons).
 - **(14/11 tarde)** Pedro liga o "✎ Modelo Diário" na nota "ideias" e confere a hora de cada linha (o aviso diz quantas vieram do histórico e quantas caíram na data de criação da nota); notas avulsas (fora das pastas) guardam a escolha mas não têm histórico de versões por linha.

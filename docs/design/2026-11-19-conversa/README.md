@@ -8,7 +8,7 @@ e funções atuais ficam.
 ## Telas
 1. Menu único da mensagem (1a Sofia, 1b sua, 1c linha de página). App: segurar. Site: setinha ⌄ ao passar o mouse ou clique direito; ESC fecha. Animação curta (≈150 ms, entra de cima).
    - Sofia: Responder, Copiar, Selecionar várias, Apagar.
-   - Sua (conversa com a Sofia): Responder, Copiar, Selecionar várias, Apagar. Editar só se você quiser (é novo: precisa do servidor).
+   - Sua (conversa com a Sofia): Responder, Copiar, Selecionar várias, Apagar. Editar (decidido 19/11: a Sofia responde de novo à versão editada; precisa do servidor).
    - "Selecionar várias" leva à seleção que já existe (barra com Responder, Copiar, Excluir). Hoje segurar entra direto nela; passa a abrir o menu.
    - Linha de página: Responder, Copiar, Editar, Marcar tarefa, Abrir na página, Apagar.
 2. Responder: mesma barra da "Criar" (05/06): traço lilás, quem + trecho, X. ESC cancela.
@@ -23,7 +23,7 @@ e funções atuais ficam.
 - **Apagar sem perguntar.** Correção: o WhatsApp pergunta (seleciona → "Cancelar / Apagar para mim" → Desfazer). Ele pergunta porque existe "apagar para todos". A Sofia não tem essa escolha, então aqui fica sem janela, só com Desfazer.
 - **Menu na última bolha abre para cima** (colado nela). A regra de 03/11 diz "sempre para baixo", mas embaixo da última bolha está o campo de digitar. Nunca folha subindo do rodapé (recusada em 03/11).
 - **Decidido (19/11):** Editar e Fixar entram; Reagir, Encaminhar e o filtro "Não lidas" ficam fora: as conversas das páginas são só textos do Pedro (a da Sofia mantém a contagem de não lidas).
-- **Editar sua mensagem na conversa com a Sofia** não existe hoje e precisa de mudança no servidor (e na memória dela). Proposta, se quiser: a Sofia responde de novo à versão editada. Se não, Editar fica só nas linhas de página (onde já existe).
+- **Conversa com a Sofia (decidido 19/11):** mesma identidade visual das outras; ela é um contato como os outros, só que fixo no topo (não arquiva, não sai da lista). Editar vale também nela: a Sofia responde de novo à versão editada (precisa de mudança no servidor e na memória dela).
 
 ## Medido na conversa do WhatsApp Web (19/11, 1440 px)
 Bolha raio 7,5 px com a ponta da cauda reta, padding interno 6 7 8 9 (texto a 7/9/10 px das bordas), letra 14/20 px, sombra fina, hora 11/15 px; setinha 24×18 no canto; data 24 px de altura, raio 6, letra 12/16 peso 600; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula de 52 px, raio 26, padding 5, letra 15 px; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder. Animações medidas: setinha 75 ms deslizando; menu abre em 300 ms (desce 8 px e cresce de 95% com um leve passo de 101%) e fecha em 300 ms encolhendo; caixa de responder sobe 24 px em 300 ms e desce igual ao fechar.
