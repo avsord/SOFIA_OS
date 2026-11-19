@@ -8,7 +8,7 @@
 //   Word/Excel/PowerPoint com os editores da Sofia) ou abre (foto, video, PDF numa janela; pagina abre).
 // - Delete apaga, Ctrl+D duplica, setas empurram, Esc solta; Ctrl+Z/Ctrl+Y sao os da pagina.
 // - So desenha o que esta na tela (com folga); afastado, arquivos viram cartao leve (nao carrega video nem PDF).
-import {isImageIcon} from './PageGlyph';
+import {PageGlyph, isImageIcon} from './PageGlyph';
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -822,7 +822,7 @@ function PagePicker({pages, exclude, onPick, onClose, title = 'Trazer página pa
       kids.length && !q ? h('button', {type: 'button', 'aria-label': isOpen ? 'Fechar ' + (x.title || '') : 'Abrir ' + (x.title || ''), onClick: () => setOpen(o => ({...o, [x.id]: !isOpen})), style: {width: 20, height: 20, border: 0, padding: 0, background: 'transparent', color: c.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s'}},
         h('svg', {width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, 'aria-hidden': true}, h('path', {d: 'M9 6l6 6-6 6'}))) : h('span', {style: {width: 20, flexShrink: 0}}),
       h('button', {type: 'button', disabled: me, title: me ? 'É este quadro' : undefined, onClick: () => onPick(x), style: {flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: '100%', border: 0, padding: 0, background: 'transparent', color: c.text, cursor: me ? 'default' : 'pointer', fontSize: 14, fontFamily: 'inherit', textAlign: 'left'}},
-        isImageIcon(ic) ? h('img', {src: /^(https?:|data:)/i.test(String(ic)) ? String(ic) : 'https://' + String(ic), alt: '', style: {width: 20, height: 20, objectFit: 'contain', margin: '0', flexShrink: 0}}) : isEmojiIcon(ic) ? h('span', {style: {width: 20, textAlign: 'center', fontSize: 16, lineHeight: 1}}, String(ic)) : <Icon name="book" size={17} color={c.muted} />,
+        isImageIcon(ic) ? h('span', {style: {width: 20, display: 'inline-flex', justifyContent: 'center'}}, h(PageGlyph, {icon: String(ic), size: 16})) : isEmojiIcon(ic) ? h('span', {style: {width: 20, textAlign: 'center', fontSize: 16, lineHeight: 1}}, String(ic)) : <Icon name="book" size={17} color={c.muted} />,
         h('span', {style: {flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column'}}, h('span', {style: {whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: depth === 0 ? 600 : 500}}, x.title || 'Sem título'),
           sub ? h('span', {style: {color: c.muted, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, sub) : null),
         x.data?.lock_json ? <Icon name="lock" size={13} color={c.warn} /> : null)),
