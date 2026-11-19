@@ -16,8 +16,8 @@ e funções atuais ficam.
 4. Apagar: some na hora + "Linha apagada · Desfazer" (6 s), sem janela.
 5. Lendo as antigas: a tela não pula quando chega mensagem; o botão "Descer para a última mensagem" (já existe) ganha a contagem. Antigas carregam sozinhas ao chegar no topo.
 6. Enviar: bolha na hora com reloginho → ✓. Sai "Enviando…". Falha: "Não enviada · Tentar novamente" (mantido).
-7. Lista mostra "Rascunho:"; lupa no cabeçalho pesquisa dentro da conversa.
-8. Site no computador: lista à esquerda, conversa à direita, setinha ⌄ no hover, pesquisa no topo.
+7. Lista: "Arquivadas" sempre em cima, com a contagem (como no WhatsApp); mostra "Rascunho:"; lupa no cabeçalho pesquisa dentro da conversa.
+8. Site no computador (refeito 19/11 pela régua do WhatsApp Web): barra lateral da Sofia (fica) + lista de ~380 px (Pesquisar, filtros Tudo / Não lidas / Páginas, Arquivadas em cima, hora e contagem de não lidas) + conversa no resto. 8a: setinha ⌄ e menu. 8b: Arquivadas troca a lista (seta ← volta) + pesquisa na conversa. "Não lidas" e Fixar são opcionais.
 
 ## Decisões para o Pedro
 - **Apagar sem perguntar.** Correção: o WhatsApp pergunta (seleciona → "Cancelar / Apagar para mim" → Desfazer). Ele pergunta porque existe "apagar para todos". A Sofia não tem essa escolha, então aqui fica sem janela, só com Desfazer.

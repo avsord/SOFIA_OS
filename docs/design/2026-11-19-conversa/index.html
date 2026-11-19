@@ -41,7 +41,7 @@ h1{font-size:22px;margin:28px 20px 4px}p.sub{margin:0 20px 18px;color:var(--mudo
 .busca{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--linha);font-size:13px}
 .busca .in{flex:1;background:var(--sup2);border-radius:10px;padding:8px 10px}
 mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 2px}
-.site{width:820px;max-width:100%}.site .fone{height:520px;border-radius:14px}
+.web{width:1240px;max-width:100%}.web .fone{overflow:auto}
 .tag{display:inline-block;font-size:10.5px;font-weight:700;color:#17122A;background:var(--lil);border-radius:6px;padding:1px 6px;margin-right:6px}
 .pend{background:#E8B04A}
 </style></head><body>
@@ -74,6 +74,14 @@ const comp=(bar='',txt='Fale com a Sofia…')=>`<div class="comp">${bar}<div sty
 const menu=(itens,pos)=>`<div class="menu" style="${pos}">${itens.map(i=>i==='|'?'<div class="sep"></div>':`<div class="${i[2]||''}">${I[i[0]]}${i[1]}</div>`).join('')}</div>`;
 const fone=(conteudo)=>`<div class="fone">${conteudo}</div>`;
 const cartao=(t,n,c,cls='cartao')=>`<section class="${cls}"><h2>${t}</h2><p class="nota">${n}</p>${c}</section>`;
+I.arq='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9h16M12 12v5M9.5 14.5L12 17l2.5-2.5"/></svg>';
+I.mais='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>';
+I.volta='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>';
+I.pin='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg>';
+const arq=(n=3)=>`<div class="it" style="border-bottom:none;padding:12px 14px"><span style="width:34px;display:flex;justify-content:center;color:var(--lil)">${I.arq}</span><div style="flex:1;font-size:14.5px;color:var(--mudo)">Arquivadas</div><span style="font-size:11.5px;font-weight:700;color:var(--mudo)">${n}</span></div>`;
+const it=(av,cor,n,p,h,extra='',sel='')=>`<div class="it" style="${sel}"><div class="av" style="background:${cor};width:44px;height:44px;border-radius:14px">${av}</div><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span class="n">${n}</span><span style="font-size:11px;color:var(--mudo)">${h}</span></div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="p" style="max-width:none;flex:1">${p}</span>${extra}</div></div></div>`;
+const chip=(t,on)=>`<span style="padding:6px 13px;border-radius:16px;font-size:13px;font-weight:600;${on?'background:var(--minha);color:var(--txt)':'border:1px solid var(--linha);color:var(--mudo)'}">${t}</span>`;
+const rail=`<div style="width:58px;flex:none;background:#0f0d14;border-right:1px solid var(--linha);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--mudo);font-size:10px;text-align:center;line-height:13px;padding:6px">barra lateral da Sofia<br>(fica como está)</div>`;
 const telas=[];
 
 // 1a menu na resposta da Sofia (app, segurar)
@@ -112,13 +120,13 @@ telas.push(cartao('6 · Enviar','A mensagem aparece na hora com um reloginho, qu
 fone(topo()+`<div class="msgs">${E('Qual meu saldo do mês?','21:50 '+I.ok)}${S('Você gastou R$ 1.240 de R$ 3.000 em novembro.','21:50')}${E('E em outubro?','21:51 '+I.relo)}<div class="l eu"><div class="b" style="opacity:.85">Mostra por categoria<div class="h" style="color:var(--ruim)">Não enviada · <u>Tentar novamente</u></div></div></div><div style="font-size:12px;color:var(--mudo);padding-left:30px">Aguardando a Sofia…</div></div>`+comp())));
 
 // 7a lista com rascunho
-telas.push(cartao('7a · Lista de conversas com rascunho','O que você deixou escrito e não enviou aparece na lista como “Rascunho:”, em verde, até enviar ou apagar.',
+telas.push(cartao('7a · Lista de conversas com rascunho','“Arquivadas” fica sempre em cima, com a contagem, como no WhatsApp. O que você deixou escrito e não enviou aparece como “Rascunho:”, em verde, até enviar ou apagar.',
 fone(`<div class="topo"><div style="flex:1;font-size:28px;font-weight:600;letter-spacing:-.5px">Conversa</div><span class="ico">${I.lupa}</span><span class="ico" style="font-size:22px">+</span></div><div class="lista">
+${arq()}
 <div class="it"><div class="av">S</div><div style="flex:1"><div class="n">Sofia</div><div class="p"><span class="rasc">Rascunho:</span> muda a reunião pra 15h</div></div><span style="font-size:11px;color:var(--mudo)">21:41</span></div>
 <div class="it"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1"><div class="n">[Página] Viagem</div><div class="p">Comprar adaptador de tomada</div></div><span style="font-size:11px;color:var(--mudo)">10:20</span></div>
 <div class="it"><div class="av" style="background:#F5A0AE">P</div><div style="flex:1"><div class="n">[Página] Casa</div><div class="p"><span class="rasc">Rascunho:</span> ver orçamento do pintor</div></div><span style="font-size:11px;color:var(--mudo)">ontem</span></div>
-<div class="it"><div class="av" style="background:#E8B04A">P</div><div style="flex:1"><div class="n">[Página] Ideias</div><div class="p">Vídeo sobre rotina</div></div><span style="font-size:11px;color:var(--mudo)">seg</span></div>
-<div class="it" style="color:var(--mudo);font-size:13px">Arquivadas</div></div>`)));
+<div class="it"><div class="av" style="background:#E8B04A">P</div><div style="flex:1"><div class="n">[Página] Ideias</div><div class="p">Vídeo sobre rotina</div></div><span style="font-size:11px;color:var(--mudo)">seg</span></div></div>`)));
 
 // 7b pesquisar dentro
 telas.push(cartao('7b · Pesquisar dentro da conversa','A lupa do cabeçalho busca no que foi escrito (hoje só busca pelo título). Setas pulam entre os achados; ESC fecha.',
@@ -126,14 +134,35 @@ fone(`<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div cl
 
 
 // 8 site (computador): lista + conversa, setinha no hover, menu e pesquisa
-telas.push(cartao('8 · Site no computador','Lista à esquerda (com Rascunho), conversa à direita. Passar o mouse mostra a setinha ⌄ na bolha; clique nela ou clique direito abre o menu; ESC fecha. A lupa abre a pesquisa no topo da conversa.',
-`<div class="fone" style="flex-direction:row"><div style="width:270px;border-right:1px solid var(--linha);display:flex;flex-direction:column"><div class="topo"><div style="flex:1;font-size:24px;font-weight:600;letter-spacing:-.5px">Conversa</div><span class="ico">${I.lupa}</span><span class="ico" style="font-size:20px">+</span></div><div class="lista">
-<div class="it" style="background:#ffffff0a"><div class="av">S</div><div style="flex:1;min-width:0"><div class="n">Sofia</div><div class="p" style="max-width:170px"><span class="rasc">Rascunho:</span> muda a reunião pra 15h</div></div></div>
-<div class="it"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1;min-width:0"><div class="n">[Página] Viagem</div><div class="p" style="max-width:170px">Comprar adaptador</div></div></div>
-<div class="it"><div class="av" style="background:#F5A0AE">P</div><div style="flex:1;min-width:0"><div class="n">[Página] Casa</div><div class="p" style="max-width:170px">Pintor na terça</div></div></div></div></div>
-<div style="flex:1;display:flex;flex-direction:column;position:relative">${topo()}<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div class="in">reunião</div><span style="color:var(--mudo);font-size:12px">1 de 3</span><span>⌃</span><span>⌄</span><span style="color:var(--mudo)">${I.x}</span></div>
-<div class="msgs">${S('Amanhã você tem dentista às 9h e <mark>reunião</mark> às 14h.','21:40')}<div class="l"><span class="s">S</span><div class="b foco">Quer que eu avise 30 min antes?<div class="h">21:40</div><span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:var(--sup2);display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span></div></div>${E('Sim','21:41 '+I.ok)}
-${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo']],'left:42px;top:50px')}</div>${comp()}</div></div>`,'cartao site'));
+// 8 site no computador: régua do WhatsApp Web (3 colunas)
+const painelLista=(conteudo)=>`<div style="width:380px;flex:none;border-right:1px solid var(--linha);display:flex;flex-direction:column">${conteudo}</div>`;
+const cabLista=`<div style="display:flex;align-items:center;padding:16px 14px 8px"><div style="flex:1;font-size:22px;font-weight:700;letter-spacing:-.3px">Conversa</div><span class="ico" style="font-size:22px">+</span><span class="ico">${I.mais}</span></div>
+<div style="padding:4px 14px 10px"><div style="display:flex;gap:10px;align-items:center;background:var(--sup2);border-radius:20px;padding:9px 14px;color:var(--mudo);font-size:13.5px">${I.lupa}Pesquisar conversas</div></div>
+<div style="display:flex;gap:8px;padding:0 14px 8px">${chip('Tudo',1)}${chip('Não lidas <b style="font-size:11px">2</b>')}${chip('Páginas')}</div>`;
+const listaWeb=`<div class="lista">${arq()}
+${it('S','var(--lil)','Sofia','<span class="rasc">Rascunho:</span> muda a reunião pra 15h','21:41',`<span style="color:var(--mudo)">${I.pin}</span>`,'background:#ffffff0d')}
+${it('P','#8fb4ff','[Página] Viagem','Comprar adaptador de tomada','10:20','<span style="background:var(--lil);color:#17122A;font-size:10.5px;font-weight:800;border-radius:9px;padding:1px 7px">2</span>')}
+${it('P','#F5A0AE','[Página] Casa','<span class="rasc">Rascunho:</span> ver orçamento do pintor','ontem')}
+${it('P','#E8B04A','[Página] Ideias','Vídeo sobre rotina','seg')}
+${it('P','#5FD3A2','[Página] Saúde','Dentista dia 21 às 9h','17/11/2026')}</div>`;
+const cabConv=(extra='')=>`<div class="topo" style="padding:10px 16px;background:var(--sup)"><div class="av" style="width:40px;height:40px;border-radius:13px">S</div><div style="flex:1"><div style="font-size:15px;font-weight:700">Sofia</div><div style="font-size:11.5px;color:var(--mudo)">online · lembra do que vocês já conversaram</div></div><span class="ico">${I.lupa}</span><span class="ico">${I.rel}</span><span class="ico">${I.mais}</span>${extra}</div>`;
+const compWeb=`<div class="comp" style="padding:10px 16px"><div style="display:flex;gap:10px;align-items:center"><span class="ico" style="font-size:22px">+</span><div class="campo" style="flex:1;border-radius:12px">Digite uma mensagem<span style="flex:1"></span><span class="ico">${I.clip}</span></div><div class="mic">${I.mic}</div></div></div>`;
+const seta=`<span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:var(--sup2);display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span>`;
+const web=(lista,conv)=>`<div class="fone" style="flex-direction:row;height:640px;border-radius:12px">${rail}${painelLista(lista)}<div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">${conv}</div></div>`;
+
+telas.push(cartao('8a · Site no computador · conversa aberta','Igual ao WhatsApp Web: lista de ~380 px à esquerda, com Pesquisar, filtros e “Arquivadas” sempre em cima; a conversa ocupa o resto. Passar o mouse na bolha mostra a setinha ⌄; clique nela ou clique direito abre o menu; ESC fecha. Fixar (📌) e “Não lidas” são <span class="tag pend">quer?</span>.',
+web(cabLista+listaWeb, cabConv()+`<div class="msgs" style="padding:16px 60px">
+<div style="align-self:center;font-size:11px;color:var(--mudo);padding:3px 10px;border-radius:8px;background:var(--sup);border:1px solid var(--linha)">Hoje</div>
+${S('Amanhã você tem dentista às 9h e reunião às 14h.','21:40')}<div class="l"><span class="s">S</span><div class="b foco" style="max-width:60%">Quer que eu avise 30 min antes?<div class="h">21:40</div>${seta}</div></div>${E('Sim, e muda a reunião pra 15h','21:41 '+I.ok)}
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:330px;top:250px')}</div>`+compWeb),'cartao web'));
+
+telas.push(cartao('8b · Site no computador · Arquivadas e pesquisa','Clicar em “Arquivadas” troca a lista pela das arquivadas, com a seta ← para voltar (não abre janela). A lupa do cabeçalho abre a pesquisa no topo da conversa: setas pulam entre os achados, ESC fecha.',
+web(`<div style="display:flex;align-items:center;gap:14px;padding:18px 14px 14px"><span class="ico" style="color:var(--txt)">${I.volta}</span><div style="font-size:19px;font-weight:700">Arquivadas</div></div><div class="lista">
+${it('P','#9aa3b5','[Página] Mudança 2025','Entregar chaves','03/10/2026')}
+${it('P','#9aa3b5','[Página] Curso inglês','Aula 12 feita','21/09/2026')}
+${it('P','#9aa3b5','[Página] Festa Lia','Bolo encomendado','02/08/2026')}</div>
+<div style="padding:14px;font-size:12px;color:var(--mudo);line-height:17px">Chegou mensagem numa arquivada? Ela continua aqui (como no WhatsApp).</div>`,
+cabConv()+`<div class="busca" style="padding:8px 16px"><span style="color:var(--mudo)">${I.lupa}</span><div class="in">reunião</div><span style="color:var(--mudo);font-size:12px">1 de 3</span><span>⌃</span><span>⌄</span><span style="color:var(--mudo)">${I.x}</span></div><div class="msgs" style="padding:16px 60px">${S('Amanhã você tem dentista às 9h e <mark>reunião</mark> às 14h.','21:40','foco')}${E('Sim, e muda a <mark>reunião</mark> pra 15h','21:41 '+I.ok)}${S('Feito: <mark>reunião</mark> às 15h.','21:41')}</div>`+compWeb),'cartao web'));
 document.getElementById('g').innerHTML=telas.join('');
 </script>
 </body></html>

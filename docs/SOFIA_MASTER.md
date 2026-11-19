@@ -19,6 +19,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
 - 2026-11-19, Claude Code (PC PEDRO, Opus com Fable de conselheiro). Mimic Kaizen mediu o WhatsApp Web (régua de chat; mensagem de teste na conversa do Pedro com ele mesmo, apagada) e fez o DESENHO da nova Conversa: `docs/design/2026-11-19-conversa/` (index.html + README com 4 decisões). Nada mudou no código do app.
+- Ajuste 19/11 (pedido do Pedro): "Arquivadas" sempre em cima da lista (como no WhatsApp) e tela do computador refeita pela régua do WhatsApp Web (8a conversa + menu, 8b Arquivadas + pesquisa).
 - Próximo passo: Pedro aprova/ajusta o desenho (menu na última bolha abrindo para cima; Reagir/Fixar/Encaminhar sim ou não; Editar na conversa com a Sofia faz ela responder de novo?). Com o ok: implementar só no site, consultando o Fable na revisão final.
 
 ## 1. O dono e a forma de trabalhar
