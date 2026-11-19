@@ -385,11 +385,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
 | 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
 | 2026-11-19 | (sem APK) | (este) | Ícone em imagem: sem margem vazia, mesma caixa do emoji comum (nome alinhado, mesma altura) em barra, lista, título, busca e quadro | tsc/testes ok (061 já falhava), site recompilado; medido em simulação local |
 | 2026-11-19 | (sem APK) | (este) | Mimic Kaizen: WhatsApp Web medido como régua de chat; desenho da nova Conversa para aprovação em docs/design/2026-11-19-conversa | só desenho, código do app intocado |
 | 2026-11-19 | (sem APK) | (este) | Notas/Diário: nota solta em cartão com 📝; hora e data travadas; Enter abre o próximo horário; T1-T3 com seleção mudam só o trecho; marcador com cores cheias; Ctrl+Z fora do campo desfaz na nota; ocultar página da barra (grupo "Ocultas"); linha "agora" do Início só informativa | tsc ok, testes sem falha nova (4 antigas); site recompilado; não conferido na tela |
+| 2026-11-19 | (sem APK) | (este) | Desenho Conversa: web.html em tela cheia com medidas reais da lista do WhatsApp Web (431 px, linha 76, Arquivadas deslizando 300 ms) e mecanismos funcionando | só desenho; conversa do WhatsApp ainda não medida |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

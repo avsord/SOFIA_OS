@@ -26,7 +26,7 @@ e funções atuais ficam.
 - **Editar sua mensagem na conversa com a Sofia** não existe hoje e precisa de mudança no servidor (e na memória dela). Proposta, se quiser: a Sofia responde de novo à versão editada. Se não, Editar fica só nas linhas de página (onde já existe).
 
 ## Não medido no WhatsApp (escolha da Sofia, não cópia)
-ESC fechando o menu; antigas carregando sozinhas.
+ESC fechando o menu; antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
 
 ## Correções sem desenho (entram junto)
 - O quadro da conversa recarrega de novo 6 s depois de abrir (`Chat.tsx`, `setTimeout(...loadBoard...,6000)`): pode trocar/piscar; recarregar só quando mudar.

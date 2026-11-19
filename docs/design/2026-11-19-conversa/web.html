@@ -25,15 +25,15 @@ svg{flex:none}
 .pesq{margin:2px 16px 8px;height:40px;border-radius:20px;background:var(--sup2);display:flex;align-items:center;gap:12px;padding:0 14px;color:var(--mudo)}
 .pesq input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:inherit;font-size:14px}
 .chips{display:flex;gap:8px;padding:0 16px 10px}
-.chip{height:32px;padding:0 13px;border-radius:16px;border:1px solid var(--linha);color:var(--mudo);font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;cursor:pointer}
-.chip.on{background:var(--minha);border-color:transparent;color:var(--txt)}
+.chip{height:32px;padding:0 13px;border-radius:9999px;transition:transform .12s cubic-bezier(.2,0,0,1);border:1px solid var(--linha);color:var(--mudo);font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.chip:active{transform:scale(.95)}.chip.on{background:var(--minha);border-color:transparent;color:var(--txt)}
 .rol{flex:1;overflow-y:auto}
-.arq{height:50px;display:flex;align-items:center;gap:18px;padding:0 24px 0 28px;cursor:pointer;color:var(--mudo);font-size:15px}
+.arq{height:49px;display:flex;align-items:center;gap:18px;padding:0 24px 0 28px;cursor:pointer;color:var(--mudo);font-size:15px}
 .arq:hover,.it:hover{background:#ffffff08}
 .arq svg{color:var(--lil)}.arq b{margin-left:auto;font-size:12px}
-.it{height:72px;display:flex;align-items:center;gap:14px;padding:0 16px 0 14px;cursor:pointer;position:relative}
+.it{height:76px;display:flex;align-items:center;gap:14px;padding:0 16px 0 14px;cursor:pointer;position:relative}
 .it.sel{background:#ffffff10}
-.av{width:49px;height:49px;border-radius:15px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;color:#17122A;font-size:17px}
+.av{width:48px;height:48px;border-radius:15px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;color:#17122A;font-size:17px}
 .it .tx{flex:1;min-width:0;border-bottom:1px solid #1f1c27;height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px}
 .lin{display:flex;align-items:center;gap:8px}
 .lin .n{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -41,7 +41,8 @@ svg{flex:none}
 .lin .p{flex:1;font-size:14px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cont{min-width:20px;height:20px;border-radius:10px;background:var(--lil);color:#17122A;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px}
 .rasc{color:var(--ok);font-weight:600}
-.it .mais{position:absolute;right:14px;bottom:12px;display:none;color:var(--mudo)}.it:hover .mais{display:block}
+.it .mais{position:absolute;right:14px;bottom:12px;display:flex;justify-content:flex-end;overflow:hidden;width:5px;opacity:0;color:var(--mudo);transition:width 75ms var(--curva),opacity 75ms var(--curva)}.it:hover .mais{width:20px;opacity:1}
+.lista{position:relative;overflow:hidden}.painelArq{position:absolute;inset:0;background:var(--painel);z-index:4;display:flex;flex-direction:column;animation:desliza 300ms cubic-bezier(.1,.82,.25,1)}.painelArq.sai{animation:volta 200ms ease-in forwards}@keyframes desliza{from{transform:translateX(-100%)}}@keyframes volta{to{transform:translateX(-100%)}}
 /* conversa */
 .conv{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--fundo);position:relative}
 .ccab{height:64px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--sup);border-bottom:1px solid var(--linha)}
@@ -76,6 +77,20 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
 .mic{width:42px;height:42px;border-radius:21px;background:var(--lil);display:flex;align-items:center;justify-content:center;color:#17122A}
 .desce{position:absolute;right:24px;bottom:80px;width:42px;height:42px;border-radius:21px;background:var(--sup2);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center}
 .desce i{position:absolute;top:-6px;right:-4px;font-style:normal;font-size:10.5px;font-weight:800;background:var(--lil);color:#17122A;border-radius:9px;padding:1px 6px}
+:root{--t-rapido:75ms;--t-lento:300ms;--curva:cubic-bezier(.14,.62,.33,.9)}
+.desce{opacity:0;transform:scale(.6);pointer-events:none;transition:opacity var(--t-lento) var(--curva),transform var(--t-lento) var(--curva);cursor:pointer}
+.desce.on{opacity:1;transform:none;pointer-events:auto}.desce i:empty{display:none}
+.citar{display:none;margin:0 16px;padding:8px 10px 8px 0;background:var(--sup2);border-radius:10px 10px 0 0;align-items:center;gap:10px;font-size:13px;animation:sobe var(--t-lento) var(--curva)}
+.citar.on{display:flex}.citar .tr{width:4px;align-self:stretch;border-radius:2px;background:var(--lil)}
+.citar b{display:block;color:var(--lil);font-size:12.5px}.citar span{color:var(--mudo);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px}
+@keyframes sobe{from{transform:translateY(100%);opacity:0}}
+.q{border-left:4px solid var(--lil);background:#0003;border-radius:6px;padding:5px 8px;margin-bottom:5px;font-size:13px;color:var(--mudo)}.q b{display:block;color:var(--lil);font-size:12.5px}
+.toast{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);background:#2a2536;border:1px solid var(--linha);border-radius:10px;padding:10px 16px;display:flex;gap:18px;align-items:center;box-shadow:0 8px 24px #0008;font-size:14px;animation:sobe var(--t-lento) var(--curva);z-index:5}
+.toast a{color:var(--lil);font-weight:700;cursor:pointer}
+.l.nova{animation:entra var(--t-rapido) ease-out}@keyframes entra{from{opacity:0;transform:translateY(6px)}}
+.digit{font-size:13px;color:var(--mudo);margin:8px 0 0 4px}
+.mic{cursor:pointer;transition:transform var(--t-rapido)}
+.edt{background:var(--sup2)!important;outline:1px solid var(--lil)}
 .aviso{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:20;background:#E8B04A;color:#17122A;font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px}
 </style></head><body>
 <div class="aviso">Desenho para aprovação · passe o mouse nas mensagens, clique na setinha ou com o botão direito · clique em Arquivadas · lupa da conversa</div>
@@ -93,7 +108,8 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
   <div class="busca" id="busca"><span id="bl"></span><input id="bq" value="reunião"><span id="bn"></span><button class="bt" id="bc">⌃</button><button class="bt" id="bb">⌄</button><button class="bt" id="bx"></button></div>
   <div class="msgs" id="msgs"></div>
   <div class="desce" title="Descer para a última mensagem"></div>
-  <div class="comp"><button class="bt" style="font-size:24px">+</button><div class="campo"><input placeholder="Digite uma mensagem" value="muda a reunião pra 15h"><button class="bt" id="clip"></button></div><div class="mic" id="mic"></div></div>
+  <div class="citar" id="citar"><span class="tr"></span><div style="flex:1;min-width:0"><b id="cq"></b><span id="ct"></span></div><button class="bt" id="cx">✕</button></div>
+  <div class="comp"><button class="bt" style="font-size:24px">+</button><div class="campo"><input id="campo" placeholder="Digite uma mensagem" value="muda a reunião pra 15h"><button class="bt" id="clip"></button></div><div class="mic" id="mic"></div></div>
  </main>
 </div>
 <div class="menu" id="menu"></div>
@@ -123,31 +139,64 @@ const conversas=[
  ['P','#ff9f7a','[Página] Finanças','Fatura vence dia 10','12/11/2026',''],
  ['P','#7fd1e8','[Página] Leituras','Terminar o capítulo 4','09/11/2026','']];
 const arquivadas=[['P','#9aa3b5','[Página] Mudança 2025','Entregar chaves','03/10/2026',''],['P','#9aa3b5','[Página] Curso inglês','Aula 12 feita','21/09/2026',''],['P','#9aa3b5','[Página] Festa Lia','Bolo encomendado','02/08/2026','']];
-const linha=([a,c,n,p,h,dir,fixa,sel,nova])=>`<div class="it ${sel?'sel':''}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${p}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada (quer?)">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
+const linha=([a,c,n,p,h,dir,fixa,sel,nova],ix)=>`<div class="it ${ix===cv?'sel':''}" data-c="${ix}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${rasc[ix]&&ix!==cv?'<span class="rasc">Rascunho:</span> '+rasc[ix]:p.replace(/<span class="rasc">Rascunho:<\/span> /,'')}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada (quer?)">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
 function lista(){ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><button class="bt" title="Nova conversa">${I.nova}</button><button class="bt" title="Mais opções">${I.mais}</button></div>
 <div class="pesq">${I.lupa}<input placeholder="Pesquisar conversas"></div>
 <div class="chips"><span class="chip on">Tudo</span><span class="chip" title="opcional (quer?)">Não lidas <b style="font-size:12px">2</b></span><span class="chip">Páginas</span></div>
 <div class="rol"><div class="arq" id="abreArq">${I.arq}<span>Arquivadas</span><b>${arquivadas.length}</b></div>${conversas.map(linha).join('')}</div>`;
- $('abreArq').onclick=listaArq;}
-function listaArq(){ $('lista').innerHTML=`<div class="cab" style="gap:14px"><button class="bt" id="voltar" title="Voltar">${I.volta}</button><h1 style="font-size:19px">Arquivadas</h1></div>
-<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Estas conversas continuam arquivadas mesmo quando chega mensagem nova.</div><div class="rol">${arquivadas.map(linha).join('')}</div>`;
- $('voltar').onclick=lista;}
-lista();
-
-const M=[['dia','Ontem'],['s','Bom dia! Quer que eu leia a agenda de hoje?','08:01'],['e','Sim, e me lembra de ligar pro Jota','08:02'],['s','Agenda de hoje: dentista às 9h, almoço com a Lia às 12h30. Lembrete das 17h: ligar pro Jota.','08:02',1],
+ $('abreArq').onclick=listaArq;
+ document.querySelectorAll('#lista .it[data-c]').forEach(e=>e.onclick=()=>troca(+e.dataset.c));}
+function listaArq(){ const p=document.createElement("div");p.className="painelArq";p.innerHTML=`<div class="cab" style="gap:14px"><button class="bt" id="voltar" title="Voltar">${I.volta}</button><h1 style="font-size:19px">Arquivadas</h1></div>
+<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Conversas guardadas fora da lista principal. (O que acontece quando chega mensagem numa arquivada: a decidir.)</div><div class="rol">${arquivadas.map((x)=>linha(x,-1)).join('')}</div>`;
+ $("lista").appendChild(p);$("voltar").onclick=()=>{p.classList.add("sai");setTimeout(()=>p.remove(),200)};}
+let cv=0;const rasc={0:'muda a reunião pra 15h',2:'ver orçamento do pintor'};
+const M=[["dia","17/11/2026"],["e","Quanto gastei esse mês?","09:12"],["s","Até agora R$ 1.240 de R$ 3.000.","09:12"],["e","E com mercado?","09:13",1],["s","R$ 410 em mercado, 33% do total.","09:13"],["e","Anota: comprar ração","19:40"],["s","Anotado na página Casa.","19:40"],["e","Que horas é o dentista?","20:05"],["s","Dia 21 às 9h.","20:05"],["e","Me lembra na véspera","20:06",1],["s","Lembrete criado para 20/11 às 20h.","20:06"],['dia','Ontem'],['s','Bom dia! Quer que eu leia a agenda de hoje?','08:01'],['e','Sim, e me lembra de ligar pro Jota','08:02'],['s','Agenda de hoje: dentista às 9h, almoço com a Lia às 12h30. Lembrete das 17h: ligar pro Jota.','08:02',1],
 ['dia','Hoje'],['e','Cria uma tarefa pra amanhã: jogar o lixo','21:06'],['s','Tarefa “Jogar o lixo” criada para amanhã.','21:07'],['s','Amanhã você tem dentista às 9h e reunião às 14h.','21:40',1],['s','Quer que eu avise 30 min antes?','21:40',1],
 ['e','Sim','21:41'],['e','e me lembra da reunião às 13h30','21:41',1,'relo']];
-let ant='';
-$('msgs').innerHTML=M.map((m,i)=>{ if(m[0]==='dia'){ant='';return `<div class="dia">${m[1]}</div>`}
- const seg=ant===m[0];ant=m[0];const st=m[0]==='e'?(m[4]==='relo'?I.relo:I.ok):'';
- return `<div class="l ${m[0]==='e'?'eu':''} ${seg?'seg':''}"><div class="b" data-i="${i}" data-q="${m[0]}"><span class="t">${m[1]}</span><span class="h">${m[2]} ${st}</span><span class="seta">${I.seta}</span></div></div>`}).join('');
-$('msgs').scrollTop=1e5;
+const menu=$("menu");
+const outras=[[['dia','Hoje'],['e','Levar carregador do notebook','09:58'],['e','Reservar hotel até sexta','10:14',1],['e','Comprar adaptador de tomada','10:20',1]],[['dia','Ontem'],['e','Pintor vem na terça','18:02']]];
+const conv=c=>c===0?M:(outras[(c-1)%2]);
+const icone=(m)=>m[0]!=='e'?'':(m[4]==='relo'?I.relo:I.ok);
+function bolha(m,i,seg,nova){const q=m[5]?`<div class="q"><b>${m[5][0]}</b>${m[5][1]}</div>`:'';
+ return `<div class="l ${m[0]==='e'?'eu':''} ${seg?'seg':''} ${nova?'nova':''}"><div class="b" data-i="${i}" data-q="${m[0]}">${q}<span class="t">${m[1]}</span><span class="h">${m[2]} ${icone(m)}</span><span class="seta">${I.seta}</span></div></div>`}
+function render(){let ant='';$('msgs').innerHTML=conv(cv).map((m,i)=>{if(m[0]==='dia'){ant='';return `<div class="dia">${m[1]}</div>`}const seg=ant===m[0];ant=m[0];return bolha(m,i,seg)}).join('');$('msgs').scrollTop=1e5;novas=0;desce()}
+function troca(c){if(c===cv)return;const v=$('campo').value.trim();if(v)rasc[cv]=v;else delete rasc[cv];cv=c;$('campo').value=rasc[c]||'';
+ const d=conversas[c];document.querySelector('.ccab .av').style.background=d[1];document.querySelector('.ccab .av').textContent=d[0];document.querySelector('.ccab .nm b').textContent=d[2];document.querySelector('.ccab .nm span').textContent=c===0?'online · lembra do que vocês já conversaram':'conversa da página';
+ fechaCitar();render();lista();botao()}
+// botão de descer: só aparece ao rolar para cima; conta as novas
+let novas=0;function desce(){const m=$('msgs');const longe=m.scrollHeight-m.scrollTop-m.clientHeight>150;document.querySelector('.desce').classList.toggle('on',longe);document.querySelector('.desce i').textContent=novas||'';if(!longe)novas=0}
+$('msgs').addEventListener('scroll',desce);document.querySelector('.desce').onclick=()=>$('msgs').scrollTo({top:1e6,behavior:'smooth'});
+// microfone vira Enviar ao digitar
+const ENV=sv('<path d="M4 12l16-8-6 16-3-7z"/>',20,2);function botao(){$('mic').innerHTML=$('campo').value.trim()?ENV:I.mic;$('mic').title=$('campo').value.trim()?'Enviar':'Mensagem de voz'}
+$('campo').oninput=botao;
+// responder
+let cita=null;function abreCitar(m){cita=[m[0]==='e'?'Você':(cv===0?'Sofia':conversas[cv][2]),m[1]];$('cq').textContent=cita[0];$('ct').textContent=cita[1];$('citar').classList.add('on');$('campo').focus()}
+function fechaCitar(){cita=null;$('citar').classList.remove('on')}$('cx').onclick=fechaCitar;
+// enviar: aparece na hora com reloginho; vira ✓ quando o servidor salva
+function hora(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function envia(){const v=$('campo').value.trim();if(!v)return;const L=conv(cv);const m=['e',v,hora(),1,'relo',cita];L.push(m);$('campo').value='';delete rasc[cv];fechaCitar();botao();render();lista();
+ setTimeout(()=>{m[4]='';render();if(cv===0){const msgs=$('msgs');msgs.insertAdjacentHTML('beforeend','<div class="digit" id="dg">Sofia está digitando…</div>');msgs.scrollTop=1e6;
+ setTimeout(()=>{$('dg')?.remove();const r=['s','Anotado. (resposta de exemplo do desenho)',hora(),1];L.push(r);const m2=$('msgs'),longe=m2.scrollHeight-m2.scrollTop-m2.clientHeight>150;if(longe){novas++;m2.insertAdjacentHTML('beforeend',bolha(r,L.length-1,false,true));desce()}else render()},1400)}},600)}
+$('mic').onclick=envia;$('campo').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();envia()}});
+// aviso com Desfazer
+function aviso(txt,desf){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.innerHTML=`<span>${txt}</span>${desf?'<a>Desfazer</a>':''}`;document.querySelector('.conv').appendChild(t);
+ if(desf)t.querySelector('a').onclick=()=>{desf();t.remove()};setTimeout(()=>t.remove(),desf?6000:2500)}
+// ações do menu
+menu.addEventListener('click',e=>{const it=e.target.closest('div[data-a]');if(!it||!atual)return;const i=+atual.dataset.i,L=conv(cv),m=L[i];const a=it.dataset.a;fecha();
+ if(a==='resp')abreCitar(m);
+ if(a==='cop'){navigator.clipboard?.writeText(m[1]).catch(()=>{});aviso('Mensagem copiada')}
+ if(a==='apa'){L.splice(i,1);render();aviso('Mensagem apagada',()=>{L.splice(i,0,m);render()})}
+ if(a==='ed'){const b=document.querySelector(`.b[data-i="${i}"]`),t=b.querySelector('.t');b.classList.add('edt');t.contentEditable=true;t.focus();document.getSelection().selectAllChildren(t);document.getSelection().collapseToEnd();
+  t.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();m[1]=t.textContent;m[2]=m[2].replace(/ · editada$/,'')+' · editada';render()}if(ev.key==='Escape'){ev.stopPropagation();render()}}}
+ if(a==='sel')aviso('Abre a seleção que já existe (Responder, Copiar, Excluir)')
+ if(a==='rea')aviso('Reagir: opcional (quer?)');if(a==='fix')aviso('Fixar: opcional (quer?)')});
+lista();render();botao();
 
-const menu=$('menu');let atual=null;
+let atual=null;
 function abre(b,x,y){ fecha(); atual=b;b.classList.add('foco');
  const eu=b.dataset.q==='e';
  const its=[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar','quer']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['rea','Reagir','quer'],['fix','Fixar','quer']];
- menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('');
+ menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div data-a="${t[0]}" class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('');
  menu.classList.add('on');const r=menu.getBoundingClientRect();
  if(y+r.height>innerHeight-70){y=Math.max(8,y-r.height);menu.style.transformOrigin='bottom left'}else menu.style.transformOrigin='top left';
  if(x+r.width>innerWidth-8)x=innerWidth-r.width-8;menu.style.left=x+'px';menu.style.top=y+'px';}
@@ -155,7 +204,7 @@ function fecha(){menu.classList.remove('on');if(atual)atual.classList.remove('fo
 $('msgs').addEventListener('click',e=>{const s=e.target.closest('.seta');if(s){const b=s.closest('.b'),r=b.getBoundingClientRect();abre(b,b.dataset.q==='e'?r.right-210:r.left,r.top+28);e.stopPropagation()}});
 $('msgs').addEventListener('contextmenu',e=>{const b=e.target.closest('.b');if(b){e.preventDefault();abre(b,e.clientX,e.clientY)}});
 document.addEventListener('click',e=>{if(!menu.contains(e.target))fecha()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){fecha();$('busca').classList.remove('on');marca('')}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){fecha();fechaCitar();$('busca').classList.remove('on');marca('')}});
 
 // pesquisa dentro da conversa
 let achados=[],pos=0;
