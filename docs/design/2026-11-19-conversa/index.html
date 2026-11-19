@@ -77,14 +77,14 @@ const cartao=(t,n,c,cls='cartao')=>`<section class="${cls}"><h2>${t}</h2><p clas
 const telas=[];
 
 // 1a menu na resposta da Sofia (app, segurar)
-telas.push(cartao('1a · Menu da mensagem (Sofia) · app','Segurar a bolha abre o menu colado embaixo dela. O mesmo menu em toda a Conversa; os itens mudam conforme a mensagem.',
+telas.push(cartao('1a · Menu da mensagem (Sofia) · app','Hoje segurar entra direto na seleção. Novo: segurar abre o menu colado embaixo; “Selecionar várias” leva à seleção de hoje (Responder, Copiar, Excluir). Os itens mudam conforme a mensagem.',
 fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${E('Cria uma tarefa pra amanhã: jogar o lixo','21:06 '+I.ok)}${S('Tarefa “Jogar o lixo” criada para amanhã.','21:07','foco')}
-${menu([['resp','Responder'],['cop','Copiar'],['tar','Marcar tarefa'],['sel','Selecionar'],'|',['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:42px;top:200px')}</div>`+comp())));
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:42px;top:200px')}</div>`+comp())));
 
 // 1b minha mensagem, site hover + clique direito
 telas.push(cartao('1b · Menu da sua mensagem · site','No site: passar o mouse mostra a setinha ⌄ no canto da bolha; clicar nela ou clique direito abre o mesmo menu. ESC fecha.',
 fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${S('Bom dia! Quer que eu leia a agenda de hoje?','08:01')}<div class="l eu"><div class="b foco">Sim, e me lembra de ligar pro Jota<div class="h">08:02 ${I.ok}</div><span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:#4a3a6e;display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span></div></div>
-${menu([['resp','Responder'],['cop','Copiar'],['ed','Editar'],['sel','Selecionar'],'|',['apa','Apagar','perigo']],'right:14px;top:205px')}</div>`+comp())));
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['ed','Editar (precisa do servidor)','quer']],'right:14px;top:205px')}</div>`+comp())));
 
 // 1c linha de página + abre para cima
 telas.push(cartao('1c · Linha de página · última mensagem','Em conversa de página o menu traz Editar, Marcar tarefa e Abrir na página. Na última bolha não cabe embaixo: abre para cima, colado nela (precisa do seu ok).',
@@ -109,7 +109,7 @@ fone(topo()+`<div class="msgs" style="justify-content:flex-start"><div style="al
 
 // 6 enviando e erro
 telas.push(cartao('6 · Enviar','A mensagem aparece na hora com um reloginho, que vira ✓ quando o servidor salva. Sai o texto “Enviando…”. Se falhar: “Não enviada · Tentar novamente” (função mantida).',
-fone(topo()+`<div class="msgs">${E('Qual meu saldo do mês?','21:50 '+I.ok)}${S('Você gastou R$ 1.240 de R$ 3.000 em novembro.','21:50')}${E('E em outubro?','21:51 '+I.relo)}<div class="l eu"><div class="b" style="opacity:.85">Mostra por categoria<div class="h" style="color:var(--ruim)">Não enviada · <u>Tentar novamente</u></div></div></div><div style="font-size:12px;color:var(--mudo);padding-left:30px">Sofia está escrevendo…</div></div>`+comp())));
+fone(topo()+`<div class="msgs">${E('Qual meu saldo do mês?','21:50 '+I.ok)}${S('Você gastou R$ 1.240 de R$ 3.000 em novembro.','21:50')}${E('E em outubro?','21:51 '+I.relo)}<div class="l eu"><div class="b" style="opacity:.85">Mostra por categoria<div class="h" style="color:var(--ruim)">Não enviada · <u>Tentar novamente</u></div></div></div><div style="font-size:12px;color:var(--mudo);padding-left:30px">Aguardando a Sofia…</div></div>`+comp())));
 
 // 7a lista com rascunho
 telas.push(cartao('7a · Lista de conversas com rascunho','O que você deixou escrito e não enviou aparece na lista como “Rascunho:”, em verde, até enviar ou apagar.',
@@ -124,6 +124,16 @@ fone(`<div class="topo"><div style="flex:1;font-size:28px;font-weight:600;letter
 telas.push(cartao('7b · Pesquisar dentro da conversa','A lupa do cabeçalho busca no que foi escrito (hoje só busca pelo título). Setas pulam entre os achados; ESC fecha.',
 fone(`<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div class="in">dentista</div><span style="color:var(--mudo);font-size:12px">2 de 5</span><span>⌃</span><span>⌄</span><span style="color:var(--mudo)">${I.x}</span></div><div class="msgs">${S('Amanhã você tem <mark>dentista</mark> às 9h e reunião às 14h.','21:40','foco')}${E('Ok','21:41 '+I.ok)}${S('Confirmado.','21:41')}</div>`+comp())));
 
+
+// 8 site (computador): lista + conversa, setinha no hover, menu e pesquisa
+telas.push(cartao('8 · Site no computador','Lista à esquerda (com Rascunho), conversa à direita. Passar o mouse mostra a setinha ⌄ na bolha; clique nela ou clique direito abre o menu; ESC fecha. A lupa abre a pesquisa no topo da conversa.',
+`<div class="fone" style="flex-direction:row"><div style="width:270px;border-right:1px solid var(--linha);display:flex;flex-direction:column"><div class="topo"><div style="flex:1;font-size:24px;font-weight:600;letter-spacing:-.5px">Conversa</div><span class="ico">${I.lupa}</span><span class="ico" style="font-size:20px">+</span></div><div class="lista">
+<div class="it" style="background:#ffffff0a"><div class="av">S</div><div style="flex:1;min-width:0"><div class="n">Sofia</div><div class="p" style="max-width:170px"><span class="rasc">Rascunho:</span> muda a reunião pra 15h</div></div></div>
+<div class="it"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1;min-width:0"><div class="n">[Página] Viagem</div><div class="p" style="max-width:170px">Comprar adaptador</div></div></div>
+<div class="it"><div class="av" style="background:#F5A0AE">P</div><div style="flex:1;min-width:0"><div class="n">[Página] Casa</div><div class="p" style="max-width:170px">Pintor na terça</div></div></div></div></div>
+<div style="flex:1;display:flex;flex-direction:column;position:relative">${topo()}<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div class="in">reunião</div><span style="color:var(--mudo);font-size:12px">1 de 3</span><span>⌃</span><span>⌄</span><span style="color:var(--mudo)">${I.x}</span></div>
+<div class="msgs">${S('Amanhã você tem dentista às 9h e <mark>reunião</mark> às 14h.','21:40')}<div class="l"><span class="s">S</span><div class="b foco">Quer que eu avise 30 min antes?<div class="h">21:40</div><span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:var(--sup2);display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span></div></div>${E('Sim','21:41 '+I.ok)}
+${menu([['resp','Responder'],['cop','Copiar'],['sel','Selecionar várias'],'|',['apa','Apagar','perigo']],'left:42px;top:50px')}</div>${comp()}</div></div>`,'cartao site'));
 document.getElementById('g').innerHTML=telas.join('');
 </script>
 </body></html>
