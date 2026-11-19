@@ -1,4 +1,4 @@
-export type Mark={start:number;end:number;bold?:boolean;italic?:boolean;underline?:boolean;strike?:boolean;code?:boolean;color?:string;highlight?:string;nolink?:boolean};
+export type Mark={start:number;end:number;bold?:boolean;italic?:boolean;underline?:boolean;strike?:boolean;code?:boolean;color?:string;highlight?:string;size?:number;nolink?:boolean};
 export type LeafBlock={id:string;text:string;type:string;marks:Mark[];checked?:boolean;align?:'left'|'center'|'right';data?:Record<string,any>};
 export type Leaf={id:string;title:string;content:string;created_at?:string;diary?:boolean;blocks?:LeafBlock[];properties?:{id:string;name:string;value:string}[]};
 export const leafId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);

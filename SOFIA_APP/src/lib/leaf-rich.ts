@@ -18,7 +18,7 @@ export function leafToHtml(block:LeafBlock):string{
   const st:any=runs.find(r=>r.start<=s&&r.end>=e)?.style||{},link=links.find(l=>l.start<=s&&l.end>=e);
   let h=esc(text.slice(s,e)).replace(/\n/g,'<br>');
   if(st.code)h='<code>'+h+'</code>';if(st.strike)h='<s>'+h+'</s>';if(st.underline)h='<u>'+h+'</u>';if(st.italic)h='<i>'+h+'</i>';if(st.bold)h='<b>'+h+'</b>';
-  const css=[st.color&&safeColor(st.color)?'color:'+safeColor(st.color):'',st.highlight&&safeColor(st.highlight)?'background-color:'+safeColor(st.highlight):''].filter(Boolean).join(';');
+  const css=[st.color&&safeColor(st.color)?'color:'+safeColor(st.color):'',st.highlight&&safeColor(st.highlight)?'background-color:'+safeColor(st.highlight):'',Number(st.size)>0&&Number(st.size)<=4?'font-size:'+Number(st.size)+'em':''].filter(Boolean).join(';');
   if(css)h='<span style="'+css+'">'+h+'</span>';
   if(link)h='<a href="'+esc(link.url)+'">'+h+'</a>';
   out+=h;
@@ -35,6 +35,8 @@ function tagStyle(tag:string,attrs:string):Style{
  if(m)for(const part of decode(m[1]).split(';')){const i=part.indexOf(':');if(i<0)continue;const k=part.slice(0,i).trim().toLowerCase(),v=part.slice(i+1).trim();
   if(k==='color'){const c=safeColor(v);if(c)s.color=c;}
   else if(k==='background-color'||k==='background'){const c=safeColor(v);if(c&&c!=='transparent')s.highlight=c;}
+  // 19/11/2026 (Pedro: "só o texto selecionado aumenta o tamanho"): tamanho do trecho, relativo à linha (em)
+  else if(k==='font-size'){const n=/^(\d*\.?\d+)em$/i.exec(v);if(n&&+n[1]>0&&+n[1]<=4&&+n[1]!==1)s.size=+n[1];}
   else if(k==='font-weight'&&/^(bold|bolder|[6-9]00)$/i.test(v))s.bold=true;
   else if(k==='font-style'&&/italic/i.test(v))s.italic=true;
   else if((k==='text-decoration'||k==='text-decoration-line')){if(/underline/i.test(v))s.underline=true;if(/line-through/i.test(v))s.strike=true;}}

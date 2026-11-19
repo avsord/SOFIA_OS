@@ -18,6 +18,7 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
+- 2026-11-19 (outra sessão, Claude Code): rodada de ajustes de Notas, Diário e barra lateral (ver §10). Não mexeu no desenho da Conversa abaixo; a próxima sessão confere na tela o que está em §9 "(19/11 ajustes)".
 - 2026-11-19, Claude Code (PC PEDRO, Opus com Fable de conselheiro). Mimic Kaizen mediu o WhatsApp Web (régua de chat; mensagem de teste na conversa do Pedro com ele mesmo, apagada) e fez o DESENHO da nova Conversa: `docs/design/2026-11-19-conversa/` (index.html + README com 4 decisões). Nada mudou no código do app.
 - Ajuste 19/11 (pedido do Pedro): "Arquivadas" sempre em cima da lista (como no WhatsApp) e tela do computador refeita pela régua do WhatsApp Web (8a conversa + menu, 8b Arquivadas + pesquisa).
 - Próximo passo: Pedro aprova/ajusta o desenho (menu na última bolha abrindo para cima; Reagir/Fixar/Encaminhar sim ou não; Editar na conversa com a Sofia faz ela responder de novo?). Com o ok: implementar só no site, consultando o Fable na revisão final.
@@ -277,6 +278,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **(19/11 ajustes)** Pedro confere no site: nota solta em cartão com 📝; Diário (hora travada, Enter = novo horário, Shift+Enter quebra linha, T1-T3 só no trecho selecionado); marcador forte; Ctrl+Z; "Ocultar da barra lateral" e o grupo "Ocultas". O registro antigo "05:2" não se corrige sozinho. Decidir se a barra das Páginas também ganha o marcador forte e o tamanho por trecho. Tamanho por trecho ainda não aparece no app do celular (só site).
 - **(19/11)** Desenho da nova Conversa (`docs/design/2026-11-19-conversa/`) esperando aprovação do Pedro; depois implementar menu único, Responder, Editar com 'editada', Apagar com Desfazer, contagem no botão de descer, envio sem 'Enviando…', Rascunho na lista, pesquisa dentro da conversa e tirar o recarregar de 6 s do quadro.
 - **(15/11 noite)** Pedro confere no site a Conversa estilo WhatsApp: lista de páginas, balões, escrever/áudio/anexo gravando na página, Arquivadas x principal, criar página e subpágina. Falta: notas (folhas) dentro da página como conversa; celular/app.
 - **(15/11)** Pedro confere no site: ponto do Início menor e a linha em L embaixo do Início com o item atual passando na horizontal (dizer se a velocidade e o tamanho estão bons).
@@ -383,11 +385,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
 | 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
 | 2026-11-19 | (sem APK) | (este) | Ícone em imagem: sem margem vazia, mesma caixa do emoji comum (nome alinhado, mesma altura) em barra, lista, título, busca e quadro | tsc/testes ok (061 já falhava), site recompilado; medido em simulação local |
 | 2026-11-19 | (sem APK) | (este) | Mimic Kaizen: WhatsApp Web medido como régua de chat; desenho da nova Conversa para aprovação em docs/design/2026-11-19-conversa | só desenho, código do app intocado |
+| 2026-11-19 | (sem APK) | (este) | Notas/Diário: nota solta em cartão com 📝; hora e data travadas; Enter abre o próximo horário; T1-T3 com seleção mudam só o trecho; marcador com cores cheias; Ctrl+Z fora do campo desfaz na nota; ocultar página da barra (grupo "Ocultas"); linha "agora" do Início só informativa | tsc ok, testes sem falha nova (4 antigas); site recompilado; não conferido na tela |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

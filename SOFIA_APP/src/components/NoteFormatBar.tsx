@@ -8,7 +8,9 @@ import {OverAll} from '../lib/over-all';
 
 const NOTE_TYPES:[string,string][]=[['text','Texto'],['heading1','T1'],['heading2','T2'],['heading3','T3'],['bullet','•'],['number','1.'],['todo','☐'],['quote','❝']];
 const NOTE_COLORS:[string,string][]=[['Padrão',''],['Vermelho','#E03E3E'],['Laranja','#E5873A'],['Amarelo','#DFAB01'],['Verde','#0F7B6C'],['Azul','#2E7CD6'],['Roxo','#9065B0'],['Cinza','#9B9A97']];
-const NOTE_MARKS:[string,string][]=[['Amarelo','rgba(250,204,21,.38)'],['Azul','rgba(96,165,250,.38)'],['Rosa','rgba(244,114,182,.38)'],['Laranja','rgba(251,146,60,.38)']];
+// 19/11/2026 (Pedro: "marcador igual a seleção de texto... que marque mesmo, esses estão confundindo com o fundo"): cores cheias;
+// o azul é o mesmo da seleção do navegador. Marcas antigas (.38) continuam como estavam.
+const NOTE_MARKS:[string,string][]=[['Azul (seleção)','#2F6FD6'],['Amarelo','#B98900'],['Verde','#16803C'],['Rosa','#C02688'],['Laranja','#D9580B'],['Vermelho','#C42B2B'],['Roxo','#7C4DDB']];
 const RESET_INK='#010203';
 
 export function NoteFormatBar({rootRef,activeType,onType}:{rootRef:React.RefObject<any>;activeType:string;onType:(type:string)=>void}){

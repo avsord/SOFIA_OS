@@ -84,7 +84,7 @@ function usePageDirectory(api:SofiaApi){
     const stale=complete?staleTrash(seen):[]; // so com a lista inteira (ver staleTrash)
      if(live&&!trashSwept){trashSwept=true;for(const x of stale.slice(0,5))void api.deleteEntity(x.id).catch(()=>{/* tenta na proxima abertura */});} // lixeira com mais de 30 dias
     if(live&&!samePages(pagesDirectory.get(),items))pagesDirectory.set(items);
-    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x),note_subshortcuts:pageSubShortcuts(x),sidebar_color:x.data?.sidebar_color,sidebar_colors:x.data?.sidebar_colors,sidebar_sub:x.data?.sidebar_sub}})));
+    if(live)api.webKeep?.('pages',items.map(x=>({id:x.id,kind:x.kind,title:x.title,state:x.state,tags:(x.tags||[]).filter(t=>t==='board-copy'),data:{icon:x.data?.icon,parent_id:x.data?.parent_id,sort_order:x.data?.sort_order,note_shortcuts:pageShortcuts(x),note_subshortcuts:pageSubShortcuts(x),sidebar_color:x.data?.sidebar_color,sidebar_colors:x.data?.sidebar_colors,sidebar_sub:x.data?.sidebar_sub,sidebar_hidden:x.data?.sidebar_hidden}})));
    }catch{/* a aba Paginas mostra o erro; a barra lateral so fica com o que ja tem */}
   }
   void load();
@@ -235,7 +235,7 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  // 09/11/2026 (Pedro: "nao tem opcao quando clico no menu na barra lateral para abrir em uma nova guia"): Abrir em nova guia; Ctrl/Cmd+clique
  // e o botao do meio do mouse na pagina tambem abrem em outra guia, como num link do navegador
  const newTab=(p:Entity)=>openTab('/paginas/'+encodeURIComponent(p.id));
- const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:subShortcutPages.get().includes(p.id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>toggleSub(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
+ const menuFor=(p:Entity)=>():MenuItem[]=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Abrir em nova guia',icon:'external',run:()=>newTab(p)},{label:'Nova subpágina',icon:'plus',run:()=>void newChild(p)},{label:subShortcutPages.get().includes(p.id)?'Tirar subatalho':'Virar subatalho',icon:'link',run:()=>toggleSub(p.id)},{label:'Duplicar',icon:'copy',run:()=>duplicate(p)},{label:'Ocultar da barra lateral',icon:'eyeOff',run:()=>setHiddenPage(p.id,true)},{label:'Excluir',icon:'trash',danger:true,run:()=>remove(p)}];
  const [expanded,setExpanded]=useState<Set<string>>(readExpanded);
  // 14/11/2026 (Pedro: opcao Atalhos no menu da pagina): mostra os atalhos dela mesmo com a seta fechada
  // 13/11/2026 (Pedro: arrastar a nota para outra pagina pela barra): a linha acende; parada ~0,7 s em cima de uma pagina
@@ -260,7 +260,10 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
   node.addEventListener('dragover',over);node.addEventListener('dragleave',leave);node.addEventListener('drop',drop);
   return()=>{clear();node.removeEventListener('dragover',over);node.removeEventListener('dragleave',leave);node.removeEventListener('drop',drop);};
  },[api,toast,undoNow]);
- const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
+ const hiddenPages=useMemo(()=>pages.filter(p=>p.data?.sidebar_hidden===true).sort(comparePageOrder),[pages]),[showHidden,setShowHidden]=useState(false);
+ // 19/11/2026 (Pedro: "opção pra ocultar páginas, mas continua aparecendo no chat"): oculta só da barra lateral (a página e as subpáginas); o chat e a busca continuam vendo
+ const setHiddenPage=(id:string,hidden:boolean)=>{void patchPage(id,d=>({...d,sidebar_hidden:hidden})).catch(()=>{});};
+ const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){if(p.data?.sidebar_hidden===true)continue;const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const l of m.values())l.sort(comparePageOrder);return m;},[pages]);
  const ids=useMemo(()=>new Set(pages.map(p=>p.id)),[pages]);
  // 15/11/2026 (Pedro: seta ao lado do nome abre e fecha os atalhos da pagina)
  const tc=useTheme();
@@ -281,6 +284,8 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
   if(open&&depth<12)walk(p.id,depth+1);}};
  // paginas cujo pai sumiu aparecem na raiz, para nao ficarem escondidas
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} onToggle={()=>{}} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)} onAuxOpen={()=>openTab('/paginas/'+encodeURIComponent(p.id))}/>);
+ if(hiddenPages.length){rows.push(<Row key="__hidden__" testID="sidebar-hidden-pages" icon={showHidden?'eye':'eyeOff'} label={'Ocultas ('+hiddenPages.length+')'} dimmed onToggle={()=>setShowHidden(v=>!v)} onPress={()=>setShowHidden(v=>!v)}/>);
+  if(showHidden)for(const p of hiddenPages)rows.push(<Row key={'hid-'+p.id} onToggle={()=>{}} depth={1} icon="book" emoji={p.data?.icon} label={p.title||'Sem título'} dimmed selected={openId===p.id} onPress={()=>onOpen(p.id)} menu={()=>[{label:'Abrir',icon:'arrowRight',run:()=>onOpen(p.id)},{label:'Mostrar na barra lateral',icon:'eye',run:()=>setHiddenPage(p.id,false)}]}/>);}
  const c=useTheme();
  return <View ref={treeRef} testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{subPicker?<ColorPicker color={pcolors[subPicker.id]||DEFAULT_SHORTCUT_COLOR} x={subPicker.x} y={subPicker.y} onLive={c=>setSubPicker(q=>q?{...q,live:c}:q)} onCommit={c=>saveColor(subPicker.id,c)} defaultColor={DEFAULT_SHORTCUT_COLOR} onClose={()=>setSubPicker(null)}/>:null}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
   {drag.emoji?<PageGlyph icon={drag.emoji} size={14}/>:<Icon name="book" size={14} color={c.muted}/>}<Text style={{color:c.text,fontSize:13}}>{drag.title}</Text></View>:null}</View>;
