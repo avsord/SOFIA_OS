@@ -56,3 +56,9 @@ Arquivadas (decidido 19/11): não chega mensagem de outra pessoa. Páginas e not
 ## Fica como está (não aparece nas telas, mas não sai)
 Quadro da conversa (Agora / Assuntos anteriores); áudio com transcrição e "Áudio apagado. A transcrição continua"; anexos, arrastar ("Solte para anexar à conversa") e Remover; visualizador de foto; prévia de link; barra "Criar" (05/06); "Tarefa em contexto"; "Aguardando a Sofia…"; Arquivadas, Nova página, Pesquisar conversas; Marcar tarefa nas linhas-tarefa da página.
 - Responder e Criar abertos juntos: só uma barra por vez; abrir uma fecha a outra.
+
+## Itens no chat e simulações de edição (19/11, `baloes.html`, desenho do Fable)
+- Balão de item = janela viva: mostra o estado de agora. Mudou o conteúdo (texto, linha, cartão) → o balão atualiza no lugar e ganha "Atualizada 14:32 · por você/Sofia", sem mensagem nova.
+- Mudou nome, lugar ou existência (criar, renomear, mover, apagar) → o balão atualiza e entra UMA linha cinza pequena (não conta como não lida). Seguidas em até 10 min juntam em "3 mudanças em Notas".
+- Sofia editando a pedido: a resposta dela é o aviso. Apagado na página: o balão vira registro tracejado + Desfazer 6 s.
+- Para o Pedro decidir: "Responder" entra no menu do balão de item; nome "Quadro de colunas"; balão com legenda não se apaga pelo chat; janela de 10 min; tema claro derivado; hora do balão de item no rodapé. "Atualizada por X", linhas cinzas e Desfazer pedem dados que o app talvez não tenha hoje.

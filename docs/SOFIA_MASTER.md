@@ -22,7 +22,8 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 - Pronto: medidas da bolha conferidas no WhatsApp (texto 14/20, padding interno 6 7 8 9, data 12/16 peso 600, campo 52 px; hora segue 12/16). Decidido: conversa com a Sofia igual às outras, fixa no topo, com Editar (ela responde de novo); Arquivadas recebe páginas e notas novas e só sai o que o Pedro tirar.
 - Novo no `web.html` (abra Casa e clique no nome): painel "Dentro de <página>" com pastas → notas, subpáginas, criar nota/pasta/subpágina, abrir página e arquivar; balões de Notas/Tabela/Link que funcionam e não se apagam pelo chat; notas na lista com 📝 e filtro Notas. Lista "hoje não funciona → fica" no README do desenho.
 - Achado grave no site atual: "Apagar" num balão de Notas/Tabela da Conversa apaga o bloco inteiro da página (todas as pastas e notas). Não corrigido (só desenho); pode ser corrigido antes, à parte, se o Pedro quiser.
-- Próximo passo: Pedro olha o web.html e dá o "aprovado" (ou ajusta); depois implementar só no site (Chat.tsx + ChatHub.tsx + page-chat.ts; Editar da Sofia precisa do servidor), com o Fable na revisão final.
+- Novo 08:25: `baloes.html` (desenho do Fable) mostra como notas, pastas, tabelas, quadros, subpáginas e links aparecem no chat, com 12 simulações de edição. Pontos para o Pedro decidir no fim do README.
+- Próximo passo: Pedro olha o web.html e o baloes.html e dá o "aprovado" (ou ajusta); depois implementar só no site (Chat.tsx + ChatHub.tsx + page-chat.ts; Editar da Sofia precisa do servidor), com o Fable na revisão final.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -389,11 +390,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-19 | (sem APK) | (este) | Mimic Kaizen: WhatsApp Web medido como régua de chat; desenho da nova Conversa para aprovação em docs/design/2026-11-19-conversa | só desenho, código do app intocado |
 | 2026-11-19 | (sem APK) | (este) | Notas/Diário: nota solta em cartão com 📝; hora e data travadas; Enter abre o próximo horário; T1-T3 com seleção mudam só o trecho; marcador com cores cheias; Ctrl+Z fora do campo desfaz na nota; ocultar página da barra (grupo "Ocultas"); linha "agora" do Início só informativa | tsc ok, testes sem falha nova (4 antigas); site recompilado; não conferido na tela |
 | 2026-11-19 | (sem APK) | (este) | Desenho Conversa: web.html em tela cheia com medidas reais da lista do WhatsApp Web (431 px, linha 76, Arquivadas deslizando 300 ms) e mecanismos funcionando | só desenho; conversa do WhatsApp ainda não medida |
 | 2026-11-19 | (sem APK) | (este) | Desenho Conversa: 4 medidas remedidas no WhatsApp (texto 14/20, padding interno, data 12/16 600; hora conferida 12/16, campo 52 px) e corrigidas em web.html, README e régua; index sem "quer?" | Só desenho, app intocado |
 | 2026-11-19 | (sem APK) | (este) | Desenho Conversa: painel da página com pastas → notas e subpáginas, balões de Notas/Tabela/Link funcionando e sem Apagar, notas com 📝 e filtro; Arquivadas decidida; hora volta a 12/16 | Só desenho, app intocado |
+| 2026-11-19 | (sem APK) | (este) | Desenho Conversa: baloes.html (Fable) com 16 cenários de itens no chat e 12 simulações de edição; conteúdo atualiza o balão, nome/lugar/apagar gera 1 linha cinza agrupada | só desenho, app intocado |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversa · balões de itens</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* mesmas cores do web.html (escuro) e do app no claro (theme.tsx) */
+:root{--bg:#0b0a0e;--painel:#121017;--sup:#1C1924;--sup2:#25212F;--linha:#2C2837;--txt:#F2EEFA;--mudo:#A49DB6;--lil:#B5A2FF;--minha:#3A2C57;--ruim:#F28B9B;--ok:#5FD3A2;--fundo:#0e0c12;--subeu:#cbbfe6;--tile:#0003;--fio:#ffffff1a;--sobre:#17122A;--amb:#E8B04A;--t-rapido:75ms;--t-lento:300ms;--curva:cubic-bezier(.14,.62,.33,.9)}
+:root.claro{--bg:#F7F6FA;--painel:#fff;--sup:#fff;--sup2:#F4F2F7;--linha:#EAE6F0;--txt:#272334;--mudo:#7F7A8D;--lil:#7258E8;--minha:#EBE5FF;--ruim:#B7475B;--ok:#1F9D6E;--fundo:#F1EEF7;--subeu:#6B6188;--tile:#7258E81c;--fio:#27233420;--sobre:#fff;--amb:#C27A12}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:20px}
+svg{flex:none}
+.pg{max-width:1240px;margin:0 auto;padding:0 20px 80px}
+.topo{position:sticky;top:0;z-index:8;background:var(--bg);border-bottom:1px solid var(--linha);padding:10px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.topo b{font-size:16px;margin-right:auto}
+.chip{height:32px;padding:0 13px;border-radius:9999px;border:1px solid var(--linha);color:var(--mudo);font:inherit;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:none;text-decoration:none}
+.chip.on{background:var(--minha);border-color:transparent;color:var(--txt)}
+h1{font-size:26px;line-height:32px;letter-spacing:-.4px;margin:28px 0 6px}h2{font-size:20px;margin:44px 0 4px;letter-spacing:-.2px}
+.sub{color:var(--mudo);max-width:760px;margin:0 0 14px}
+.regra{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.regra div{background:var(--sup);border:1px solid var(--linha);border-radius:12px;padding:14px}
+.regra b{display:block;font-size:15px;margin-bottom:4px}.regra span{color:var(--mudo);font-size:13.5px}
+.tag{display:inline-block;font-size:11px;line-height:16px;font-weight:700;border-radius:5px;padding:1px 7px;background:var(--minha);color:var(--txt);vertical-align:1px}
+.tag.l2{background:var(--amb);color:#17122A}
+.pq{background:var(--sup);border:1px solid var(--linha);border-left:4px solid var(--lil);border-radius:8px;padding:9px 12px;font-size:13px;line-height:19px;color:var(--mudo);margin:8px 0}
+.pq b{color:var(--txt)}
+/* galeria */
+.cen{margin-top:26px}.ch b{font-size:15px}.ch span{color:var(--mudo);margin-left:8px;font-size:13px}
+.par{display:flex;gap:16px;align-items:flex-start;margin-top:8px}
+.tela{background:var(--fundo);border:1px solid var(--linha);border-radius:14px;overflow:hidden;position:relative;min-width:0}
+.tela>i{display:block;font-style:normal;font-size:11px;color:var(--mudo);padding:6px 12px;border-bottom:1px solid var(--linha);background:var(--painel);letter-spacing:.3px}
+.tela.cel{width:390px;flex:none}.tela.pc{flex:1}
+.ms{display:flex;flex-direction:column;gap:2px;padding:10px 8% 14px}.cel .ms{padding:8px 12px 12px}
+/* balões: medidas do web.html (texto 14/20, padding 6 7 8 9, hora 12/16) */
+.dia,.ev{align-self:center;font-size:12px;line-height:16px;font-weight:600;color:var(--mudo);background:var(--sup);border:1px solid var(--linha);padding:4px 12px;border-radius:6px;margin:10px 0;box-shadow:0 1px .5px #0000001f}
+.ev{font-weight:500;max-width:92%;text-align:center;margin:8px 0}.ev b{color:var(--txt);font-weight:600}.ev a{color:var(--lil);font-weight:700;cursor:pointer;margin-left:6px}
+.ev summary{cursor:pointer;list-style:none}.ev summary::-webkit-details-marker{display:none}.ev summary::after{content:' ▾';color:var(--lil)}.ev[open] summary::after{content:' ▴'}
+.ev p{margin:6px 0 0;text-align:left;border-top:1px solid var(--linha);padding-top:6px}
+.l{display:flex;margin-top:8px;position:relative}.l.seg{margin-top:2px}.l.eu{justify-content:flex-end}
+.l.nova,.ev.nova{animation:entra .25s ease-out}@keyframes entra{from{opacity:0;transform:translateY(6px)}}
+.b{max-width:65%;background:var(--sup);border:1px solid var(--linha);border-radius:0 7.5px 7.5px 7.5px;padding:6px 7px 8px 9px;font-size:14px;line-height:20px;position:relative;box-shadow:0 1px .5px #0b141a21;min-width:0}
+.cel .b{max-width:86%}
+.eu .b{background:var(--minha);border-color:transparent;border-radius:7.5px 0 7.5px 7.5px}.seg .b{border-radius:7.5px}
+.b .h{float:right;margin:6px 0 -5px 12px;font-size:12px;line-height:16px;color:var(--mudo);display:flex;gap:4px;align-items:center}.eu .b .h,.eu .mt{color:var(--subeu)}
+.b .seta{position:absolute;top:7px;right:5px;width:24px;height:18px;border-radius:4px;display:none;align-items:center;justify-content:center;color:var(--txt);background:linear-gradient(90deg,transparent,var(--sup) 40%);cursor:pointer}
+.eu .b .seta{background:linear-gradient(90deg,transparent,var(--minha) 40%)}
+.b:hover .seta{display:flex;animation:seta 75ms var(--curva)}@keyframes seta{from{transform:translateX(100%);opacity:0}}
+.q{border-left:4px solid var(--lil);background:var(--tile);border-radius:6px;padding:5px 8px;margin-bottom:5px;font-size:13px;color:var(--mudo);display:flex;gap:8px;align-items:center}.q b{display:block;color:var(--lil);font-size:12.5px}.q i{font-style:normal;font-size:17px}
+/* balão de item */
+.b.card{min-width:270px;width:340px}.cel .b.card{width:300px}
+.ct{display:flex;gap:10px;align-items:center;padding-right:20px}
+.ci{width:38px;height:38px;border-radius:9px;background:var(--tile);display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+.cx{min-width:0;flex:1}.cx b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:600}
+.cx small{display:block;font-size:12.5px;line-height:17px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.eu .cx small{color:var(--subeu)}
+.cx small a{color:var(--lil);cursor:pointer}.cx small em{font-style:normal;font-weight:700;font-size:10.5px;background:var(--amb);color:#17122A;border-radius:5px;padding:0 5px;margin-right:5px}
+.pv{margin-top:8px;border-radius:6px;overflow:hidden;font-size:12.5px;line-height:18px;border:1px solid var(--fio)}
+.pv>div{display:flex;gap:8px;padding:4px 8px;border-top:1px solid var(--fio)}.pv>div:first-child{border-top:0}
+.pv .n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pv .d{color:var(--mudo);flex:none}.eu .pv .d,.eu .pv.g>div:first-child,.eu .pv .mais{color:var(--subeu)}
+.pv.g>div{justify-content:space-between}.pv.g>div:first-child,.pv .mais{color:var(--mudo)}.pv.g span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv.t{padding:6px 8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;white-space:pre-line;overflow-wrap:anywhere}
+.pv.v{border-style:dashed;padding:9px 8px;text-align:center;color:var(--mudo)}.eu .pv.v{color:var(--subeu)}
+.pv.q{display:flex;border:0;gap:5px;overflow:visible}.pv.q>div{flex:1;min-width:0;display:block;padding:5px;border:1px solid var(--fio);border-radius:6px}
+.pv.q u{display:flex;justify-content:space-between;text-decoration:none;font-size:11.5px;font-weight:700;margin-bottom:3px}.pv.q u i{font-style:normal;font-weight:500;opacity:.7}
+.pv.q s{display:block;text-decoration:none;background:var(--tile);border-radius:4px;padding:1px 5px;margin-top:3px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv.q small{display:block;font-size:11px;opacity:.7;margin-top:2px}
+.cap{margin-top:8px}
+.mt{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:12px;line-height:16px;color:var(--mudo)}.mt .hr{display:flex;gap:4px;align-items:center;margin-left:auto;flex:none}
+.ca{margin:8px -7px -8px -9px;padding:8px 0;border-top:1px solid var(--fio);text-align:center;color:var(--lil);font-weight:600;cursor:pointer;font-size:13.5px}.ca:hover{background:var(--fio)}
+.arqv .ct,.arqv .pv{opacity:.55}
+.b.lap{background:none;border:1px dashed var(--mudo);box-shadow:none;color:var(--mudo)}.lap .cx small,.lap .mt{color:var(--mudo)}.lap .ci{filter:grayscale(1)}.lap .seta{background:none}
+.pisca{border-radius:4px;animation:pisca 2.4s ease-out}@keyframes pisca{0%,40%{background:var(--lil);color:var(--sobre)}}
+/* menu */
+.menu{background:var(--sup2);border:1px solid var(--linha);border-radius:12px;padding:5px;width:215px;box-shadow:0 12px 30px #0006}
+.menu.flu{position:fixed;z-index:9;display:none;animation:ab .3s cubic-bezier(.17,.17,0,1)}.menu.flu.on{display:block}
+@keyframes ab{from{opacity:0;transform:translateY(-8px) scale(.95)}50%{transform:translate(0) scale(1.01)}}
+.menu div{display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:12px;cursor:pointer;font-size:14px}.menu div:hover{background:var(--fio)}
+.menu .sep{height:1px;padding:0;margin:4px 6px;background:var(--linha)}.menu .perigo{color:var(--ruim)}
+.menu .dica{height:auto;padding:6px 12px 4px;font-size:12px;color:var(--mudo);cursor:default;line-height:16px}.menu .dica:hover{background:none}
+.menus{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}.menus figure{margin:0}.menus figcaption{font-size:12.5px;color:var(--mudo);margin-bottom:6px;font-weight:600}
+/* campo, responder, lista */
+.comp{min-height:64px;display:flex;align-items:center;padding:6px 16px 6px 18px;background:var(--sup);border-top:1px solid var(--linha)}
+.bt{width:40px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;color:var(--mudo);border:0;background:none;font-size:24px;flex:none}
+.campo{flex:1;min-height:52px;border-radius:26px;margin:0 6px;background:var(--sup2);display:flex;align-items:center;padding:5px 5px 5px 18px;color:var(--mudo);font-size:15px;min-width:0}
+.mic{width:40px;height:40px;border-radius:9999px;background:var(--lil);color:var(--sobre);display:flex;align-items:center;justify-content:center;flex:none}
+.citar{display:flex;margin:0 16px;min-height:59px;padding:7px 12px 10px 0;background:var(--sup2);border-radius:10px 10px 0 0;align-items:center;gap:10px;font-size:13px}
+.citar .tr{width:4px;align-self:stretch;border-radius:2px;background:var(--lil)}.citar b{display:block;color:var(--lil);font-size:12.5px}.citar span{color:var(--mudo)}.citar i{font-style:normal;font-size:20px}
+.it{height:76px;display:flex;align-items:center;gap:14px;padding:0 16px 0 14px;background:var(--painel)}
+.av{width:48px;height:48px;border-radius:15px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;color:#17122A;font-size:17px}
+.it .tx{flex:1;min-width:0;border-bottom:1px solid var(--linha);height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.lin{display:flex;gap:8px}.lin .n{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lin .hh{font-size:12px;color:var(--mudo)}.lin .p{flex:1;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* simulações */
+.sim{display:flex;gap:16px;align-items:flex-start;margin-top:12px}
+.sim .tela{flex:1;display:flex;flex-direction:column}.sim.cel .tela{flex:none;width:390px}.sim.cel .b{max-width:86%}.sim.cel .b.card{width:300px}.sim.cel .ms{padding:8px 12px 12px}
+.ccab{height:64px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--sup);border-bottom:1px solid var(--linha)}
+.ccab .av{width:40px;height:40px;border-radius:13px;font-size:15px}.ccab b{display:block;font-size:16px}.ccab span{font-size:12.5px;color:var(--mudo)}
+#sm{height:470px;overflow-y:auto;justify-content:flex-start}
+.lado{width:400px;flex:none;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto}
+.sb{display:block;width:100%;text-align:left;font:inherit;color:var(--txt);background:var(--sup);border:1px solid var(--linha);border-radius:10px;padding:8px 12px;margin-bottom:6px;cursor:pointer}
+.sb:hover{border-color:var(--lil)}.sb.on{background:var(--minha);border-color:var(--lil)}.sb .tag{float:right;margin:2px 0 0 8px}
+.toast{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);background:var(--sup2);border:1px solid var(--linha);border-radius:10px;padding:10px 16px;display:flex;gap:18px;align-items:center;box-shadow:0 8px 24px #0006;font-size:14px;animation:sobe var(--t-lento) var(--curva);z-index:5;white-space:nowrap}
+.toast a{color:var(--lil);font-weight:700;cursor:pointer}.toast a.ap{outline:2px solid var(--lil);outline-offset:3px;border-radius:4px}@keyframes sobe{from{transform:translate(-50%,100%);opacity:0}}
+.digit{font-size:13px;color:var(--mudo);margin:8px 0 0 4px}
+.selbar{display:none;height:52px;align-items:center;gap:18px;padding:0 18px;background:var(--sup2);border-top:1px solid var(--linha);font-weight:600}.selbar span{margin-right:auto}.selbar a{color:var(--lil)}.selbar a.perigo{color:var(--ruim)}
+.selec .selbar{display:flex}.selec .comp{display:none}
+.selec .l{padding-left:32px}.selec .l::before{content:'';position:absolute;left:2px;top:50%;margin-top:-10px;width:20px;height:20px;border-radius:6px;border:2px solid var(--mudo)}
+.selec .l.mk::before{background:var(--lil);border-color:var(--lil);content:'✓';color:var(--sobre);font-size:13px;font-weight:800;text-align:center;line-height:17px}
+.selec .l.tr::before{content:'🔒';border:0;font-size:14px}.selec .l.tr .b{opacity:.6}
+@media(max-width:980px){.par,.sim{flex-direction:column}.tela.cel,.sim.cel .tela{width:min(390px,100%)}.tela.pc,.sim .tela{width:100%}.lado{width:100%;position:static;max-height:none}.regra{grid-template-columns:1fr}}
+</style></head><body>
+<div class="pg">
+<div class="topo"><b>Conversa · balões de itens</b>
+ <a class="chip" href="#galeria">1 · Cenários</a><a class="chip" href="#sim">2 · Simular edições</a><a class="chip" href="#regras">3 · Apagar</a>
+ <button class="chip" id="tema">☀ Ver no claro</button></div>
+
+<h1>Como notas, pastas, tabelas, quadros e subpáginas aparecem na Conversa</h1>
+<p class="sub">Desenho para aprovação (19/11/2026). Mesmas cores, letras e medidas do <b>web.html</b>. Nada aqui tira função que já existe. Passe o mouse num balão e clique na setinha para ver o menu.</p>
+<div class="regra">
+ <div><b>1. O balão é uma janela do item</b><span>Ele mostra o item como está agora na página. Não é uma cópia parada do dia em que foi enviado.</span></div>
+ <div><b>2. Mudou o que está dentro: só o balão muda</b><span>Texto da nota, linha da tabela, cartão do quadro. O balão atualiza no lugar e ganha “Atualizada 14:32 · por você”. Nenhuma mensagem nova.</span></div>
+ <div><b>3. Mudou nome, lugar ou deixou de existir: balão + uma linha pequena</b><span>Criar, renomear, mover, arquivar, apagar. Várias seguidas viram uma linha só, com a contagem.</span></div>
+</div>
+<div class="pq"><b>Por que assim:</b> se cada letra digitada numa nota virasse mensagem, a conversa virava barulho. Mas se uma nota muda de nome ou some sem aviso, você procura e não acha. Então o conteúdo atualiza quieto e só o que muda “onde está” deixa um rastro curto. Essas linhas pequenas não contam como não lida e não sobem a conversa na lista.</div>
+
+<h2 id="galeria">1 · Todos os cenários</h2>
+<p class="sub">Cada cenário aparece no celular (390) e no computador. Use os botões para ver todos como enviados por você ou pela Sofia.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip on" data-dir="">Como no dia a dia</button><button class="chip" data-dir="e">Todos enviados por você</button><button class="chip" data-dir="s">Todos enviados pela Sofia</button></div>
+<div id="gal"></div>
+
+<h2 id="sim">2 · Simular edições</h2>
+<p class="sub">Clique num botão: a cena é montada e a mudança acontece na conversa. A etiqueta diz de que lado da regra ela cai.</p>
+<div style="display:flex;gap:8px"><button class="chip on" data-larg="pc">Computador</button><button class="chip" data-larg="cel">Celular 390</button></div>
+<div class="sim" id="simbox">
+ <div class="tela"><div class="ccab"><div class="av" id="sav" style="background:#F5A0AE">P</div><div><b id="snm">[Página] Casa</b><span id="ssb">2 pastas · 3 notas · ver e criar</span></div></div>
+  <div class="ms" id="sm"></div>
+  <div class="selbar"><span>2 selecionadas</span><a>Responder</a><a>Copiar</a><a class="perigo">Excluir</a></div>
+  <div class="comp"><span class="bt">+</span><div class="campo">Digite uma mensagem</div><div class="mic" id="smic"></div></div></div>
+ <div class="lado"><div id="sbs"></div><div id="sex"></div></div>
+</div>
+
+<h2 id="regras">3 · Apagar: só na página</h2>
+<p class="sub">Hoje, “Apagar” num balão de Notas, Tabela ou Quadro apaga o bloco inteiro da página, com todas as pastas e notas. No desenho isso não existe mais no chat.</p>
+<div class="menus" id="menus"></div>
+<div class="pq"><b>Por que assim:</b> o balão é a porta para o item, não o item. Apagar uma mensagem nunca pode levar junto uma pasta inteira. Por isso o balão de item não tem “Apagar” e não entra em “Selecionar várias → Excluir” (veja a simulação “Selecionar várias”). Apagar pasta, nota, tabela ou quadro: só abrindo a página. Quando isso acontece lá, o balão vira um registro apagado (cenário 14) em vez de sumir, para a conversa não ficar com buraco.</div>
+<div class="pq"><b>O que entra de novo no menu do balão de item:</b> “Responder” (para comentar um item, cenário 10). Abrir e Abrir na página continuam. Mensagens de texto ficam com o menu de hoje, sem mudança.</div>
+</div>
+<div class="menu flu" id="menu"></div>
+<script>
+const sv=(d,s=18,w=1.8)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const I={seta:sv('<path d="M6 9l6 6 6-6"/>',16,2.2),ok:sv('<path d="M5 12l5 5 9-10"/>',14,2.4),pasta:sv('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+mic:sv('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',20,2),
+resp:sv('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>'),cop:sv('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'),
+sel:sv('<circle cx="12" cy="12" r="8"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'),apa:sv('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'),ed:sv('<path d="M4 20h4L19 9l-4-4L4 16z"/>'),fix:sv('<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/>'),
+abrir:sv('<path d="M5 12h14M13 6l6 6-6 6"/>'),abrp:sv('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>')};
+const $=id=>document.getElementById(id);$('smic').innerHTML=I.mic;
+// tipos de item: ícone, botão do balão, texto de quando foi apagado
+const TP={notas:[I.pasta,'Ver pastas e notas','Bloco de Notas apagado'],nota:['📝','Abrir nota','Nota apagada'],pasta:['📁','Abrir pasta','Pasta apagada'],tab:['▦','Abrir na página','Tabela apagada'],
+ quad:['▥','Abrir na página','Quadro apagado'],sub:['📄','Abrir conversa','Subpágina apagada'],link:['↗','Abrir conversa','Página apagada']};
+let DIR='';
+// "*" na frente de um texto = acabou de mudar (pisca em lilás)
+const f=s=>{s=String(s==null?'':s);return s.replace(/\*([^]*)$/,'<span class="pisca">$1</span>')};
+function previa(p){if(!p)return'';const[k,a,mais]=p;
+ if(k==='t')return `<div class="pv t">${a.split('\n').map(f).join('\n')}</div>`;
+ if(k==='v')return `<div class="pv v">${a}</div>`;
+ if(k==='l')return `<div class="pv">${a.map(r=>`<div><span>${r[0]}</span><span class="n">${f(r[1])}</span><span class="d">${f(r[2])}</span></div>`).join('')}${mais?`<div class="mais">${f(mais)}</div>`:''}</div>`;
+ if(k==='g')return `<div class="pv g">${a.map(r=>`<div><span>${f(r[0])}</span><span>${f(r[1])}</span></div>`).join('')}${mais?`<div class="mais">${f(mais)}</div>`:''}</div>`;
+ if(k==='q')return `<div class="pv q">${a.map(c=>`<div><u>${c[0]}<i>${f(c[1])}</i></u>${c[2].slice(0,2).map(x=>`<s>${f(x)}</s>`).join('')}${c[2].length>2?`<small>+${c[2].length-2}</small>`:''}</div>`).join('')}</div>`;return''}
+function card(o,nova){const T=TP[o.k],de=o.fx||DIR||o.de||'e',eu=de==='e',hr=`<span class="hr">${o.h||''} ${eu?I.ok:''}</span>`,
+ abre=`<div class="l tr ${eu?'eu':''} ${nova?'nova':''}"${o.id?` id="${o.id}"`:''}>`,cita=o.q?`<div class="q"><div><b>${o.q[0]}</b>${o.q[1]}</div></div>`:'';
+ if(o.st==='apag')return abre+`<div class="b card lap" data-m="lap"><div class="ct"><span class="ci">🗑</span><div class="cx"><b>${T[2]} na página</b><small>“${o.t}” · hoje às 14:40</small></div></div><div class="mt"><span>Fica só o registro</span>${hr}</div><span class="seta">${I.seta}</span></div></div>`;
+ if(o.st==='nao')return abre+`<div class="b card lap" data-m="lap"><div class="ct"><span class="ci">?</span><div class="cx"><b>Item não encontrado</b><small>Foi movido ou você não tem mais acesso</small></div></div><div class="mt"><span>Nada foi apagado por aqui</span>${hr}</div><div class="ca">Tentar de novo</div><span class="seta">${I.seta}</span></div></div>`;
+ const arq=o.st==='arq';
+ return abre+`<div class="b card ${arq?'arqv':''}" data-m="card">${cita}<div class="ct"><span class="ci">${T[0]}</span><div class="cx"><b>${f(o.t)}</b><small>${arq?'<em>Arquivada</em>':''}${f(o.s)}</small></div></div>${previa(o.pv)}${o.cap?`<div class="cap">${o.cap}</div>`:''}<div class="mt"><span>${f(o.at)}</span>${hr}</div><div class="ca">${arq?'Abrir (está em Arquivadas)':o.ac||T[1]}</div><span class="seta">${I.seta}</span></div></div>`}
+function fala(o,nova){const de=o.fx||DIR||o.de||'e',eu=de==='e';
+ return `<div class="l ${eu?'eu':''} ${o.seg?'seg':''} ${nova?'nova':''}"${o.id?` id="${o.id}"`:''}><div class="b" data-m="tx${de}">${o.q?`<div class="q"><i>${o.q[2]||''}</i><div><b>${o.q[0]}</b>${o.q[1]}</div></div>`:''}<span>${o.tx}</span><span class="h">${o.h||''} ${eu?I.ok:''}</span><span class="seta">${I.seta}</span></div></div>`}
+const um=(o,nova)=>o.dia?`<div class="dia">${o.dia}</div>`:o.ev?`<div class="ev ${nova?'nova':''}"${o.id?` id="${o.id}"`:''}>${o.ev}</div>`:o.tx?fala(o,nova):card(o,nova);
+
+// ===== 1 · galeria =====
+const LISTA=['l',[['📁','Mercado','2 notas'],['📁','Contas','1 nota']]];
+const TXT=['t','arroz\ncafé\nração'];
+const TAB=['g',[['Item','Valor'],['Sala','R$ 1.200'],['Quartos','R$ 1.600']],'+ 1 linha'];
+const QUAD=['q',[['A fazer',3,['Comprar tinta','Lixar parede','Chamar pintor']],['Fazendo',1,['Orçamento']],['Feito',2,['Medir sala','Escolher cor']]]];
+const G=[
+['Bloco de Notas','resumo das pastas, por você e pela Sofia','Mostra as pastas com a contagem, para você saber o que tem dentro sem abrir. O botão abre o painel “Dentro de Casa”.',
+ [{k:'notas',t:'Notas',s:'2 pastas · 3 notas',pv:LISTA,h:'10:02'},{k:'notas',de:'s',t:'Notas',s:'em Casa · 2 pastas · 3 notas',pv:LISTA,h:'10:04',cap:'Organizei as notas da Casa em duas pastas.'}]],
+['Nota','na conversa da própria página','Dentro da página Casa não precisa repetir “em Casa”: só a pasta. As 3 primeiras linhas do texto já resolvem a maioria das consultas.',
+ [{k:'nota',t:'Lista da semana',s:'Nota · 📁 Mercado',pv:TXT,h:'10:06'}]],
+['Pasta','com as notas que estão nela','Pasta mostra os nomes das notas e quando cada uma mudou. “Abrir pasta” abre o painel já nela.',
+ [{k:'pasta',t:'Mercado',s:'Pasta · 2 notas',pv:['l',[['📝','Lista da semana','hoje'],['📝','Feira','ontem']]],h:'10:07'}]],
+['Nota dentro de pasta, vista de fora','na conversa com a Sofia ou em outra página','Fora da página dona, o balão diz o caminho inteiro (pasta e página). O nome da página é clicável.',
+ [{k:'nota',de:'s',t:'Lista da semana',s:'Nota · 📁 Mercado · em <a>Casa</a>',pv:TXT,h:'19:40',cap:'Anotei “ração” aqui.'}]],
+['Tabela','as primeiras linhas','Duas linhas e o total bastam para reconhecer a tabela. Editar é na página, onde cabe.',
+ [{k:'tab',t:'Orçamento do pintor',s:'Tabela · 3 linhas',pv:TAB,h:'10:08'}]],
+['Quadro de colunas','colunas, contagem e os primeiros cartões','Chamado “Quadro de colunas” para não confundir com o “Quadro da conversa” (Agora / Assuntos anteriores), que continua existindo.',
+ [{k:'quad',t:'Reforma: etapas',s:'Quadro de colunas · 6 cartões',pv:QUAD,h:'10:09'}]],
+['Subpágina','com a última linha escrita nela','Subpágina é uma conversa. Então o botão é “Abrir conversa”, igual ao resto.',
+ [{k:'sub',t:'Reforma',s:'Subpágina de Casa',pv:['l',[['💬','Orçamento: R$ 2.800','ontem']]],h:'10:10'}]],
+['Link para outra página','leva à conversa daquela página','Hoje o link leva à página dona. No desenho ele abre a conversa da página apontada.',
+ [{k:'link',t:'Viagem',s:'Página · link',h:'10:11'},{k:'link',de:'s',t:'Viagem',s:'Página · 3 linhas hoje',h:'10:12',cap:'O adaptador de tomada está aqui.'}]],
+['Item com texto junto','a legenda fica dentro do mesmo balão','Um balão só: o item em cima, o que você escreveu embaixo.',
+ [{k:'tab',t:'Orçamento do pintor',s:'Tabela · 3 linhas',pv:TAB,h:'18:03',cap:'Confere se o valor dos quartos está certo antes de sábado.'}]],
+['Responder a um item','na conversa e no campo de escrever','A citação mostra o ícone, o nome e o tipo. Clicar nela rola até o balão do item. Entra “Responder” no menu do balão de item.',
+ [{k:'nota',t:'Lista da semana',s:'Nota · 📁 Mercado',pv:TXT,h:'10:06'},{tx:'Falta sabão em pó aqui',h:'18:20',q:['Você','Lista da semana · Nota','📝']},{tx:'Quer que eu acrescente?',de:'s',fx:'s',h:'18:20',q:['Você','Lista da semana · Nota','📝']}],
+ `<div class="citar"><span class="tr"></span><i>📝</i><div style="flex:1;min-width:0"><b>Você</b><span>Lista da semana · Nota</span></div><span class="bt" style="font-size:16px">✕</span></div><div class="comp"><span class="bt">+</span><div class="campo" style="color:var(--txt)">Falta sabão em pó aqui</div><div class="mic">➤</div></div>`],
+['Nome comprido','corta sem quebrar o balão','Título em até 2 linhas, o resto com reticências. O balão nunca passa da largura da conversa.',
+ [{k:'nota',t:'Lista de compras da semana do aniversário da Lia com tudo que falta para a festa',s:'Nota · 📁 Festas e comemorações de 2026 · em Casa',pv:['t','bolo de chocolate com recheio de brigadeiro\nbalões\nvelas'],h:'11:00'},
+  {k:'tab',de:'s',t:'Orçamento_do_pintor_versão_final_revisada_novembro',s:'Tabela · 12 linhas',pv:['g',[['Item','Valor'],['Sala e corredor com duas demãos e massa corrida','R$ 1.200,00']],'+ 11 linhas'],h:'11:01'}]],
+['Vazios','pasta sem nota, tabela sem linha','Vazio também é informação. O balão diz que está vazio e o botão leva direto a preencher.',
+ [{k:'pasta',t:'Presentes',s:'Pasta · sem notas',pv:['v','Pasta vazia'],ac:'+ Nova nota em Presentes',h:'11:05'},{k:'tab',de:'s',t:'Gastos de dezembro',s:'Tabela · sem linhas',pv:['v','Tabela vazia'],h:'11:06'}]],
+['Item arquivado','continua abrindo','Arquivar não apaga. O balão fica mais apagado, avisa “Arquivada” e abre do mesmo jeito.',
+ [{k:'nota',st:'arq',t:'Luz e água',s:'Nota · 📁 Contas',pv:['t','Luz vence dia 10\nÁgua vence dia 15'],h:'12:00'}]],
+['Item apagado na página','o balão vira registro, não some','Se o balão sumisse, a conversa ficava com buraco e respostas sem sentido. O registro diz o que era e quando saiu.',
+ [{k:'nota',st:'apag',t:'Feira',h:'12:10'},{tx:'Era a lista antiga, pode ignorar',h:'14:41',q:['Você','Nota apagada · Feira','🗑']}]],
+['Item não encontrado ou sem acesso','não foi você que apagou','Diferente do apagado: aqui a Sofia não sabe o que houve. Ela diz isso e deixa tentar de novo, sem assustar.',
+ [{k:'link',st:'nao',t:'Viagem',h:'12:20'},{k:'tab',de:'s',st:'nao',t:'x',h:'12:21'}]],
+['Na lista de conversas','como o item aparece na prévia','A prévia mostra o último balão: tipo e nome (ou o registro de apagado). Já as linhas cinzas de mudança não aparecem aqui nem contam como não lida.',0,0,
+ [['P','#F5A0AE','[Página] Casa','📝 Nota: Lista da semana','10:06'],['S','var(--lil)','Sofia','▦ Tabela: Orçamento do pintor','18:03'],['P','#8fb4ff','[Página] Viagem','🗑 Nota apagada na página','12:10']]]];
+function galeria(){$('gal').innerHTML=G.map((c,i)=>{const corpo=c[5]?c[5].map(r=>`<div class="it"><div class="av" style="background:${r[1]}">${r[0]}</div><div class="tx"><div class="lin"><span class="n">${r[2]}</span><span class="hh">${r[4]}</span></div><div class="lin"><span class="p">${r[3]}</span></div></div></div>`).join(''):`<div class="ms">${c[3].map(o=>um(o)).join('')}</div>${c[4]||''}`;
+ return `<section class="cen"><div class="ch"><b>${i+1} · ${c[0]}</b><span>${c[1]}</span></div><div class="par"><div class="tela cel"><i>CELULAR · 390</i>${corpo}</div><div class="tela pc"><i>COMPUTADOR</i>${corpo}</div></div><div class="pq"><b>Por que assim:</b> ${c[2]}</div></section>`}).join('')}
+galeria();
+document.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{DIR=b.dataset.dir;document.querySelectorAll('[data-dir]').forEach(x=>x.classList.toggle('on',x===b));galeria();DIR=''});
+$('tema').onclick=()=>{const c=document.documentElement.classList.toggle('claro');$('tema').textContent=c?'☾ Ver no escuro':'☀ Ver no claro'};
+
+// ===== menus =====
+function menuDe(m){const it=(a,t,c)=>`<div class="${c||''}">${I[a]}${t}</div>`;
+ if(m==='lap')return '<div class="dica">Este item não existe mais na página. O balão é só o registro.</div>'+it('resp','Responder');
+ if(m==='card')return it('resp','Responder')+it('abrir','Abrir')+it('abrp','Abrir na página')+'<div class="sep"></div><div class="dica">Apagar pasta, nota ou tabela: só na página</div>';
+ return it('resp','Responder')+it('cop','Copiar')+(m==='txe'?it('ed','Editar'):'')+it('sel','Selecionar várias')+'<div class="sep"></div>'+it('apa','Apagar','perigo')+it('fix','Fixar')}
+$('menus').innerHTML=[['card','Balão de item (nota, pasta, tabela, quadro, subpágina, link)'],['txe','Mensagem de texto sua, na conversa com a Sofia (como hoje; linha de página mantém Marcar tarefa e Abrir na página)'],['lap','Item apagado na página']].map(m=>`<figure><figcaption>${m[1]}</figcaption><div class="menu">${menuDe(m[0])}</div></figure>`).join('');
+const menu=$('menu');
+document.addEventListener('click',e=>{const s=e.target.closest('.seta');menu.classList.remove('on');if(!s)return;const b=s.closest('.b'),r=b.getBoundingClientRect();menu.innerHTML=menuDe(b.dataset.m);menu.classList.add('on');
+ const h=menu.offsetHeight;menu.style.left=Math.max(8,Math.min(r.right-215,innerWidth-225))+'px';menu.style.top=(r.top+28+h>innerHeight?Math.max(8,r.top-h):r.top+28)+'px'});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')menu.classList.remove('on')});
+addEventListener('scroll',()=>menu.classList.remove('on'),true);
+
+// ===== 2 · simulações =====
+const sm=$('sm');let tok=0;
+const zz=ms=>new Promise((r,j)=>{const k=tok;setTimeout(()=>k===tok?r():j(0),ms)});
+const fim=()=>sm.scrollTo({top:1e6,behavior:'smooth'});
+function cena(quem,itens){sm.innerHTML='<div class="dia">Hoje</div>'+itens.map(o=>um(o)).join('');$('simbox').classList.remove('selec');document.querySelector('.toast')?.remove();
+ const s=quem==='Sofia';$('sav').textContent=s?'S':'P';$('sav').style.background=s?'var(--lil)':'#F5A0AE';$('snm').textContent=s?'Sofia':'[Página] Casa';$('ssb').textContent=s?'online · lembra do que vocês já conversaram':'2 pastas · 3 notas · ver e criar'}
+const poe=o=>{const e=$(o.id);if(e)e.outerHTML=um(o);else junta(o)};
+const junta=o=>{sm.insertAdjacentHTML('beforeend',um(o,1));fim()};
+function toast(txt,desf){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.innerHTML=`<span>${txt}</span>${desf?'<a>Desfazer</a>':''}`;sm.parentElement.appendChild(t);
+ if(desf)t.querySelector('a').onclick=()=>{tok++;desf();t.remove()};const k=tok;setTimeout(()=>{if(k===tok)t.remove()},6000);return t}
+const N1={id:'n1',k:'nota',t:'Lista da semana',s:'Nota · 📁 Mercado',pv:['t','arroz\ncafé'],h:'10:02'};
+const P1={id:'p1',k:'pasta',t:'Mercado',s:'Pasta · 2 notas',pv:['l',[['📝','Lista da semana','hoje'],['📝','Feira','ontem']]],h:'10:03'};
+const T1={id:'t1',k:'tab',t:'Orçamento do pintor',s:'Tabela · 3 linhas',pv:TAB,h:'10:05'};
+const Q1={id:'q1',k:'quad',t:'Reforma: etapas',s:'Quadro de colunas · 6 cartões',pv:QUAD,h:'10:09'};
+const B1={id:'b1',k:'notas',t:'Notas',s:'2 pastas · 3 notas',pv:LISTA,h:'10:01'};
+const PAPO={tx:'Pintor vem na terça',h:'10:20'};
+const EU='*Atualizada 14:32 · por você';
+const B='<span class="tag">só o balão muda</span>',BL='<span class="tag l2">balão + 1 linha</span>';
+async function apagar(){cena('Casa',[N1,PAPO,{tx:'ver orçamento do pintor',h:'10:21',seg:1}]);await zz(1000);
+ poe({...N1,st:'apag'});junta({id:'ev1',ev:'🗑 Nota <b>Lista da semana</b> apagada na página · 14:40'});
+ return toast('Nota apagada na página',()=>{poe({...N1,t:'*Lista da semana',at:'*De volta · 14:40'});$('ev1')?.remove();toast('Nota de volta, do jeito que estava')})}
+const SIMS=[
+['Texto da nota editado na página',B,'O texto novo aparece dentro do mesmo balão, piscando em lilás por 2 segundos. Embaixo fica “Atualizada 14:32 · por você”. A conversa não ganha nada novo.','Digitar numa nota é a coisa mais comum do mundo. Se virasse mensagem, você teria 30 avisos por dia sobre algo que você mesmo fez.',
+ async()=>{cena('Casa',[N1,PAPO]);await zz(1000);poe({...N1,pv:['t','arroz\ncafé\n*ração\n*sabão em pó'],at:EU})}],
+['Nota renomeada',BL,'O nome troca no balão e entra uma linha pequena dizendo o nome antigo e o novo.','Se você procurar pelo nome antigo, a linha explica para onde ele foi. É uma linha só, cinza, que não conta como mensagem.',
+ async()=>{cena('Casa',[N1,PAPO]);await zz(1000);poe({...N1,t:'*Lista de sábado',at:EU});await zz(500);junta({ev:'📝 Nota <b>Lista da semana</b> agora se chama <b>Lista de sábado</b> · 14:32'})}],
+['Nota movida para outra pasta',BL,'O balão da nota troca a pasta, o balão da pasta antiga perde uma nota, e entra uma linha “foi de Mercado para Contas”.','Mudou de lugar: é o tipo de coisa que faz a gente se perder. Uma linha resolve, mesmo com dois balões atualizados.',
+ async()=>{cena('Casa',[P1,N1]);await zz(1000);poe({...N1,s:'Nota · *📁 Contas',at:EU});poe({...P1,s:'Pasta · *1 nota',pv:['l',[['📝','Feira','ontem']]],at:EU});await zz(500);junta({ev:'📝 <b>Lista da semana</b> foi de <b>Mercado</b> para <b>Contas</b> · 14:32 <a>Ver</a>'})}],
+['Pasta renomeada',BL,'O balão da pasta e todos os balões de notas dela trocam o nome ao mesmo tempo. Entra uma linha só.','Uma mudança sua = uma linha. Não importa quantos balões ela toca.',
+ async()=>{cena('Casa',[P1,N1]);await zz(1000);poe({...P1,t:'*Compras',at:EU});poe({...N1,s:'Nota · *📁 Compras'});await zz(500);junta({ev:'📁 Pasta <b>Mercado</b> agora se chama <b>Compras</b> · 14:32'})}],
+['Nova nota criada numa pasta',BL,'O balão da pasta ganha a nota nova na lista e a contagem sobe. Entra uma linha com “Abrir”.','Nasceu uma coisa nova: a linha serve de atalho para ela. A nota não ganha um balão grande sozinha, para não empurrar a conversa.',
+ async()=>{cena('Casa',[P1,PAPO]);await zz(1000);poe({...P1,s:'Pasta · *3 notas',pv:['l',[['📝','*Padaria','agora'],['📝','Lista da semana','hoje'],['📝','Feira','ontem']]],at:EU});await zz(500);junta({ev:'📝 Nova nota <b>Padaria</b> em <b>Mercado</b> · 14:32 <a>Abrir</a>'})}],
+['Linha da tabela editada e outra adicionada',B,'Primeiro o valor muda dentro do balão. Depois a contagem passa de 3 para 4 linhas. Nenhuma linha no chat.','Tabela muda o tempo todo. O balão sempre mostra o estado de agora; o histórico de cada célula fica na página.',
+ async()=>{cena('Casa',[T1,PAPO]);await zz(1000);poe({...T1,pv:['g',[['Item','Valor'],['Sala','R$ 1.200'],['Quartos','*R$ 1.750']],'+ 1 linha'],at:EU});await zz(1800);
+  poe({...T1,s:'Tabela · *4 linhas',pv:['g',[['Item','Valor'],['Sala','R$ 1.200'],['Quartos','R$ 1.750']],'*+ 2 linhas'],at:'*Atualizada 14:33 · por você'})}],
+['Cartão do quadro movido de coluna',B,'O cartão sai de “A fazer” e aparece em “Feito”, com as contagens trocando. Nenhuma linha no chat.','Mover cartão é o uso normal do quadro, igual a digitar numa nota.',
+ async()=>{cena('Casa',[Q1,PAPO]);await zz(1000);poe({...Q1,pv:['q',[['A fazer','*2',['Lixar parede','Chamar pintor']],['Fazendo',1,['Orçamento']],['Feito','*3',['*Comprar tinta','Medir sala','Escolher cor']]]],at:EU})}],
+['Sofia edita a nota a seu pedido','<span class="tag">só o balão muda</span>','Você pede, a Sofia responde citando a nota, e o balão da nota atualiza com “por Sofia”. Não entra linha cinza.','A resposta da Sofia já é o aviso. Duas marcas para a mesma coisa seria barulho. O “por Sofia” no balão deixa claro quem mexeu.',
+ async()=>{const n={...N1,de:'s',s:'Nota · 📁 Mercado · em <a>Casa</a>',h:'10:02'};cena('Sofia',[n]);await zz(800);junta({tx:'Sofia, põe ração e sabão em pó na Lista da semana',h:'14:32'});await zz(900);
+  sm.insertAdjacentHTML('beforeend','<div class="digit" id="dg">Sofia está digitando…</div>');fim();await zz(1200);$('dg').remove();
+  poe({...n,pv:['t','arroz\ncafé\n*ração\n*sabão em pó'],at:'*Atualizada 14:32 · por Sofia'});junta({tx:'Feito. Acrescentei ração e sabão em pó.',de:'s',h:'14:32',q:['Sofia editou','Lista da semana · Nota','📝']})}],
+['Várias mudanças seguidas',BL,'Quatro mudanças em 6 minutos: a primeira (texto) não gera linha. As outras três viram UMA linha, que troca de “1 mudança” para “3 mudanças em Notas”. Clique nela para abrir a lista.','Regra de calma: mudanças seguidas, sem mensagem no meio e em até 10 minutos, juntam na mesma linha. Você vê que mexeu, sem a conversa virar um extrato.',
+ async()=>{cena('Casa',[B1,N1]);await zz(900);poe({...N1,pv:['t','arroz\ncafé\n*ração'],at:'*Atualizada 14:30 · por você'});await zz(1400);
+  poe({...N1,t:'*Lista de sábado',pv:['t','arroz\ncafé\nração'],at:'Atualizada 14:32 · por você'});junta({id:'gr',ev:'📝 Nota <b>Lista da semana</b> agora se chama <b>Lista de sábado</b> · 14:32'});await zz(1600);
+  const g=(n,h,ls)=>`<details class="ev" id="gr"><summary>📁 <b>*${n} mudanças em Notas</b> · 14:32 a ${h}</summary><p>${ls.join('<br>')}</p></details>`.replace(/\*(\d)/,'<span class="pisca">$1</span>');
+  const a='Lista da semana agora se chama Lista de sábado',b='Lista de sábado foi de Mercado para Contas',c='Nova pasta Presentes';
+  poe({...N1,t:'Lista de sábado',s:'Nota · *📁 Contas',pv:['t','arroz\ncafé\nração'],at:'Atualizada 14:34 · por você'});$('gr').outerHTML=g(2,'14:34',[a,b]);await zz(1600);
+  poe({...B1,s:'*3 pastas · 3 notas',pv:['l',[['📁','Mercado','1 nota'],['📁','Contas','2 notas'],['📁','*Presentes','vazia']]],at:'*Atualizada 14:36 · por você'});$('gr').outerHTML=g(3,'14:36',[a,b,c]);await zz(1500);$('gr').open=true;fim()}],
+['Nota apagada na página',BL,'O balão vira um registro tracejado (“Nota apagada na página”), entra uma linha e aparece “Desfazer” por 6 segundos. As mensagens em volta não saem do lugar.','O balão não some para a conversa não ficar com buraco. E como apagar é sério, é o único caso que mostra “Desfazer”, igual ao apagar de hoje.',
+ async()=>{await apagar()}],
+['Desfazer o apagar','<span class="tag">volta tudo</span>','Mesma cena de antes, e o “Desfazer” é clicado: o balão volta inteiro, a linha de “apagada” sai e fica só um aviso rápido.','Desfazer tem que limpar o rastro todo. Se a linha ficasse, a conversa diria que a nota foi apagada, e ela não foi.',
+ async()=>{const t=await apagar();await zz(1900);const a=t.querySelector('a');a.classList.add('ap');await zz(700);a.click()}],
+['Selecionar várias com um item no meio','<span class="tag">regra de apagar</span>','As mensagens de texto ganham a caixinha. O balão da nota mostra um cadeado e não pode ser marcado. “Excluir” age só nos textos.','Excluir mensagens nunca pode apagar uma nota, pasta ou tabela. Para tirar o item, só na página.',
+ async()=>{cena('Casa',[{...PAPO,id:'a1'},N1,{tx:'ver orçamento do pintor',h:'10:21',id:'a2'}]);await zz(900);$('simbox').classList.add('selec');await zz(500);$('a1').classList.add('mk');await zz(400);$('a2').classList.add('mk');await zz(500);toast('O balão da nota não entra: ela continua na página')}]];
+$('sbs').innerHTML=SIMS.map((s,i)=>`<button class="sb" data-s="${i}">${s[1]}Simular: ${s[0]}</button>`).join('');
+function roda(i){tok++;const s=SIMS[i];document.querySelectorAll('.sb').forEach((b,k)=>b.classList.toggle('on',k===i));
+ $('sex').innerHTML=`<div class="pq"><b>O que acontece:</b> ${s[2]}</div><div class="pq"><b>Por que assim:</b> ${s[3]}</div>`;s[4]().catch(()=>{})}
+$('sbs').onclick=e=>{const b=e.target.closest('.sb');if(b)roda(+b.dataset.s)};
+document.querySelectorAll('[data-larg]').forEach(b=>b.onclick=()=>{$('simbox').classList.toggle('cel',b.dataset.larg==='cel');document.querySelectorAll('[data-larg]').forEach(x=>x.classList.toggle('on',x===b))});
+cena('Casa',[B1,N1,P1,T1,Q1]);$('sex').innerHTML='<div class="pq">Escolha uma simulação acima. Dá para clicar de novo para repetir.</div>';
+</script>
+</body></html>
