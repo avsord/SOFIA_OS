@@ -18,9 +18,9 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
-- 2026-11-19, Claude Code (PC PEDRO). Novo: arrastar páginas na barra lateral sem lag (fantasma anda sem redesenhar a barra; ordem nova aparece na hora) e soltar no vão entre linhas funciona; ícone da página aceita emoji em imagem (link png/gif, imagem colada ou arrastada do slackmojis), no tamanho do emoji (`src/components/PageGlyph.tsx`).
-- Não conferido na tela (sem login aqui): tsc, testes (só falha o 061 do splash Android, que já falhava antes) e site recompilado.
-- Próximo passo: Pedro testa arrastar páginas e põe um emoji do slackmojis (abrir ícone da página → arrastar a imagem ou colar o endereço da imagem); diz o que ajustar.
+- 2026-11-19, Claude Code (PC PEDRO). Barra lateral: arrastar sem lag e soltar no vão funciona. Ícone de página aceita emoji em imagem (link, colar ou arrastar do slackmojis): `src/components/PageGlyph.tsx` corta a margem vazia (mede pelos pixels via images.weserv.nl, só leitura) e usa a caixa de um emoji invisível, então nome e altura da linha ficam iguais aos de emoji comum.
+- Conferido por simulação local medida em pixels (lista de subpáginas e barra), não no site logado. Testes ok (só o 061 do splash Android, que já falhava antes).
+- Próximo passo: Pedro confere o Claude na barra, na lista de subpáginas e no título da página.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -382,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Conversa no site: notas dos blocos de Notas viram conversas ("em <página>", Arquivadas até puxar); escrever/áudio/anexo grava dentro da nota (Diário com hora roxa); "Abrir nota" | testes ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: criar subpágina abre só o ramo da página-mãe (sub-subpáginas abertas antes ficam fechadas) | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
 | 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
+| 2026-11-19 | (sem APK) | (este) | Ícone em imagem: sem margem vazia, mesma caixa do emoji comum (nome alinhado, mesma altura) em barra, lista, título, busca e quadro | tsc/testes ok (061 já falhava), site recompilado; medido em simulação local |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

@@ -33,11 +33,17 @@ export function PageGlyph({icon,size,style}:{icon:string;size:number;style?:Text
  useEffect(()=>{if(!image){setInk(undefined);return;}let live=true;setInk(undefined);void measure(src).then(v=>{if(live)setInk(v);});return()=>{live=false;};},[image,src]);
  if(!image)return <Text style={[{fontSize:size},style]}>{icon}</Text>;
  const s=Math.round(size);
- if(ink===undefined)return <View style={{width:s,height:s}}/>; // sem pulo enquanto mede
- if(!ink){const f=Math.round(size*1.15);return <View style={{width:s,height:s,alignItems:'center',justifyContent:'center',overflow:'visible'}}><Image accessibilityIgnoresInvertColors source={{uri:src}} resizeMode="contain" style={{width:f,height:f}}/></View>;}
- // desenho (sem a margem) com a mesma área do emoji (s×s); desenho largo/alto passa no máximo 15% do lado; centralizado
- const iw=ink.fw*ink.ar,ih=ink.fh,H=Math.min(s/Math.sqrt(iw*ih),1.15*s/Math.max(iw,ih)),W=H*ink.ar,left=(s-ink.fw*W)/2-ink.fx*W,top=(s-ink.fh*H)/2-ink.fy*H;
- return <View style={{width:s,height:s,overflow:'visible',position:'relative'}}><Image accessibilityIgnoresInvertColors source={{uri:src}} resizeMode="stretch" style={{position:'absolute',width:W,height:H,left,top}}/></View>;
+ // A caixa é a de um emoji de texto invisível com o mesmo estilo (fonte, tamanho, altura de linha):
+ // nome ao lado e altura da linha ficam idênticos aos de um emoji comum. O desenho fica por cima,
+ // centralizado na horizontal e ~5% abaixo do centro, como o desenho do emoji fica (medido 19/11/2026).
+ let art:React.ReactNode=null;
+ if(ink===null){const f=Math.round(size*1.15);art=<Image accessibilityIgnoresInvertColors source={{uri:src}} resizeMode="contain" style={{width:f,height:f}}/>;}
+ else if(ink){const iw=ink.fw*ink.ar,ih=ink.fh,H=Math.min(s/Math.sqrt(iw*ih),1.15*s/Math.max(iw,ih)),W=H*ink.ar,left=(s-ink.fw*W)/2-ink.fx*W,top=(s-ink.fh*H)/2-ink.fy*H;
+  art=<View style={{width:s,height:s,position:'relative'}}><Image accessibilityIgnoresInvertColors source={{uri:src}} resizeMode="stretch" style={{position:'absolute',width:W,height:H,left,top}}/></View>;}
+ return <View style={{position:'relative'}}>
+  <Text aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[{fontSize:size},style,{opacity:0,color:'transparent'}]}>📄</Text>
+  <View pointerEvents="none" style={{position:'absolute',left:0,right:0,top:0,bottom:0,alignItems:'center',justifyContent:'center',paddingTop:Math.round(size*0.1)}}>{art}</View>
+ </View>;
 }
 
 /** Imagem colada/arrastada vira data: pequena (GIF pequeno fica como está para continuar animado). */

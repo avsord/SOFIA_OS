@@ -83,3 +83,4 @@
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
 | 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
+| 2026-11-19 | (sem APK) | (este) | Ícone em imagem: sem margem vazia, mesma caixa do emoji comum (nome alinhado, mesma altura) em barra, lista, título, busca e quadro | tsc/testes ok (061 já falhava), site recompilado; medido em simulação local |
