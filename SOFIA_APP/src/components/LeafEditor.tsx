@@ -21,7 +21,7 @@ import {PageRichInput} from './PageRichInput';
 import {htmlToLeaf,leafToHtml} from '../lib/leaf-rich';
 import {NoteFormatBar} from './NoteFormatBar';
 import {fitTextarea} from '../lib/fit-textarea';
-import {diaryDays,diaryHidden,isDiaryEntry,diaryEditedLabel} from '../lib/page-templates';
+import {diaryDays,diaryDayKey,diaryHidden,isDiaryEntry,diaryEditedLabel} from '../lib/page-templates';
 import {guardLeafEntry,leafDiaryEnter,leafToDiary,lineTimesFromVersions} from '../lib/leaf-diary';
 const RICH_WEB=Platform.OS==='web';
 export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(patch:Partial<Leaf>)=>void;titleRef:React.RefObject<TextInput|null>;pageId?:string}){
@@ -96,7 +96,12 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
   const at=prev.text.length,merged={...prev,text:prev.text+me.text,marks:[...(prev.marks||[]),...(me.marks||[]).map(m=>({...m,start:m.start+at,end:m.end+at}))]};
   save(cur.filter(x=>x.id!==id).map(x=>x.id===prev.id?merged:x));setActive(prev.id);
   setTimeout(()=>{const p:any=inputs.current.get(prev.id);try{p?.focus?.({preventScroll:true});p?.setSelectionRange?.(at,at);}catch{focusEnd(prev.id);}},40);return true;};
- const diaryEnterAt=(id:string)=>{const n:any=inputs.current.get(id),cur=latest.current.find(x=>x.id===id);if(!n||!cur||n.selectionStart!==n.selectionEnd||Number(n.selectionEnd)<cur.text.length)return false;
+ const diaryLocked=(id:string,ne:any,e:any)=>{const cur:any=latest.current.find(x=>x.id===id);if(!cur)return false;const day=!!diaryDayKey(cur),lock=day?String(cur.text||'').length+1:(isDiaryEntry(cur)?(String(cur.text).match(/^\d{2}:\d{2}\s\s/)||[''])[0].length:0);if(!lock)return false;
+  const edit=(String(ne.key).length===1&&!ne.ctrlKey&&!ne.metaKey)||ne.key==='Backspace'||ne.key==='Delete'||(day&&ne.key==='Enter')||((ne.ctrlKey||ne.metaKey)&&/^[xv]$/i.test(String(ne.key)));if(!edit)return false;
+  const n:any=inputs.current.get(id),s=Number(n?.selectionStart),z=Number(n?.selectionEnd);if(!Number.isFinite(s)||!Number.isFinite(z))return false;
+  if(!(s<lock||(!day&&ne.key==='Backspace'&&s===lock&&z===lock)))return false;
+  e.preventDefault?.();if(!day)try{n?.setSelectionRange?.(lock,lock);}catch{}return true;};
+ const diaryEnterAt=(id:string)=>{if(!latest.current.find(x=>x.id===id))return false;
   const r=leafDiaryEnter(latest.current,id);if(!r)return false;save(r.blocks);setActive(r.focus);setTimeout(()=>focusEnd(r.focus),60);return true;};
  async function setDiary(on:boolean){if(!on){onChange({diary:false});return;}if(diaryBusy)return;setDiaryBusy(true);let times=new Map<string,string>();
   try{const api=currentApi();if(api&&pageId)times=lineTimesFromVersions(await api.entityVersions(pageId),leaf.id);}catch{/* sem versões: usa a data da linha ou da nota */}
@@ -157,6 +162,10 @@ export function LeafEditor({leaf,onChange,titleRef,pageId}:{leaf:Leaf;onChange:(
   onKeyPress={(e:any)=>{const ne=e?.nativeEvent||{};
    // Enter continua quebrando a linha dentro do mesmo bloco, como no campo antigo da nota
    if((ne.key==='ArrowUp'||ne.key==='ArrowDown')&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&arrowAt(b.id,ne.key==='ArrowUp'?-1:1)){e.preventDefault?.();return;}
+   // 19/11/2026 (Pedro: "datas e horas tem que ficar travado"): no Diário, a hora do registro e o título do dia não se editam pelo teclado
+   if(leaf.diary&&diaryLocked(b.id,ne,e))return;
+   // 19/11/2026 (Pedro: "apertando enter não tá abrindo o próximo horário"): Enter num registro sempre abre o próximo horário (Shift+Enter quebra a linha)
+   if(ne.key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&leaf.diary&&isDiaryEntry(latest.current.find(x=>x.id===b.id) as any)){e.preventDefault?.();diaryEnterAt(b.id);return;}
    if(ne.key==='Backspace'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&backspaceAt(b.id)){e.preventDefault?.();return;}
    if(ne.key==='Enter'&&!ne.shiftKey&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey&&leaf.diary&&diaryEnterAt(b.id)){e.preventDefault?.();return;}
    if(ne.key==='Enter'&&!ne.ctrlKey&&!ne.metaKey&&!ne.altKey){e.preventDefault?.();(globalThis as any).document?.execCommand?.('insertLineBreak');return;}
