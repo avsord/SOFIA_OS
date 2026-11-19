@@ -29,7 +29,7 @@ e funções atuais ficam.
 Bolha raio 7,5 px com a ponta da cauda reta, letra 14,2/19 px, sombra fina, hora 12 px; setinha 24×18 no canto; data 24 px de altura com raio 6; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder.
 
 ## Não medido no WhatsApp (escolha da Sofia, não cópia)
-ESC fechando a conversa inteira (no WhatsApp o ESC sem nada aberto fecha a conversa; na Sofia não); antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
+ESC sem nada aberto; antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
 
 ## Correções sem desenho (entram junto)
 - O quadro da conversa recarrega de novo 6 s depois de abrir (`Chat.tsx`, `setTimeout(...loadBoard...,6000)`): pode trocar/piscar; recarregar só quando mudar.
