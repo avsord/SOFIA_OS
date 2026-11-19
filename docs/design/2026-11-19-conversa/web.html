@@ -111,7 +111,9 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
 .nome{display:flex;gap:8px;padding:6px 16px 6px 20px}.pn .nome{padding-left:46px}
 .nome input{flex:1;height:36px;border-radius:10px;border:1px solid var(--lil);background:var(--bg);color:var(--txt);padding:0 10px;font:inherit;outline:0}
 .nome button{height:36px;padding:0 14px;border:0;border-radius:10px;background:var(--lil);color:#17122A;font:inherit;font-weight:700;cursor:pointer}
-.ccab .nm{cursor:pointer}.ccab .nm span a{color:var(--lil);cursor:pointer}.onde{color:var(--lil)}
+.ccab .nm{cursor:pointer;min-width:0}.ccab .nm span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app{position:relative}@media (max-width:1599px){.info{position:absolute;right:0;top:0;bottom:0;z-index:6;box-shadow:-12px 0 30px #0008}}
+.ccab .nm span a{color:var(--lil);cursor:pointer}.onde{color:var(--lil)}
 .b.card{min-width:270px}.card .ct{display:flex;gap:10px;align-items:center;padding-right:44px}.card .ci{width:38px;height:38px;border-radius:9px;background:#0003;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
 .card .ct b{display:block;font-weight:600}.card .ct small{display:block;color:#cbbfe6;font-size:12.5px;line-height:17px}
 .card .mini{margin-top:8px;border-radius:6px;overflow:hidden;font-size:12.5px;border:1px solid #ffffff1a}.card .mini div{display:flex;justify-content:space-between;padding:4px 8px;border-top:1px solid #ffffff12}.card .mini div:first-child{border:0;color:#cbbfe6}
@@ -267,12 +269,12 @@ function resumo(pg){const D=dentro(pg),n=D.pastas.reduce((s,p)=>s+p[1].length,0)
 function sub(c){if(c===0)return 'online · lembra do que vocês já conversaram';const m=META[c];
  if(m&&m.pasta)return `Nota · 📁 ${m.pasta} · em <a data-ir="${m.pg}">${nome(m.pg)}</a>`;
  if(m)return `Subpágina · em <a data-ir="${m.pg}">${nome(m.pg)}</a>`;
- const r=resumo(c);return (r||'nada dentro ainda')+' · clique aqui para ver e criar'}
+ const r=resumo(c);return (r||'nada dentro ainda')+' · ver e criar'}
 function troca(c){if(c===cv)return;const v=$('campo').value.trim();if(v)rasc[cv]=v;else delete rasc[cv];cv=c;$('campo').value=rasc[c]||'';
  const d=conversas[c],av=document.querySelector('.ccab .av');av.style.background=d[1];av.textContent=d[0];document.querySelector('.ccab .nm b').textContent=d[2];
  document.querySelector('.ccab .nm span').innerHTML=sub(c);fechaPainel();fechaCitar();render();lista();botao()}
 document.querySelector('.ccab .nm').onclick=e=>{const a=e.target.closest('a[data-ir]');if(a){const pg=+a.dataset.ir;troca(pg);abrePainel(pg);return}
- if(cv!==0&&!META[cv])$('info').classList.contains('on')?fechaPainel():abrePainel(cv)};
+ if(cv!==0)$('info').classList.contains('on')?fechaPainel():abrePainel(cv)};
 // lista: Sofia fixa em cima (nunca sai); filtros Tudo / Páginas / Notas
 var filtro='tudo';var ehNota=i=>!!(META[i]&&META[i].pasta);
 var extrasArq=()=>conversas.map((x,i)=>i).filter(i=>i>=9&&conversas[i]&&!PRINC.has(i));
@@ -289,7 +291,7 @@ function listaArq(){const p=document.createElement("div");p.className="painelArq
 function principal(i,on){on?PRINC.add(i):PRINC.delete(i);lista();if(painelDe!=null)abrePainel(painelDe);aviso(on?`“${nome(i)}” na lista principal`:`“${nome(i)}” foi para Arquivadas`,()=>{on?PRINC.delete(i):PRINC.add(i);lista();if(painelDe!=null)abrePainel(painelDe)})}
 // painel "Dentro de <página>": pastas → notas, subpáginas, criar, abrir a página, arquivar
 let painelDe=null;
-function abrePainel(pg){painelDe=pg;const D=dentro(pg),nm=nome(pg),fechadas=[...document.querySelectorAll('#info .pasta.fechada')].map(e=>e.dataset.k);
+function abrePainel(pg){painelDe=pg;if(ehNota(pg)){const m=META[pg];$('info').innerHTML=`<div class="icab"><button class="bt" id="ix" title="Fechar">${I.x}</button><b>Nota ${nome(pg)}</b></div><div class="irol"><div class="isec">ONDE ESTÁ</div><div class="nov neutro" data-vai="${m.pg}">${I.pasta} ${m.pasta} · em ${nome(m.pg)}</div><div class="isec">NOTA</div><div class="nov neutro" data-ac="abrp">${I.abrp} Abrir a nota</div><div class="nov neutro" data-ac="arq">${PRINC.has(pg)?I.arq+' Arquivar conversa':I.pin+' Trazer para a lista principal'}</div></div>`;$('info').classList.add('on');return}const D=dentro(pg),nm=nome(pg),fechadas=[...document.querySelectorAll('#info .pasta.fechada')].map(e=>e.dataset.k);
  const item=i=>`<div class="ir" data-ir="${i}"><div class="av2">${conversas[i][0]}</div><div class="tx2"><b>${nome(i)}</b><span>${limpa(conversas[i][3]).replace(/^.*· /,'')}</span></div><span class="hh">${conversas[i][4]}</span><button class="bt pi" data-pi="${i}" title="${PRINC.has(i)?'Arquivar':'Trazer para a lista principal'}">${PRINC.has(i)?I.arq:I.pin}</button></div>`;
  $('info').innerHTML=`<div class="icab"><button class="bt" id="ix" title="Fechar">${I.x}</button><b>Dentro de ${nm}</b></div><div class="irol">
 <div class="isec">PASTAS DE NOTAS</div>${D.pastas.map((p,k)=>`<div class="pasta ${fechadas.includes(String(k))?'fechada':''}" data-k="${k}"><div class="ph">${I.pasta}<span>${p[0]}</span><small>${plural(p[1].length,'nota','notas')}</small><span class="seta2">${I.seta}</span></div><div class="pn">${p[1].map(item).join('')}<div class="nov" data-nov="nota" data-k="${k}">+ Nova nota em ${p[0]}</div></div></div>`).join('')}
@@ -311,9 +313,10 @@ $('info').addEventListener('click',e=>{const t=e.target;
   nv.outerHTML=`<div class="nome"><input placeholder="${ph2}"><button>Criar</button></div>`;const box=$('info').querySelector('.nome'),inp=box.querySelector('input');inp.focus();
   const ok=()=>{const v=inp.value.trim();if(v)criar(tipo,k,v)};box.querySelector('button').onclick=ok;
   inp.onkeydown=ev=>{if(ev.key==='Enter')ok();if(ev.key==='Escape'){ev.stopPropagation();abrePainel(painelDe)}};return}
- const ac=t.closest('[data-ac]');if(ac){if(ac.dataset.ac==='abrp')return aviso(`Abre a página ${nome(painelDe)} (como hoje)`);return principal(painelDe,!PRINC.has(painelDe))}
+ const vai=t.closest('[data-vai]');if(vai){const pg=+vai.dataset.vai;troca(pg);return abrePainel(pg)}
+ const ac=t.closest('[data-ac]');if(ac){if(ac.dataset.ac==='abrp')return aviso(`Abre ${ehNota(painelDe)?'a nota':'a página'} ${nome(painelDe)} (como hoje)`);return principal(painelDe,!PRINC.has(painelDe))}
  const ir=t.closest('.ir[data-ir]');if(ir)troca(+ir.dataset.ir)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.classList.contains('on')&&$('info').classList.contains('on')&&!e.target.closest?.('.nome'))fechaPainel()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.classList.contains('on')&&$('info').classList.contains('on')&&!e.target.closest?.('.nome'))fechaPainel()},true);
 // cartões da página (Notas, Tabela, Link de página): abrem de verdade; não se apagam pelo chat
 function cartao(m,i){const ic={notas:I.pasta,tab:'▦',link:'📄'}[m[1]],sm=m[1]==='notas'?resumo(cv).split(' · ').slice(0,2).join(' · '):m[3];
  const mini=m[1]==='tab'?'<div class="mini"><div><span>Item</span><span>Valor</span></div><div><span>Sala</span><span>R$ 1.200</span></div><div><span>Quartos</span><span>R$ 1.600</span></div></div>':'';

@@ -39,11 +39,13 @@ Hoje não funciona → fica assim:
 - Pastas não aparecem em lugar nenhum da Conversa → painel **Dentro de <página>** (clique no nome da página no topo, como "Dados do contato" no WhatsApp): pastas que abrem e fecham, com as notas dentro, **+ Nova nota em <pasta>** e **+ Nova pasta**.
 - Subpáginas ficam empilhadas no topo da conversa, antes das mensagens → vão para o painel (seção Subpáginas, **+ Subpágina**). O botão "Subpágina" do topo sai dali, a função fica.
 - Notas na lista com o mesmo ícone das páginas e sem dizer de onde são → ícone 📝 e a linha "📁 Mercado · Casa"; filtro **Notas** ao lado de Tudo / Páginas.
-- Conversa de uma nota não tem caminho de volta → topo "Nota · 📁 Mercado · em Casa", e "Casa" abre a página com o painel aberto.
-- **"Apagar" num balão de Notas/Tabela/Quadro apaga o bloco inteiro da página** (todas as pastas e notas), só com uma confirmação → esses balões não têm Apagar no chat: o menu mostra Abrir / Abrir na página e o aviso "Apagar pasta, nota ou tabela: só na página".
+- Conversa de uma nota mostra "em <página>", mas não a pasta → topo "Nota · 📁 Mercado · em Casa"; "Casa" abre a página com o painel aberto. Clicar no nome da nota abre um painel pequeno com Abrir a nota e Arquivar/Trazer (funções de hoje).
+- **"Apagar" num balão de Notas/Tabela/Quadro apaga o bloco inteiro da página** (todas as pastas e notas), só com uma confirmação → esses balões não têm Apagar no chat (nem entram em "Selecionar várias → Excluir"): o menu mostra Abrir / Abrir na página e o aviso "Apagar pasta, nota ou tabela: só na página".
 - Tabela e Quadro só dizem "abrir na página" → balão com as 2 primeiras linhas e **Abrir na página**.
 - Link de página leva à página dona, não à página do link → balão **Abrir conversa** daquela página.
-- Abrir a página e Arquivar/Trazer continuam: no fim do painel (e o alfinete em cada nota/subpágina tira ou põe na lista principal).
+- Subpágina tem o mesmo painel (com as pastas e subpáginas dela). Abrir a página e Arquivar/Trazer continuam: no fim do painel (e o alfinete em cada nota/subpágina tira ou põe na lista principal).
+- Painel: abaixo de 1600 px de largura ele passa por cima da conversa (não aperta a conversa).
+- Campo de escrever: no WhatsApp a pílula de 52 px contém os botões (+ e emoji); aqui os botões ficam fora dela (escolha da Sofia, como já estava).
 
 Arquivadas (decidido 19/11): não chega mensagem de outra pessoa. Páginas e notas novas entram em Arquivadas e ficam lá até o Pedro tirar. Ponto aberto: hoje a página criada pelo "+" da própria Conversa nasce na principal (`chat_main:true` em `ChatHub.tsx`); no desenho, nota e subpágina criadas no painel abrem na hora, mas ficam em Arquivadas.
 
