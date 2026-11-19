@@ -18,9 +18,8 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
-- 2026-11-19, Claude Code (PC PEDRO). Barra lateral: arrastar sem lag e soltar no vão funciona. Ícone de página aceita emoji em imagem (link, colar ou arrastar do slackmojis): `src/components/PageGlyph.tsx` corta a margem vazia (mede pelos pixels via images.weserv.nl, só leitura) e usa a caixa de um emoji invisível, então nome e altura da linha ficam iguais aos de emoji comum.
-- Conferido por simulação local medida em pixels (lista de subpáginas e barra), não no site logado. Testes ok (só o 061 do splash Android, que já falhava antes).
-- Próximo passo: Pedro confere o Claude na barra, na lista de subpáginas e no título da página.
+- 2026-11-19, Claude Code (PC PEDRO, Opus com Fable de conselheiro). Mimic Kaizen mediu o WhatsApp Web (régua de chat; mensagem de teste na conversa do Pedro com ele mesmo, apagada) e fez o DESENHO da nova Conversa: `docs/design/2026-11-19-conversa/` (index.html + README com 4 decisões). Nada mudou no código do app.
+- Próximo passo: Pedro aprova/ajusta o desenho (menu na última bolha abrindo para cima; Reagir/Fixar/Encaminhar sim ou não; Editar na conversa com a Sofia faz ela responder de novo?). Com o ok: implementar só no site, consultando o Fable na revisão final.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -277,6 +276,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+- **(19/11)** Desenho da nova Conversa (`docs/design/2026-11-19-conversa/`) esperando aprovação do Pedro; depois implementar menu único, Responder, Editar com 'editada', Apagar com Desfazer, contagem no botão de descer, envio sem 'Enviando…', Rascunho na lista, pesquisa dentro da conversa e tirar o recarregar de 6 s do quadro.
 - **(15/11 noite)** Pedro confere no site a Conversa estilo WhatsApp: lista de páginas, balões, escrever/áudio/anexo gravando na página, Arquivadas x principal, criar página e subpágina. Falta: notas (folhas) dentro da página como conversa; celular/app.
 - **(15/11)** Pedro confere no site: ponto do Início menor e a linha em L embaixo do Início com o item atual passando na horizontal (dizer se a velocidade e o tamanho estão bons).
 - **(14/11 tarde)** Pedro liga o "✎ Modelo Diário" na nota "ideias" e confere a hora de cada linha (o aviso diz quantas vieram do histórico e quantas caíram na data de criação da nota); notas avulsas (fora das pastas) guardam a escolha mas não têm histórico de versões por linha.
@@ -382,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Barra lateral: criar subpágina abre só o ramo da página-mãe (sub-subpáginas abertas antes ficam fechadas) | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
 | 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
 | 2026-11-19 | (sem APK) | (este) | Ícone em imagem: sem margem vazia, mesma caixa do emoji comum (nome alinhado, mesma altura) em barra, lista, título, busca e quadro | tsc/testes ok (061 já falhava), site recompilado; medido em simulação local |
+| 2026-11-19 | (sem APK) | (este) | Mimic Kaizen: WhatsApp Web medido como régua de chat; desenho da nova Conversa para aprovação em docs/design/2026-11-19-conversa | só desenho, código do app intocado |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Conversa</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0a0e;--tela:#121017;--sup:#1C1924;--sup2:#25212F;--linha:#2C2837;--txt:#F2EEFA;--mudo:#A49DB6;--lil:#B5A2FF;--minha:#3A2C57;--ruim:#F28B9B;--ok:#5FD3A2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+h1{font-size:22px;margin:28px 20px 4px}p.sub{margin:0 20px 18px;color:var(--mudo);font-size:13px;max-width:900px;line-height:19px}
+.grade{display:flex;flex-wrap:wrap;gap:28px;padding:0 20px 40px}
+.cartao{width:390px;max-width:100%}.cartao h2{font-size:14px;margin:0 0 4px}.cartao .nota{font-size:12px;color:var(--mudo);margin:0 0 10px;line-height:17px;min-height:34px}
+.fone{height:700px;background:var(--tela);border:1px solid var(--linha);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.topo{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid var(--linha)}
+.av{width:34px;height:34px;border-radius:11px;background:var(--lil);color:#17122A;font-weight:800;display:flex;align-items:center;justify-content:center}
+.ico{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--mudo)}
+.msgs{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:12px;position:relative;overflow:hidden}
+.l{display:flex;gap:8px;align-items:flex-start}.l.eu{justify-content:flex-end}
+.s{width:22px;height:22px;flex:none;border-radius:7px;background:var(--lil);color:#17122A;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.b{max-width:78%;background:var(--sup);border:1px solid var(--linha);border-radius:5px 16px 16px 16px;padding:9px 12px 6px;font-size:14px;line-height:20px;position:relative}
+.eu .b{background:var(--minha);border-color:transparent;border-radius:16px 16px 5px 16px}
+.h{text-align:right;font-size:10px;color:var(--mudo);margin-top:3px;display:flex;justify-content:flex-end;gap:5px;align-items:center}
+.eu .h{color:#cbbfe6}
+.foco{outline:2px solid var(--lil);outline-offset:2px}
+.menu{position:absolute;z-index:3;background:var(--sup2);border:1px solid var(--linha);border-radius:12px;padding:5px;min-width:190px;box-shadow:0 12px 30px #0008;font-size:13.5px}
+.menu div{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px}.menu div:first-child{background:#ffffff0d}
+.menu .sep{height:1px;background:var(--linha);padding:0;margin:4px 6px}.menu .perigo{color:var(--ruim)}
+.menu .quer{color:var(--mudo);border:1px dashed #4a4459;margin-top:4px}
+.menu svg,.bar svg{flex:none}
+.comp{padding:8px 10px 10px;border-top:1px solid var(--linha);background:var(--sup)}
+.campo{display:flex;align-items:center;gap:6px;min-height:44px;border-radius:22px;background:var(--sup2);padding:0 6px 0 14px;font-size:14.5px;color:var(--mudo)}
+.mic{width:44px;height:44px;border-radius:22px;background:var(--lil);display:flex;align-items:center;justify-content:center;flex:none}
+.bar{display:flex;align-items:center;gap:10px;margin:0 2px 8px;padding:7px 8px 7px 0;border-radius:10px;background:var(--sup2);font-size:12.5px}
+.bar .tr{width:3px;align-self:stretch;border-radius:2px;background:var(--lil)}
+.bar b{display:block;font-size:12px;color:var(--lil)}.bar span.t{color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:240px}
+.toast{position:absolute;left:12px;right:12px;bottom:8px;background:#2a2536;border:1px solid var(--linha);border-radius:12px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 24px #0008}
+.toast a{color:var(--lil);font-weight:700;text-decoration:none}
+.desce{position:absolute;right:14px;bottom:12px;width:40px;height:40px;border-radius:20px;background:var(--sup2);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center}
+.desce i{position:absolute;top:-6px;right:-4px;font-style:normal;font-size:10px;font-weight:800;background:var(--lil);color:#17122A;border-radius:9px;padding:1px 6px}
+.lista .it{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid #1f1c27;align-items:center}
+.lista .it .n{font-size:14px;font-weight:600}.lista .it .p{font-size:12.5px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.rasc{color:var(--ok);font-weight:600}
+.busca{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--linha);font-size:13px}
+.busca .in{flex:1;background:var(--sup2);border-radius:10px;padding:8px 10px}
+mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 2px}
+.site{width:820px;max-width:100%}.site .fone{height:520px;border-radius:14px}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;color:#17122A;background:var(--lil);border-radius:6px;padding:1px 6px;margin-right:6px}
+.pend{background:#E8B04A}
+</style></head><body>
+<h1>Nova Conversa · desenho para aprovação</h1>
+<p class="sub">Régua: WhatsApp Web medido em 19/11 (régua de chat; não é o DNA 27/27). Cores e fontes continuam as da Sofia; muda o jeito, não a cara. Nenhuma função atual sai. <span class="tag pend">quer?</span> = item opcional, você decide. Detalhes e decisões em README.md.</p>
+<div class="grade" id="g"></div>
+<script>
+const I={
+ resp:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>',
+ cop:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+ ed:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+ tar:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 12l3 3 5-6"/></svg>',
+ pag:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/></svg>',
+ sel:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
+ apa:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/></svg>',
+ x:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+ lupa:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>',
+ rel:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>',
+ baixo:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F2EEFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+ mic:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#17122A" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+ clip:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 11l-8 8a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7-7"/></svg>',
+ relo:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2 2"/></svg>',
+ ok:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+ seta:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>'
+};
+const topo=(extra='')=>`<div class="topo"><div class="av">S</div><div style="flex:1"><div style="font-size:15px;font-weight:700">Sofia</div><div style="font-size:11.5px;color:var(--mudo)">online · lembra do que vocês já conversaram</div></div><span class="ico">${I.lupa}</span><span class="ico">${I.rel}</span>${extra}</div>`;
+const S=(t,h,c='')=>`<div class="l"><span class="s">S</span><div class="b ${c}">${t}<div class="h">${h}</div></div></div>`;
+const E=(t,h,c='')=>`<div class="l eu"><div class="b ${c}">${t}<div class="h">${h}</div></div></div>`;
+const comp=(bar='',txt='Fale com a Sofia…')=>`<div class="comp">${bar}<div style="display:flex;gap:8px;align-items:flex-end"><div class="campo" style="flex:1"><span style="flex:1">${txt}</span><span class="ico">${I.clip}</span></div><div class="mic">${I.mic}</div></div></div>`;
+const menu=(itens,pos)=>`<div class="menu" style="${pos}">${itens.map(i=>i==='|'?'<div class="sep"></div>':`<div class="${i[2]||''}">${I[i[0]]}${i[1]}</div>`).join('')}</div>`;
+const fone=(conteudo)=>`<div class="fone">${conteudo}</div>`;
+const cartao=(t,n,c,cls='cartao')=>`<section class="${cls}"><h2>${t}</h2><p class="nota">${n}</p>${c}</section>`;
+const telas=[];
+
+// 1a menu na resposta da Sofia (app, segurar)
+telas.push(cartao('1a · Menu da mensagem (Sofia) · app','Segurar a bolha abre o menu colado embaixo dela. O mesmo menu em toda a Conversa; os itens mudam conforme a mensagem.',
+fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${E('Cria uma tarefa pra amanhã: jogar o lixo','21:06 '+I.ok)}${S('Tarefa “Jogar o lixo” criada para amanhã.','21:07','foco')}
+${menu([['resp','Responder'],['cop','Copiar'],['tar','Marcar tarefa'],['sel','Selecionar'],'|',['resp','Reagir','quer'],['pag','Fixar na conversa','quer']],'left:42px;top:200px')}</div>`+comp())));
+
+// 1b minha mensagem, site hover + clique direito
+telas.push(cartao('1b · Menu da sua mensagem · site','No site: passar o mouse mostra a setinha ⌄ no canto da bolha; clicar nela ou clique direito abre o mesmo menu. ESC fecha.',
+fone(topo()+`<div class="msgs" style="justify-content:flex-start;padding-top:40px">${S('Bom dia! Quer que eu leia a agenda de hoje?','08:01')}<div class="l eu"><div class="b foco">Sim, e me lembra de ligar pro Jota<div class="h">08:02 ${I.ok}</div><span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:#4a3a6e;display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span></div></div>
+${menu([['resp','Responder'],['cop','Copiar'],['ed','Editar'],['sel','Selecionar'],'|',['apa','Apagar','perigo']],'right:14px;top:205px')}</div>`+comp())));
+
+// 1c linha de página + abre para cima
+telas.push(cartao('1c · Linha de página · última mensagem','Em conversa de página o menu traz Editar, Marcar tarefa e Abrir na página. Na última bolha não cabe embaixo: abre para cima, colado nela (precisa do seu ok).',
+fone(`<div class="topo"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1"><div style="font-size:15px;font-weight:700">[Página] Viagem</div><div style="font-size:11.5px;color:var(--mudo)">conversa da página</div></div><span class="ico">${I.lupa}</span></div><div class="msgs">${E('Levar carregador do notebook','ontem')}${E('Reservar hotel até sexta','10:14 '+I.ok,'foco')}
+${menu([['resp','Responder'],['cop','Copiar'],['ed','Editar'],['tar','Marcar tarefa'],['pag','Abrir na página'],'|',['apa','Apagar','perigo']],'right:14px;bottom:66px')}</div>`+comp('','Escrever nesta página'))));
+
+// 2 responder
+telas.push(cartao('2 · Responder','A barra é a mesma da “Criar” aprovada em 05: traço lilás, quem e o trecho, X. ESC ou X cancela.',
+fone(topo()+`<div class="msgs">${S('Amanhã você tem dentista às 9h e reunião às 14h.','21:40')}${E('Ok','21:41 '+I.ok)}</div>`+comp(`<div class="bar"><span class="tr"></span><div style="flex:1;min-width:0"><b>Respondendo à Sofia</b><span class="t">Amanhã você tem dentista às 9h e reunião às 14h.</span></div><span style="color:var(--mudo)">${I.x}</span></div>`,'Muda a reunião pra 15h'))));
+
+// 3 editar
+telas.push(cartao('3 · Editar','Edita no lugar, como já é hoje (função mantida): a bolha vira campo, Enter salva, ESC desiste. Depois aparece “editada” ao lado da hora.',
+fone(`<div class="topo"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1"><div style="font-size:15px;font-weight:700">[Página] Viagem</div><div style="font-size:11.5px;color:var(--mudo)">conversa da página</div></div></div><div class="msgs">${E('Levar carregador do notebook','ontem')}<div class="l eu"><div class="b" style="background:var(--sup2);border:1px solid var(--lil);width:78%">Reservar hotel até quinta<span style="border-left:2px solid var(--lil);margin-left:1px"></span><div class="h" style="color:var(--mudo)">Enter salva · Esc desiste</div></div></div>${E('Comprar adaptador de tomada','10:20 · <i>editada</i> '+I.ok)}</div>`+comp('','Escrever nesta página'))));
+
+// 4 apagar + desfazer
+telas.push(cartao('4 · Apagar','Some na hora, sem janela perguntando. Embaixo: “Apagada · Desfazer” por 6 s. (O WhatsApp pergunta porque tem “apagar para todos”; a Sofia não tem.)',
+fone(`<div class="topo"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1"><div style="font-size:15px;font-weight:700">[Página] Viagem</div><div style="font-size:11.5px;color:var(--mudo)">conversa da página</div></div></div><div class="msgs" style="padding-bottom:62px">${E('Levar carregador do notebook','ontem')}<div class="l eu" style="opacity:.25"><div class="b" style="height:12px;padding:0;min-width:120px"></div></div>${E('Comprar adaptador de tomada','10:20 '+I.ok)}<div class="toast"><span>Linha apagada</span><a href="#">Desfazer</a></div></div>`+comp('','Escrever nesta página'))));
+
+// 5 rolado para cima
+telas.push(cartao('5 · Lendo lá em cima','Chegou mensagem e você está lendo as antigas: a tela não pula. O botão de descer (já existe) ganha a contagem de novas. Ao subir até o topo, as antigas carregam sozinhas (escolha da Sofia).',
+fone(topo()+`<div class="msgs" style="justify-content:flex-start"><div style="align-self:center;font-size:11px;color:var(--mudo);padding:3px 10px;border-radius:10px;background:var(--sup);border:1px solid var(--linha)">2 de novembro</div>${S('Registrei duas despesas de 02/11.','02:28')}${E('Valeu','02:29 '+I.ok)}${S('Lembrete: pagar a fatura até dia 10.','09:00')}<div class="desce">${I.baixo}<i>2</i></div></div>`+comp())));
+
+// 6 enviando e erro
+telas.push(cartao('6 · Enviar','A mensagem aparece na hora com um reloginho, que vira ✓ quando o servidor salva. Sai o texto “Enviando…”. Se falhar: “Não enviada · Tentar novamente” (função mantida).',
+fone(topo()+`<div class="msgs">${E('Qual meu saldo do mês?','21:50 '+I.ok)}${S('Você gastou R$ 1.240 de R$ 3.000 em novembro.','21:50')}${E('E em outubro?','21:51 '+I.relo)}<div class="l eu"><div class="b" style="opacity:.85">Mostra por categoria<div class="h" style="color:var(--ruim)">Não enviada · <u>Tentar novamente</u></div></div></div><div style="font-size:12px;color:var(--mudo);padding-left:30px">Sofia está escrevendo…</div></div>`+comp())));
+
+// 7a lista com rascunho
+telas.push(cartao('7a · Lista de conversas com rascunho','O que você deixou escrito e não enviou aparece na lista como “Rascunho:”, em verde, até enviar ou apagar.',
+fone(`<div class="topo"><div style="flex:1;font-size:28px;font-weight:600;letter-spacing:-.5px">Conversa</div><span class="ico">${I.lupa}</span><span class="ico" style="font-size:22px">+</span></div><div class="lista">
+<div class="it"><div class="av">S</div><div style="flex:1"><div class="n">Sofia</div><div class="p"><span class="rasc">Rascunho:</span> muda a reunião pra 15h</div></div><span style="font-size:11px;color:var(--mudo)">21:41</span></div>
+<div class="it"><div class="av" style="background:#8fb4ff">P</div><div style="flex:1"><div class="n">[Página] Viagem</div><div class="p">Comprar adaptador de tomada</div></div><span style="font-size:11px;color:var(--mudo)">10:20</span></div>
+<div class="it"><div class="av" style="background:#F5A0AE">P</div><div style="flex:1"><div class="n">[Página] Casa</div><div class="p"><span class="rasc">Rascunho:</span> ver orçamento do pintor</div></div><span style="font-size:11px;color:var(--mudo)">ontem</span></div>
+<div class="it"><div class="av" style="background:#E8B04A">P</div><div style="flex:1"><div class="n">[Página] Ideias</div><div class="p">Vídeo sobre rotina</div></div><span style="font-size:11px;color:var(--mudo)">seg</span></div>
+<div class="it" style="color:var(--mudo);font-size:13px">Arquivadas</div></div>`)));
+
+// 7b pesquisar dentro
+telas.push(cartao('7b · Pesquisar dentro da conversa','A lupa do cabeçalho busca no que foi escrito (hoje só busca pelo título). Setas pulam entre os achados; ESC fecha.',
+fone(`<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div class="in">dentista</div><span style="color:var(--mudo);font-size:12px">2 de 5</span><span>⌃</span><span>⌄</span><span style="color:var(--mudo)">${I.x}</span></div><div class="msgs">${S('Amanhã você tem <mark>dentista</mark> às 9h e reunião às 14h.','21:40','foco')}${E('Ok','21:41 '+I.ok)}${S('Confirmado.','21:41')}</div>`+comp())));
+
+document.getElementById('g').innerHTML=telas.join('');
+</script>
+</body></html>
