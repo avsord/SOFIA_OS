@@ -214,7 +214,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   // 14/11/2026 (Pedro: "ampliar as pastas para alinhar com a parte de cima; em monitor maior, mais pastas por linha em vez de blocos gigantes"):
   // colunas de no mínimo 300 px que ocupam a largura toda (a fileira cheia termina junto da busca); tela maior = mais colunas.
   const tileFor=(n:number)=>{if(!(gridW>0)||n<1)return 224;const cols=Math.max(1,Math.floor((gridW+10)/(300+10)));return Math.floor((gridW-10*(cols-1))/cols)-0.5;};
-  const tileW=tileFor(opened?foldersIn(opened.id).length:foldersIn('').length);
+  const tileW=tileFor(opened?foldersIn(opened.id).length:foldersIn('').length+rootNotes.length);
   const gridLayout=(e:any)=>{const w=Math.round(e?.nativeEvent?.layout?.width||0);if(w&&Math.abs(w-gridW)>1){lastGridW=w;setGridW(w);}};
   const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id,item:DragItem={kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},bar=(side:string)=>hover==='folder:'+b.id+'|'+side?<View pointerEvents="none" style={{position:'absolute',top:6,bottom:6,width:3,borderRadius:2,backgroundColor:c.accent,[side==='before'?'left':'right']:3}}/>:null;
   return <View key={b.id} ref={r=>{targets.current[b.id]=r;bindDom(r,dragProps(item));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===b.id?'1':'0'}} as any)} style={{width:desktop?tileW:'48%',position:'relative'}}>
@@ -228,12 +228,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
     <Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{last?'Última: '+(last.title||'Sem título'):'Vazia'}</Text>{bar('before')}{bar('after')}
    </Pressable>
   </View>;};
- const noteCard=(b:Book,p:Leaf,showFolder=false)=>{const prev=leafPreview(p),stamp=leafStamp(p as Dated),lifted=drag?.kind==='note'&&drag.id===p.id,tid='note:'+b.id+':'+p.id,line=(side:string)=>hover===tid+'|'+side?<View pointerEvents="none" style={{position:'absolute',left:6,right:6,[side==='before'?'top':'bottom']:-6,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null,hovered=noteHover.key===tid,showDots=!showFolder&&(!desktop||hovered||lifted);const item:DragItem={kind:'note',id:p.id,from:b.id,label:'📝 '+(p.title||'Sem título')};
-  return <View key={b.id+':'+p.id} ref={r=>{if(!showFolder)targets.current[tid]=r;bindDom(r,dragProps(item,p));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===p.id?'1':'0'}} as any)} style={{position:'relative'}}>
+ const noteCard=(b:Book,p:Leaf,showFolder=false,tile=0)=>{const prev=leafPreview(p),stamp=leafStamp(p as Dated),lifted=drag?.kind==='note'&&drag.id===p.id,tid='note:'+b.id+':'+p.id,line=(side:string)=>hover===tid+'|'+side?<View pointerEvents="none" style={{position:'absolute',left:6,right:6,[side==='before'?'top':'bottom']:-6,height:3,borderRadius:2,backgroundColor:c.accent}}/>:null,hovered=noteHover.key===tid,showDots=!showFolder&&(!desktop||hovered||lifted);const item:DragItem={kind:'note',id:p.id,from:b.id,label:'📝 '+(p.title||'Sem título')};
+  return <View key={b.id+':'+p.id} ref={r=>{if(!showFolder)targets.current[tid]=r;bindDom(r,dragProps(item,p));}} collapsable={false} {...({dataSet:{notesItem:'1',notesLifted:lifted&&mouse?'1':'0',notesLanded:landed===p.id?'1':'0'}} as any)} style={tile?{width:desktop?tile:'48%',position:'relative'}:{position:'relative'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir nota '+(p.title||'Sem título')} onPress={()=>{if(!dragRef.current)open(b,p);}} onHoverIn={()=>noteHover.enter(tid)} onHoverOut={noteHover.leave}
     {...(desktop?contextMenu(()=>noteItems(b.id,p.id,null,false)):{})}
     delayLongPress={300} onLongPress={showFolder||mouse?undefined:e=>startDrag(item,e)} onPressOut={showFolder||mouse?undefined:()=>pressOut()}
-    style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,opacity:lifted&&!mouse?0.35:pressed?0.75:1})}>
+    style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,...(tile?{height:132,overflow:'hidden'}:null),opacity:lifted&&!mouse?0.35:pressed?0.75:1})}>
     <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
      <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:16,fontWeight:'600'}}>{p.title||'Sem título'}</Text>
      {stamp?<Text style={{color:c.muted,fontSize:11}}>{stamp}</Text>:null}
@@ -274,7 +274,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
   </View>:<View testID="notes-folder-grid" onLayout={gridLayout} style={{flexDirection:'row',flexWrap:'wrap',gap:10,opacity:gridW>0?1:0}}>
    {foldersIn('').map(folderTile)}
    {/* 13/11/2026 (Pedro): na raiz, pastas e notas soltas juntas (a nota solta é um cartão, sem pasta "Geral") */}
-   {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:foldersIn('').length?4:0}}>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
+   {rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p,false,tileW))}
    {!foldersIn('').length&&!rootNotes.length?<Pressable onPress={()=>addLeaf()} style={{flex:1,borderRadius:18,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:28}}>📝</Text><Text style={{color:c.muted,fontSize:13,textAlign:'center'}}>{tap('Nenhuma nota ainda. Toque para criar a primeira nota (ou use ＋ Pasta).')}</Text></Pressable>:null}
   </View>}
   {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>{mouse?'Arraste uma nota ou pasta para mudar a ordem, para dentro de outra pasta, para fora dela ou para a lixeira.':tap('Segure uma nota ou pasta e arraste para mudar a ordem, para dentro de outra pasta, para fora dela ou para a lixeira.')}</Text>:null}
