@@ -1,4 +1,5 @@
 import {MOTION_EASE,useReducedMotion} from '../lib/motion';
+import {PageGlyph,isImageIcon} from './PageGlyph';
 import {contextMenu} from './ContextMenu';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Animated,FlatList,Pressable,Text,View} from 'react-native';
@@ -113,7 +114,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     ListFooterComponent={footer?<View style={{marginHorizontal:-10}}>{footer}</View>:null}
    />:<>{header}{visible.slice(0,limit).map(renderRow)}{footer}</>}
   {line!=null&&drop?<View pointerEvents="none" accessibilityLabel={'Soltar '+(drop.kind==='before'?'antes':'depois')+' no nível '+drop.depth} style={{position:'absolute',top:line-origin.current.y-1.5,left:drop.depth*PAGE_INDENT+(compact?0:28),right:6,height:3,borderRadius:2,backgroundColor:c.accent,zIndex:99}}/>:null}
-  {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><Text style={{fontSize:24}}>{String(ghost.page.data?.icon||'📄')}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'500',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
+  {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><PageGlyph icon={String(ghost.page.data?.icon||'📄')} size={24}/><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'500',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
  </View>;
 }
 function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}:{page:Entity;compact:boolean;onTouchStart:()=>void;onOpen:()=>void;onHold:(x:number,y:number)=>void;onMove:(x:number,y:number)=>void;onEnd:()=>void;onCancel:()=>void}){
@@ -129,7 +130,7 @@ function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}
   onResponderRelease={e=>{stopTimer();if(held.current){latest.current.onMove(e.nativeEvent.pageX,e.nativeEvent.pageY);latest.current.onEnd();}else if(!moved.current)latest.current.onOpen();held.current=false;}}
   onResponderTerminationRequest={()=>!held.current}
   onResponderTerminate={()=>{stopTimer();if(held.current)latest.current.onCancel();held.current=false;}}>
-  {String(page.data?.icon||'').trim()?<Text style={{fontSize:compact?18:20,color:c.text,width:26,textAlign:'center'}}>{String(page.data?.icon).trim()}</Text>:<View style={{width:26,alignItems:'center'}}><Icon name="note" size={compact?17:19} color={c.accent} weight="duotone"/></View>}{/* 07/11/2026 (revisao): sem icone escolhido, o mesmo icone de linha dos Recentes (era o emoji 📄 colorido) */}<Text numberOfLines={1} style={{flex:1,fontSize:compact?14:16,color:c.text,fontWeight:'500'}}>{page.title}</Text>
+  {String(page.data?.icon||'').trim()?(isImageIcon(page.data?.icon)?<View style={{width:26,alignItems:'center'}}><PageGlyph icon={String(page.data?.icon)} size={compact?18:20}/></View>:<Text style={{fontSize:compact?18:20,color:c.text,width:26,textAlign:'center'}}>{String(page.data?.icon).trim()}</Text>):<View style={{width:26,alignItems:'center'}}><Icon name="note" size={compact?17:19} color={c.accent} weight="duotone"/></View>}{/* 07/11/2026 (revisao): sem icone escolhido, o mesmo icone de linha dos Recentes (era o emoji 📄 colorido) */}<Text numberOfLines={1} style={{flex:1,fontSize:compact?14:16,color:c.text,fontWeight:'500'}}>{page.title}</Text>
  </View>;
 }
 

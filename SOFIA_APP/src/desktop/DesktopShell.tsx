@@ -1,4 +1,5 @@
 import {EMBED} from '../lib/embed'; // 08/11/2026: pagina dentro do Quadro (sem barra lateral nem barra de cima)
+import {PageGlyph,isImageIcon} from '../components/PageGlyph';
 import {DRIVE_APP} from '../lib/features';
 import {DriveWindowHost,openDriveWindow,closeDriveWindow,useDriveWindowOpen} from '../components/DriveWindow';
 import {uiScale} from '../web/desktop-scale';
@@ -41,7 +42,7 @@ import {APP_SHORTCUTS,SIDEBAR_COLLAPSED,SIDEBAR_WIDTH,useSidebarWidth,appModuleT
 import {currentArrival,onTimelineTimes,requestArrivalOpen} from '../lib/timeline-arrivals';
 
 export const TAB_LABELS:Record<string,{label:string;icon:IconName}>={home:{label:'Início',icon:'home'},chat:{label:'Conversa',icon:'sofia'},pages:{label:'Páginas',icon:'book'},agenda:{label:'Agenda',icon:'calendar'},apps:{label:'Apps',icon:'grid'},profile:{label:'Perfil',icon:'user'},notifications:{label:'Notificações',icon:'bell'}};
-const isEmoji=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v);
+const isEmoji=(v:unknown)=>isImageIcon(v)||(typeof v==='string'&&v.length>0&&v.length<=8&&!/^[a-z0-9_-]+$/i.test(v));
 
 type Props={
  api:SofiaApi;tab:Tab;locked:boolean;profile:{name:string;email:string};
@@ -109,7 +110,7 @@ function Row({dot,onDot,small,onAuxOpen,icon,emoji,label,selected,onPress,depth=
   {/* 06/11/2026 (Pedro: "se nao tem subpagina nao tem porque ter esse pra abrir"): sem subpaginas a seta some (fica so o espaco, para alinhar) */}
   {onToggle&&!hasChildren?<View style={{width:16,height:16}}/>:null}
   {onToggle&&hasChildren?<Pressable accessibilityRole="button" accessibilityLabel={(expanded?'Recolher ':'Abrir ')+label} onPress={onToggle} hitSlop={6} style={{width:16,height:16,borderRadius:5,alignItems:'center',justifyContent:'center',opacity:hasChildren?1:0.35}}><View style={{...({transitionProperty:'transform',transitionDuration:'160ms',transitionTimingFunction:'ease-out'} as any),transform:[{rotate:expanded?'90deg':'0deg'}]}}><Icon name="chevron" size={13} color={c.muted}/></View></Pressable>:null}
-  {dot?<Pressable testID={testID?testID+'-cor':undefined} accessibilityRole="button" accessibilityLabel={'Cor do atalho '+label} onPress={onDot} hitSlop={6} style={{width:Math.round(20*uiScale()),height:18,minWidth:Math.round(20*uiScale()),flexShrink:0,borderRadius:9,alignSelf:'center',alignItems:'center',justifyContent:'center'}}>{()=><View style={{width:8,height:8,minWidth:8,flexShrink:0,aspectRatio:1,borderRadius:999,backgroundColor:dot}}/>}</Pressable>:emoji?<Text style={{fontSize:16,width:Math.round(20*uiScale()),textAlign:"center",flexShrink:0}}>{emoji}</Text>:icon?<View style={{position:"relative",width:Math.round(20*uiScale()),alignItems:"center",flexShrink:0}}><Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>{collapsed&&trailing&&typeof trailing!=="string"?<View testID="desktop-icon-dot" style={{position:"absolute",top:-3,right:-4,width:7,height:7,borderRadius:4,backgroundColor:(trailing as any)?.props?.["data-color"]||c.accent}}/>:null}</View>:null}
+  {dot?<Pressable testID={testID?testID+'-cor':undefined} accessibilityRole="button" accessibilityLabel={'Cor do atalho '+label} onPress={onDot} hitSlop={6} style={{width:Math.round(20*uiScale()),height:18,minWidth:Math.round(20*uiScale()),flexShrink:0,borderRadius:9,alignSelf:'center',alignItems:'center',justifyContent:'center'}}>{()=><View style={{width:8,height:8,minWidth:8,flexShrink:0,aspectRatio:1,borderRadius:999,backgroundColor:dot}}/>}</Pressable>:emoji?(isImageIcon(emoji)?<View style={{width:Math.round(20*uiScale()),alignItems:"center",flexShrink:0}}><PageGlyph icon={emoji} size={16}/></View>:<Text style={{fontSize:16,width:Math.round(20*uiScale()),textAlign:"center",flexShrink:0}}>{emoji}</Text>):icon?<View style={{position:"relative",width:Math.round(20*uiScale()),alignItems:"center",flexShrink:0}}><Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>{collapsed&&trailing&&typeof trailing!=="string"?<View testID="desktop-icon-dot" style={{position:"absolute",top:-3,right:-4,width:7,height:7,borderRadius:4,backgroundColor:(trailing as any)?.props?.["data-color"]||c.accent}}/>:null}</View>:null}
   {collapsed?null:<Text numberOfLines={1} style={{flex:afterLabel?undefined:1,flexShrink:1,color:selected?c.accent:small?c.muted:c.text,fontSize:small?12.5:14,fontWeight:selected?'600':'400'}}>{label}</Text>}{!collapsed&&afterLabel?<>{afterLabel}<View style={{flex:1}}/></>:null}
   {!collapsed&&hint?<Text style={{color:c.muted,fontSize:11}}>{hint}</Text>:null}
   {!collapsed&&trailing?<Text style={{color:c.muted,fontSize:11}}>{trailing}</Text>:null}
@@ -198,7 +199,12 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
    toast('Página “'+name+'” excluída',[{label:'Desfazer',run:undoNow}]);
   }catch(e){appAlert('Não foi possível excluir',e instanceof Error?e.message:String(e));}};
  const movePageTo=(id:string,spot:PageSpot)=>{const cur=byIdRef.current.get(id)||pagesDirectory.get()?.find(x=>x.id===id);if(!cur)return Promise.reject(Error('A página não está mais na lista.'));
-  setDir(list=>list.map(x=>x.id===id?{...x,data:{...x.data,parent_id:spot.parentId,node_type:spot.parentId?'page':'space'}}:x));
+  setDir(list=>{const moved={...cur,data:{...cur.data,parent_id:spot.parentId,node_type:spot.parentId?'page':'space'}};
+   // 19/11/2026 (Pedro: lag quando encaixa): a ordem nova aparece na hora; a resposta do servidor só confirma
+   const sibs=list.filter(x=>x.id!==id&&x.kind===cur.kind&&String(x.data?.parent_id||'')===spot.parentId).sort(comparePageOrder);let at=sibs.length;
+   if(spot.kind!=='inside'){const i=sibs.findIndex(x=>x.id===spot.anchorId);if(i>=0)at=spot.kind==='before'?i:i+1;}
+   sibs.splice(at,0,moved);const rank=new Map(sibs.map((x,i)=>[x.id,(i+1)*1024]));
+   return list.map(x=>x.id===id?{...moved,data:{...moved.data,sort_order:rank.get(id)}}:rank.has(x.id)?{...x,data:{...x.data,sort_order:rank.get(x.id)}}:x);});
   return api.movePage({id,revision:cur.revision,parentId:spot.parentId,kind:spot.kind,anchorId:spot.anchorId}).then(r=>{const items=r?.items||[];if(items.length)setDir(list=>list.map(x=>items.find(y=>y.id===x.id)||x));systemChanged(api);});};
  // arrastar página na barra: meio da linha = dentro; borda de cima/baixo = antes/depois (como no Notion)
  const [drag,setDrag]=useState<{id:string;x:number;y:number;title:string;emoji?:string}|null>(null),[target,setTarget]=useState<{id:string;kind:'before'|'after'|'inside'}|null>(null);
@@ -206,12 +212,20 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  const isInside=(id:string,ancestor:string)=>{let cur=byIdRef.current.get(id),n=0;while(cur&&n++<60){const parent=String(cur.data?.parent_id||'');if(!parent)return false;if(parent===ancestor)return true;cur=byIdRef.current.get(parent);}return false;};
  const bindDrag=(p:Entity)=>(node:any)=>{if(!node||typeof node.addEventListener!=='function'||node.__sofiaDrag===p.id)return;node.__sofiaDrag=p.id;
   node.addEventListener('mousedown',(ev:MouseEvent)=>{if(ev.button!==0)return;const d=document,sx=ev.clientX,sy=ev.clientY;let on=false,last:{id:string;kind:'before'|'after'|'inside'}|null=null;
-   const move=(e:MouseEvent)=>{if(!on&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;on=true;e.preventDefault();d.getSelection?.()?.removeAllRanges?.();
-    const box=(d.querySelector('[data-testid="sidebar-page-tree"]') as HTMLElement|null)?.getBoundingClientRect();
-    setDrag({id:p.id,x:e.clientX-(box?.left||0),y:e.clientY-(box?.top||0),title:p.title||'Sem título',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined});
-    const el=(d.elementFromPoint(e.clientX,e.clientY) as HTMLElement|null)?.closest?.('[data-testid^="sidebar-page-"]') as HTMLElement|null;const id=el?.getAttribute('data-testid')?.replace(/^sidebar-page-/,'').replace(/-(more|add)$/,'')||'';
-    if(!el||!id||id===p.id||isInside(id,p.id)){last=null;setTarget(null);return;}const r=el.getBoundingClientRect(),f=(e.clientY-r.top)/r.height;last={id,kind:f<0.34?'before':f>0.66?'after':'inside'};setTarget(last);};
-   const up=()=>{d.removeEventListener('mousemove',move);d.removeEventListener('mouseup',up);if(!on)return;justDragged.current=true;setTimeout(()=>{justDragged.current=false;},60);setDrag(null);setTarget(null);
+   // 19/11/2026 (Pedro: arrastar com lag e às vezes não vai): o fantasma anda pelo DOM (sem redesenhar a barra a cada pixel),
+   // o alvo só muda quando muda, e o vão entre linhas conta para a linha mais perto (antes caía no "tree" e a página não ia)
+   let frame=0,px=0,py=0;const tree=()=>d.querySelector('[data-testid="sidebar-page-tree"]') as HTMLElement|null;
+   const same=(a:typeof last,b:typeof last)=>a===b||(!!a&&!!b&&a.id===b.id&&a.kind===b.kind);
+   const step=()=>{frame=0;const t=tree(),box=t?.getBoundingClientRect();const g=t?.querySelector('[data-testid="sidebar-drag-ghost"]') as HTMLElement|null;
+    if(g){g.style.left=(px-(box?.left||0)+12)+'px';g.style.top=(py-(box?.top||0)-14)+'px';}
+    let best:HTMLElement|null=null,bd=Infinity;if(t&&box&&px>=box.left-40&&px<=box.right+40&&py>=box.top-24&&py<=box.bottom+24)t.querySelectorAll('[data-testid^="sidebar-page-"]').forEach(n=>{const id=n.getAttribute('data-testid')!.slice(13);if(!byIdRef.current.has(id))return;const r=(n as HTMLElement).getBoundingClientRect();if(!r.height)return;const dd=py<r.top?r.top-py:py>r.bottom?py-r.bottom:0;if(dd<bd){bd=dd;best=n as HTMLElement;}});
+    const el=best as HTMLElement|null,id=el?.getAttribute('data-testid')?.slice(13)||'';let next:typeof last=null;
+    if(el&&id&&id!==p.id&&!isInside(id,p.id)){const r=el.getBoundingClientRect(),f=(py-r.top)/r.height;next={id,kind:f<0.34?'before':f>0.66?'after':'inside'};}
+    if(!same(next,last)){last=next;setTarget(next);}};
+   const move=(e:MouseEvent)=>{if(!on&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;e.preventDefault();px=e.clientX;py=e.clientY;
+    if(!on){on=true;d.getSelection?.()?.removeAllRanges?.();const box=tree()?.getBoundingClientRect();setDrag({id:p.id,x:px-(box?.left||0),y:py-(box?.top||0),title:p.title||'Sem título',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined});}
+    if(!frame)frame=requestAnimationFrame(step);};
+   const up=()=>{if(frame){cancelAnimationFrame(frame);step();}d.removeEventListener('mousemove',move);d.removeEventListener('mouseup',up);if(!on)return;justDragged.current=true;setTimeout(()=>{justDragged.current=false;},60);setDrag(null);setTarget(null);
     if(!last)return;const anchor=byIdRef.current.get(last.id);if(!anchor)return;const parentId=last.kind==='inside'?anchor.id:String(anchor.data?.parent_id||'');
     if(last.kind==='inside')setExpanded(prev=>{const n=new Set(prev);n.add(anchor.id);try{localStorage.setItem(EXPANDED_KEY,JSON.stringify([...n]));}catch{/* modo privado */}return n;});
     const from=pageSpot([...byIdRef.current.values()],p.id),to:PageSpot={parentId,kind:last.kind,anchorId:anchor.id},name=byIdRef.current.get(p.id)?.title||p.title||'Sem título';
@@ -268,7 +282,7 @@ function PageTree({pages,openId,onOpen,api,toast,undoNow}:{pages:Entity[];openId
  walk('',0);for(const [parent,list] of children)if(parent&&!ids.has(parent))for(const p of list)rows.push(<Row key={p.id} onToggle={()=>{}} depth={0} icon="book" label={p.title||'Sem título'} selected={openId===p.id} onPress={()=>onOpen(p.id)} onAuxOpen={()=>openTab('/paginas/'+encodeURIComponent(p.id))}/>);
  const c=useTheme();
  return <View ref={treeRef} testID="sidebar-page-tree" style={{position:'relative'}}>{rows}{subPicker?<ColorPicker color={pcolors[subPicker.id]||DEFAULT_SHORTCUT_COLOR} x={subPicker.x} y={subPicker.y} onLive={c=>setSubPicker(q=>q?{...q,live:c}:q)} onCommit={c=>saveColor(subPicker.id,c)} defaultColor={DEFAULT_SHORTCUT_COLOR} onClose={()=>setSubPicker(null)}/>:null}{drag?<View pointerEvents="none" testID="sidebar-drag-ghost" style={{position:'absolute',left:drag.x+12,top:drag.y-14,zIndex:9999,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6,borderRadius:8,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,opacity:0.92,shadowColor:'#000',shadowOpacity:0.3,shadowRadius:12}}>
-  {drag.emoji?<Text style={{fontSize:14}}>{drag.emoji}</Text>:<Icon name="book" size={14} color={c.muted}/>}<Text style={{color:c.text,fontSize:13}}>{drag.title}</Text></View>:null}</View>;
+  {drag.emoji?<PageGlyph icon={drag.emoji} size={14}/>:<Icon name="book" size={14} color={c.muted}/>}<Text style={{color:c.text,fontSize:13}}>{drag.title}</Text></View>:null}</View>;
 }
 
 /** Próximos eventos (agenda) na barra lateral, como no Notion: título, horário e "Ver todos". */
@@ -320,7 +334,7 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
      {results.length?results.map((cmd,i)=>{const head=cmd.group!==lastGroup;lastGroup=cmd.group;return <React.Fragment key={cmd.id}>
       {head?<Text style={{color:c.muted,fontSize:11,fontWeight:'600',paddingHorizontal:16,paddingTop:10,paddingBottom:4}}>{cmd.group}</Text>:null}
       <Pressable accessibilityRole="menuitem" onHoverIn={()=>setIndex(i)} onPress={()=>run(cmd)} style={{flexDirection:'row',alignItems:'center',gap:10,marginHorizontal:6,paddingHorizontal:10,paddingVertical:9,borderRadius:8,backgroundColor:i===index?c.accentSoft:'transparent'}}>
-       {cmd.emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{cmd.emoji}</Text>:cmd.icon?<Icon name={cmd.icon} size={18} color={i===index?c.accent:c.muted}/>:null}
+       {cmd.emoji?(isImageIcon(cmd.emoji)?<View style={{width:20,alignItems:'center'}}><PageGlyph icon={cmd.emoji} size={16}/></View>:<Text style={{fontSize:16,width:20,textAlign:'center'}}>{cmd.emoji}</Text>):cmd.icon?<Icon name={cmd.icon} size={18} color={i===index?c.accent:c.muted}/>:null}
        <Text numberOfLines={1} style={{flex:1,color:i===index?c.accent:c.text,fontSize:14}}>{cmd.label}</Text>
        {cmd.hint?<Text style={{color:c.muted,fontSize:11}}>{cmd.hint}</Text>:null}
       </Pressable></React.Fragment>;}):<Text style={{color:c.muted,padding:20,fontSize:14}}>Nada encontrado.</Text>}

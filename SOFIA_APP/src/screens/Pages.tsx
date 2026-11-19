@@ -1,4 +1,5 @@
 import {EMBED} from '../lib/embed';
+import {PageGlyph,isImageIcon} from '../components/PageGlyph';
 import {pushEsc,ESC_LEVEL} from '../lib/esc-stack';
 import {SaveStatus} from '../components/SaveStatus'; // 13/11/2026: Salvando… -> Salvo, sem piscar // 13/11/2026: Esc volta para a pagina mae
 import {requestOpenNote} from '../lib/notes-move'; // 13/11/2026: nota recente abre ja aberta
@@ -683,7 +684,7 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
   const icon=String(page.data?.icon||'');
   return <Pressable key={key} testID={'page-link-'+page.id} accessibilityRole="link" accessibilityLabel={'Abrir '+(page.title||'Sem título')} {...auxPage(page.id)} onPress={()=>{peekOut();open(page);}} onHoverIn={e=>peekIn(page.id,e)} onHoverOut={peekOut}
    style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,alignSelf:'flex-start',paddingVertical:4,paddingHorizontal:2,borderRadius:4,backgroundColor:hovered?c.input:'transparent'})}>
-   {icon?<Text style={{fontSize:18,lineHeight:24}}>{icon}</Text>:<Icon name="note" size={18} color={c.muted}/>}
+   {icon?<PageGlyph icon={icon} size={18} style={{lineHeight:24}}/>:<Icon name="note" size={18} color={c.muted}/>}
    <Text style={{color:c.text,fontSize:16,lineHeight:24,fontWeight:'600',textDecorationLine:'underline',textDecorationColor:c.muted+'80'} as any}>{page.title||'Sem título'}</Text>
   </Pressable>;
  }
@@ -694,12 +695,12 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
   const left=Math.max(12,Math.min(peek.x,vw-292)),top=peek.y+220>vh?Math.max(12,peek.y-250):peek.y;
   return <View pointerEvents="none" testID="page-peek" style={{position:'fixed' as any,left,top,width:280,zIndex:9000,borderRadius:10,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,overflow:'hidden',shadowColor:'#000',shadowOpacity:0.3,shadowRadius:20,shadowOffset:{width:0,height:8}}}>
    <View style={{padding:14,gap:4}}>
-    {page.data?.icon?<Text style={{fontSize:28}}>{String(page.data.icon)}</Text>:<Icon name="note" size={24} color={c.muted}/>}
+    {page.data?.icon?<PageGlyph icon={String(page.data.icon)} size={28}/>:<Icon name="note" size={24} color={c.muted}/>}
     {parent?<Text numberOfLines={1} style={{color:c.muted,fontSize:10,fontWeight:'600',letterSpacing:0.6}}>{(parent.title||'Sem título').toLocaleUpperCase('pt-BR')}</Text>:null}
     <Text numberOfLines={2} style={{color:c.text,fontSize:14,fontWeight:'600'}}>{page.title||'Sem título'}</Text>
    </View>
    <View style={{marginHorizontal:12,marginBottom:12,borderRadius:6,backgroundColor:c.bg,padding:10,gap:3,minHeight:56}}>
-    {kids.map(k=><Text key={k.id} numberOfLines={1} style={{color:c.text,fontSize:11,textDecorationLine:'underline'}}>{(k.data?.icon?String(k.data.icon)+' ':'')+(k.title||'Sem título')}</Text>)}
+    {kids.map(k=><Text key={k.id} numberOfLines={1} style={{color:c.text,fontSize:11,textDecorationLine:'underline'}}>{(k.data?.icon&&!isImageIcon(k.data.icon)?String(k.data.icon)+' ':'')+(k.title||'Sem título')}</Text>)}
     {lines.map(x=><Text key={x.id} numberOfLines={1} style={{color:x.type.startsWith('heading')?c.text:c.muted,fontSize:11,fontWeight:x.type.startsWith('heading')?'600':'400'}}>{(x.type==='bullet'?'• ':'')+String(x.text)}</Text>)}
     {!kids.length&&!lines.length?<Text style={{color:c.muted,fontSize:11,fontStyle:'italic'}}>Página vazia</Text>:null}
    </View>
@@ -801,14 +802,14 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
    <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:(draft.blocks||[]).some((x:any)=>x?.type==='collection')?1480:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
     {/* 0.3.267 (computador): como no Notion, sem ícone não aparece o 📄; "Adicionar ícone" e "Adicionar capa" surgem ao passar o mouse */}
     {desktop?<Pressable accessible={false} testID="page-header" onHoverIn={headHover.enter} onHoverOut={headHover.leave}>{()=><>
-     {draft.appearance.icon?<Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({width:82,height:82,marginLeft:-4,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:56,lineHeight:78,color:c.text}}>{String(draft.appearance.icon)}</Text></Pressable>:<View style={{height:hasCover?50:24}}/>}
+     {draft.appearance.icon?<Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({width:82,height:82,marginLeft:-4,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:h?c.input:'transparent'})}><PageGlyph icon={String(draft.appearance.icon)} size={56} style={{fontSize:56,lineHeight:78,color:c.text}}/></Pressable>:<View style={{height:hasCover?50:24}}/>}
      {!preview?<View style={{flexDirection:'row',gap:2,height:30,marginTop:6,marginLeft:-6,opacity:headHover.on?1:0}}>
       {!draft.appearance.icon?<Pressable testID="page-add-icon" accessibilityRole="button" accessibilityLabel="Adicionar ícone" onHoverIn={headHover.enter} onHoverOut={headHover.leave} onPress={e=>openAppearance('icon',e)} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Text style={{fontSize:13}}>☺</Text><Text style={{color:c.muted,fontSize:13}}>Adicionar ícone</Text></Pressable>:null}
       {!hasCover?<Pressable testID="page-add-cover" accessibilityRole="button" accessibilityLabel="Adicionar capa" onHoverIn={headHover.enter} onHoverOut={headHover.leave} onPress={()=>{const pick=PAGE_COVERS[Math.floor(Math.random()*PAGE_COVERS.length)][1];store.edit(selected.id,d=>({...d,appearance:{...d.appearance,cover_type:'preset',cover_value:pick,cover_attachment_id:'',cover_position:''}}));void store.flush(selected.id);}} style={({hovered:h}:any)=>({flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:6,borderRadius:6,backgroundColor:h?c.input:'transparent'})}><Icon name="image" size={14} color={c.muted}/><Text style={{color:c.muted,fontSize:13}}>Adicionar capa</Text></Pressable>:null}
      </View>:null}
      {titleInput}
     </>}</Pressable>:<>
-    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:56,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><PageGlyph icon={String(draft.appearance.icon||'📄')} size={56} style={{color:c.text}}/></Pressable>
     {titleInput}
     </>}
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
@@ -855,7 +856,7 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
   {desktop&&orderReady&&recentPages.length?<View testID="pages-recent" style={{paddingHorizontal:dpx(DESK_LEFT) as any /* 07/11/2026 (revisao): mesma borda do titulo (eram 3 bordas na tela) */,paddingBottom:18,gap:10}}>
    <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Recentes</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} {...auxPage(p.id)} onPress={()=>open(p)} style={({hovered}:any)=>({width:228,minHeight:58,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:10,flexDirection:'row',alignItems:'center'})} /* 07/11/2026 (revisao + desenho 'cartoezinhos pequenos'): cartao baixo, icone ao lado (era 216x112 com um vao no meio) */>
-    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
+    {p.data?.icon?<PageGlyph icon={String(p.data.icon)} size={20}/>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
     <View style={{gap:2,flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
    </Pressable>)}</View>
    {recentNotes.length?<View testID="pages-recent-notes" style={{gap:2,marginTop:10}}>
@@ -863,7 +864,7 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
     {recentNotes.map(r=><Pressable key={r.page.id+':'+r.id} accessibilityRole="button" accessibilityLabel={'Abrir nota '+r.title} onPress={()=>{requestOpenNote(r.page.id,r.id);open(r.page);}}
      style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:7,paddingHorizontal:10,marginHorizontal:-10,borderRadius:8,backgroundColor:hovered?c.input:'transparent'})}>
      <Icon name="note" size={16} color={c.muted}/><Text numberOfLines={1} style={{flex:1,minWidth:0,color:c.text,fontSize:14}}>{r.title}</Text>
-     <Text numberOfLines={1} style={{color:c.muted,fontSize:12,maxWidth:240}}>{(r.page.data?.icon&&r.page.data?.icon_mode!=='image'?String(r.page.data.icon)+' ':'')+(r.page.title||'Sem título')}</Text>
+     <Text numberOfLines={1} style={{color:c.muted,fontSize:12,maxWidth:240}}>{(r.page.data?.icon&&!isImageIcon(r.page.data.icon)?String(r.page.data.icon)+' ':'')+(r.page.title||'Sem título')}</Text>
      <Text numberOfLines={1} style={{color:c.muted,fontSize:12,width:96,textAlign:'right'}}>{r.stamp}</Text>
     </Pressable>)}
    </View>:null}
@@ -874,7 +875,7 @@ function pageLinkView(page:Entity,key:string,b?:PageBlock){
   {!desktop&&orderReady&&recentPages.length>1?<View testID="pages-recent-phone" style={{paddingBottom:6}}>
    <Text style={{paddingHorizontal:16,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.5,paddingBottom:8}}>RECENTES</Text>
    <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:16,gap:10}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir recente '+(p.title||'Sem título')} {...auxPage(p.id)} onPress={()=>open(p)} style={({pressed}:any)=>({width:120,padding:12,borderRadius:14,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:8,opacity:pressed?0.7:1})}>
-    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:20}}>{String(p.data.icon)}</Text>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
+    {p.data?.icon?<PageGlyph icon={String(p.data.icon)} size={20}/>:<Icon name="note" size={20} color={c.accent} weight="duotone"/>}
     <Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:13,lineHeight:17}}>{p.title||'Sem título'}</Text>
    </Pressable>)}</ScrollView>
    <Text style={{paddingHorizontal:16,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.5,paddingTop:16,paddingBottom:4}}>TODAS AS PÁGINAS</Text>

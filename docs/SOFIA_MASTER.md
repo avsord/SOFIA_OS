@@ -18,9 +18,9 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 ---
 
 ## 0. Passagem (onde paramos — substituir a cada sessão, não acumular)
-- 2026-11-15 18:50, Claude Code (PC PEDRO). Novo: link na Conversa mostra prévia (campo com X e balão; YouTube com capa, título e canal; `src/components/LinkCard.tsx`, `src/lib/link-info.ts`, teste `tests/link-preview-chat-15-11.test.cjs`). Antes, pronto, só site (sem APK): a aba Conversa no computador virou uma lista de conversas estilo WhatsApp (`SOFIA_APP/src/screens/ChatHub.tsx`, regras em `src/lib/page-chat.ts`). A Sofia é a primeira conversa (o chat de sempre); as outras são as páginas, lidas em balões (um por bloco). Escrever, gravar áudio (mic) ou anexar grava na página (texto vira bloco com hora; áudio e arquivo viram bloco de arquivo). Tocar no balão: Editar/Apagar. "+" cria página, "Subpágina" cria filha, "Abrir página" leva à página. Principal x Arquivadas: campo `chat_main` da página (alfinete traz, caixa arquiva); o servidor ganhou esse campo no catálogo (`src/core/catalog.js`). Páginas com senha não entram. Celular/app e tela estreita continuam só com o chat da Sofia.
-- Não conferido na tela (sem login aqui): só testes (`tests/chat-paginas-15-11.test.cjs`), tsc e site recompilado.
-- Próximo passo: Pedro abre Conversa no site, puxa páginas das Arquivadas, escreve, grava áudio e anexa; diz o que ajustar (desenho aprovado no chat em 15/11, quadro simples).
+- 2026-11-19, Claude Code (PC PEDRO). Novo: arrastar páginas na barra lateral sem lag (fantasma anda sem redesenhar a barra; ordem nova aparece na hora) e soltar no vão entre linhas funciona; ícone da página aceita emoji em imagem (link png/gif, imagem colada ou arrastada do slackmojis), no tamanho do emoji (`src/components/PageGlyph.tsx`).
+- Não conferido na tela (sem login aqui): tsc, testes (só falha o 061 do splash Android, que já falhava antes) e site recompilado.
+- Próximo passo: Pedro testa arrastar páginas e põe um emoji do slackmojis (abrir ícone da página → arrastar a imagem ou colar o endereço da imagem); diz o que ajustar.
 
 ## 1. O dono e a forma de trabalhar
 
@@ -382,11 +382,11 @@ O histórico completo fica em [docs/historico/DIARIO_DE_RODADAS.md](historico/DI
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|
-| 2026-11-15 | (sem APK) | (este) | Barra lateral: recolher subatalhos das páginas não faz mais o topo descer (espaço no fim segura a posição e some ao rolar para cima) | teste ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Conversa no site: notas dos blocos de Notas viram conversas ("em <página>", Arquivadas até puxar); escrever/áudio/anexo grava dentro da nota (Diário com hora roxa); "Abrir nota" | testes ok; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: criar subpágina abre só o ramo da página-mãe (sub-subpáginas abertas antes ficam fechadas) | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinha, emoji e ícone das páginas no mesmo espaço (escala do site), nomes alinhados | tsc ok, site recompilado; não conferido na tela |
 | 2026-11-15 | (sem APK) | (este) | Barra lateral: bolinhas dos atalhos não crescem mais ao passar o mouse | tsc ok, site recompilado |
+| 2026-11-19 | (sem APK) | (este) | Barra lateral: arrastar sem lag e soltar no vão funciona; ícone de página aceita emoji em imagem (slackmojis) no tamanho certo | tsc ok, testes ok (061 já falhava), site recompilado; não visto na tela |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 - **11/11: o site compilado fica em `public/web` da RAIZ do repositório, não em SOFIA_APP.** Dois commits subiram com `git add SOFIA_APP docs` e o site no ar não mudou (Railway pulou). Depois do push, conferir no Railway que o deploy foi SUCCESS e que o arquivo novo responde no site.
