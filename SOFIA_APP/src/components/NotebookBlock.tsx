@@ -234,12 +234,12 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange,pageId
     {...(desktop?contextMenu(()=>noteItems(b.id,p.id,null,false)):{})}
     delayLongPress={300} onLongPress={showFolder||mouse?undefined:e=>startDrag(item,e)} onPressOut={showFolder||mouse?undefined:()=>pressOut()}
     style={({pressed}:any)=>({backgroundColor:hovered&&desktop?c.line+'55':c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:14,gap:5,...(tile?{height:132,overflow:'hidden'}:null),opacity:lifted&&!mouse?0.35:pressed?0.75:1})}>
-    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+    {tile?<Text style={{fontSize:28,lineHeight:34}}>📝</Text>:null}<View style={{flexDirection:'row',alignItems:'center',gap:8}}>
      <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:16,fontWeight:'600'}}>{p.title||'Sem título'}</Text>
      {stamp?<Text style={{color:c.muted,fontSize:11}}>{stamp}</Text>:null}
      {!showFolder?<Pressable testID="note-row-more" accessibilityRole="button" accessibilityLabel={'Opções da nota '+(p.title||'Sem título')} hitSlop={8} onPress={(e:any)=>{e?.stopPropagation?.();openNoteMenu(b.id,p.id,e,false);}} style={({hovered:h}:any)=>({width:28,height:24,marginVertical:-4,marginRight:-6,borderRadius:6,alignItems:'center',justifyContent:'center',backgroundColor:h?c.line:'transparent',opacity:showDots?1:0})}><Icon name="more" size={16} color={c.muted}/></Pressable>:null}
     </View>
-    {prev?<Text numberOfLines={2} style={{color:c.muted,fontSize:13,lineHeight:18}}>{prev}</Text>:<Text style={{color:c.muted,fontSize:12,fontStyle:'italic'}}>Nota vazia</Text>}
+    {prev?<Text numberOfLines={tile?1:2} style={{color:c.muted,fontSize:13,lineHeight:18}}>{prev}</Text>:<Text style={{color:c.muted,fontSize:12,fontStyle:'italic'}}>Nota vazia</Text>}
     {showFolder?<Text style={{color:c.accent,fontSize:11,fontWeight:'500'}}>{b.root?'📝 Fora de pastas':(b.emoji||'📁')+' '+(b.name||'Sem título')}</Text>:null}
    </Pressable>{line('before')}{line('after')}
   </View>;};
