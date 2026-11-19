@@ -25,8 +25,11 @@ e funções atuais ficam.
 - **Opcionais ("quer?")**: Reagir, Fixar, Encaminhar. Num chat com IA não são ganho óbvio.
 - **Editar sua mensagem na conversa com a Sofia** não existe hoje e precisa de mudança no servidor (e na memória dela). Proposta, se quiser: a Sofia responde de novo à versão editada. Se não, Editar fica só nas linhas de página (onde já existe).
 
+## Medido na conversa do WhatsApp Web (19/11, 1440 px)
+Bolha raio 7,5 px com a ponta da cauda reta, letra 14,2/19 px, sombra fina, hora 12 px; setinha 24×18 no canto; data 24 px de altura com raio 6; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder.
+
 ## Não medido no WhatsApp (escolha da Sofia, não cópia)
-ESC fechando o menu; antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
+ESC fechando a conversa inteira (no WhatsApp o ESC sem nada aberto fecha a conversa; na Sofia não); antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
 
 ## Correções sem desenho (entram junto)
 - O quadro da conversa recarrega de novo 6 s depois de abrir (`Chat.tsx`, `setTimeout(...loadBoard...,6000)`): pode trocar/piscar; recarregar só quando mudar.
