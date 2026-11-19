@@ -10,7 +10,7 @@ export const isImageIcon=(v:unknown):boolean=>typeof v==='string'&&(/^(https?:\/
 const srcOf=(v:string)=>{const t=v.trim();return BARE.test(t)?'https://'+t:t;};
 
 export function PageGlyph({icon,size,style}:{icon:string;size:number;style?:TextStyle}){
- if(isImageIcon(icon)){const s=Math.round(size*1.05);return <Image accessibilityIgnoresInvertColors source={{uri:srcOf(icon)}} resizeMode="contain" style={{width:s,height:s}}/>;}
+ if(isImageIcon(icon)){const s=Math.round(size*1.25);return <Image accessibilityIgnoresInvertColors source={{uri:srcOf(icon)}} resizeMode="contain" style={{width:s,height:s}}/>;}
  return <Text style={[{fontSize:size},style]}>{icon}</Text>;
 }
 
