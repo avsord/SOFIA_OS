@@ -139,7 +139,7 @@ fone(`<div class="busca"><span style="color:var(--mudo)">${I.lupa}</span><div cl
 const painelLista=(conteudo)=>`<div style="width:380px;flex:none;border-right:1px solid var(--linha);display:flex;flex-direction:column">${conteudo}</div>`;
 const cabLista=`<div style="display:flex;align-items:center;padding:16px 14px 8px"><div style="flex:1;font-size:22px;font-weight:700;letter-spacing:-.3px">Conversa</div><span class="ico" style="font-size:22px">+</span><span class="ico">${I.mais}</span></div>
 <div style="padding:4px 14px 10px"><div style="display:flex;gap:10px;align-items:center;background:var(--sup2);border-radius:20px;padding:9px 14px;color:var(--mudo);font-size:13.5px">${I.lupa}Pesquisar conversas</div></div>
-<div style="display:flex;gap:8px;padding:0 14px 8px">${chip('Tudo',1)}${chip('Não lidas <b style="font-size:11px">2</b>')}${chip('Páginas')}</div>`;
+<div style="display:flex;gap:8px;padding:0 14px 8px">${chip('Tudo',1)}${chip('Páginas')}</div>`;
 const listaWeb=`<div class="lista">${arq()}
 ${it('S','var(--lil)','Sofia','<span class="rasc">Rascunho:</span> muda a reunião pra 15h','21:41',`<span style="color:var(--mudo)">${I.pin}</span>`,'background:#ffffff0d')}
 ${it('P','#8fb4ff','[Página] Viagem','Comprar adaptador de tomada','10:20','<span style="background:var(--lil);color:#17122A;font-size:10.5px;font-weight:800;border-radius:9px;padding:1px 7px">2</span>')}
@@ -151,7 +151,7 @@ const compWeb=`<div class="comp" style="padding:10px 16px"><div style="display:f
 const seta=`<span style="position:absolute;top:4px;right:6px;width:22px;height:22px;border-radius:11px;background:var(--sup2);display:flex;align-items:center;justify-content:center;color:#fff">${I.seta}</span>`;
 const web=(lista,conv)=>`<div class="fone" style="flex-direction:row;height:640px;border-radius:12px">${rail}${painelLista(lista)}<div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">${conv}</div></div>`;
 
-telas.push(cartao('8a · Site no computador · conversa aberta','Igual ao WhatsApp Web: lista de ~380 px à esquerda, com Pesquisar, filtros e “Arquivadas” sempre em cima; a conversa ocupa o resto. Passar o mouse na bolha mostra a setinha ⌄; clique nela ou clique direito abre o menu; ESC fecha. Fixar (📌) e “Não lidas” são <span class="tag pend">quer?</span>.',
+telas.push(cartao('8a · Site no computador · conversa aberta','Igual ao WhatsApp Web: lista de ~380 px à esquerda, com Pesquisar, filtros e “Arquivadas” sempre em cima; a conversa ocupa o resto. Passar o mouse na bolha mostra a setinha ⌄; clique nela ou clique direito abre o menu; ESC fecha. Fixar (📌) e Editar entram; Reagir e o filtro “Não lidas” ficam fora (as conversas das páginas são só textos seus).',
 web(cabLista+listaWeb, cabConv()+`<div class="msgs" style="padding:16px 60px">
 <div style="align-self:center;font-size:11px;color:var(--mudo);padding:3px 10px;border-radius:8px;background:var(--sup);border:1px solid var(--linha)">Hoje</div>
 ${S('Amanhã você tem dentista às 9h e reunião às 14h.','21:40')}<div class="l"><span class="s">S</span><div class="b foco" style="max-width:60%">Quer que eu avise 30 min antes?<div class="h">21:40</div>${seta}</div></div>${E('Sim, e muda a reunião pra 15h','21:41 '+I.ok)}

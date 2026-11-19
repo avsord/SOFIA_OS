@@ -62,11 +62,11 @@ svg{flex:none}
 .eu .b .h{color:#cbbfe6}
 .b .seta{position:absolute;top:7px;right:5px;width:24px;height:18px;border-radius:4px;display:none;align-items:center;justify-content:center;color:var(--txt);background:linear-gradient(90deg,transparent,var(--sup) 40%);cursor:pointer}
 .eu .b .seta{background:linear-gradient(90deg,transparent,var(--minha) 40%)}
-.b:hover .seta,.b.foco .seta{display:flex}
+.b:hover .seta,.b.foco .seta{display:flex;animation:seta 75ms cubic-bezier(.14,.62,.33,.9)}@keyframes seta{from{transform:translateX(100%);opacity:0}}
 .b.foco{outline:2px solid var(--lil);outline-offset:1px}
 mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.at{background:#B5A2FFaa}
-.menu{position:fixed;z-index:9;background:var(--sup2);border:1px solid var(--linha);border-radius:12px;padding:5px;min-width:197px;box-shadow:0 12px 30px #0009;display:none;transform-origin:top left;animation:ab .18s cubic-bezier(.14,.62,.33,.9)}
-@keyframes ab{from{opacity:0;transform:scale(.92)}}
+.menu{position:fixed;z-index:9;background:var(--sup2);border:1px solid var(--linha);border-radius:12px;padding:5px;min-width:197px;box-shadow:0 12px 30px #0009;display:none;transform-origin:top left;animation:ab .3s cubic-bezier(.17,.17,0,1)}.menu.sai{display:block;pointer-events:none;animation:sa .3s cubic-bezier(.1,.82,.25,1) forwards}@keyframes sa{to{opacity:0;transform:scale(0)}}
+@keyframes ab{from{opacity:0;transform:translateY(-8px) scale(.95)}50%{transform:translate(0) scale(1.01)}}
 .menu.on{display:block}
 .menu div{display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:12px;cursor:pointer;font-size:14px}
 .menu div:hover{background:#ffffff10}.menu .sep{height:1px;padding:0;margin:4px 6px;background:var(--linha)}.menu .perigo{color:var(--ruim)}
@@ -80,10 +80,10 @@ mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.
 :root{--t-rapido:75ms;--t-lento:300ms;--curva:cubic-bezier(.14,.62,.33,.9)}
 .desce{opacity:0;transform:scale(.6);pointer-events:none;transition:opacity var(--t-lento) var(--curva),transform var(--t-lento) var(--curva);cursor:pointer}
 .desce.on{opacity:1;transform:none;pointer-events:auto}.desce i:empty{display:none}
-.citar{display:none;margin:0 16px;min-height:59px;box-sizing:border-box;padding:7px 12px 10px 0;background:var(--sup2);border-radius:10px 10px 0 0;align-items:center;gap:10px;font-size:13px;animation:sobe var(--t-lento) var(--curva)}
+.citar{display:none;margin:0 16px;min-height:59px;box-sizing:border-box;padding:7px 12px 10px 0;background:var(--sup2);border-radius:10px 10px 0 0;align-items:center;gap:10px;font-size:13px;animation:resp .3s cubic-bezier(.47,0,.745,.715)}
 .citar.on{display:flex}.citar .tr{width:4px;align-self:stretch;border-radius:2px;background:var(--lil)}
 .citar b{display:block;color:var(--lil);font-size:12.5px}.citar span{color:var(--mudo);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px}
-@keyframes sobe{from{transform:translateY(100%);opacity:0}}
+@keyframes sobe{from{transform:translateY(100%);opacity:0}}@keyframes resp{from{transform:translateY(24px);opacity:0}}.citar.sai{display:flex;animation:resp .3s cubic-bezier(.47,0,.745,.715) reverse forwards}
 .q{border-left:4px solid var(--lil);background:#0003;border-radius:6px;padding:5px 8px;margin-bottom:5px;font-size:13px;color:var(--mudo)}.q b{display:block;color:var(--lil);font-size:12.5px}
 .toast{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);background:#2a2536;border:1px solid var(--linha);border-radius:10px;padding:10px 16px;display:flex;gap:18px;align-items:center;box-shadow:0 8px 24px #0008;font-size:14px;animation:sobe var(--t-lento) var(--curva);z-index:5}
 .toast a{color:var(--lil);font-weight:700;cursor:pointer}
@@ -142,7 +142,7 @@ const arquivadas=[['P','#9aa3b5','[Página] Mudança 2025','Entregar chaves','03
 const linha=([a,c,n,p,h,dir,fixa,sel,nova],ix)=>`<div class="it ${ix===cv?'sel':''}" data-c="${ix}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${rasc[ix]&&ix!==cv?'<span class="rasc">Rascunho:</span> '+rasc[ix]:p.replace(/<span class="rasc">Rascunho:<\/span> /,'')}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada (quer?)">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
 function lista(){ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><button class="bt" title="Nova conversa">${I.nova}</button><button class="bt" title="Mais opções">${I.mais}</button></div>
 <div class="pesq">${I.lupa}<input placeholder="Pesquisar conversas"></div>
-<div class="chips"><span class="chip on">Tudo</span><span class="chip" title="opcional (quer?)">Não lidas <b style="font-size:12px">2</b></span><span class="chip">Páginas</span></div>
+<div class="chips"><span class="chip on">Tudo</span><span class="chip">Páginas</span></div>
 <div class="rol"><div class="arq" id="abreArq">${I.arq}<span>Arquivadas</span><b>${arquivadas.length}</b></div>${conversas.map(linha).join('')}</div>`;
  $('abreArq').onclick=listaArq;
  document.querySelectorAll('#lista .it[data-c]').forEach(e=>e.onclick=()=>troca(+e.dataset.c));}
@@ -170,8 +170,8 @@ $('msgs').addEventListener('scroll',desce);document.querySelector('.desce').oncl
 const ENV=sv('<path d="M4 12l16-8-6 16-3-7z"/>',20,2);function botao(){$('mic').innerHTML=$('campo').value.trim()?ENV:I.mic;$('mic').title=$('campo').value.trim()?'Enviar':'Mensagem de voz'}
 $('campo').oninput=botao;
 // responder
-let cita=null;function abreCitar(m){cita=[m[0]==='e'?'Você':(cv===0?'Sofia':conversas[cv][2]),m[1]];$('cq').textContent=cita[0];$('ct').textContent=cita[1];$('citar').classList.add('on');$('campo').focus()}
-function fechaCitar(){cita=null;$('citar').classList.remove('on')}$('cx').onclick=fechaCitar;
+let cita=null;function abreCitar(m){cita=[m[0]==='e'?'Você':(cv===0?'Sofia':conversas[cv][2]),m[1]];$('cq').textContent=cita[0];$('ct').textContent=cita[1];$('citar').classList.remove('sai');$('citar').classList.add('on');$('campo').focus()}
+function fechaCitar(){cita=null;const c=$("citar");if(!c.classList.contains("on"))return;c.classList.remove("on");c.classList.add("sai");setTimeout(()=>c.classList.remove("sai"),300)}$('cx').onclick=fechaCitar;
 // enviar: aparece na hora com reloginho; vira ✓ quando o servidor salva
 function hora(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function envia(){const v=$('campo').value.trim();if(!v)return;const L=conv(cv);const m=['e',v,hora(),1,'relo',cita];L.push(m);$('campo').value='';delete rasc[cv];fechaCitar();botao();render();lista();
@@ -195,12 +195,12 @@ lista();render();botao();
 let atual=null;
 function abre(b,x,y){ fecha(); atual=b;b.classList.add('foco');
  const eu=b.dataset.q==='e';
- const its=[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar','quer']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['rea','Reagir','quer'],['fix','Fixar','quer']];
+ const its=[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['fix','Fixar']];
  menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div data-a="${t[0]}" class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('');
- menu.classList.add('on');const r=menu.getBoundingClientRect();
+ menu.classList.remove("sai");menu.classList.add("on");const r=menu.getBoundingClientRect();
  if(y+r.height>innerHeight-70){y=Math.max(8,y-r.height);menu.style.transformOrigin='bottom left'}else menu.style.transformOrigin='top left';
  if(x+r.width>innerWidth-8)x=innerWidth-r.width-8;menu.style.left=x+'px';menu.style.top=y+'px';}
-function fecha(){menu.classList.remove('on');if(atual)atual.classList.remove('foco');atual=null}
+function fecha(){if(menu.classList.contains("on")){menu.classList.remove("on");menu.classList.add("sai");setTimeout(()=>menu.classList.remove("sai"),300)}if(atual)atual.classList.remove('foco');atual=null}
 $('msgs').addEventListener('click',e=>{const s=e.target.closest('.seta');if(s){const b=s.closest('.b'),r=b.getBoundingClientRect();abre(b,b.dataset.q==='e'?r.right-210:r.left,r.top+28);e.stopPropagation()}});
 $('msgs').addEventListener('contextmenu',e=>{const b=e.target.closest('.b');if(b){e.preventDefault();abre(b,e.clientX,e.clientY)}});
 document.addEventListener('click',e=>{if(!menu.contains(e.target))fecha()});

@@ -17,16 +17,16 @@ e funções atuais ficam.
 5. Lendo as antigas: a tela não pula quando chega mensagem; o botão "Descer para a última mensagem" (já existe) ganha a contagem. Antigas carregam sozinhas ao chegar no topo.
 6. Enviar: bolha na hora com reloginho → ✓. Sai "Enviando…". Falha: "Não enviada · Tentar novamente" (mantido).
 7. Lista: "Arquivadas" sempre em cima, com a contagem (como no WhatsApp); mostra "Rascunho:"; lupa no cabeçalho pesquisa dentro da conversa.
-8. Site no computador: página própria em tela cheia, `web.html` (régua do WhatsApp Web; passar o mouse, clique direito, Arquivadas e pesquisa funcionam). Resumo também nas telas 8a/8b (refeito 19/11 pela régua do WhatsApp Web): barra lateral da Sofia (fica) + lista de ~380 px (Pesquisar, filtros Tudo / Não lidas / Páginas, Arquivadas em cima, hora e contagem de não lidas) + conversa no resto. 8a: setinha ⌄ e menu. 8b: Arquivadas troca a lista (seta ← volta) + pesquisa na conversa. "Não lidas" e Fixar são opcionais.
+8. Site no computador: página própria em tela cheia, `web.html` (régua do WhatsApp Web; passar o mouse, clique direito, Arquivadas e pesquisa funcionam). Resumo também nas telas 8a/8b (refeito 19/11 pela régua do WhatsApp Web): barra lateral da Sofia (fica) + lista de ~380 px (Pesquisar, filtros Tudo / Páginas, Arquivadas em cima, hora e contagem de não lidas) + conversa no resto. 8a: setinha ⌄ e menu. 8b: Arquivadas troca a lista (seta ← volta) + pesquisa na conversa. Fixar entra.
 
 ## Decisões para o Pedro
 - **Apagar sem perguntar.** Correção: o WhatsApp pergunta (seleciona → "Cancelar / Apagar para mim" → Desfazer). Ele pergunta porque existe "apagar para todos". A Sofia não tem essa escolha, então aqui fica sem janela, só com Desfazer.
 - **Menu na última bolha abre para cima** (colado nela). A regra de 03/11 diz "sempre para baixo", mas embaixo da última bolha está o campo de digitar. Nunca folha subindo do rodapé (recusada em 03/11).
-- **Opcionais ("quer?")**: Reagir, Fixar, Encaminhar. Num chat com IA não são ganho óbvio.
+- **Decidido (19/11):** Editar e Fixar entram; Reagir, Encaminhar e o filtro "Não lidas" ficam fora: as conversas das páginas são só textos do Pedro (a da Sofia mantém a contagem de não lidas).
 - **Editar sua mensagem na conversa com a Sofia** não existe hoje e precisa de mudança no servidor (e na memória dela). Proposta, se quiser: a Sofia responde de novo à versão editada. Se não, Editar fica só nas linhas de página (onde já existe).
 
 ## Medido na conversa do WhatsApp Web (19/11, 1440 px)
-Bolha raio 7,5 px com a ponta da cauda reta, letra 14,2/19 px, sombra fina, hora 12 px; setinha 24×18 no canto; data 24 px de altura com raio 6; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder.
+Bolha raio 7,5 px com a ponta da cauda reta, letra 14,2/19 px, sombra fina, hora 12 px; setinha 24×18 no canto; data 24 px de altura com raio 6; cabeçalho e rodapé 64 px, botões 40 px, campo em pílula; menu 197 px com itens de 36 px; caixa de responder 59 px. Cores continuam as da Sofia. Medido com 2 mensagens de teste na conversa do Pedro consigo mesmo, já apagadas. Também visto: ESC fecha o menu e a caixa de responder. Animações medidas: setinha 75 ms deslizando; menu abre em 300 ms (desce 8 px e cresce de 95% com um leve passo de 101%) e fecha em 300 ms encolhendo; caixa de responder sobe 24 px em 300 ms e desce igual ao fechar.
 
 ## Não medido no WhatsApp (escolha da Sofia, não cópia)
 ESC sem nada aberto; antigas carregando sozinhas; conversa arquivada continuar arquivada quando chega mensagem (no WhatsApp é uma configuração).
