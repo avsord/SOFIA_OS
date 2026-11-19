@@ -54,11 +54,12 @@ type Props={
 const SIDE_FADE=StyleSheet.create({in:{animationKeyframes:{'0%':{opacity:0},'100%':{opacity:1}},animationDuration:'260ms',animationTimingFunction:'ease-out',animationFillMode:'both'} as any});
 // 15/11/2026 (Pedro: "embaixo de inicio cria um outro nome com o nome da tarefa atual indicando em L... pode ir passando na horizontal"): item atual da linha do tempo embaixo do Início, ligado por um L; se não couber, o texto passa na horizontal
 const NOW_RUN=StyleSheet.create({go:{animationKeyframes:{'0%':{transform:[{translateX:'0%'}]},'100%':{transform:[{translateX:'-50%'}]}},animationTimingFunction:'linear',animationIterationCount:'infinite'} as any});
-function HomeNow({a,onPress}:{a:{title:string;at:number;color?:string;info?:string;ref?:string};onPress:()=>void}){
+// 19/11/2026 (Pedro: "somente um observador"): só mostra; sem clique, sem destaque, sem selecionar texto
+function HomeNow({a}:{a:{title:string;at:number;color?:string;info?:string;ref?:string};onPress?:()=>void}){
  const c=useTheme(),[w,setW]=useState(0),[box,setBox]=useState(0),run=box>0&&w>box;
  const hm=new Date(a.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),text=[a.title,hm,a.info!==hm?a.info:''].filter(Boolean).join(' · ');
  const ts={color:c.muted,fontSize:12.5,flexShrink:0,paddingRight:run?36:0,...({whiteSpace:'nowrap'} as any)};
- return <Pressable testID="desktop-home-now" accessibilityRole="button" accessibilityLabel={'Agora: '+text} onPress={onPress} style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:7,minHeight:24,paddingLeft:16,paddingRight:8,marginHorizontal:8,borderRadius:8,backgroundColor:hovered?c.line+'80':'transparent'})}>
+ return <View testID="desktop-home-now" accessibilityLabel={'Agora: '+text} style={{flexDirection:'row',alignItems:'center',gap:7,minHeight:24,paddingLeft:16,paddingRight:8,marginHorizontal:8,borderRadius:8,...({userSelect:'none',cursor:'default'} as any)}}>
   <View pointerEvents="none" style={{width:10,height:11,marginTop:-9,flexShrink:0,borderLeftWidth:1.5,borderBottomWidth:1.5,borderColor:c.muted,borderBottomLeftRadius:5,opacity:0.6}}/>
   <View onLayout={(e:any)=>setBox(e.nativeEvent.layout.width)} style={{flex:1,minWidth:0,overflow:'hidden',flexDirection:'row'}}>
    <View testID="desktop-home-now-run" style={[{flexDirection:'row',flexShrink:0},run?NOW_RUN.go:null,run?({animationDuration:Math.max(8,Math.round(w/28))+'s'} as any):null]}>
@@ -66,7 +67,7 @@ function HomeNow({a,onPress}:{a:{title:string;at:number;color?:string;info?:stri
     {run?<Text aria-hidden style={ts}>{text}</Text>:null}
    </View>
   </View>
- </Pressable>;
+ </View>;
 }
 let trashSwept=false;
 function usePageDirectory(api:SofiaApi){
