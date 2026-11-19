@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversa · site</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0a0e;--painel:#121017;--sup:#1C1924;--sup2:#25212F;--linha:#2C2837;--txt:#F2EEFA;--mudo:#A49DB6;--lil:#B5A2FF;--minha:#3A2C57;--ruim:#F28B9B;--ok:#5FD3A2;--fundo:#0e0c12}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--txt);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;overflow:hidden}
+.app{display:flex;height:100vh}
+svg{flex:none}
+/* barra lateral da Sofia (fica como está) */
+.side{width:240px;flex:none;background:#0f0d14;border-right:1px solid var(--linha);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.side .marca{display:flex;align-items:center;gap:10px;padding:6px 8px 14px;font-weight:800}
+.side .marca i{width:26px;height:26px;border-radius:8px;background:var(--lil);color:#17122A;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:13px}
+.side a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--mudo);text-decoration:none;font-size:13.5px}
+.side a.on{background:#ffffff0f;color:var(--txt);font-weight:600}
+.side .tit{font-size:11px;color:var(--mudo);padding:16px 10px 4px;letter-spacing:.3px}
+.side .nota{margin-top:auto;font-size:10.5px;color:#6f6880;padding:8px 10px}
+/* lista (régua WhatsApp: ~30% da tela, mín. 340, máx. 500) */
+.lista{width:30%;min-width:340px;max-width:500px;flex:none;background:var(--painel);border-right:1px solid var(--linha);display:flex;flex-direction:column}
+.cab{height:64px;display:flex;align-items:center;padding:0 16px 0 20px;gap:4px}
+.cab h1{flex:1;font-size:22px;margin:0;font-weight:700;letter-spacing:-.3px}
+.bt{width:40px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;color:var(--mudo);cursor:pointer;border:0;background:none}
+.bt:hover{background:#ffffff12;color:var(--txt)}
+.pesq{margin:2px 16px 8px;height:40px;border-radius:20px;background:var(--sup2);display:flex;align-items:center;gap:12px;padding:0 14px;color:var(--mudo)}
+.pesq input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:inherit;font-size:14px}
+.chips{display:flex;gap:8px;padding:0 16px 10px}
+.chip{height:32px;padding:0 13px;border-radius:16px;border:1px solid var(--linha);color:var(--mudo);font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.chip.on{background:var(--minha);border-color:transparent;color:var(--txt)}
+.rol{flex:1;overflow-y:auto}
+.arq{height:50px;display:flex;align-items:center;gap:18px;padding:0 24px 0 28px;cursor:pointer;color:var(--mudo);font-size:15px}
+.arq:hover,.it:hover{background:#ffffff08}
+.arq svg{color:var(--lil)}.arq b{margin-left:auto;font-size:12px}
+.it{height:72px;display:flex;align-items:center;gap:14px;padding:0 16px 0 14px;cursor:pointer;position:relative}
+.it.sel{background:#ffffff10}
+.av{width:49px;height:49px;border-radius:15px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;color:#17122A;font-size:17px}
+.it .tx{flex:1;min-width:0;border-bottom:1px solid #1f1c27;height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.lin{display:flex;align-items:center;gap:8px}
+.lin .n{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lin .h{font-size:12px;color:var(--mudo)}.lin .h.nova{color:var(--lil);font-weight:700}
+.lin .p{flex:1;font-size:14px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cont{min-width:20px;height:20px;border-radius:10px;background:var(--lil);color:#17122A;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.rasc{color:var(--ok);font-weight:600}
+.it .mais{position:absolute;right:14px;bottom:12px;display:none;color:var(--mudo)}.it:hover .mais{display:block}
+/* conversa */
+.conv{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--fundo);position:relative}
+.ccab{height:64px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--sup);border-bottom:1px solid var(--linha)}
+.ccab .av{width:40px;height:40px;border-radius:13px;font-size:15px}
+.ccab .nm{flex:1}.ccab .nm b{display:block;font-size:16px}.ccab .nm span{font-size:12.5px;color:var(--mudo)}
+.busca{display:none;height:52px;align-items:center;gap:10px;padding:0 16px;background:var(--sup);border-bottom:1px solid var(--linha)}
+.busca.on{display:flex}
+.busca input{flex:1;height:36px;border-radius:10px;border:0;background:var(--sup2);color:var(--txt);padding:0 12px;font:inherit;outline:0}
+.busca span{color:var(--mudo);font-size:12.5px}
+.msgs{flex:1;overflow-y:auto;padding:20px 8% 12px;display:flex;flex-direction:column;gap:2px}
+.dia{align-self:center;font-size:12px;color:var(--mudo);background:var(--sup);border:1px solid var(--linha);padding:5px 12px;border-radius:8px;margin:10px 0}
+.l{display:flex;margin-top:8px}.l.seg{margin-top:2px}.l.eu{justify-content:flex-end}
+.b{max-width:65%;background:var(--sup);border:1px solid var(--linha);border-radius:4px 12px 12px 12px;padding:7px 10px 6px 11px;font-size:14.5px;line-height:20px;position:relative}
+.eu .b{background:var(--minha);border-color:transparent;border-radius:12px 4px 12px 12px}
+.seg .b{border-radius:12px}
+.b .h{float:right;margin:6px 0 -4px 12px;font-size:11px;color:var(--mudo);display:flex;gap:4px;align-items:center}
+.eu .b .h{color:#cbbfe6}
+.b .seta{position:absolute;top:3px;right:4px;width:26px;height:22px;border-radius:0 10px 0 14px;display:none;align-items:center;justify-content:center;color:var(--txt);background:linear-gradient(90deg,transparent,var(--sup) 40%);cursor:pointer}
+.eu .b .seta{background:linear-gradient(90deg,transparent,var(--minha) 40%)}
+.b:hover .seta,.b.foco .seta{display:flex}
+.b.foco{outline:2px solid var(--lil);outline-offset:1px}
+mark{background:#B5A2FF55;color:var(--txt);border-radius:3px;padding:0 1px}mark.at{background:#B5A2FFaa}
+.menu{position:fixed;z-index:9;background:var(--sup2);border:1px solid var(--linha);border-radius:12px;padding:6px;min-width:210px;box-shadow:0 12px 30px #0009;display:none;transform-origin:top left;animation:ab .18s cubic-bezier(.14,.62,.33,.9)}
+@keyframes ab{from{opacity:0;transform:scale(.92)}}
+.menu.on{display:block}
+.menu div{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px}
+.menu div:hover{background:#ffffff10}.menu .sep{height:1px;padding:0;margin:4px 6px;background:var(--linha)}.menu .perigo{color:var(--ruim)}
+.menu .quer{color:var(--mudo)}.menu .quer em{margin-left:auto;font-style:normal;font-size:10px;background:#E8B04A;color:#17122A;border-radius:5px;padding:1px 5px;font-weight:700}
+.comp{flex:none;min-height:62px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--sup)}
+.campo{flex:1;min-height:42px;border-radius:10px;background:var(--sup2);display:flex;align-items:center;padding:0 8px 0 14px}
+.campo input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:inherit;font-size:15px}
+.mic{width:42px;height:42px;border-radius:21px;background:var(--lil);display:flex;align-items:center;justify-content:center;color:#17122A}
+.desce{position:absolute;right:24px;bottom:80px;width:42px;height:42px;border-radius:21px;background:var(--sup2);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center}
+.desce i{position:absolute;top:-6px;right:-4px;font-style:normal;font-size:10.5px;font-weight:800;background:var(--lil);color:#17122A;border-radius:9px;padding:1px 6px}
+.aviso{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:20;background:#E8B04A;color:#17122A;font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px}
+</style></head><body>
+<div class="aviso">Desenho para aprovação · passe o mouse nas mensagens, clique na setinha ou com o botão direito · clique em Arquivadas · lupa da conversa</div>
+<div class="app">
+ <nav class="side">
+  <div class="marca"><i>S</i>Sofia</div>
+  <a>⌂ Início</a><a class="on">💬 Conversa</a><a>▤ Páginas</a><a>▦ Agenda</a><a>◫ Apps</a><a>☺ Perfil</a><a>🔔 Notificações</a>
+  <div class="tit">ATALHOS</div><a>📄 Viagem</a><a>📄 Casa</a>
+  <div class="nota">barra lateral da Sofia: fica como está hoje</div>
+ </nav>
+ <section class="lista" id="lista"></section>
+ <main class="conv">
+  <div class="ccab"><div class="av" style="background:var(--lil)">S</div><div class="nm"><b>Sofia</b><span>online · lembra do que vocês já conversaram</span></div>
+   <button class="bt" id="lupa" title="Pesquisar na conversa"></button><button class="bt" title="Quadro da conversa (Agora / Assuntos anteriores)" id="quadro"></button><button class="bt" title="Mais opções" id="mais"></button></div>
+  <div class="busca" id="busca"><span id="bl"></span><input id="bq" value="reunião"><span id="bn"></span><button class="bt" id="bc">⌃</button><button class="bt" id="bb">⌄</button><button class="bt" id="bx"></button></div>
+  <div class="msgs" id="msgs"></div>
+  <div class="desce" title="Descer para a última mensagem"></div>
+  <div class="comp"><button class="bt" style="font-size:24px">+</button><div class="campo"><input placeholder="Digite uma mensagem" value="muda a reunião pra 15h"><button class="bt" id="clip"></button></div><div class="mic" id="mic"></div></div>
+ </main>
+</div>
+<div class="menu" id="menu"></div>
+<script>
+const sv=(d,s=18,w=1.8)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const I={lupa:sv('<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',20),rel:sv('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',20),
+mais:'<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
+nova:sv('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',20),arq:sv('<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9h16M12 12v5M9.5 14.5L12 17l2.5-2.5"/>',20),
+volta:sv('<path d="M19 12H5M11 6l-6 6 6 6"/>',20,2),x:sv('<path d="M6 6l12 12M18 6L6 18"/>',18,2),seta:sv('<path d="M6 9l6 6 6-6"/>',16,2.2),
+ok:sv('<path d="M5 12l5 5 9-10"/>',14,2.4),relo:sv('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2 2"/>',12,2.4),clip:sv('<path d="M20 11l-8 8a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7-7"/>',20),
+mic:sv('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',20,2),baixo:sv('<path d="M6 9l6 6 6-6"/>',20,2),
+pin:sv('<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/>',15),
+resp:sv('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>'),cop:sv('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'),
+sel:sv('<circle cx="12" cy="12" r="8"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'),apa:sv('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'),ed:sv('<path d="M4 20h4L19 9l-4-4L4 16z"/>'),
+rea:sv('<circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M8.5 14a4 4 0 0 0 7 0"/>'),fix:sv('<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/>')};
+const $=id=>document.getElementById(id);
+$('lupa').innerHTML=I.lupa;$('quadro').innerHTML=I.rel;$('mais').innerHTML=I.mais;$('bl').innerHTML=I.lupa;$('bx').innerHTML=I.x;$('clip').innerHTML=I.clip;$('mic').innerHTML=I.mic;
+document.querySelector('.desce').innerHTML=I.baixo+'<i>2</i>';
+
+const conversas=[
+ ['S','var(--lil)','Sofia','<span class="rasc">Rascunho:</span> muda a reunião pra 15h','21:41','',1,1],
+ ['P','#8fb4ff','[Página] Viagem','Comprar adaptador de tomada','10:20','<span class="cont">2</span>',0,0,1],
+ ['P','#F5A0AE','[Página] Casa','<span class="rasc">Rascunho:</span> ver orçamento do pintor','Ontem',''],
+ ['P','#E8B04A','[Página] Ideias','Vídeo sobre rotina','Segunda',''],
+ ['P','#5FD3A2','[Página] Saúde','Dentista dia 21 às 9h','17/11/2026',''],
+ ['P','#c9a2ff','[Página] Trabalho','Mandar proposta ao Jota','15/11/2026',''],
+ ['P','#ff9f7a','[Página] Finanças','Fatura vence dia 10','12/11/2026',''],
+ ['P','#7fd1e8','[Página] Leituras','Terminar o capítulo 4','09/11/2026','']];
+const arquivadas=[['P','#9aa3b5','[Página] Mudança 2025','Entregar chaves','03/10/2026',''],['P','#9aa3b5','[Página] Curso inglês','Aula 12 feita','21/09/2026',''],['P','#9aa3b5','[Página] Festa Lia','Bolo encomendado','02/08/2026','']];
+const linha=([a,c,n,p,h,dir,fixa,sel,nova])=>`<div class="it ${sel?'sel':''}"><div class="av" style="background:${c}">${a}</div><div class="tx"><div class="lin"><span class="n">${n}</span><span class="h ${nova?'nova':''}">${h}</span></div><div class="lin"><span class="p">${p}</span>${fixa?`<span style="color:var(--mudo)" title="Fixada (quer?)">${I.pin}</span>`:''}${dir}</div></div><span class="mais">${I.seta}</span></div>`;
+function lista(){ $('lista').innerHTML=`<div class="cab"><h1>Conversa</h1><button class="bt" title="Nova conversa">${I.nova}</button><button class="bt" title="Mais opções">${I.mais}</button></div>
+<div class="pesq">${I.lupa}<input placeholder="Pesquisar conversas"></div>
+<div class="chips"><span class="chip on">Tudo</span><span class="chip" title="opcional (quer?)">Não lidas <b style="font-size:12px">2</b></span><span class="chip">Páginas</span></div>
+<div class="rol"><div class="arq" id="abreArq">${I.arq}<span>Arquivadas</span><b>${arquivadas.length}</b></div>${conversas.map(linha).join('')}</div>`;
+ $('abreArq').onclick=listaArq;}
+function listaArq(){ $('lista').innerHTML=`<div class="cab" style="gap:14px"><button class="bt" id="voltar" title="Voltar">${I.volta}</button><h1 style="font-size:19px">Arquivadas</h1></div>
+<div style="padding:4px 28px 14px;font-size:13px;color:var(--mudo);line-height:19px">Estas conversas continuam arquivadas mesmo quando chega mensagem nova.</div><div class="rol">${arquivadas.map(linha).join('')}</div>`;
+ $('voltar').onclick=lista;}
+lista();
+
+const M=[['dia','Ontem'],['s','Bom dia! Quer que eu leia a agenda de hoje?','08:01'],['e','Sim, e me lembra de ligar pro Jota','08:02'],['s','Agenda de hoje: dentista às 9h, almoço com a Lia às 12h30. Lembrete das 17h: ligar pro Jota.','08:02',1],
+['dia','Hoje'],['e','Cria uma tarefa pra amanhã: jogar o lixo','21:06'],['s','Tarefa “Jogar o lixo” criada para amanhã.','21:07'],['s','Amanhã você tem dentista às 9h e reunião às 14h.','21:40',1],['s','Quer que eu avise 30 min antes?','21:40',1],
+['e','Sim','21:41'],['e','e me lembra da reunião às 13h30','21:41',1,'relo']];
+let ant='';
+$('msgs').innerHTML=M.map((m,i)=>{ if(m[0]==='dia'){ant='';return `<div class="dia">${m[1]}</div>`}
+ const seg=ant===m[0];ant=m[0];const st=m[0]==='e'?(m[4]==='relo'?I.relo:I.ok):'';
+ return `<div class="l ${m[0]==='e'?'eu':''} ${seg?'seg':''}"><div class="b" data-i="${i}" data-q="${m[0]}"><span class="t">${m[1]}</span><span class="h">${m[2]} ${st}</span><span class="seta">${I.seta}</span></div></div>`}).join('');
+$('msgs').scrollTop=1e5;
+
+const menu=$('menu');let atual=null;
+function abre(b,x,y){ fecha(); atual=b;b.classList.add('foco');
+ const eu=b.dataset.q==='e';
+ const its=[['resp','Responder'],['cop','Copiar'],...(eu?[['ed','Editar','quer']]:[]),['sel','Selecionar várias'],'|',['apa','Apagar','perigo'],['rea','Reagir','quer'],['fix','Fixar','quer']];
+ menu.innerHTML=its.map(t=>t==='|'?'<div class="sep"></div>':`<div class="${t[2]||''}">${I[t[0]]}${t[1]}${t[2]==='quer'?'<em>quer?</em>':''}</div>`).join('');
+ menu.classList.add('on');const r=menu.getBoundingClientRect();
+ if(y+r.height>innerHeight-70){y=Math.max(8,y-r.height);menu.style.transformOrigin='bottom left'}else menu.style.transformOrigin='top left';
+ if(x+r.width>innerWidth-8)x=innerWidth-r.width-8;menu.style.left=x+'px';menu.style.top=y+'px';}
+function fecha(){menu.classList.remove('on');if(atual)atual.classList.remove('foco');atual=null}
+$('msgs').addEventListener('click',e=>{const s=e.target.closest('.seta');if(s){const b=s.closest('.b'),r=b.getBoundingClientRect();abre(b,b.dataset.q==='e'?r.right-210:r.left,r.top+28);e.stopPropagation()}});
+$('msgs').addEventListener('contextmenu',e=>{const b=e.target.closest('.b');if(b){e.preventDefault();abre(b,e.clientX,e.clientY)}});
+document.addEventListener('click',e=>{if(!menu.contains(e.target))fecha()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){fecha();$('busca').classList.remove('on');marca('')}});
+
+// pesquisa dentro da conversa
+let achados=[],pos=0;
+function marca(q){document.querySelectorAll('.b .t').forEach(t=>{t.innerHTML=t.textContent;if(q)t.innerHTML=t.textContent.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark>$1</mark>')});
+ achados=[...document.querySelectorAll('mark')];pos=achados.length-1;mostra()}
+function mostra(){achados.forEach(m=>m.classList.remove('at'));$('bn').textContent=achados.length?`${pos+1} de ${achados.length}`:'nada';if(achados[pos]){achados[pos].classList.add('at');achados[pos].scrollIntoView({block:'center'})}}
+$('lupa').onclick=()=>{$('busca').classList.add('on');$('bq').focus();marca($('bq').value)};
+$('bq').oninput=e=>marca(e.target.value);
+$('bc').onclick=()=>{if(achados.length){pos=(pos-1+achados.length)%achados.length;mostra()}};
+$('bb').onclick=()=>{if(achados.length){pos=(pos+1)%achados.length;mostra()}};
+$('bx').onclick=()=>{$('busca').classList.remove('on');marca('')};
+</script>
+</body></html>
