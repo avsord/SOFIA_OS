@@ -4,10 +4,13 @@
 import React from 'react';
 import {Image,Text,type TextStyle} from 'react-native';
 
-export const isImageIcon=(v:unknown):boolean=>typeof v==='string'&&/^(https?:\/\/\S+|data:image\/[a-z+.-]+;base64,)/i.test(v.trim());
+// também aceita endereço de imagem sem "https://" (ex.: emojis.slackmojis.com/.../claude.png)
+const BARE=/^[\w.-]+\.[a-z]{2,}\/\S+\.(png|gif|jpe?g|webp|svg|avif)(\?\S*)?$/i;
+export const isImageIcon=(v:unknown):boolean=>typeof v==='string'&&(/^(https?:\/\/\S+|data:image\/[a-z+.-]+;base64,)/i.test(v.trim())||BARE.test(v.trim()));
+const srcOf=(v:string)=>{const t=v.trim();return BARE.test(t)?'https://'+t:t;};
 
 export function PageGlyph({icon,size,style}:{icon:string;size:number;style?:TextStyle}){
- if(isImageIcon(icon)){const s=Math.round(size*1.05);return <Image accessibilityIgnoresInvertColors source={{uri:icon.trim()}} resizeMode="contain" style={{width:s,height:s}}/>;}
+ if(isImageIcon(icon)){const s=Math.round(size*1.05);return <Image accessibilityIgnoresInvertColors source={{uri:srcOf(icon)}} resizeMode="contain" style={{width:s,height:s}}/>;}
  return <Text style={[{fontSize:size},style]}>{icon}</Text>;
 }
 
